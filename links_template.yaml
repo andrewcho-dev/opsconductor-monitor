@@ -1,0 +1,54 @@
+links:
+  - name: "ciena-link-1"
+    friendly_name: "Main Optical Link 1"
+    source:
+      switch: "10.127.0.10"
+      port: 1001
+      port_name: "optical-1/1/1"
+    destination:
+      switch: "10.127.0.20"
+      port: 2001
+      port_name: "optical-2/1/1"
+    expected_power_range:
+      tx_min: -5.0
+      tx_max: 5.0
+      rx_min: -15.0
+      rx_max: -5.0
+    fiber_type: "single-mode"
+    distance_km: 10
+    active: true
+
+  - name: "ciena-link-2"
+    friendly_name: "Main Optical Link 2"
+    source:
+      switch: "10.127.0.10"
+      port: 1002
+      port_name: "optical-1/1/2"
+    destination:
+      switch: "10.127.0.30"
+      port: 3001
+      port_name: "optical-3/1/1"
+    expected_power_range:
+      tx_min: -5.0
+      tx_max: 5.0
+      rx_min: -15.0
+      rx_max: -5.0
+    fiber_type: "single-mode"
+    distance_km: 15
+    active: true
+
+monitoring:
+  poll_interval_seconds: 300
+  retention_days: 90
+  anomaly_threshold_db: 3.0
+  temperature_threshold_c: 70
+
+snmp:
+  community: "public"
+  timeout_seconds: 5
+  retries: 3
+
+alerts:
+  email_enabled: false
+  email_recipients: []
+  webhook_url: ""

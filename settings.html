@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Scan Settings</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 10px; 
+            font-size: 11px; 
+            background-color: #f5f5f5;
+        }
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            background-color: white;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 16px;
+            color: #333;
+        }
+        .back-link {
+            font-size: 11px;
+        }
+        .sections-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .section { 
+            padding: 10px; 
+            border: 1px solid #ddd; 
+            border-radius: 3px; 
+            background-color: #fafafa;
+        }
+        .section h3 { 
+            margin: 0 0 8px 0; 
+            color: #333; 
+            font-size: 13px;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 3px;
+        }
+        .form-group { 
+            margin: 5px 0; 
+            display: flex;
+            align-items: center;
+        }
+        .form-group label { 
+            display: inline-block; 
+            width: 120px; 
+            font-weight: bold; 
+            font-size: 10px;
+        }
+        .form-group input, .form-group select { 
+            padding: 2px 4px; 
+            border: 1px solid #ccc; 
+            border-radius: 2px; 
+            width: 100px; 
+            font-size: 10px;
+        }
+        .form-group input[type="text"].wide {
+            width: 150px;
+        }
+        .btn { 
+            background-color: #007bff; 
+            color: white; 
+            padding: 4px 8px; 
+            border: none; 
+            border-radius: 3px; 
+            cursor: pointer; 
+            margin: 2px; 
+            font-size: 10px;
+        }
+        .btn:hover { background-color: #0056b3; }
+        .btn-save { background-color: #28a745; }
+        .btn-save:hover { background-color: #218838; }
+        .btn-reset { background-color: #6c757d; }
+        .btn-reset:hover { background-color: #545b62; }
+        .status { 
+            margin: 8px 0; 
+            padding: 6px; 
+            border-radius: 3px; 
+            font-size: 10px;
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .actions {
+            text-align: center;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            background-color: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚙️ Scan Settings</h1>
+            <div class="back-link">
+                <a href="/">← Back to Scan Results</a>
+            </div>
+        </div>
+        
+        <div class="sections-grid">
+            <!-- Ping Settings -->
+            <div class="section">
+                <h3>🏓 Ping</h3>
+                <div class="form-group">
+                    <label for="pingCommand">Command:</label>
+                    <input type="text" id="pingCommand" value="ping">
+                </div>
+                <div class="form-group">
+                    <label for="pingCount">Count:</label>
+                    <input type="number" id="pingCount" value="1" min="1" max="10">
+                </div>
+                <div class="form-group">
+                    <label for="pingTimeout">Timeout (s):</label>
+                    <input type="number" id="pingTimeout" value="0.3" min="0.1" max="10" step="0.1">
+                </div>
+                <div class="form-group">
+                    <label for="onlineStatus">Online Text:</label>
+                    <input type="text" id="onlineStatus" value="online">
+                </div>
+                <div class="form-group">
+                    <label for="offlineStatus">Offline Text:</label>
+                    <input type="text" id="offlineStatus" value="offline">
+                </div>
+            </div>
+            
+            <!-- SNMP Settings -->
+            <div class="section">
+                <h3>🔍 SNMP</h3>
+                <div class="form-group">
+                    <label for="snmpVersion">Version:</label>
+                    <select id="snmpVersion">
+                        <option value="1">v1</option>
+                        <option value="2c" selected>v2c</option>
+                        <option value="3">v3</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="snmpCommunity">Community:</label>
+                    <input type="text" id="snmpCommunity" value="public">
+                </div>
+                <div class="form-group">
+                    <label for="snmpPort">Port:</label>
+                    <input type="number" id="snmpPort" value="161" min="1" max="65535">
+                </div>
+                <div class="form-group">
+                    <label for="snmpTimeout">Timeout (s):</label>
+                    <input type="number" id="snmpTimeout" value="1" min="0.1" max="10" step="0.1">
+                </div>
+                <div class="form-group">
+                    <label for="snmpSuccessStatus">Success Text:</label>
+                    <input type="text" id="snmpSuccessStatus" value="YES">
+                </div>
+                <div class="form-group">
+                    <label for="snmpFailStatus">Fail Text:</label>
+                    <input type="text" id="snmpFailStatus" value="NO">
+                </div>
+            </div>
+            
+            <!-- RDP Settings -->
+            <div class="section">
+                <h3>🖥️ RDP</h3>
+                <div class="form-group">
+                    <label for="rdpPort">Port:</label>
+                    <input type="text" id="rdpPort" value="3389">
+                </div>
+                <div class="form-group">
+                    <label for="rdpTimeout">Timeout:</label>
+                    <input type="text" id="rdpTimeout" value="3">
+                </div>
+                <div class="form-group">
+                    <label for="rdpSuccessStatus">Success Text:</label>
+                    <input type="text" id="rdpSuccessStatus" value="YES">
+                </div>
+                <div class="form-group">
+                    <label for="rdpFailStatus">Fail Text:</label>
+                    <input type="text" id="rdpFailStatus" value="NO">
+                </div>
+            </div>
+            
+            <!-- SSH Settings -->
+            <div class="section">
+                <h3>🔐 SSH</h3>
+                <div class="form-group">
+                    <label for="sshPort">Port:</label>
+                    <input type="text" id="sshPort" value="22">
+                </div>
+                <div class="form-group">
+                    <label for="sshTimeout">Timeout:</label>
+                    <input type="text" id="sshTimeout" value="3">
+                </div>
+                <div class="form-group">
+                    <label for="sshUsername">Username:</label>
+                    <input type="text" id="sshUsername" value="su">
+                </div>
+                <div class="form-group">
+                    <label for="sshPassword">Password:</label>
+                    <input type="password" id="sshPassword" value="wwp">
+                </div>
+                <div class="form-group">
+                    <label for="sshSuccessStatus">Success Text:</label>
+                    <input type="text" id="sshSuccessStatus" value="YES">
+                </div>
+                <div class="form-group">
+                    <label for="sshFailStatus">Fail Text:</label>
+                    <input type="text" id="sshFailStatus" value="NO">
+                </div>
+            </div>
+        </div>
+        
+        <!-- General Settings -->
+        <div class="section" style="margin-bottom: 15px;">
+            <h3>⚙️ General</h3>
+            <div style="display: flex; gap: 20px;">
+                <div class="form-group">
+                    <label for="maxThreads">Max Threads:</label>
+                    <input type="number" id="maxThreads" value="100" min="1" max="1000">
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label for="completionMessage">Completion Message:</label>
+                    <input type="text" id="completionMessage" value="Capability scan completed: {online}/{total} hosts online" class="wide">
+                </div>
+            </div>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div class="actions">
+            <button class="btn btn-save" onclick="saveSettings()">💾 Save</button>
+            <button class="btn btn-reset" onclick="resetToDefaults()">🔄 Reset</button>
+            <button class="btn" onclick="testSettings()">🧪 Test</button>
+            <button class="btn" onclick="exportSettings()">📤 Export</button>
+            <button class="btn" onclick="importSettings()">📥 Import</button>
+        </div>
+        
+        <!-- Status Display -->
+        <div id="status" class="status" style="display: none;"></div>
+    </div>
+
+    <script>
+        // Load current settings from server
+        async function loadSettings() {
+            try {
+                const response = await fetch('/get_settings');
+                const settings = await response.json();
+                
+                // Populate form fields
+                document.getElementById('pingCommand').value = settings.ping_command || 'ping';
+                document.getElementById('pingCount').value = settings.ping_count || '1';
+                document.getElementById('pingTimeout').value = settings.ping_timeout || '0.3';
+                document.getElementById('onlineStatus').value = settings.online_status || 'online';
+                document.getElementById('offlineStatus').value = settings.offline_status || 'offline';
+                
+                document.getElementById('snmpVersion').value = settings.snmp_version || '2c';
+                document.getElementById('snmpCommunity').value = settings.snmp_community || 'public';
+                document.getElementById('snmpPort').value = settings.snmp_port || '161';
+                document.getElementById('snmpTimeout').value = settings.snmp_timeout || '1';
+                document.getElementById('snmpSuccessStatus').value = settings.snmp_success_status || 'YES';
+                document.getElementById('snmpFailStatus').value = settings.snmp_fail_status || 'NO';
+                
+                document.getElementById('sshPort').value = settings.ssh_port || '22';
+                document.getElementById('sshTimeout').value = settings.ssh_timeout || '3';
+                document.getElementById('sshUsername').value = settings.ssh_username || 'admin';
+                document.getElementById('sshPassword').value = settings.ssh_password || 'admin';
+                document.getElementById('sshSuccessStatus').value = settings.ssh_success_status || 'YES';
+                document.getElementById('sshFailStatus').value = settings.ssh_fail_status || 'NO';
+                
+                document.getElementById('rdpPort').value = settings.rdp_port || '3389';
+                document.getElementById('rdpTimeout').value = settings.rdp_timeout || '3';
+                document.getElementById('rdpSuccessStatus').value = settings.rdp_success_status || 'YES';
+                document.getElementById('rdpFailStatus').value = settings.rdp_fail_status || 'NO';
+                
+                document.getElementById('maxThreads').value = settings.max_threads || '100';
+                document.getElementById('completionMessage').value = settings.completion_message || 'Capability scan completed: {online}/{total} hosts online';
+                
+            } catch (error) {
+                showStatus('Error loading settings: ' + error.message, 'error');
+            }
+        }
+        
+        // Save settings to server
+        async function saveSettings() {
+            const settings = {
+                ping_command: document.getElementById('pingCommand').value,
+                ping_count: document.getElementById('pingCount').value,
+                ping_timeout: document.getElementById('pingTimeout').value,
+                online_status: document.getElementById('onlineStatus').value,
+                offline_status: document.getElementById('offlineStatus').value,
+                
+                snmp_version: document.getElementById('snmpVersion').value,
+                snmp_community: document.getElementById('snmpCommunity').value,
+                snmp_port: document.getElementById('snmpPort').value,
+                snmp_timeout: document.getElementById('snmpTimeout').value,
+                snmp_success_status: document.getElementById('snmpSuccessStatus').value,
+                snmp_fail_status: document.getElementById('snmpFailStatus').value,
+                
+                ssh_port: document.getElementById('sshPort').value,
+                ssh_timeout: document.getElementById('sshTimeout').value,
+                ssh_username: document.getElementById('sshUsername').value,
+                ssh_password: document.getElementById('sshPassword').value,
+                ssh_success_status: document.getElementById('sshSuccessStatus').value,
+                ssh_fail_status: document.getElementById('sshFailStatus').value,
+                
+                rdp_port: document.getElementById('rdpPort').value,
+                rdp_timeout: document.getElementById('rdpTimeout').value,
+                rdp_success_status: document.getElementById('rdpSuccessStatus').value,
+                rdp_fail_status: document.getElementById('rdpFailStatus').value,
+                
+                max_threads: document.getElementById('maxThreads').value,
+                completion_message: document.getElementById('completionMessage').value
+            };
+            
+            try {
+                const response = await fetch('/save_settings', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(settings)
+                });
+                
+                const result = await response.json();
+                if (result.status === 'success') {
+                    showStatus('Settings saved successfully!', 'success');
+                } else {
+                    showStatus('Error saving settings: ' + result.message, 'error');
+                }
+            } catch (error) {
+                showStatus('Error saving settings: ' + error.message, 'error');
+            }
+        }
+        
+        // Reset to default values
+        function resetToDefaults() {
+            if (confirm('Reset all settings to default values?')) {
+                document.getElementById('pingCommand').value = 'ping';
+                document.getElementById('pingCount').value = '1';
+                document.getElementById('pingTimeout').value = '0.3';
+                document.getElementById('onlineStatus').value = 'online';
+                document.getElementById('offlineStatus').value = 'offline';
+                
+                document.getElementById('snmpVersion').value = '2c';
+                document.getElementById('snmpCommunity').value = 'public';
+                document.getElementById('snmpPort').value = '161';
+                document.getElementById('snmpTimeout').value = '1';
+                document.getElementById('snmpSuccessStatus').value = 'YES';
+                document.getElementById('snmpFailStatus').value = 'NO';
+                
+                document.getElementById('sshPort').value = '22';
+                document.getElementById('sshTimeout').value = '3';
+                document.getElementById('sshUsername').value = 'admin';
+                document.getElementById('sshPassword').value = 'admin';
+                document.getElementById('sshSuccessStatus').value = 'YES';
+                document.getElementById('sshFailStatus').value = 'NO';
+                
+                document.getElementById('rdpPort').value = '3389';
+                document.getElementById('rdpTimeout').value = '3';
+                document.getElementById('rdpSuccessStatus').value = 'YES';
+                document.getElementById('rdpFailStatus').value = 'NO';
+                
+                document.getElementById('maxThreads').value = '100';
+                document.getElementById('completionMessage').value = 'Capability scan completed: {online}/{total} hosts online';
+                
+                showStatus('Settings reset to defaults. Click "Save" to apply.', 'success');
+            }
+        }
+        
+        // Test current settings
+        async function testSettings() {
+            showStatus('Testing settings...', 'success');
+            try {
+                const response = await fetch('/test_settings', {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                if (result.status === 'success') {
+                    showStatus('Settings test passed! All tools are accessible.', 'success');
+                } else {
+                    showStatus('Settings test failed: ' + result.message, 'error');
+                }
+            } catch (error) {
+                showStatus('Error testing settings: ' + error.message, 'error');
+            }
+        }
+        
+        // Export settings to JSON file
+        function exportSettings() {
+            const settings = {
+                ping_command: document.getElementById('pingCommand').value,
+                ping_count: document.getElementById('pingCount').value,
+                ping_timeout: document.getElementById('pingTimeout').value,
+                online_status: document.getElementById('onlineStatus').value,
+                offline_status: document.getElementById('offlineStatus').value,
+                
+                snmp_version: document.getElementById('snmpVersion').value,
+                snmp_community: document.getElementById('snmpCommunity').value,
+                snmp_port: document.getElementById('snmpPort').value,
+                snmp_timeout: document.getElementById('snmpTimeout').value,
+                snmp_success_status: document.getElementById('snmpSuccessStatus').value,
+                snmp_fail_status: document.getElementById('snmpFailStatus').value,
+                
+                ssh_port: document.getElementById('sshPort').value,
+                ssh_timeout: document.getElementById('sshTimeout').value,
+                ssh_username: document.getElementById('sshUsername').value,
+                ssh_password: document.getElementById('sshPassword').value,
+                ssh_success_status: document.getElementById('sshSuccessStatus').value,
+                ssh_fail_status: document.getElementById('sshFailStatus').value,
+                
+                rdp_port: document.getElementById('rdpPort').value,
+                rdp_timeout: document.getElementById('rdpTimeout').value,
+                rdp_success_status: document.getElementById('rdpSuccessStatus').value,
+                rdp_fail_status: document.getElementById('rdpFailStatus').value,
+                
+                max_threads: document.getElementById('maxThreads').value,
+                completion_message: document.getElementById('completionMessage').value
+            };
+            
+            const blob = new Blob([JSON.stringify(settings, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'scan_settings.json';
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            showStatus('Settings exported successfully!', 'success');
+        }
+        
+        // Import settings from JSON file
+        function importSettings() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = function(event) {
+                const file = event.target.files[0];
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const settings = JSON.parse(e.target.result);
+                        
+                        // Populate form fields
+                        document.getElementById('pingCommand').value = settings.ping_command || 'ping';
+                        document.getElementById('pingCount').value = settings.ping_count || '1';
+                        document.getElementById('pingTimeout').value = settings.ping_timeout || '0.3';
+                        document.getElementById('onlineStatus').value = settings.online_status || 'online';
+                        document.getElementById('offlineStatus').value = settings.offline_status || 'offline';
+                        
+                        document.getElementById('snmpVersion').value = settings.snmp_version || '2c';
+                        document.getElementById('snmpCommunity').value = settings.snmp_community || 'public';
+                        document.getElementById('snmpPort').value = settings.snmp_port || '161';
+                        document.getElementById('snmpTimeout').value = settings.snmp_timeout || '1';
+                        document.getElementById('snmpSuccessStatus').value = settings.snmp_success_status || 'YES';
+                        document.getElementById('snmpFailStatus').value = settings.snmp_fail_status || 'NO';
+                        
+                        document.getElementById('sshPort').value = settings.ssh_port || '22';
+                        document.getElementById('sshTimeout').value = settings.ssh_timeout || '3';
+                        document.getElementById('sshUsername').value = settings.ssh_username || 'admin';
+                        document.getElementById('sshPassword').value = settings.ssh_password || 'admin';
+                        document.getElementById('sshSuccessStatus').value = settings.ssh_success_status || 'YES';
+                        document.getElementById('sshFailStatus').value = settings.ssh_fail_status || 'NO';
+                        
+                        document.getElementById('maxThreads').value = settings.max_threads || '100';
+                        document.getElementById('completionMessage').value = settings.completion_message || 'Capability scan completed: {online}/{total} hosts online';
+                        
+                        showStatus('Settings imported successfully! Click "Save" to apply.', 'success');
+                    } catch (error) {
+                        showStatus('Error importing settings: ' + error.message, 'error');
+                    }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
+        }
+        
+        // Show status message
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = 'status ' + type;
+            statusDiv.style.display = 'block';
+            
+            // Hide after 3 seconds
+            setTimeout(() => {
+                statusDiv.style.display = 'none';
+            }, 3000);
+        }
+        
+        // Load settings on page load
+        window.onload = function() {
+            loadSettings();
+        };
+    </script>
+</body>
+</html>

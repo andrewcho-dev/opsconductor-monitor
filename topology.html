@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Network Topology</title>
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            width: 100%;
+        }
+        .header {
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #ddd;
+            flex-shrink: 0;
+        }
+        .header h1 {
+            margin: 0;
+        }
+        .content {
+            flex: 1;
+            position: relative;
+            min-height: 500px;
+        }
+        #network {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+        }
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 18px;
+            z-index: 10;
+        }
+    </style>
+    <script src="https://unpkg.com/vis-network@9.1.2/dist/vis-network.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <button onclick="window.location.href='/'" style="padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">← Back to Main</button>
+                <div>
+                    <h1 style="margin: 0;">Network Topology</h1>
+                    <p style="margin: 5px 0 0 0;">Visualizing LLDP connections between selected devices</p>
+                </div>
+            </div>
+        </div>
+        <div class="content">
+            <div id="network"></div>
+            <div id="loading" class="loading">Loading topology...</div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const ipsParam = urlParams.get('ips');
+            let ipList = [];
+            try {
+                ipList = JSON.parse(decodeURIComponent(ipsParam));
+            } catch (e) {
+                alert('Invalid IP list');
+                return;
+            }
+
+            if (ipList.length === 0) {
+                document.getElementById('loading').textContent = 'No devices selected';
+                return;
+            }
+
+            // Fetch topology data
+            fetch('/topology_data', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ip_list: ipList })
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('loading').style.display = 'none';
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
+                }
+                renderNetwork(data.nodes, data.edges);
+            })
+            .catch(error => {
+                document.getElementById('loading').textContent = 'Error loading topology';
+                console.error('Error:', error);
+            });
+        });
+
+        function renderNetwork(nodes, edges) {
+            const container = document.getElementById('network');
+            
+            const data = {
+                nodes: new vis.DataSet(nodes),
+                edges: new vis.DataSet(edges)
+            };
+
+            const options = {
+                layout: {
+                    randomSeed: 2
+                },
+                nodes: {
+                    shape: 'box',
+                    size: 30,
+                    font: {
+                        size: 14,
+                        color: '#000'
+                    },
+                    borderWidth: 2,
+                    shadow: true
+                },
+                edges: {
+                    width: 2,
+                    shadow: true,
+                    smooth: false,
+                    arrows: {
+                        to: { enabled: false },
+                        from: { enabled: false }
+                    },
+                    font: {
+                        size: 12,
+                        align: 'middle'
+                    }
+                },
+                physics: {
+                    enabled: true,
+                    barnesHut: {
+                        gravitationalConstant: -5000,
+                        centralGravity: 0.1,
+                        springLength: 200,
+                        springConstant: 0.01,
+                        damping: 0.5,
+                        avoidOverlap: 1
+                    },
+                    stabilization: {
+                        enabled: true,
+                        iterations: 2000,
+                        updateInterval: 25,
+                        fit: true
+                    }
+                },
+                interaction: {
+                    hover: true,
+                    tooltipDelay: 300,
+                    dragNodes: true,
+                    dragView: true,
+                    zoomView: true
+                }
+            };
+
+            const network = new vis.Network(container, data, options);
+            
+            // Create tooltip element
+            const tooltip = document.createElement('div');
+            tooltip.id = 'edge-tooltip';
+            tooltip.style.cssText = 'position:absolute;background:#333;color:#fff;padding:8px 12px;border-radius:4px;font-size:13px;pointer-events:none;display:none;white-space:pre-line;z-index:1000;max-width:400px;';
+            document.body.appendChild(tooltip);
+            
+            // Show tooltip on edge hover
+            network.on('hoverEdge', function(params) {
+                const edgeId = params.edge;
+                const edge = data.edges.get(edgeId);
+                if (edge && edge.title) {
+                    tooltip.textContent = edge.title;
+                    tooltip.style.display = 'block';
+                }
+            });
+            
+            // Hide tooltip when not hovering
+            network.on('blurEdge', function() {
+                tooltip.style.display = 'none';
+            });
+            
+            // Move tooltip with mouse
+            container.addEventListener('mousemove', function(e) {
+                if (tooltip.style.display === 'block') {
+                    tooltip.style.left = (e.pageX + 15) + 'px';
+                    tooltip.style.top = (e.pageY + 15) + 'px';
+                }
+            });
+        }
+    </script>
+</body>
+</html>

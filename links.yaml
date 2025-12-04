@@ -1,0 +1,92 @@
+links:
+  - name: "doc-sdnsw1-port-5-to-msf-sdnsw1"
+    friendly_name: "doc-sdnsw1:5 → msf-sdnsw1:21"
+    source:
+      switch: "10.127.0.200"
+      port: 5
+      port_name: "doc-sdnsw1 Port 5"
+    destination:
+      switch: "10.127.0.221"
+      port: 21
+      port_name: "msf-sdnsw1 Port 21"
+    expected_power_range:
+      tx_min: -10.0
+      tx_max: 10.0
+      rx_min: -20.0
+      rx_max: -5.0
+    fiber_type: "single-mode"
+    distance_km: 10
+    active: true
+
+  - name: "doc-sdnsw1-port-18-to-vss-aggsw01"
+    friendly_name: "doc-sdnsw1:18 → vss-aggsw01:eth-0-2"
+    source:
+      switch: "10.127.0.200"
+      port: 18
+      port_name: "doc-sdnsw1 Port 18"
+    destination:
+      switch: "10.127.0.29"
+      port: "eth-0-2"
+      port_name: "vss-aggsw01 eth-0-2"
+    expected_power_range:
+      tx_min: -10.0
+      tx_max: 10.0
+      rx_min: -20.0
+      rx_max: -5.0
+    fiber_type: "single-mode"
+    distance_km: 15
+    active: true
+
+  - name: "pom-sdnsw1-port-21-to-moc-sdnsw1"
+    friendly_name: "pom-sdnsw1:21 → moc-sdnsw1:2"
+    source:
+      switch: "10.127.0.138"
+      port: 21
+      port_name: "pom-sdnsw1 Port 21"
+    destination:
+      switch: "10.127.0.104"
+      port: 2
+      port_name: "moc-sdnsw1 Port 2"
+    expected_power_range:
+      tx_min: -10.0
+      tx_max: 10.0
+      rx_min: -20.0
+      rx_max: -5.0
+    fiber_type: "single-mode"
+    distance_km: 10
+    active: true
+
+  - name: "pom-sdnsw1-port-22-to-doc-sdnsw1"
+    friendly_name: "pom-sdnsw1:22 → doc-sdnsw1:1"
+    source:
+      switch: "10.127.0.138"
+      port: 22
+      port_name: "pom-sdnsw1 Port 22"
+    destination:
+      switch: "10.127.0.200"
+      port: 1
+      port_name: "doc-sdnsw1 Port 1"
+    expected_power_range:
+      tx_min: -10.0
+      tx_max: 10.0
+      rx_min: -20.0
+      rx_max: -5.0
+    fiber_type: "single-mode"
+    distance_km: 10
+    active: true
+
+monitoring:
+  poll_interval_seconds: 300
+  retention_days: 90
+  anomaly_threshold_db: 3.0
+  temperature_threshold_c: 70
+
+snmp:
+  community: "public"
+  timeout_seconds: 5
+  retries: 3
+
+alerts:
+  email_enabled: false
+  email_recipients: []
+  webhook_url: ""

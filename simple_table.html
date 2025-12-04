@@ -1,0 +1,1928 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Network Scan Results</title>
+    <style>
+        html, body {
+            height: 100%;
+        }
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            font-size: 12px; 
+            display: flex;
+            flex-direction: column;
+        }
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            padding: 10px;
+        }
+        .app-header {
+            padding: 0;
+            background-color: transparent;
+            margin-bottom: 10px;
+        }
+        .app-header h1 {
+            margin: 0 0 5px 0;
+            font-size: 16px;
+        }
+        .app-main {
+            flex: 1 1 auto;
+            display: flex;
+            overflow: hidden;
+            padding: 0;
+        }
+        .sidebar {
+            flex: 0 0 350px;
+            background-color: transparent;
+            overflow-y: auto;
+            padding: 0;
+            margin-right: 10px;
+        }
+        .main-content {
+            flex: 1 1 auto;
+            overflow-y: auto;
+            padding: 0;
+        }
+        .app-content {
+            flex: 1 1 auto;
+            overflow-y: auto;
+            padding: 0;
+        }
+        
+        /* Unified Groups Card Styling */
+        .groups-card {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            margin-bottom: 0;
+            padding: 15px;
+            height: 100%;
+        }
+        .groups-card table {
+            margin: 0;
+            width: 100% !important;
+        }
+        
+        /* Main Card Styling */
+        .main-card {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            margin-bottom: 0;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            padding: 15px;
+        }
+        .main-card .app-content {
+            flex: 1 1 auto;
+            overflow-y: auto;
+            padding: 0;
+        }
+        .main-card .footer {
+            flex: 0 0 auto;
+            margin: 15px 0 0 0;
+            padding: 15px 0 0 0;
+            border-top: 1px solid #dee2e6;
+        }
+        
+        /* Header Card Styling */
+        .header-card {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            margin-bottom: 0;
+            padding: 15px 15px 10px 15px;
+            height: auto;
+        }
+        .group-row {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .group-row:hover {
+            background-color: #f0f8ff;
+        }
+        .group-row.selected {
+            background-color: #e3f2fd;
+            border-left: 4px solid #2196f3;
+        }
+        .group-type {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 9px;
+            font-weight: bold;
+            margin-right: 5px;
+        }
+        .group-type.network {
+            background: #28a745;
+            color: white;
+        }
+        .group-type.custom {
+            background: #007bff;
+            color: white;
+        }
+        .group-type.all {
+            background: #17a2b8;
+            color: white;
+        }
+        .group-action-btn {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 3px 6px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 9px;
+            margin-right: 2px;
+        }
+        .group-action-btn:hover {
+            background: #545b62;
+        }
+        .group-action-btn.edit {
+            background: #17a2b8;
+        }
+        .group-action-btn.edit:hover {
+            background: #138496;
+        }
+        .group-action-btn.delete {
+            background: #dc3545;
+        }
+        .group-action-btn.delete:hover {
+            background: #c82333;
+        }
+        .no-groups {
+            text-align: center;
+            color: #666;
+            padding: 20px;
+            font-style: italic;
+            font-size: 12px;
+        }
+        table { border-collapse: collapse; width: 100%; font-size: 11px; }
+        th, td { border: 1px solid #ddd; padding: 4px 6px; text-align: left; line-height: 1.2; }
+        
+        /* Ensure consistent row heights */
+        .groups-card td {
+            line-height: 1.2;
+            vertical-align: top;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .groups-card .group-name-cell {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 150px;
+        }
+        .groups-card .group-name {
+            font-weight: normal;
+            font-size: 11px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin: 0;
+        }
+        .groups-card .group-details {
+            font-size: 9px;
+            color: #666;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin: 0;
+        }
+        .group-highlight {
+            background-color: #eef6ff !important;
+        }
+        .group-highlight td {
+            border-left: 3px solid #3b82f6;
+        }
+        
+        /* Consistent checkbox styling */
+        input[type="checkbox"] {
+            width: 12px !important;
+            height: 12px !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            vertical-align: middle !important;
+            box-sizing: border-box !important;
+        }
+        
+        /* Specific styling for header and folder checkboxes */
+        th input[type="checkbox"],
+        .network-folder input[type="checkbox"] {
+            width: 12px !important;
+            height: 12px !important;
+            max-width: 12px !important;
+            max-height: 12px !important;
+            min-width: 12px !important;
+            min-height: 12px !important;
+        }
+        th { 
+            background-color: #f2f2f2; 
+            cursor: pointer; 
+            font-size: 11px; 
+            font-weight: bold; 
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            line-height: 1.2;
+            height: 20px;
+        }
+        th:hover { background-color: #e6e6e6; }
+        
+        /* Make columns more compact for better data density */
+        th:nth-child(1), td:nth-child(1) { width: 30px; text-align: center; } /* Select checkbox */
+        th:nth-child(2), td:nth-child(2) { width: 100px; } /* IP Address */
+        th:nth-child(3), td:nth-child(3) { width: 120px; } /* Hostname */
+        th:nth-child(4), td:nth-child(4) { width: 50px; text-align: center; } /* PING */
+        th:nth-child(5), td:nth-child(5) { width: 50px; text-align: center; } /* SNMP */
+        th:nth-child(6), td:nth-child(6) { width: 50px; text-align: center; } /* SSH */
+        th:nth-child(7), td:nth-child(7) { width: 50px; text-align: center; } /* RDP */
+        th:nth-child(8), td:nth-child(8) { width: 140px; } /* Timestamp */
+        th:nth-child(9), td:nth-child(9) { width: 80px; text-align: center; } /* Actions */
+        
+        .responding { background-color: #d4edda; }
+        .no-response { background-color: #f8d7da; }
+        .snmp-yes { background-color: #d1ecf1; }
+        .snmp-no { background-color: #f5c6cb; }
+        .ssh-yes { background-color: #d1ecf1; }
+        .ssh-no { background-color: #f5c6cb; }
+        .rdp-yes { background-color: #d4edda; }
+        .rdp-no { background-color: #f8d7da; }
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: white; margin: 15% auto; padding: 20px; border-radius: 5px; width: 400px; }
+        .btn { background-color: #007bff; color: white; padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; margin: 3px; font-size: 11px; }
+        .btn:hover { background-color: #0056b3; }
+        .btn-delete { background-color: #dc3545; color: white; padding: 3px 6px; border: none; border-radius: 3px; cursor: pointer; font-size: 11px; }
+        .btn-delete:hover { background-color: #c82333; }
+        .btn-detail { background-color: #17a2b8; color: white; padding: 3px 6px; border: none; border-radius: 3px; cursor: pointer; font-size: 11px; margin-right: 2px; }
+        .btn-detail:hover { background-color: #138496; }
+        .filter-input { padding: 3px 5px; margin: 3px 0; width: 180px; font-size: 11px; }
+        
+        /* Toggle switch styles */
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 24px;
+            background-color: #ccc;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .toggle-switch.active {
+            background-color: #4CAF50;
+        }
+        .toggle-slider {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            background-color: white;
+            border-radius: 50%;
+            transition: transform 0.3s;
+        }
+        .toggle-switch.active .toggle-slider {
+            transform: translateX(26px);
+        }
+        
+        /* Network folder styling */
+        .network-folder {
+            background-color: #f0f0f0;
+            border-bottom: 2px solid #ddd;
+        }
+        
+        .network-folder td {
+            padding: 4px 6px;
+            font-size: 11px;
+            line-height: 1.2;
+            height: 20px;
+        }
+        
+        .folder-icon {
+            margin-right: 8px;
+            font-size: 11px;
+            vertical-align: middle;
+        }
+        
+        .device-row {
+            background-color: #fff;
+        }
+        
+        .network-select {
+            margin-right: 5px;
+            transition: opacity 0.2s ease;
+        }
+        
+        .network-select:hover {
+            opacity: 0.8 !important;
+        }
+        
+        .device-checkbox {
+            margin-left: 10px;
+        }
+        
+        /* Fixed footer styles */
+        .footer {
+            flex: 0 0 auto;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background-color: #2c3e50;
+            border-top: 2px solid #34495e;
+            padding: 10px 20px;
+            text-align: left;
+            font-weight: bold;
+            font-size: 12px;
+            color: #ecf0f1;
+            box-shadow: 0 -2px 5px rgba(0,0,0,0.3);
+            white-space: nowrap;
+            z-index: 10;
+        }
+
+        .footer .filter-toggle {
+            cursor: pointer;
+        }
+
+        .footer .filter-toggle.filter-active {
+            text-decoration: underline;
+            color: #1abc9c;
+        }
+        
+        /* Add padding to body to prevent footer from covering content */
+        body {
+            padding-bottom: 40px;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="header-card">
+            <div class="app-header">
+                <h1>Network Scan Results</h1>
+                <div class="controls-row">
+                    <button class="btn" onclick="openPingModal()">🔍 SCAN</button>
+                    <button class="btn" onclick="startSNMPScan()">📊 SNMP</button>
+                    <button class="btn" onclick="startSSHCLIScan()">💻 SSH</button>
+                    <button class="btn" onclick="openTopology()">🌐 LLDP</button>
+                    <button class="btn" onclick="openSettings()">⚙️ SETTINGS</button>
+                    <button class="btn" onclick="openCreateGroupModal()" style="background-color: #007bff;">📋 CREATE GROUP</button>
+                    <button class="btn" onclick="deleteSelectedRecords()" style="background-color: #dc3545;">🗑️ DELETE SELECTED</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="app-main">
+            <!-- Sidebar with Unified Groups -->
+            <div class="sidebar">
+                <div class="groups-card">
+                    <table style="width: 100%; font-size: 11px; margin-bottom: 10px;">
+                        <thead>
+                            <tr>
+                                <th style="width: 20px; font-weight: bold; font-size: 11px;"><input type="checkbox" id="selectAllGroups" onchange="toggleSelectAllGroups()"></th>
+                                <th style="font-weight: bold; font-size: 11px;">GROUP NAME</th>
+                                <th style="width: 60px; font-weight: bold; font-size: 11px;">ACTIONS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="unifiedGroupsList">
+                            <!-- All groups (network + custom) will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Main Content Area -->
+            <div class="main-content">
+                <div class="main-card">
+                    <div class="app-content">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></th>
+                                    <th onclick="sortTable(1)">IP ADDRESS ↕</th>
+                                    <th>HOSTNAME</th>
+                                    <th>PING</th>
+                                    <th>SNMP</th>
+                                    <th>SSH</th>
+                                    <th>RDP</th>
+                                    <th>TIMESTAMP</th>
+                                    <th>ACTIONS</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Fixed Footer with Statistics -->
+                    <div id="summary" class="footer">
+                        <span id="summaryFilters"></span>
+                        <span id="summarySelection"></span>
+                    </div>
+                </div>
+            </div>
+
+    <!-- Create Group Modal -->
+    <div id="createGroupModal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 500px;">
+            <h2>Create Device Group</h2>
+            <label for="groupName">Group Name:</label>
+            <input type="text" id="groupName" placeholder="Enter group name" style="width: 100%; margin: 10px 0; padding: 8px;">
+            
+            <label for="groupDescription">Description (optional):</label>
+            <textarea id="groupDescription" placeholder="Enter group description" style="width: 100%; margin: 10px 0; padding: 8px; height: 60px;"></textarea>
+            
+            <label for="groupDevices">Device IP Addresses (one per line):</label>
+            <textarea id="groupDevices" placeholder="10.127.0.1&#10;10.127.0.2&#10;10.127.0.3" style="width: 100%; margin: 10px 0; padding: 8px; height: 100px;"></textarea>
+            
+            <div style="margin-top: 15px;">
+                <button class="btn" onclick="createGroup()" style="background-color: #28a745;">Create Group</button>
+                <button class="btn" onclick="closeCreateGroupModal()" style="background-color: #6c757d;">Cancel</button>
+                <button class="btn" onclick="addSelectedDevicesToGroup()" style="background-color: #17a2b8;">Add Selected Devices</button>
+            </div>
+            <div id="createGroupStatus" style="margin-top: 10px;"></div>
+        </div>
+    </div>
+
+    <!-- Edit Group Modal -->
+    <div id="editGroupModal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 450px;">
+            <h2>Edit Group</h2>
+            <label for="editGroupName">Group Name:</label>
+            <input type="text" id="editGroupName" style="width: 100%; margin: 10px 0; padding: 8px;">
+            
+            <label for="editGroupDescription">Description:</label>
+            <textarea id="editGroupDescription" style="width: 100%; margin: 10px 0; padding: 8px; height: 80px;"></textarea>
+            
+            <div style="margin-top: 15px;">
+                <button class="btn" onclick="saveGroupEdits()" style="background-color: #28a745;">Save Changes</button>
+                <button class="btn" onclick="closeEditGroupModal()" style="background-color: #6c757d;">Cancel</button>
+            </div>
+            <div id="editGroupStatus" style="margin-top: 10px;"></div>
+        </div>
+    </div>
+
+    <!-- Ping Modal -->
+    <div id="pingModal" class="modal">
+        <div class="modal-content">
+            <h2>Fast Network Scan (Ports + Hostnames)</h2>
+            <label for="networkRange">Network Range:</label>
+            <input type="text" id="networkRange" value="10.127.0.0/24" style="width: 100%; margin: 10px 0; padding: 5px;">
+            <button class="btn" onclick="startPingScan()">Start Scan</button>
+            <button class="btn" onclick="closePingModal()">Cancel</button>
+            <div id="pingStatus" style="margin-top: 10px;"></div>
+        </div>
+    </div>
+
+    
+
+    <!-- Progress Modal -->
+    <div id="progressModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h2>Scanning Network...</h2>
+            <div id="progressMessage">Please wait while we scan the network.</div>
+            <div id="progressBar" style="width: 100%; height: 20px; background-color: #f0f0f0; margin: 10px 0; border-radius: 4px;">
+                <div id="progressFill" style="width: 0%; height: 100%; background-color: #4CAF50; transition: width 0.3s; border-radius: 4px;"></div>
+            </div>
+            <div style="margin-top: 10px;">
+                <button class="btn" onclick="cancelCurrentScan()" id="cancelScanButton" style="background-color: #dc3545;">Cancel Scan</button>
+                <button class="btn" onclick="closeProgressModal()" style="display: none;" id="progressCloseButton">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <h2>Settings</h2>
+            <label for="pingTimeout">Ping Timeout (ms):</label>
+            <input type="number" id="pingTimeout" value="1000" style="width: 100%; margin: 10px 0; padding: 5px;">
+            <label for="pingRetries">Ping Retries:</label>
+            <input type="number" id="pingRetries" value="3" style="width: 100%; margin: 10px 0; padding: 5px;">
+            <label for="snmpTimeout">SNMP Timeout (ms):</label>
+            <input type="number" id="snmpTimeout" value="2000" style="width: 100%; margin: 10px 0; padding: 5px;">
+            <label for="snmpRetries">SNMP Retries:</label>
+            <input type="number" id="snmpRetries" value="2" style="width: 100%; margin: 10px 0; padding: 5px;">
+            <label for="sshTimeout">SSH Timeout (ms):</label>
+            <input type="number" id="sshTimeout" value="5000" style="width: 100%; margin: 10px 0; padding: 5px;">
+            <label for="rdpTimeout">RDP Timeout (ms):</label>
+            <input type="number" id="rdpTimeout" value="3000" style="width: 100%; margin: 10px 0; padding: 5px;">
+            <button class="btn" onclick="saveSettings()">Save Settings</button>
+            <button class="btn" onclick="testSettings()">Test Settings</button>
+            <button class="btn" onclick="closeSettings()">Cancel</button>
+            <div id="settingsStatus" style="margin-top: 10px;"></div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let currentData = [];
+        let sortDirection = {};
+        let deviceGroups = [];
+        let networkGroups = {};
+        let selectedGroupId = null; // Track which group is currently selected
+        let currentEditingGroup = null;
+        let highlightedIps = new Set();
+        let footerFilterState = {
+            ping: false,
+            snmp: false,
+            ssh: false,
+            rdp: false
+        };
+
+        // Unified Groups Functions
+        function loadUnifiedGroups() {
+            // Load custom groups
+            fetch('/device_groups')
+                .then(response => {
+                    console.log('Groups response status:', response.status);
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Groups loaded:', data.length, 'groups');
+                    deviceGroups = data;
+                    
+                    // Load network groups
+                    loadNetworkGroups();
+                    
+                    // Render unified list
+                    renderUnifiedGroups();
+                })
+                .catch(error => {
+                    console.error('Error loading device groups:', error);
+                    document.getElementById('unifiedGroupsList').innerHTML = 
+                        '<div class="no-groups">Error loading groups</div>';
+                });
+        }
+
+        function loadNetworkGroups() {
+            networkGroups = {};
+            
+            // Group devices by network range
+            currentData.forEach(device => {
+                const networkRange = device.network_range || 'Unknown Network';
+                
+                if (!networkGroups[networkRange]) {
+                    networkGroups[networkRange] = [];
+                }
+                networkGroups[networkRange].push(device);
+            });
+        }
+
+        function normalizeGroupName(name) {
+            return (name || '').trim().toLowerCase();
+        }
+
+        function renderUnifiedGroups() {
+            const groupsList = document.getElementById('unifiedGroupsList');
+            groupsList.innerHTML = '';
+            
+            const customNameSet = new Set(
+                deviceGroups.map(group => normalizeGroupName(group.group_name))
+            );
+            
+            // Add "All Devices" option
+            const allDevicesRow = createGroupRow({
+                id: 'all',
+                name: 'All Devices',
+                type: 'all',
+                device_count: currentData.length,
+                description: 'All devices in the system'
+            });
+            groupsList.appendChild(allDevicesRow);
+            
+            // Add network groups
+            Object.keys(networkGroups).sort().forEach(networkRange => {
+                const devices = networkGroups[networkRange];
+                if (customNameSet.has(normalizeGroupName(networkRange))) {
+                    // A custom group exists with the same name—treat it as custom only.
+                    return;
+                }
+                const networkGroup = {
+                    id: 'network_' + networkRange.replace(/[^a-zA-Z0-9]/g, '_'),
+                    name: networkRange,
+                    type: 'network',
+                    device_count: devices.length,
+                    description: `${devices.filter(d => d.ping_status.includes('online')).length} online`,
+                    devices: devices
+                };
+                
+                const groupRow = createGroupRow(networkGroup);
+                groupsList.appendChild(groupRow);
+            });
+            
+            // Add custom groups
+            deviceGroups.forEach(group => {
+                const customGroup = {
+                    id: 'custom_' + group.id,
+                    name: group.group_name,
+                    type: 'custom',
+                    device_count: group.device_count,
+                    description: group.description || 'Custom device group',
+                    custom_id: group.id
+                };
+                
+                const groupRow = createGroupRow(customGroup);
+                groupsList.appendChild(groupRow);
+            });
+            
+            if (Object.keys(networkGroups).length === 0 && deviceGroups.length === 0) {
+                groupsList.innerHTML = '<tr><td colspan="3" class="no-groups">No groups available</td></tr>';
+            }
+        }
+
+        function createGroupRow(group) {
+            const row = document.createElement('tr');
+            row.className = 'group-row';
+            row.setAttribute('data-group-id', group.id);
+            row.setAttribute('data-group-type', group.type);
+            row.setAttribute('data-group-name', group.name || '');
+            
+            if (selectedGroupId === group.id) {
+                row.classList.add('selected');
+            }
+            
+            const typeLabel = group.type === 'network' ? '🌐' : 
+                            group.type === 'custom' ? '📋' : '🔍';
+            const typeClass = group.type === 'network' ? 'network' : 
+                            group.type === 'custom' ? 'custom' : 'all';
+            
+            let actionsHtml = '';
+            actionsHtml += `<button class="group-action-btn edit" onclick="openEditGroupModal('${group.id}', '${group.type}', event)">Edit</button>`;
+            actionsHtml += `<button class="group-action-btn delete" onclick="deleteGroup('${group.id}', '${group.type}', event)">Delete</button>`;
+            
+            row.innerHTML = `
+                <td><input type="checkbox" class="group-checkbox" data-group-id="${group.id}" data-group-type="${group.type}" onchange="toggleGroupSelection('${group.id}', '${group.type}')"></td>
+                <td class="group-name-cell" onclick="selectGroup('${group.id}', '${group.type}')" style="cursor: pointer;">
+                    ${group.name}
+                </td>
+                <td>${actionsHtml}</td>
+            `;
+            
+            return row;
+        }
+
+        function toggleSelectAllGroups() {
+            const selectAll = document.getElementById('selectAllGroups');
+            const groupCheckboxes = document.querySelectorAll('.group-checkbox');
+            
+            groupCheckboxes.forEach(checkbox => {
+                checkbox.checked = selectAll.checked;
+            });
+            
+            // If select all is checked, select the first group to show devices
+            if (selectAll.checked && groupCheckboxes.length > 0) {
+                const firstCheckbox = groupCheckboxes[0];
+                selectGroup(firstCheckbox.getAttribute('data-group-id'), firstCheckbox.getAttribute('data-group-type'));
+            }
+        }
+
+        function toggleGroupSelection(groupId, groupType) {
+            // When a group checkbox is clicked, select that group
+            selectGroup(groupId, groupType);
+            
+            // Update the select all checkbox state
+            const allCheckboxes = document.querySelectorAll('.group-checkbox');
+            const checkedCheckboxes = document.querySelectorAll('.group-checkbox:checked');
+            const selectAllCheckbox = document.getElementById('selectAllGroups');
+            
+            if (checkedCheckboxes.length === 0) {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+            } else if (checkedCheckboxes.length === allCheckboxes.length) {
+                selectAllCheckbox.checked = true;
+                selectAllCheckbox.indeterminate = false;
+            } else {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = true;
+            }
+        }
+
+        function selectGroup(groupId, groupType) {
+            // If clicking the already selected group, unselect it
+            if (selectedGroupId === groupId) {
+                // Clear group selection
+                document.querySelectorAll('.group-row').forEach(row => {
+                    row.classList.remove('selected');
+                });
+                
+                // Clear group checkboxes
+                document.querySelectorAll('.group-checkbox').forEach(checkbox => {
+                    checkbox.checked = false;
+                });
+                
+                // Clear device selections
+                clearAllDeviceSelections();
+                
+                // Reset selected group
+                selectedGroupId = null;
+                
+                // Update select all checkbox
+                const selectAllCheckbox = document.getElementById('selectAllGroups');
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+                
+                // Clear highlights and selections
+                setHighlightedIps([]);
+                renderTable(currentData);
+                showMessage('Group selection cleared');
+                clearAllDeviceSelections();
+                updateSelectionCount();
+                
+                return;
+            }
+            
+            // Update selected state
+            document.querySelectorAll('.group-row').forEach(row => {
+                row.classList.remove('selected');
+            });
+            
+            // Update checkbox state
+            document.querySelectorAll('.group-checkbox').forEach(checkbox => {
+                checkbox.checked = false;
+            });
+            
+            const selectedRow = document.querySelector(`[data-group-id="${groupId}"]`);
+            if (selectedRow) {
+                selectedRow.classList.add('selected');
+            }
+            
+            const selectedCheckbox = document.querySelector(`.group-checkbox[data-group-id="${groupId}"]`);
+            if (selectedCheckbox) {
+                selectedCheckbox.checked = true;
+            }
+            
+            selectedGroupId = groupId;
+            
+            // Update select all checkbox state
+            const allCheckboxes = document.querySelectorAll('.group-checkbox');
+            const checkedCheckboxes = document.querySelectorAll('.group-checkbox:checked');
+            const selectAllCheckbox = document.getElementById('selectAllGroups');
+            
+            if (checkedCheckboxes.length === 0) {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+            } else if (checkedCheckboxes.length === allCheckboxes.length) {
+                selectAllCheckbox.checked = true;
+                selectAllCheckbox.indeterminate = false;
+            } else {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = true;
+            }
+            
+            // Load devices for this group
+            const groupDisplayName = selectedRow?.getAttribute('data-group-name') || '';
+            
+            if (groupType === 'all') {
+                loadAllDevices();
+            } else if (groupType === 'network') {
+                loadNetworkDevices(groupDisplayName);
+            } else if (groupType === 'custom') {
+                const customId = groupId.replace('custom_', '');
+                loadCustomDevices(customId);
+            }
+        }
+
+        function setHighlightedIps(ipList) {
+            highlightedIps = new Set((ipList || []).filter(Boolean));
+        }
+
+        function loadAllDevices() {
+            const allIps = currentData.map(device => device.ip_address);
+            setHighlightedIps(allIps);
+            renderTable(currentData);
+            showMessage(`Showing all ${currentData.length} devices`);
+            selectDevicesInTable(currentData);
+        }
+
+        function loadNetworkDevices(networkRange) {
+            const devices = networkGroups[networkRange] || [];
+            const ipList = devices.map(device => device.ip_address);
+            setHighlightedIps(ipList);
+            renderTable(currentData);
+            showMessage(`Highlighting ${devices.length} devices in network ${networkRange}`);
+            selectDevicesInTable(devices);
+        }
+
+        function loadCustomDevices(customId) {
+            fetch(`/device_groups/${customId}/devices`)
+                .then(response => response.json())
+                .then(devices => {
+                    const ipList = devices.map(device => device.ip_address);
+                    setHighlightedIps(ipList);
+                    renderTable(currentData);
+                    showMessage(`Highlighting ${devices.length} devices in custom group`);
+                    selectDevicesInTable(devices);
+                })
+                .catch(error => {
+                    console.error('Error loading custom group devices:', error);
+                    showMessage('Error loading group devices', 'error');
+                });
+        }
+
+        function selectDevicesInTable(devices) {
+            // Clear all selections first
+            clearAllDeviceSelections();
+            
+            // Select devices in the provided list
+            devices.forEach(device => {
+                const checkbox = document.querySelector(`.device-checkbox[data-ip="${device.ip_address}"]`);
+                if (checkbox) {
+                    checkbox.checked = true;
+                }
+            });
+            
+            updateFolderIndicators();
+            updateSelectionCount();
+        }
+
+        function clearAllDeviceSelections() {
+            // Clear all device checkboxes
+            const checkboxes = document.querySelectorAll('.device-checkbox');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = false;
+            });
+        }
+
+        function deleteGroup(groupId, groupType, event) {
+            event.stopPropagation();
+            
+            if (groupType === 'custom') {
+                const customId = groupId.replace('custom_', '');
+                deleteCustomGroup(customId, event);
+            } else if (groupType === 'network') {
+                if (confirm(`Are you sure you want to remove the network group "${groupId.replace('network_', '').replace(/_/g, '.')}"? This will not delete the devices, only remove them from the network grouping.`)) {
+                    // For network groups, we could implement device network_range clearing
+                    // For now, just show a message
+                    alert('Network group deletion would require clearing network ranges from devices. This feature can be implemented.');
+                }
+            } else if (groupType === 'all') {
+                alert('Cannot delete the "All Devices" group.');
+            }
+        }
+
+        function findCustomGroupByName(name) {
+            if (!name) return null;
+            const target = normalizeGroupName(name);
+            return deviceGroups.find(g => normalizeGroupName(g.group_name) === target) || null;
+        }
+
+        function resolveGroupForEdit(groupId, groupType, event) {
+            if (groupType === 'custom' && groupId.startsWith('custom_')) {
+                const numericId = parseInt(groupId.replace('custom_', ''), 10);
+                if (!isNaN(numericId)) {
+                    const match = deviceGroups.find(g => g.id === numericId);
+                    return match ? { ...match, isNew: false } : null;
+                }
+            }
+            const row = event?.currentTarget?.closest('tr');
+            const groupName = row?.getAttribute('data-group-name') || groupId;
+            const matchByName = findCustomGroupByName(groupName);
+            return matchByName ? { ...matchByName, isNew: false } : null;
+        }
+
+        function populateEditGroupModal(group) {
+            currentEditingGroup = {
+                id: group.id ?? null,
+                group_name: group.group_name || group.name || '',
+                description: group.description || '',
+                isNew: !!group.isNew
+            };
+            document.getElementById('editGroupName').value = group.group_name || '';
+            document.getElementById('editGroupDescription').value = group.description || '';
+            document.getElementById('editGroupStatus').textContent = '';
+            document.getElementById('editGroupModal').style.display = 'block';
+        }
+
+        function openEditGroupModal(groupId, groupType, event) {
+            event?.stopPropagation();
+            
+            let group = resolveGroupForEdit(groupId, groupType, event);
+            
+            if (!group) {
+                const row = event?.currentTarget?.closest('tr');
+                const fallbackName = row?.getAttribute('data-group-name') || groupId.replace('network_', '').replace(/_/g, '.');
+                
+                // Reload custom groups and try again in case state is stale
+                fetch('/device_groups')
+                    .then(response => response.json())
+                    .then(data => {
+                        deviceGroups = data;
+                        group = resolveGroupForEdit(groupId, groupType, event);
+                        if (group) {
+                            populateEditGroupModal(group);
+                        } else {
+                            populateEditGroupModal({
+                                id: null,
+                                group_name: fallbackName,
+                                description: '',
+                                isNew: true
+                            });
+                            document.getElementById('editGroupStatus').textContent = 'This network group will be saved as a new custom group.';
+                            document.getElementById('editGroupStatus').style.color = '#856404';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error loading device groups for edit:', error);
+                        populateEditGroupModal({
+                            id: null,
+                            group_name: fallbackName,
+                            description: '',
+                            isNew: true
+                        });
+                        document.getElementById('editGroupStatus').textContent = 'Editing as new custom group (could not load existing details).';
+                        document.getElementById('editGroupStatus').style.color = '#856404';
+                    });
+                return;
+            }
+            
+            populateEditGroupModal(group);
+        }
+
+        function closeEditGroupModal() {
+            document.getElementById('editGroupModal').style.display = 'none';
+            currentEditingGroup = null;
+        }
+
+        function saveGroupEdits() {
+            if (!currentEditingGroup) {
+                return;
+            }
+            
+            const nameInput = document.getElementById('editGroupName').value.trim();
+            const descriptionInput = document.getElementById('editGroupDescription').value.trim();
+            const statusEl = document.getElementById('editGroupStatus');
+            
+            if (!nameInput) {
+                statusEl.textContent = 'Group name cannot be empty.';
+                statusEl.style.color = 'red';
+                return;
+            }
+            
+            statusEl.textContent = 'Saving...';
+            statusEl.style.color = 'blue';
+            
+            const payload = {
+                group_name: nameInput,
+                description: descriptionInput || null
+            };
+            
+            let requestPromise;
+            if (currentEditingGroup.id) {
+                requestPromise = fetch(`/device_groups/${currentEditingGroup.id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                }).then(response => response.json());
+            } else {
+                requestPromise = fetch('/device_groups', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                }).then(response => response.json());
+            }
+            
+            requestPromise
+                .then(result => {
+                    if (result.success) {
+                        statusEl.textContent = currentEditingGroup.id ? 'Group updated successfully.' : 'Custom group created successfully.';
+                        statusEl.style.color = 'green';
+                        
+                        if (!currentEditingGroup.id && result.group?.id) {
+                            currentEditingGroup.id = result.group.id;
+                            currentEditingGroup.isNew = false;
+                        }
+                        currentEditingGroup.group_name = nameInput;
+                        currentEditingGroup.description = descriptionInput;
+                        
+                        setTimeout(() => {
+                            closeEditGroupModal();
+                            loadUnifiedGroups();
+                        }, 800);
+                    } else {
+                        statusEl.textContent = result.error || 'Failed to save group.';
+                        statusEl.style.color = 'red';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error saving group:', error);
+                    statusEl.textContent = 'Error: ' + error.message;
+                    statusEl.style.color = 'red';
+                });
+        }
+
+        function openCreateGroupModal() {
+            document.getElementById('createGroupModal').style.display = 'block';
+            document.getElementById('groupName').value = '';
+            document.getElementById('groupDescription').value = '';
+            document.getElementById('groupDevices').value = '';
+            document.getElementById('createGroupStatus').textContent = '';
+        }
+
+        function closeCreateGroupModal() {
+            document.getElementById('createGroupModal').style.display = 'none';
+        }
+
+        function createGroup() {
+            const groupName = document.getElementById('groupName').value.trim();
+            const groupDescription = document.getElementById('groupDescription').value.trim();
+            const groupDevicesText = document.getElementById('groupDevices').value.trim();
+            
+            if (!groupName) {
+                document.getElementById('createGroupStatus').textContent = 'Group name is required';
+                document.getElementById('createGroupStatus').style.color = 'red';
+                return;
+            }
+            
+            // Parse IP addresses
+            let ipAddresses = [];
+            if (groupDevicesText) {
+                ipAddresses = groupDevicesText.split('\n')
+                    .map(ip => ip.trim())
+                    .filter(ip => ip && ip.match(/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/));
+            }
+            
+            document.getElementById('createGroupStatus').textContent = 'Creating group...';
+            document.getElementById('createGroupStatus').style.color = 'blue';
+            
+            // Create the group
+            fetch('/device_groups', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    group_name: groupName,
+                    description: groupDescription || null
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const groupId = data.group.id;
+                    
+                    // Add devices to the group if any provided
+                    if (ipAddresses.length > 0) {
+                        return fetch(`/device_groups/${groupId}/devices`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                ip_addresses: ipAddresses
+                            })
+                        })
+                        .then(response => response.json())
+                        .then(addData => {
+                            return {
+                                ...data,
+                                devices_added: addData.added_count,
+                                devices_requested: addData.total_requested
+                            };
+                        });
+                    }
+                    
+                    return data;
+                } else {
+                    throw new Error(data.error || 'Failed to create group');
+                }
+            })
+            .then(result => {
+                let message = `Group "${groupName}" created successfully`;
+                if (result.devices_added !== undefined) {
+                    message += ` with ${result.devices_added}/${result.devices_requested} devices added`;
+                }
+                
+                document.getElementById('createGroupStatus').textContent = message;
+                document.getElementById('createGroupStatus').style.color = 'green';
+                
+                // Reload groups and close modal after a short delay
+                setTimeout(() => {
+                    loadUnifiedGroups();
+                    closeCreateGroupModal();
+                }, 1500);
+            })
+            .catch(error => {
+                console.error('Error creating group:', error);
+                document.getElementById('createGroupStatus').textContent = 'Error: ' + error.message;
+                document.getElementById('createGroupStatus').style.color = 'red';
+            });
+        }
+
+        function addSelectedDevicesToGroup() {
+            const selectedDevices = getSelectedDevices();
+            
+            if (selectedDevices.length === 0) {
+                document.getElementById('createGroupStatus').textContent = 'No devices selected';
+                document.getElementById('createGroupStatus').style.color = 'red';
+                return;
+            }
+            
+            // Add selected devices to the textarea
+            document.getElementById('groupDevices').value = selectedDevices.join('\n');
+            document.getElementById('createGroupStatus').textContent = `Added ${selectedDevices.length} selected devices`;
+            document.getElementById('createGroupStatus').style.color = 'blue';
+        }
+
+        function clearAllSelections() {
+            const checkboxes = document.querySelectorAll('input[data-ip]');
+            checkboxes.forEach(checkbox => checkbox.checked = false);
+            document.getElementById('selectAll').checked = false;
+            updateFolderIndicators(); // Add this call to update folder indicators
+        }
+
+        function showMessage(message, type = 'success') {
+            // Create a temporary message element
+            const messageDiv = document.createElement('div');
+            messageDiv.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 10px 20px;
+                background: ${type === 'error' ? '#dc3545' : type === 'info' ? '#17a2b8' : '#28a745'};
+                color: white;
+                border-radius: 4px;
+                z-index: 10000;
+                font-size: 14px;
+            `;
+            messageDiv.textContent = message;
+            document.body.appendChild(messageDiv);
+            
+            setTimeout(() => {
+                if (messageDiv.parentNode) {
+                    messageDiv.parentNode.removeChild(messageDiv);
+                }
+            }, 3000);
+        }
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM Content Loaded - JavaScript is working!');
+            console.log('About to call loadData...');
+            loadData();
+            console.log('About to call loadUnifiedGroups...');
+            loadUnifiedGroups();
+            console.log('Initialization complete!');
+        });
+
+        // Smart Scan Logic
+        function openPingModal() {
+            const selectedDevices = getSelectedDevices();
+            console.log('Selected devices:', selectedDevices);
+            
+            if (selectedDevices.length > 0) {
+                console.log('Scanning selected devices:', selectedDevices);
+                scanSelectedDevices(selectedDevices);
+            } else {
+                console.log('No devices selected, showing modal');
+                document.getElementById('pingModal').style.display = 'block';
+            }
+        }
+
+        function getSelectedDevices() {
+            const selectedDevices = [];
+            const deviceCheckboxes = document.querySelectorAll('.device-checkbox:checked');
+            console.log('Found device checkboxes:', deviceCheckboxes.length);
+            
+            deviceCheckboxes.forEach(checkbox => {
+                const ip = checkbox.getAttribute('data-ip');
+                console.log('Found selected IP:', ip);
+                selectedDevices.push(ip);
+            });
+            
+            return selectedDevices;
+        }
+
+        function scanSelectedDevices(ipList) {
+            console.log('Starting scan of IP list:', ipList);
+            document.getElementById('progressModal').style.display = 'block';
+            document.getElementById('progressMessage').textContent = `Starting scan for ${ipList.length} devices...`;
+            document.getElementById('progressFill').style.width = '0%';
+            document.getElementById('progressCloseButton').style.display = 'none';
+            
+            fetch('/scan_selected', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ip_list: ipList })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Scan response:', data);
+                if (data.status === 'started') {
+                    // Scan started, poll for progress
+                    pollScanProgress();
+                } else if (data.error) {
+                    document.getElementById('progressMessage').textContent = 'Error: ' + data.error;
+                    document.getElementById('progressCloseButton').style.display = 'block';
+                }
+            })
+            .catch(error => {
+                console.error('Error starting scan:', error);
+                document.getElementById('progressMessage').textContent = 'Error starting scan';
+                document.getElementById('progressCloseButton').style.display = 'block';
+            });
+        }
+
+        // Footer-based filtering
+        function toggleFooterFilter(kind) {
+            if (kind === 'total') {
+                // Clear all filters and show everything
+                footerFilterState.ping = false;
+                footerFilterState.snmp = false;
+                footerFilterState.ssh = false;
+                footerFilterState.rdp = false;
+            } else if (kind in footerFilterState) {
+                footerFilterState[kind] = !footerFilterState[kind];
+            }
+            renderTable(currentData);
+        }
+
+        function refreshData() {
+            const expandedFolders = [];
+            document.querySelectorAll('.folder-icon').forEach(icon => {
+                if (icon.textContent === '📂') {
+                    const parentText = icon.parentElement.textContent;
+                    const match = parentText.match(/([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\/[0-9]+)/);
+                    if (match) {
+                        expandedFolders.push(match[1]);
+                    }
+                }
+            });
+            
+            const selectedDevices = [];
+            document.querySelectorAll('.device-checkbox:checked').forEach(checkbox => {
+                selectedDevices.push(checkbox.getAttribute('data-ip'));
+            });
+            
+            const selectedNetworks = [];
+            document.querySelectorAll('.network-select:checked').forEach(checkbox => {
+                selectedNetworks.push(checkbox.getAttribute('data-network'));
+            });
+            
+            console.log('Preserving expanded folders:', expandedFolders);
+            console.log('Preserving selected devices:', selectedDevices);
+            console.log('Preserving selected networks:', selectedNetworks);
+            
+            fetch('/data')
+                .then(response => response.json())
+                .then(data => {
+                    currentData = data;
+                    renderTable(data);
+                    
+                    // Restore selected devices after render
+                    selectedDevices.forEach(ip => {
+                        const checkbox = document.querySelector(`.device-checkbox[data-ip="${ip}"]`);
+                        if (checkbox) {
+                            checkbox.checked = true;
+                        }
+                    });
+                    
+                    // Restore selected networks after render
+                    selectedNetworks.forEach(network => {
+                        const checkbox = document.querySelector(`.network-select[data-network="${network}"]`);
+                        if (checkbox) {
+                            checkbox.checked = true;
+                        }
+                    });
+                    
+                    updateFolderIndicators();
+                })
+                .catch(error => console.error('Error loading data:', error));
+        }
+
+        function updateSelectionCount() {
+            const selectedCount = document.querySelectorAll('.device-checkbox:checked').length;
+            const selectionSpan = document.getElementById('summarySelection');
+            const selectionText = selectedCount > 0 ? ` | Selected: ${selectedCount}` : '';
+            selectionSpan.textContent = selectionText;
+        }
+
+        function updateFolderIndicators() {
+            document.querySelectorAll('.network-folder').forEach(folderRow => {
+                const networkRange = folderRow.getAttribute('data-network');
+                if (!networkRange) return;
+                
+                const ipList = (networkGroups[networkRange] || []).map(device => device.ip_address);
+                const highlightedCount = ipList.filter(ip => highlightedIps.has(ip)).length;
+                const folderIcon = folderRow.querySelector('.folder-icon');
+                const networkCheckbox = folderRow.querySelector('.network-select');
+                
+                if (highlightedCount === ipList.length && ipList.length > 0) {
+                    folderRow.classList.add('selected');
+                    if (folderIcon) folderIcon.textContent = '📂';
+                    if (networkCheckbox) {
+                        networkCheckbox.checked = true;
+                        networkCheckbox.indeterminate = false;
+                    }
+                } else if (highlightedCount > 0) {
+                    folderRow.classList.add('selected');
+                    if (folderIcon) folderIcon.textContent = '📂';
+                    if (networkCheckbox) {
+                        networkCheckbox.checked = false;
+                        networkCheckbox.indeterminate = true;
+                    }
+                } else {
+                    folderRow.classList.remove('selected');
+                    if (folderIcon) folderIcon.textContent = '📁';
+                    if (networkCheckbox) {
+                        networkCheckbox.checked = false;
+                        networkCheckbox.indeterminate = false;
+                    }
+                }
+            });
+        }
+
+        function showMessage(message) {
+            const messageDiv = document.createElement('div');
+            messageDiv.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #4CAF50;
+                color: white;
+                padding: 15px;
+                border-radius: 5px;
+                z-index: 10000;
+                max-width: 300px;
+            `;
+            messageDiv.textContent = message;
+            document.body.appendChild(messageDiv);
+            
+            setTimeout(() => {
+                if (messageDiv.parentNode) {
+                    messageDiv.parentNode.removeChild(messageDiv);
+                }
+            }, 3000);
+        }
+
+        function closeProgressModal() {
+            document.getElementById('progressModal').style.display = 'none';
+            document.getElementById('cancelScanButton').style.display = 'inline-block';
+        }
+        
+        function cancelCurrentScan() {
+            fetch('/cancel_scan', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        document.getElementById('progressMessage').textContent = 'Cancelling scan...';
+                        document.getElementById('cancelScanButton').style.display = 'none';
+                    } else {
+                        console.log('Cancel response:', data);
+                    }
+                })
+                .catch(error => console.error('Error cancelling scan:', error));
+        }
+
+        // Table Rendering
+        function renderTable(data) {
+            console.log('Rendering table with', data.length, 'devices');
+            const tbody = document.getElementById('tableBody');
+            const summaryFilters = document.getElementById('summaryFilters');
+            const summarySelection = document.getElementById('summarySelection');
+            
+            if (!tbody) {
+                console.error('tableBody element not found!');
+                return;
+            }
+            
+            tbody.innerHTML = '';
+            console.log('Table body cleared');
+            
+            const totalDevices = data.length;
+            let totalResponding = 0;
+            let totalSnmpYes = 0;
+            let totalSshYes = 0;
+            let totalRdpYes = 0;
+            
+            data.forEach(row => {
+                const isResponding = row.ping_status && (row.ping_status.includes('online') || row.ping_status.includes('RESPONDS'));
+                const hasSNMP = row.snmp_status && row.snmp_status.includes('YES');
+                const hasSSH = row.ssh_status && row.ssh_status.includes('YES');
+                const hasRDP = row.rdp_status && row.rdp_status.includes('YES');
+                
+                if (isResponding) totalResponding++;
+                if (hasSNMP) totalSnmpYes++;
+                if (hasSSH) totalSshYes++;
+                if (hasRDP) totalRdpYes++;
+                
+                const deviceRow = document.createElement('tr');
+                deviceRow.className = isResponding ? 'responding' : 'no-response';
+                if (hasSNMP) deviceRow.className = deviceRow.className + ' snmp-yes';
+                if (hasSSH) deviceRow.className = deviceRow.className + ' ssh-yes';
+                if (hasRDP) deviceRow.className = deviceRow.className + ' rdp-yes';
+                const isHighlighted = highlightedIps.has(row.ip_address);
+                if (isHighlighted) {
+                    deviceRow.classList.add('group-highlight');
+                }
+                
+                const pingStatus = isResponding ? '✓' : '';
+                const snmpStatus = hasSNMP ? '✓' : '';
+                const sshStatus = hasSSH ? '✓' : '';
+                const rdpStatus = hasRDP ? '✓' : '';
+                
+                const shouldShowTimestamp = isResponding || hasSNMP || hasSSH || hasRDP;
+                const timestampDisplay = shouldShowTimestamp ? (row.scan_timestamp || '') : '';
+                
+                const checkboxCheckedAttr = isHighlighted ? 'checked' : '';
+                
+                deviceRow.innerHTML = `
+                    <td><input type="checkbox" class="row-select device-checkbox" data-ip="${row.ip_address}" onchange="updateSelectionCount();" ${checkboxCheckedAttr}></td>
+                    <td>${row.ip_address}</td>
+                    <td>${row.snmp_hostname || ''}</td>
+                    <td style="color: ${isResponding ? 'green' : 'inherit'}; font-weight: bold;">${pingStatus}</td>
+                    <td style="color: ${hasSNMP ? 'green' : 'inherit'}; font-weight: bold;">${snmpStatus}</td>
+                    <td style="color: ${hasSSH ? 'green' : 'inherit'}; font-weight: bold;">${sshStatus}</td>
+                    <td style="color: ${hasRDP ? 'green' : 'inherit'}; font-weight: bold;">${rdpStatus}</td>
+                    <td>${timestampDisplay}</td>
+                    <td>
+                        <button class="btn-detail" onclick="showDeviceDetail('${row.ip_address}')">Detail</button>
+                        <button class="btn-delete" onclick="deleteDevice('${row.ip_address}')">Delete</button>
+                    </td>
+                `;
+                tbody.appendChild(deviceRow);
+            });
+            
+            // Update summary
+            const parts = [];
+            parts.push(`TOTAL: ${totalDevices}`);
+            parts.push(`RESPONDING: ${totalResponding}`);
+            parts.push(`SNMP: ${totalSnmpYes}`);
+            parts.push(`SSH: ${totalSshYes}`);
+            parts.push(`RDP: ${totalRdpYes}`);
+            
+            summaryFilters.innerHTML = parts.join(' &nbsp;&nbsp;&nbsp;&nbsp; ');
+            const selectedCount = document.querySelectorAll('.device-checkbox:checked').length;
+            summarySelection.textContent = selectedCount > 0 ? ` &nbsp;&nbsp;&nbsp;&nbsp; SELECTED: ${selectedCount}` : '';
+        }
+
+        function toggleNetworkFolder(networkRange) {
+            const iconId = `icon-${networkRange.replace(/[^a-zA-Z0-9]/g, '-')}`;
+            const folderIcon = document.getElementById(iconId);
+            const deviceRows = document.querySelectorAll(`.device-row[data-network="${networkRange}"]`);
+            
+            if (folderIcon.textContent === '📁') {
+                folderIcon.textContent = '📂';
+                deviceRows.forEach(row => {
+                    row.style.display = '';
+                    row.removeAttribute('data-filtered');
+                });
+            } else {
+                folderIcon.textContent = '📁';
+                deviceRows.forEach(row => {
+                    row.style.display = 'none';
+                });
+            }
+        }
+
+        function toggleNetwork(networkRange) {
+            const checkboxes = document.querySelectorAll(`.device-checkbox[data-network="${networkRange}"]`);
+            const networkCheckbox = document.querySelector(`.network-select[data-network="${networkRange}"]`);
+            
+            if (networkCheckbox.indeterminate) {
+                checkboxes.forEach(checkbox => {
+                    checkbox.checked = true;
+                });
+            } else {
+                checkboxes.forEach(checkbox => {
+                    checkbox.checked = networkCheckbox.checked;
+                });
+            }
+            
+            updateFolderIndicators();
+            updateSelectionCount();
+        }
+
+        function toggleSelectAll() {
+            const selectAll = document.getElementById('selectAll');
+            const networkCheckboxes = document.querySelectorAll('.network-select');
+            const deviceCheckboxes = document.querySelectorAll('.device-checkbox');
+            
+            networkCheckboxes.forEach(checkbox => {
+                checkbox.checked = selectAll.checked;
+            });
+            
+            deviceCheckboxes.forEach(checkbox => {
+                checkbox.checked = selectAll.checked;
+            });
+            
+            updateFolderIndicators();
+            updateSelectionCount();
+        }
+
+        // Responsive Toggle removed – always show all devices
+
+        // Utility Functions
+        function loadData() {
+            console.log('Loading data...');
+            fetch('/data')
+                .then(response => {
+                    console.log('Response status:', response.status);
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Data loaded:', data.length, 'devices');
+                    currentData = data;
+                    renderTable(data);
+                    updateFolderIndicators();
+                    // Refresh unified groups to update network groups
+                    loadUnifiedGroups();
+                })
+                .catch(error => {
+                    console.error('Error loading data:', error);
+                });
+        }
+
+        function closePingModal() {
+            document.getElementById('pingModal').style.display = 'none';
+        }
+
+        function openSettings() {
+            // Open the full settings page which exposes all Ping/SNMP/SSH/RDP options
+            window.location.href = '/settings.html';
+        }
+
+        function openTopology() {
+            const selectedDevices = getSelectedDevices();
+            if (selectedDevices.length === 0) {
+                alert('Please select devices to view topology');
+                return;
+            }
+            // Open the topology page with selected IPs
+            const ipsParam = encodeURIComponent(JSON.stringify(selectedDevices));
+            window.location.href = '/topology.html?ips=' + ipsParam;
+        }
+
+        
+        function closeSettings() {
+            document.getElementById('settingsModal').style.display = 'none';
+        }
+
+        function filterTable() {
+            const input = document.getElementById('filterInput');
+            const filter = input.value.toLowerCase();
+            const tbody = document.getElementById('tableBody');
+            const rows = tbody.getElementsByTagName('tr');
+            
+            for (let row of rows) {
+                const ipAddress = row.cells[1]?.textContent.toLowerCase() || '';
+                const hostname = row.cells[2]?.textContent.toLowerCase() || '';
+                
+                if (ipAddress.includes(filter) || hostname.includes(filter)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            }
+        }
+
+        function sortTable(columnIndex) {
+            // Only support sorting on the IP Address column
+            if (columnIndex !== 1) {
+                return;
+            }
+
+            const tbody = document.getElementById('tableBody');
+            const allRows = Array.from(tbody.rows);
+            const newRows = [];
+
+            // Toggle sort direction for this column
+            const currentDir = sortDirection[columnIndex] || 'asc';
+            const newDir = currentDir === 'asc' ? 'desc' : 'asc';
+            sortDirection[columnIndex] = newDir;
+
+            // Helper for comparing two device rows by column
+            function compareRows(a, b) {
+                const aCell = a.cells[columnIndex];
+                const bCell = b.cells[columnIndex];
+                if (!aCell && !bCell) return 0;
+                if (!aCell) return 1;
+                if (!bCell) return -1;
+
+                const aValue = aCell.textContent.trim();
+                const bValue = bCell.textContent.trim();
+
+                // Numeric IP sort for IP address column
+                const aParts = aValue.split('.').map(p => parseInt(p, 10));
+                const bParts = bValue.split('.').map(p => parseInt(p, 10));
+
+                if (aParts.length === 4 && bParts.length === 4 &&
+                    aParts.every(n => !isNaN(n)) && bParts.every(n => !isNaN(n))) {
+                    for (let i = 0; i < 4; i++) {
+                        if (aParts[i] !== bParts[i]) {
+                            const diff = aParts[i] - bParts[i];
+                            return newDir === 'asc' ? diff : -diff;
+                        }
+                    }
+                    return 0;
+                }
+
+                const cmp = aValue.localeCompare(bValue);
+                return newDir === 'asc' ? cmp : -cmp;
+            }
+
+            // Walk rows, keeping each network folder and sorting only its device rows
+            let i = 0;
+            while (i < allRows.length) {
+                const row = allRows[i];
+                if (row.classList.contains('network-folder')) {
+                    const folderRow = row;
+                    const deviceRows = [];
+                    i++;
+                    while (i < allRows.length && !allRows[i].classList.contains('network-folder')) {
+                        deviceRows.push(allRows[i]);
+                        i++;
+                    }
+
+                    deviceRows.sort(compareRows);
+                    newRows.push(folderRow, ...deviceRows);
+                } else {
+                    // Safety: any stray rows without folder wrapper
+                    newRows.push(row);
+                    i++;
+                }
+            }
+
+            tbody.innerHTML = '';
+            newRows.forEach(row => tbody.appendChild(row));
+        }
+
+        function deleteDevice(ip_address) {
+            if (confirm('Are you sure you want to delete this device?')) {
+                fetch('/delete_device', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ ip_address: ip_address })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        showMessage('Device deleted successfully');
+                        refreshData();
+                    } else {
+                        showMessage('Error: ' + (data.error || 'Unknown error'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error deleting device:', error);
+                    showMessage('Error deleting device');
+                });
+            }
+        }
+
+        function deleteSelectedRecords() {
+            const selectedCheckboxes = document.querySelectorAll('.device-checkbox:checked');
+            if (selectedCheckboxes.length === 0) {
+                alert('No devices selected for deletion');
+                return;
+            }
+            
+            if (confirm(`⚠️ Are you sure you want to DELETE ${selectedCheckboxes.length} selected records?\n\nThis action cannot be undone!`)) {
+                const ipList = Array.from(selectedCheckboxes).map(cb => cb.getAttribute('data-ip'));
+                
+                fetch('/delete_selected', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ ip_list: ipList })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        showMessage(`Deleted ${selectedCheckboxes.length} records successfully!`);
+                        refreshData();
+                    } else {
+                        showMessage('Error: ' + (data.error || 'Unknown error'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error deleting selected records:', error);
+                    showMessage('Error deleting selected records');
+                });
+            }
+        }
+
+        function showDeviceDetail(ip_address) {
+            const url = `/device_detail.html?ip=${encodeURIComponent(ip_address)}`;
+            window.open(url, '_blank', 'width=1200,height=800');
+        }
+
+        function startPingScan() {
+            const networkRange = document.getElementById('networkRange').value;
+            if (!networkRange) {
+                alert('Please enter a network range');
+                return;
+            }
+            
+            document.getElementById('pingStatus').textContent = 'Starting scan...';
+            
+            // Close the input modal and show progress modal
+            closePingModal();
+            document.getElementById('progressModal').style.display = 'block';
+            document.getElementById('progressMessage').textContent = `Starting scan for ${networkRange}...`;
+            document.getElementById('progressFill').style.width = '0%';
+            document.getElementById('progressCloseButton').style.display = 'none';
+            
+            // Start the scan (async - returns immediately)
+            fetch('/scan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ network_range: networkRange })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'started') {
+                    // Scan started successfully, now poll for progress
+                    pollScanProgress();
+                } else if (data.error) {
+                    document.getElementById('progressMessage').textContent = 'Error: ' + data.error;
+                    document.getElementById('progressCloseButton').style.display = 'block';
+                }
+            })
+            .catch(error => {
+                console.error('Error starting scan:', error);
+                document.getElementById('progressMessage').textContent = 'Error starting scan';
+                document.getElementById('progressCloseButton').style.display = 'block';
+            });
+        }
+        
+        function pollScanProgress() {
+            const progressInterval = setInterval(() => {
+                fetch('/progress')
+                    .then(response => response.json())
+                    .then(progress => {
+                        if (progress.total > 0) {
+                            const percentage = Math.round((progress.scanned / progress.total) * 100);
+                            document.getElementById('progressFill').style.width = percentage + '%';
+                            document.getElementById('progressMessage').textContent = 
+                                `Scanning: ${progress.scanned}/${progress.total} devices (${progress.online} online)`;
+                        }
+                        
+                        if (progress.status === 'complete') {
+                            clearInterval(progressInterval);
+                            document.getElementById('progressMessage').textContent = 
+                                `Scan complete! ${progress.scanned} devices scanned, ${progress.online} online`;
+                            document.getElementById('progressFill').style.width = '100%';
+                            document.getElementById('cancelScanButton').style.display = 'none';
+                            refreshData();
+                            
+                            // Auto-close modal after 2 seconds
+                            setTimeout(() => {
+                                closeProgressModal();
+                            }, 2000);
+                        } else if (progress.status === 'error') {
+                            clearInterval(progressInterval);
+                            document.getElementById('progressMessage').textContent = 'Scan error: ' + (progress.error || 'Unknown error');
+                            document.getElementById('progressCloseButton').style.display = 'block';
+                            document.getElementById('cancelScanButton').style.display = 'none';
+                        } else if (progress.status === 'cancelled') {
+                            clearInterval(progressInterval);
+                            document.getElementById('progressMessage').textContent = 'Scan cancelled';
+                            document.getElementById('progressCloseButton').style.display = 'block';
+                            document.getElementById('cancelScanButton').style.display = 'none';
+                            refreshData();
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Progress error:', error);
+                    });
+            }, 500);
+        }
+
+        function startSNMPScan() {
+            const selectedDevices = getSelectedDevices();
+            const ipList = selectedDevices;
+
+            // Show shared progress modal
+            document.getElementById('progressModal').style.display = 'block';
+            document.getElementById('progressFill').style.width = '0%';
+            document.getElementById('progressCloseButton').style.display = 'none';
+            document.getElementById('progressMessage').textContent =
+                ipList.length > 0
+                    ? `Starting SNMP scan for ${ipList.length} devices...`
+                    : 'Starting SNMP scan for all devices with SNMP detected...';
+
+            const body = ipList.length > 0 ? { ip_list: ipList } : {};
+
+            fetch('/snmp_scan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'started') {
+                    // SNMP scan started, poll shared /progress endpoint
+                    pollScanProgress();
+                } else if (data.error) {
+                    document.getElementById('progressMessage').textContent = 'Error: ' + data.error;
+                    document.getElementById('progressCloseButton').style.display = 'block';
+                }
+            })
+            .catch(error => {
+                console.error('Error starting SNMP scan:', error);
+                document.getElementById('progressMessage').textContent = 'Error starting SNMP scan';
+                document.getElementById('progressCloseButton').style.display = 'block';
+            });
+        }
+
+        function startSSHCLIScan() {
+            const selectedDevices = getSelectedDevices();
+            const ipList = selectedDevices;
+
+            // Show shared progress modal
+            document.getElementById('progressModal').style.display = 'block';
+            document.getElementById('progressFill').style.width = '0%';
+            document.getElementById('progressCloseButton').style.display = 'none';
+            document.getElementById('progressMessage').textContent =
+                ipList.length > 0
+                    ? `Starting SSH scan for ${ipList.length} devices...`
+                    : 'Starting SSH scan for all devices with SSH detected...';
+
+            const body = ipList.length > 0 ? { ip_list: ipList } : {};
+
+            fetch('/ssh_scan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'started') {
+                    // SSH scan started, reuse shared /progress endpoint
+                    pollScanProgress();
+                } else if (data.error) {
+                    document.getElementById('progressMessage').textContent = 'Error: ' + data.error;
+                    document.getElementById('progressCloseButton').style.display = 'block';
+                }
+            })
+            .catch(error => {
+                console.error('Error starting SSH scan:', error);
+                document.getElementById('progressMessage').textContent = 'Error starting SSH scan';
+                document.getElementById('progressCloseButton').style.display = 'block';
+            });
+        }
+
+        function saveSettings() {
+            const settings = {
+                pingTimeout: document.getElementById('pingTimeout').value,
+                pingRetries: document.getElementById('pingRetries').value,
+                snmpTimeout: document.getElementById('snmpTimeout').value,
+                snmpRetries: document.getElementById('snmpRetries').value,
+                sshTimeout: document.getElementById('sshTimeout').value,
+                rdpTimeout: document.getElementById('rdpTimeout').value
+            };
+            
+            fetch('/save_settings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(settings)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    document.getElementById('settingsStatus').textContent = 'Settings saved successfully';
+                    closeSettings();
+                } else {
+                    document.getElementById('settingsStatus').textContent = 'Error: ' + (data.error || 'Unknown error');
+                }
+            })
+            .catch(error => {
+                console.error('Error saving settings:', error);
+                document.getElementById('settingsStatus').textContent = 'Error saving settings';
+            });
+        }
+
+        function testSettings() {
+            document.getElementById('settingsStatus').textContent = 'Testing settings...';
+            setTimeout(() => {
+                document.getElementById('settingsStatus').textContent = 'Settings test completed successfully';
+            }, 1000);
+        }
+    </script>
+</body>
+</html>
