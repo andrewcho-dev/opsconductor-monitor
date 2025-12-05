@@ -40,6 +40,7 @@ class DatabaseManager:
             cur.execute(query, params or ())
             if fetch:
                 result = cur.fetchall()
+                conn.commit()  # Commit even when fetching (for INSERT with RETURNING)
                 conn.close()
                 return result
             else:

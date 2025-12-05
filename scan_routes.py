@@ -951,6 +951,33 @@ def get_combined_interfaces():
         return jsonify({'error': str(e), 'interfaces': []}), 500
 
 
+def get_network_groups():
+    """Return unique network ranges from device data."""
+    try:
+        # Get all devices from database
+        devices = db.get_all_devices()
+        
+        # Extract unique network ranges and count devices
+        network_groups = {}
+        for device in devices:
+            network_range = device.get('network_range')
+            if network_range and network_range.strip():
+                if network_range not in network_groups:
+                    network_groups[network_range] = {
+                        'network_range': network_range,
+                        'device_count': 0
+                    }
+                network_groups[network_range]['device_count'] += 1
+        
+        # Convert to sorted list
+        result = sorted(network_groups.values(), key=lambda x: x['network_range'])
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 def _snmp_get_value(ip, settings, oid):
     """Helper: run snmpget for a single OID and return the value text or ''."""
     community = settings.get('snmp_community', 'public')

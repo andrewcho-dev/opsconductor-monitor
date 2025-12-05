@@ -3,6 +3,7 @@
 
 import json
 from flask import Flask, jsonify, request, send_from_directory
+from flask_cors import CORS
 from database import db
 from scan_routes import (
     start_scan,
@@ -14,10 +15,12 @@ from scan_routes import (
     ssh_scan_devices,
     get_ssh_cli_interfaces,
     get_combined_interfaces,
+    get_network_groups,
 )
 from settings_routes import get_settings_route, save_settings_route, test_settings_route
 
 app = Flask(__name__, static_folder='.')
+CORS(app, origins=['http://localhost:5173', 'http://192.168.10.50:5173'])
 
 # Static files
 @app.route('/static/<path:filename>')
@@ -137,6 +140,10 @@ def get_ssh_cli_interfaces_route():
 @app.route('/get_combined_interfaces', methods=['POST'])
 def get_combined_interfaces_route():
     return get_combined_interfaces()
+
+@app.route('/network_groups', methods=['GET'])
+def get_network_groups_route():
+    return get_network_groups()
 
 @app.route('/topology_data', methods=['POST'])
 def topology_data():
