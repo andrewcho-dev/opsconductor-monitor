@@ -234,7 +234,7 @@ const CompleteJobBuilder = ({ job, onSave, onTest, onBack }) => {
           success_criteria: {
             return_code: 0,
             output_contains: ['succeeded', 'open'],
-            output_regex: 'Connection to .* port .* \\[tcp/ssh\\] succeeded!'
+            output_regex: 'Connection to .* port .* succeeded!'
           }
         },
         targeting: {
@@ -307,7 +307,7 @@ const CompleteJobBuilder = ({ job, onSave, onTest, onBack }) => {
           success_criteria: {
             return_code: 0,
             output_contains: ['succeeded', 'open'],
-            output_regex: 'Connection to .* port .* \\[tcp/rdp\\] succeeded!'
+            output_regex: 'Connection to .* port .* succeeded!'
           }
         },
         targeting: {
@@ -1428,7 +1428,7 @@ const CompleteJobBuilder = ({ job, onSave, onTest, onBack }) => {
                       Ping Failure
                     </button>
                     <button
-                      onClick={() => setTestInput('SNMPv2c: Community is public\nsysDescr.0 = STRING: "Cisco IOS Software, C2960 Software (C2960-LANBASEK9-M), Version 15.0(2)SE"')}
+                      onClick={() => setTestInput('SNMPv2c: Community is public\nsysDescr.0 = STRING: \"Cisco IOS Software, C2960 Software (C2960-LANBASEK9-M), Version 15.0(2)SE\"')}
                       className="w-full px-2 py-1 bg-blue-500 text-white rounded text-xs"
                     >
                       SNMP Success
