@@ -455,6 +455,22 @@ const CompleteJobBuilder = ({ job, onSave, onTest, onBack }) => {
     const targetType = action.targeting.source;
     const targets = availableTargets[targetType] || [];
     
+    // Initialize selectedTarget when component loads or targetType changes
+    useEffect(() => {
+      if (targetType === 'network_range') {
+        setSelectedTarget(action.targeting.network_range || '');
+      } else if (targetType === 'custom_groups' || targetType === 'network_groups') {
+        const groups = action.targeting[targetType] || [];
+        if (Array.isArray(groups) && groups.length > 0) {
+          setSelectedTarget(groups[0]); // Select first group by default
+        } else {
+          setSelectedTarget('');
+        }
+      } else {
+        setSelectedTarget('');
+      }
+    }, [targetType, action.targeting]);
+    
     const handleTargetSelection = (target) => {
       setSelectedTarget(target);
       if (targetType === 'network_range') {
@@ -525,6 +541,12 @@ const CompleteJobBuilder = ({ job, onSave, onTest, onBack }) => {
             <label className="block text-xs font-medium mb-1">
               Select {targetType.replace('_', ' ')} from database:
             </label>
+            {/* Debug info - remove later */}
+            {process.env.NODE_ENV === 'development' && (
+              <div className="text-xs text-gray-400 mb-1">
+                Debug: Found {targets.length} targets for type '{targetType}': {targets.join(', ')}
+              </div>
+            )}
             {targets.length > 0 ? (
               <select
                 value={selectedTarget}
