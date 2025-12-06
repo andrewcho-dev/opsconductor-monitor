@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Play, Square, RefreshCw, Plus, Trash2, Save, TestTube, Settings } from 'lucide-react';
 import { cn } from '../lib/utils';
-import CompleteJobBuilder from '../components/CompleteJobBuilder';
+import CompleteJobBuilder from '../components/jobBuilder/CompleteJobBuilder';
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component {
