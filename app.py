@@ -167,6 +167,67 @@ def get_combined_interfaces_route():
 def get_network_groups_route():
     return get_network_groups()
 
+
+@app.route('/api/network-ranges', methods=['GET'])
+def api_network_ranges():
+    """Return unique network ranges for use in the Job Builder."""
+    try:
+        devices = db.get_all_devices()
+        ranges_set = set()
+        for device in devices:
+            network_range = device.get('network_range')
+            if network_range and network_range.strip():
+                ranges_set.add(network_range.strip())
+
+        ranges = sorted(ranges_set)
+        return jsonify({'ranges': ranges})
+    except Exception as e:
+        return jsonify({'error': str(e), 'ranges': []}), 500
+
+
+@app.route('/api/custom-groups', methods=['GET'])
+def api_custom_groups():
+    """Return all device groups as custom target groups."""
+    try:
+        rows = db.get_all_device_groups()
+        groups = []
+        for row in rows:
+            # row: (id, group_name, description, created_at, updated_at, device_count)
+            group = {
+                'id': row[0],
+                'name': row[1],
+                'description': row[2] or '',
+                'device_count': row[5] if len(row) > 5 else 0,
+            }
+            groups.append(group)
+
+        return jsonify({'groups': groups})
+    except Exception as e:
+        return jsonify({'error': str(e), 'groups': []}), 500
+
+
+@app.route('/api/network-groups', methods=['GET'])
+def api_network_groups():
+    """Return network groups (network_range + device_count)."""
+    try:
+        devices = db.get_all_devices()
+        network_groups = {}
+        for device in devices:
+            network_range = device.get('network_range')
+            if network_range and network_range.strip():
+                key = network_range.strip()
+                if key not in network_groups:
+                    network_groups[key] = {
+                        'network_range': key,
+                        'device_count': 0,
+                    }
+                network_groups[key]['device_count'] += 1
+
+        groups = sorted(network_groups.values(), key=lambda x: x['network_range'])
+        return jsonify({'groups': groups})
+    except Exception as e:
+        return jsonify({'error': str(e), 'groups': []}), 500
+
 # Poller System Routes
 @app.route('/poller/status', methods=['GET'])
 def poller_status_route():

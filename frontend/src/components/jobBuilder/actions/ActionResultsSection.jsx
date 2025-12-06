@@ -5,7 +5,10 @@ const PARSER_TYPES = ['regex', 'json', 'xml', 'csv', 'custom'];
 
 export const ActionResultsSection = ({ action, actionIndex, updateAction }) => (
   <section className="space-y-2">
-    <h4 className="text-xs font-bold uppercase tracking-wide text-gray-600">Results &amp; Storage</h4>
+    <h4 className="text-xs font-bold uppercase tracking-wide text-gray-600 flex items-center gap-1">
+      <span>💾</span>
+      <span>Results &amp; Storage</span>
+    </h4>
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
       <label className="flex flex-col gap-1 font-medium text-gray-600">
         Parser Type

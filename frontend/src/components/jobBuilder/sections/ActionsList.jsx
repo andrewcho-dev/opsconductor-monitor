@@ -7,8 +7,7 @@ export const ActionsList = ({
   updateAction,
   deleteAction,
   moveAction,
-  onOpenTargetModal,
-  onSourceChange,
+  onOpenTargetsModal,
   onAddPattern,
   onUpdatePattern,
   onRemovePattern
@@ -40,8 +39,7 @@ export const ActionsList = ({
           updateAction={updateAction}
           deleteAction={deleteAction}
           moveAction={moveAction}
-          onOpenTargetModal={onOpenTargetModal}
-          onSourceChange={onSourceChange}
+          onOpenTargetModal={onOpenTargetsModal}
           onAddPattern={onAddPattern}
           onUpdatePattern={onUpdatePattern}
           onRemovePattern={onRemovePattern}

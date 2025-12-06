@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 
 const FALLBACK_TARGETS = {
-  network_ranges: ['192.168.1.0/24', '10.0.0.0/16', '172.16.0.0/12', '192.168.10.0/24'],
-  custom_groups: ['Production Servers', 'Development Environment', 'Test Network', 'DMZ Servers'],
-  network_groups: ['Core Infrastructure', 'Edge Devices', 'Security Appliances', 'Monitoring Systems']
+  network_ranges: [],
+  custom_groups: [],
+  network_groups: []
 };
 
 export const useAvailableTargets = () => {

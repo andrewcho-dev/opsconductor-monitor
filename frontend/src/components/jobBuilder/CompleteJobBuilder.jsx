@@ -2,21 +2,13 @@ import React, { useEffect, useMemo, useState } from 'react';
 import JobBuilderErrorBoundary from './JobBuilderErrorBoundary';
 import { DEFAULT_JOB, createEmptyAction } from './defaultJob';
 import { useAvailableTargets } from './hooks/useAvailableTargets';
-import TargetSelectionModal from './TargetSelectionModal';
+import UnifiedTargetsModal from './UnifiedTargetsModal';
 import { JobHeader } from './sections/JobHeader';
 import { JobInformation } from './sections/JobInformation';
 import { ExecutionConfiguration } from './sections/ExecutionConfiguration';
 import { ActionsList } from './sections/ActionsList';
 import { RawJsonPanel } from './sections/RawJsonPanel';
 import { RegexTestingPanel } from './sections/RegexTestingPanel';
-
-const DATABASE_SOURCES = new Set(['network_range', 'custom_groups', 'network_groups']);
-
-const SOURCE_KEY_MAP = {
-  network_range: 'network_ranges',
-  custom_groups: 'custom_groups',
-  network_groups: 'network_groups'
-};
 
 const cloneJob = (job) => JSON.parse(JSON.stringify(job));
 
@@ -158,77 +150,30 @@ const CompleteJobBuilderInner = ({ job, onSave, onTest, onBack }) => {
     });
   };
 
-  const resetTargetingForSource = (actionIndex, source) => {
-    updateAction(actionIndex, 'targeting.source', source);
-
-    if (source === 'network_range') {
-      updateAction(actionIndex, 'targeting.network_range', '');
-    } else if (source === 'custom_groups' || source === 'network_groups') {
-      updateAction(actionIndex, `targeting.${source}`, []);
-    } else if (source === 'target_list') {
-      updateAction(actionIndex, 'targeting.target_list', '');
-    } else if (source === 'file') {
-      updateAction(actionIndex, 'targeting.file_path', '');
-    }
+  const openTargetsModal = (actionIndex) => {
+    setActiveTargetModal({ open: true, actionIndex, sourceType: null });
   };
 
-  const handleSourceChange = (actionIndex, source) => {
-    resetTargetingForSource(actionIndex, source);
-
-    if (DATABASE_SOURCES.has(source)) {
-      setActiveTargetModal({ open: true, actionIndex, sourceType: source });
-    }
-  };
-
-  const openTargetModal = (actionIndex, sourceType) => {
-    setActiveTargetModal({ open: true, actionIndex, sourceType });
-  };
-
-  const closeTargetModal = () => {
+  const closeTargetsModal = () => {
     setActiveTargetModal({ open: false, actionIndex: null, sourceType: null });
   };
 
-  const handleTargetSelection = (value) => {
-    const { actionIndex, sourceType } = activeTargetModal;
-    if (actionIndex == null) return;
+  const handleTargetsSave = (actionIndex, payload) => {
+    if (actionIndex == null || !payload) return;
+    const {
+      source,
+      network_groups = [],
+      custom_groups = [],
+      target_list = '',
+      file_path = ''
+    } = payload;
 
-    if (sourceType === 'network_range') {
-      updateAction(actionIndex, 'targeting.network_range', value);
-    } else if (sourceType === 'custom_groups' || sourceType === 'network_groups') {
-      updateAction(actionIndex, `targeting.${sourceType}`, [value]);
-    }
-
-    closeTargetModal();
-  };
-
-  const handleCustomTarget = (rawValue) => {
-    const { actionIndex, sourceType } = activeTargetModal;
-    if (actionIndex == null) return;
-
-    if (sourceType === 'network_range') {
-      updateAction(actionIndex, 'targeting.network_range', rawValue.trim());
-      closeTargetModal();
-      return;
-    }
-
-    try {
-      const parsed = JSON.parse(rawValue);
-      if (Array.isArray(parsed)) {
-        updateAction(actionIndex, `targeting.${sourceType}`, parsed);
-        closeTargetModal();
-        return;
-      }
-    } catch (err) {
-      // fall back to newline-split below
-    }
-
-    const list = rawValue
-      .split(/\n+/)
-      .map((entry) => entry.trim())
-      .filter(Boolean);
-
-    updateAction(actionIndex, `targeting.${sourceType}`, list);
-    closeTargetModal();
+    updateAction(actionIndex, 'targeting.source', source);
+    updateAction(actionIndex, 'targeting.network_groups', network_groups);
+    updateAction(actionIndex, 'targeting.custom_groups', custom_groups);
+    updateAction(actionIndex, 'targeting.target_list', target_list);
+    updateAction(actionIndex, 'targeting.file_path', file_path);
+    closeTargetsModal();
   };
 
   const runRegexTest = () => {
@@ -323,26 +268,9 @@ const CompleteJobBuilderInner = ({ job, onSave, onTest, onBack }) => {
     }
   }, [testMode, testInput, testActionIndex, currentJob.actions]);
 
-  const modalItems = useMemo(() => {
-    if (!activeTargetModal.open) return [];
-    const sourceKey = SOURCE_KEY_MAP[activeTargetModal.sourceType];
-    return sourceKey ? availableTargets[sourceKey] || [] : [];
-  }, [activeTargetModal, availableTargets]);
-
-  const modalSelectedValue = useMemo(() => {
+  const activeAction = useMemo(() => {
     if (!activeTargetModal.open) return null;
-    const action = currentJob.actions[activeTargetModal.actionIndex];
-    if (!action) return null;
-
-    if (activeTargetModal.sourceType === 'network_range') {
-      return action.targeting?.network_range || '';
-    }
-
-    if (activeTargetModal.sourceType === 'custom_groups' || activeTargetModal.sourceType === 'network_groups') {
-      return action.targeting?.[activeTargetModal.sourceType] || [];
-    }
-
-    return null;
+    return currentJob.actions[activeTargetModal.actionIndex] || null;
   }, [activeTargetModal, currentJob.actions]);
 
   return (
@@ -367,8 +295,7 @@ const CompleteJobBuilderInner = ({ job, onSave, onTest, onBack }) => {
               updateAction={updateAction}
               deleteAction={deleteAction}
               moveAction={moveAction}
-              onOpenTargetModal={openTargetModal}
-              onSourceChange={handleSourceChange}
+              onOpenTargetsModal={openTargetsModal}
               onAddPattern={addParsingPattern}
               onUpdatePattern={updateParsingPattern}
               onRemovePattern={removeParsingPattern}
@@ -391,16 +318,14 @@ const CompleteJobBuilderInner = ({ job, onSave, onTest, onBack }) => {
         </div>
       </div>
 
-      <TargetSelectionModal
+      <UnifiedTargetsModal
         isOpen={activeTargetModal.open}
-        sourceType={activeTargetModal.sourceType}
-        items={modalItems}
-        selectedValue={modalSelectedValue}
-        onSelect={handleTargetSelection}
-        onCustomSubmit={handleCustomTarget}
-        onClose={closeTargetModal}
+        action={activeAction}
+        availableTargets={availableTargets}
         loading={targetsLoading}
         onRefresh={refreshTargets}
+        onClose={closeTargetsModal}
+        onSave={(payload) => handleTargetsSave(activeTargetModal.actionIndex, payload)}
       />
     </div>
   );

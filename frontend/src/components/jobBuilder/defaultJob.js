@@ -17,7 +17,7 @@ export const createEmptyAction = () => ({
     }
   },
   targeting: {
-    source: 'network_range',
+    source: 'network_groups',
     network_range: '10.127.0.0/24',
     target_list: '',
     exclude_list: '',

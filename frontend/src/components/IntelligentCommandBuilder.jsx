@@ -10,6 +10,7 @@ const IntelligentCommandBuilder = ({ action, actionIndex, updateAction }) => {
   const [commandData, setCommandData] = useState({});
   const [validationResults, setValidationResults] = useState({});
   const [showPreview, setShowPreview] = useState(true);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   // Initialize platform and command from existing action
   useEffect(() => {
@@ -250,12 +251,23 @@ const IntelligentCommandBuilder = ({ action, actionIndex, updateAction }) => {
 
       {/* Command Selection - COMPACT VERSION */}
       <div className="bg-white rounded shadow p-3">
-        <h4 className="text-sm font-bold mb-2 flex items-center gap-2">
-          <span>⚡</span> COMMAND SELECTION
-          <span className="text-xs font-normal text-gray-600 ml-1">
-            (What to execute)
-          </span>
-        </h4>
+        <div className="flex items-center justify-between mb-2">
+          <h4 className="text-sm font-bold flex items-center gap-2">
+            <span>⚡</span> COMMAND SELECTION
+            <span className="text-xs font-normal text-gray-600 ml-1">
+              (What to execute)
+            </span>
+          </h4>
+          <button
+            type="button"
+            onClick={() => setShowAdvanced(true)}
+            disabled={!selectedCommand}
+            className="p-1 rounded-full text-blue-600 hover:bg-blue-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Advanced command settings"
+          >
+            ⚙️
+          </button>
+        </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">
           <div>
@@ -298,211 +310,191 @@ const IntelligentCommandBuilder = ({ action, actionIndex, updateAction }) => {
           </div>
         </div>
 
-        {/* Compact Command Info */}
-        {selectedCommand && commandData.name && (
-          <div className="bg-blue-50 border border-blue-200 rounded p-2 text-xs">
-            <div className="flex items-start gap-2">
-              <span className="text-blue-600">ℹ️</span>
-              <div className="flex-1">
-                <div className="font-medium text-blue-800">{commandData.name}</div>
-                <div className="text-blue-600 mt-1">{commandData.description}</div>
-                {commandData.syntax && (
-                  <div className="mt-1 font-mono text-blue-700 bg-blue-100 p-1 rounded">
-                    Syntax: {commandData.syntax}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Compact Command List for Quick Reference */}
-        {selectedCategory === 'all' && (
-          <div className="mt-2">
-            <div className="text-xs font-medium text-gray-600 mb-1">Quick Reference:</div>
-            <div className="max-h-32 overflow-y-auto border rounded bg-gray-50 p-1">
-              <div className="grid grid-cols-2 gap-1 text-xs">
-                {Object.entries(commandsByCategory).slice(0, 4).map(([category, commands]) => (
-                  <div key={category} className="col-span-1">
-                    <div className="font-medium text-gray-700 mb-1">
-                      {getCategoryIcon(category)} {category.replace(/_/g, ' ')}
-                    </div>
-                    {commands.slice(0, 3).map(command => (
-                      <button
-                        key={command.id}
-                        onClick={() => handleCommandChange(command.id)}
-                        className={`block w-full text-left p-1 rounded border transition-colors ${
-                          selectedCommand === command.id
-                            ? 'bg-blue-500 text-white border-blue-600'
-                            : 'bg-white hover:bg-gray-100 border-gray-200'
-                        }`}
-                      >
-                        <div className="font-medium">{command.name}</div>
-                      </button>
-                    ))}
-                    {commands.length > 3 && (
-                      <div className="text-xs text-gray-500 italic p-1">
-                        +{commands.length - 3} more...
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
+        {/* Compact Command Info: show ONLY the concrete command that will run */}
+        {selectedCommand && commandData.syntax && (
+          <div className="mt-2 rounded border border-gray-700 bg-gray-900 px-2 py-1 text-[11px] font-mono text-green-400 overflow-x-auto whitespace-nowrap">
+            {generateCommandPreview()}
           </div>
         )}
       </div>
 
-      {/* Command Configuration */}
-      {commandData.name && (
-        <div className="bg-white rounded shadow p-4">
-          <h4 className="text-sm font-bold mb-3 flex items-center gap-2">
-            <span>⚙️</span> COMMAND CONFIGURATION
-            <span className="text-xs font-normal text-gray-600 ml-1">
-              (Parameters for {commandData.name})
-            </span>
-          </h4>
-          
-          {commandData.warnings && commandData.warnings.length > 0 && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded p-3 mb-4">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-yellow-600">⚠️</span>
-                <span className="text-sm font-medium text-yellow-800">Important Notes</span>
-              </div>
-              <ul className="text-xs text-yellow-700 space-y-1">
-                {commandData.warnings.map((warning, index) => (
-                  <li key={index}>• {warning}</li>
-                ))}
-              </ul>
+      {/* Advanced modal for command parameters + preview */}
+      {showAdvanced && selectedCommand && commandData.name && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setShowAdvanced(false)} />
+          <div className="relative z-10 w-full max-w-3xl bg-white rounded-lg shadow-xl border border-gray-200 p-4 space-y-4">
+            <div className="flex items-center justify-between border-b pb-2">
+              <h4 className="text-sm font-bold flex items-center gap-2">
+                <span>⚙️</span> Advanced Command Settings
+                <span className="text-xs font-normal text-gray-600 ml-1">
+                  {commandData.name}
+                </span>
+              </h4>
+              <button
+                type="button"
+                onClick={() => setShowAdvanced(false)}
+                className="text-gray-500 hover:text-gray-700 text-sm"
+              >
+                ✕
+              </button>
             </div>
-          )}
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {Object.entries(commandData.parameters || {}).map(([key, param]) => {
-              const validation = validationResults[key] || {};
-              const value = action.login_method?.parameters?.[key] || '';
-              
-              return (
-                <div key={key} className="space-y-1">
-                  <label className="block text-xs font-medium flex items-center gap-1">
-                    {param.label}
-                    {param.required && <span className="text-red-500">*</span>}
-                    <span className="text-gray-400">{getValidationIcon(validation.status)}</span>
-                  </label>
-                  
-                  {param.type === 'select' ? (
-                    <select
-                      value={value}
-                      onChange={(e) => handleParameterChange(key, e.target.value)}
-                      className={`w-full p-2 border rounded text-sm ${getValidationColor(validation.status)} focus:bg-white focus:ring-2 focus:ring-blue-300`}
-                    >
-                      {param.options?.map(option => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  ) : param.type === 'checkbox' ? (
-                    <label className="flex items-center gap-2 p-2 border rounded text-sm bg-gray-50">
-                      <input
-                        type="checkbox"
-                        checked={value}
-                        onChange={(e) => handleParameterChange(key, e.target.checked)}
-                        className="rounded"
-                      />
-                      <span className="text-xs">{param.label}</span>
+
+            {/* Command Configuration (moved into modal) */}
+            {commandData.warnings && commandData.warnings.length > 0 && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded p-3 mb-2">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-yellow-600">⚠️</span>
+                  <span className="text-sm font-medium text-yellow-800">Important Notes</span>
+                </div>
+                <ul className="text-xs text-yellow-700 space-y-1">
+                  {commandData.warnings.map((warning, index) => (
+                    <li key={index}>• {warning}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {Object.entries(commandData.parameters || {}).map(([key, param]) => {
+                const validation = validationResults[key] || {};
+                const value = action.login_method?.parameters?.[key] || '';
+
+                return (
+                  <div key={key} className="space-y-1">
+                    <label className="block text-xs font-medium flex items-center gap-1">
+                      {param.label}
+                      {param.required && <span className="text-red-500">*</span>}
+                      <span className="text-gray-400">{getValidationIcon(validation.status)}</span>
                     </label>
-                  ) : (
-                    <input
-                      type={param.type || 'text'}
-                      value={value}
-                      onChange={(e) => handleParameterChange(key, e.target.value)}
-                      placeholder={param.placeholder || ''}
-                      className={`w-full p-2 border rounded text-sm ${getValidationColor(validation.status)} focus:bg-white focus:ring-2 focus:ring-blue-300`}
-                    />
-                  )}
-                  
-                  {/* Validation Messages */}
-                  <div className="space-y-1">
-                    {validation.errors?.map((error, index) => (
-                      <div key={index} className="text-xs text-red-600 flex items-center gap-1">
-                        <span>❌</span> {error}
-                      </div>
-                    ))}
-                    {validation.warnings?.map((warning, index) => (
-                      <div key={index} className="text-xs text-yellow-600 flex items-center gap-1">
-                        <span>⚠️</span> {warning}
-                      </div>
-                    ))}
-                    {validation.status === 'valid' && (
-                      <div className="text-xs text-green-600 flex items-center gap-1">
-                        <span>✅</span> Valid
+
+                    {param.type === 'select' ? (
+                      <select
+                        value={value}
+                        onChange={(e) => handleParameterChange(key, e.target.value)}
+                        className={`w-full p-2 border rounded text-sm ${getValidationColor(
+                          validation.status
+                        )} focus:bg-white focus:ring-2 focus:ring-blue-300`}
+                      >
+                        {param.options?.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    ) : param.type === 'checkbox' ? (
+                      <label className="flex items-center gap-2 p-2 border rounded text-sm bg-gray-50">
+                        <input
+                          type="checkbox"
+                          checked={value}
+                          onChange={(e) => handleParameterChange(key, e.target.checked)}
+                          className="rounded"
+                        />
+                        <span className="text-xs">{param.label}</span>
+                      </label>
+                    ) : (
+                      <input
+                        type={param.type || 'text'}
+                        value={value}
+                        onChange={(e) => handleParameterChange(key, e.target.value)}
+                        placeholder={param.placeholder || ''}
+                        className={`w-full p-2 border rounded text-sm ${getValidationColor(
+                          validation.status
+                        )} focus:bg-white focus:ring-2 focus:ring-blue-300`}
+                      />
+                    )}
+
+                    {/* Validation Messages */}
+                    <div className="space-y-1">
+                      {validation.errors?.map((error, index) => (
+                        <div key={index} className="text-xs text-red-600 flex items-center gap-1">
+                          <span>❌</span> {error}
+                        </div>
+                      ))}
+                      {validation.warnings?.map((warning, index) => (
+                        <div key={index} className="text-xs text-yellow-600 flex items-center gap-1">
+                          <span>⚠️</span> {warning}
+                        </div>
+                      ))}
+                      {validation.status === 'valid' && (
+                        <div className="text-xs text-green-600 flex items-center gap-1">
+                          <span>✅</span> Valid
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Help Text */}
+                    {param.help && (
+                      <div className="text-xs text-blue-600 flex items-start gap-1">
+                        <span>ℹ️</span>
+                        <span>{param.help}</span>
                       </div>
                     )}
                   </div>
-                  
-                  {/* Help Text */}
-                  {param.help && (
-                    <div className="text-xs text-blue-600 flex items-start gap-1">
-                      <span>ℹ️</span>
-                      <span>{param.help}</span>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Command Preview */}
-      {commandData.syntax && (
-        <div className="bg-gray-900 rounded shadow p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h4 className="text-sm font-bold text-green-400 flex items-center gap-2">
-              <span>👁️</span> COMMAND PREVIEW
-            </h4>
-            <button
-              onClick={() => setShowPreview(!showPreview)}
-              className="text-xs text-gray-400 hover:text-white"
-            >
-              {showPreview ? 'Hide' : 'Show'}
-            </button>
-          </div>
-          
-          {showPreview && (
-            <div className="space-y-3">
-              <div className="font-mono text-sm text-green-400 bg-black rounded p-3">
-                {generateCommandPreview()}
-              </div>
-              
-              {/* Variables */}
-              <div className="text-xs text-gray-400">
-                <div className="font-medium mb-2">Variables:</div>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <code className="bg-gray-800 px-1 py-0.5 rounded">{'{target}'}</code>
-                    <span>- Will be replaced with actual target addresses</span>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Examples */}
-              {commandData.examples && commandData.examples.length > 0 && (
-                <div className="text-xs text-gray-400">
-                  <div className="font-medium mb-2">Examples:</div>
-                  <div className="space-y-2">
-                    {commandData.examples.map((example, index) => (
-                      <div key={index} className="bg-gray-800 rounded p-2">
-                        <div className="font-mono text-green-300">{example.command}</div>
-                        <div className="text-gray-500 mt-1">{example.description}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+                );
+              })}
             </div>
-          )}
+
+            {/* Command Preview (moved into modal) */}
+            {commandData.syntax && (
+              <div className="bg-gray-900 rounded shadow p-4 mt-2">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-bold text-green-400 flex items-center gap-2">
+                    <span>👁️</span> COMMAND PREVIEW
+                  </h4>
+                  <button
+                    onClick={() => setShowPreview(!showPreview)}
+                    className="text-xs text-gray-400 hover:text-white"
+                  >
+                    {showPreview ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+
+                {showPreview && (
+                  <div className="space-y-3">
+                    <div className="font-mono text-sm text-green-400 bg-black rounded p-3">
+                      {generateCommandPreview()}
+                    </div>
+
+                    {/* Variables */}
+                    <div className="text-xs text-gray-400">
+                      <div className="font-medium mb-2">Variables:</div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <code className="bg-gray-800 px-1 py-0.5 rounded">{'{target}'}</code>
+                          <span>- Will be replaced with actual target addresses</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Examples */}
+                    {commandData.examples && commandData.examples.length > 0 && (
+                      <div className="text-xs text-gray-400">
+                        <div className="font-medium mb-2">Examples:</div>
+                        <div className="space-y-2">
+                          {commandData.examples.map((example, index) => (
+                            <div key={index} className="bg-gray-800 rounded p-2">
+                              <div className="font-mono text-green-300">{example.command}</div>
+                              <div className="text-gray-500 mt-1">{example.description}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex justify-end pt-2 border-t mt-2">
+              <button
+                type="button"
+                onClick={() => setShowAdvanced(false)}
+                className="px-3 py-1 text-xs rounded border border-gray-300 text-gray-700 hover:bg-gray-100"
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

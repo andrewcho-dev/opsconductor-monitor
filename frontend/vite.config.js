@@ -23,6 +23,9 @@ export default defineConfig({
       '/get_ssh_cli_interfaces': 'http://192.168.10.50:5000',
       '/power_history': 'http://192.168.10.50:5000',
       '/topology_data': 'http://192.168.10.50:5000',
+      '/api/network-ranges': 'http://192.168.10.50:5000',
+      '/api/custom-groups': 'http://192.168.10.50:5000',
+      '/api/network-groups': 'http://192.168.10.50:5000',
     }
   },
   build: {
