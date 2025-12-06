@@ -4,6 +4,46 @@ import { Play, Square, RefreshCw, Plus, Trash2, Save, TestTube, Settings } from 
 import { cn } from '../lib/utils';
 import CompleteJobBuilder from '../components/CompleteJobBuilder';
 
+// Error Boundary Component
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('Poller Modal Error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-lg p-6 max-w-md mx-4">
+            <h3 className="text-lg font-bold text-red-800 mb-2">⚠️ Job Builder Error</h3>
+            <p className="text-gray-600 mb-4">Something went wrong loading the job builder.</p>
+            <button 
+              onClick={() => {
+                this.setState({ hasError: false, error: null });
+                if (this.props.onClose) this.props.onClose();
+              }}
+              className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+            >
+              Close Job Builder
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 const Poller = ({ openJobBuilder = false }) => {
   const [status, setStatus] = useState({
     discovery: { active: false, next_run: null },
@@ -13,8 +53,15 @@ const Poller = ({ openJobBuilder = false }) => {
     execution_log: []
   });
   const [logs, setLogs] = useState([]);
-  const [showJobBuilder, setShowJobBuilder] = useState(openJobBuilder);
+  const [showJobBuilder, setShowJobBuilder] = useState(false);
   const [editingJob, setEditingJob] = useState(null);
+  
+  // Handle openJobBuilder prop safely
+  useEffect(() => {
+    if (openJobBuilder) {
+      setShowJobBuilder(true);
+    }
+  }, [openJobBuilder]);
   const [jobs, setJobs] = useState([
     {
       id: 'discovery',
@@ -646,8 +693,12 @@ const Poller = ({ openJobBuilder = false }) => {
       {showJobBuilder && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 overflow-hidden">
           <div className="h-full w-full overflow-auto">
-            <CompleteJobBuilder
-              job={editingJob || {
+            <ErrorBoundary onClose={() => {
+              setShowJobBuilder(false);
+              setEditingJob(null);
+            }}>
+              <CompleteJobBuilder
+                job={editingJob || {
                 job_id: 'discovery',
                 name: 'Network Discovery',
                 description: 'Complete network discovery with all parameters exposed',
@@ -760,6 +811,7 @@ const Poller = ({ openJobBuilder = false }) => {
                 setEditingJob(null);
               }}
             />
+            </ErrorBoundary>
           </div>
         </div>
       )}
