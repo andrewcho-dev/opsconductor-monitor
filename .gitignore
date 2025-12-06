@@ -11,3 +11,10 @@ venv/
 .pytest_cache/
 .idea/
 .vscode/
+
+# Build artifacts
+dist/
+frontend/dist/
+
+# Local databases / data
+*.sqlite

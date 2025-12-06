@@ -1,16 +1,38 @@
-# React + Vite
+# Frontend (React/Vite) – OpsConductor Monitor
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+UI for the poller dashboard and modular Job Builder.
 
-Currently, two official plugins are available:
+## Prereqs
+- Node 18+
+- Backend running at `http://192.168.10.50:5000` (or adjust proxy in `vite.config.js`)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Install
+```bash
+npm install
+```
 
-## React Compiler
+## Run (dev, port 3000, all interfaces)
+```bash
+npm run dev -- --host 0.0.0.0 --port 3000
+```
+Vite proxy forwards API calls to the backend (see `vite.config.js`).
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Build (outputs to ../dist)
+```bash
+npm run build
+```
 
-## Expanding the ESLint configuration
+## Lint
+```bash
+npm run lint
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Key entry points
+- `src/main.jsx` – app bootstrap
+- `src/App.jsx` – routes
+- `src/pages/Poller.jsx` – poller dashboard + Job Builder modal
+- `src/components/jobBuilder/` – modular Job Builder (CompleteJobBuilder, sections, actions, TargetSelectionModal, hooks)
+
+## Notes
+- Dev server listens on `0.0.0.0:3000` when run with the flags above for LAN access.
+- Build artifacts go to `../dist` (gitignored).
