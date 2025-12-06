@@ -22,7 +22,6 @@ export default defineConfig({
       '/get_combined_interfaces': 'http://192.168.10.50:5000',
       '/get_ssh_cli_interfaces': 'http://192.168.10.50:5000',
       '/power_history': 'http://192.168.10.50:5000',
-      '/poller': 'http://192.168.10.50:5000',
       '/topology_data': 'http://192.168.10.50:5000',
     }
   },

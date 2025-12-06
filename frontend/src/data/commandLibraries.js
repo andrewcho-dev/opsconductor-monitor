@@ -269,6 +269,570 @@ export const COMMAND_LIBRARIES = {
             }
           }
         }
+      },
+
+      // NETWORK SCANNING COMMANDS
+      nmap: {
+        name: "Network Port Scanner",
+        description: "Scan for open ports and services on target hosts",
+        category: "scanning",
+        syntax: "nmap -{scan_type} -p {port_range} -{timing} {target}",
+        parameters: {
+          scan_type: {
+            type: "select",
+            label: "Scan Type",
+            default: "sS",
+            required: true,
+            options: [
+              { value: "sS", label: "SYN Scan (Stealth)" },
+              { value: "sT", label: "TCP Connect Scan" },
+              { value: "sU", label: "UDP Scan" },
+              { value: "sP", label: "Ping Scan" },
+              { value: "sV", label: "Version Detection" }
+            ]
+          },
+          port_range: {
+            type: "text",
+            label: "Port Range",
+            default: "1-1000",
+            required: true,
+            placeholder: "e.g., 22,80,443 or 1-65535"
+          },
+          timing: {
+            type: "select",
+            label: "Timing Template",
+            default: "T4",
+            required: true,
+            options: [
+              { value: "T3", label: "Normal" },
+              { value: "T4", label: "Fast" },
+              { value: "T5", label: "Aggressive" }
+            ]
+          }
+        },
+        variables: {
+          "{target}": {
+            required: true,
+            description: "IP address, hostname, or CIDR range"
+          }
+        },
+        warnings: ["Port scanning may be detected by security systems"],
+        examples: [
+          { command: "nmap -sS -p 22,80,443 -T4 192.168.1.100", description: "Quick common port scan" }
+        ]
+      },
+
+      netcat: {
+        name: "Netcat Port Test",
+        description: "Test TCP/UDP port connectivity using netcat",
+        category: "scanning",
+        syntax: "nc -{protocol} -v -z -w {timeout} {target} {port}",
+        parameters: {
+          protocol: {
+            type: "select",
+            label: "Protocol",
+            default: "",
+            required: true,
+            options: [
+              { value: "", label: "TCP" },
+              { value: "u", label: "UDP" }
+            ]
+          },
+          timeout: {
+            type: "number",
+            label: "Timeout",
+            default: 3,
+            min: 1,
+            max: 30,
+            required: true,
+            unit: "seconds"
+          }
+        },
+        variables: {
+          "{target}": { required: true, description: "Target IP address or hostname" },
+          "{port}": { required: true, description: "Port number to test" }
+        },
+        examples: [
+          { command: "nc -v -z -w 3 192.168.1.100 80", description: "Test HTTP port" }
+        ]
+      },
+
+      // SYSTEM INFORMATION COMMANDS
+      hostname: {
+        name: "Hostname Information",
+        description: "Get system hostname and domain information",
+        category: "system",
+        syntax: "hostname -{detail_level}",
+        parameters: {
+          detail_level: {
+            type: "select",
+            label: "Detail Level",
+            default: "f",
+            required: true,
+            options: [
+              { value: "s", label: "Short hostname" },
+              { value: "f", label: "Fully qualified domain name" },
+              { value: "i", label: "IP address" },
+              { value: "a", label: "All information" }
+            ]
+          }
+        }
+      },
+
+      uname: {
+        name: "System Information",
+        description: "Get detailed system information",
+        category: "system",
+        syntax: "uname -{options}",
+        parameters: {
+          options: {
+            type: "select",
+            label: "Information Type",
+            default: "a",
+            required: true,
+            options: [
+              { value: "s", label: "Kernel name" },
+              { value: "r", label: "Kernel release" },
+              { value: "v", label: "Kernel version" },
+              { value: "m", label: "Machine hardware" },
+              { value: "a", label: "All information" }
+            ]
+          }
+        }
+      },
+
+      df: {
+        name: "Disk Space Usage",
+        description: "Check disk space usage and availability",
+        category: "system",
+        syntax: "df -{format} {path}",
+        parameters: {
+          format: {
+            type: "select",
+            label: "Output Format",
+            default: "h",
+            required: true,
+            options: [
+              { value: "h", label: "Human readable" },
+              { value: "k", label: "Kilobytes" },
+              { value: "m", label: "Megabytes" },
+              { value: "g", label: "Gigabytes" }
+            ]
+          }
+        },
+        variables: {
+          "{path}": {
+            required: false,
+            description: "Specific path to check (default: all filesystems)",
+            default: ""
+          }
+        }
+      },
+
+      free: {
+        name: "Memory Usage",
+        description: "Check system memory usage and availability",
+        category: "system",
+        syntax: "free -{format}",
+        parameters: {
+          format: {
+            type: "select",
+            label: "Display Format",
+            default: "h",
+            required: true,
+            options: [
+              { value: "b", label: "Bytes" },
+              { value: "k", label: "Kilobytes" },
+              { value: "m", label: "Megabytes" },
+              { value: "g", label: "Gigabytes" },
+              { value: "h", label: "Human readable" }
+            ]
+          }
+        }
+      },
+
+      // NETWORK CONFIGURATION COMMANDS
+      ip_addr: {
+        name: "IP Address Information",
+        description: "Show network interface IP addresses",
+        category: "networking",
+        syntax: "ip addr show {interface}",
+        parameters: {},
+        variables: {
+          "{interface}": {
+            required: false,
+            description: "Specific interface (default: all interfaces)",
+            default: ""
+          }
+        }
+      },
+
+      ip_route: {
+        name: "Routing Table",
+        description: "Display network routing table",
+        category: "networking",
+        syntax: "ip route show"
+      },
+
+      ss: {
+        name: "Socket Statistics",
+        description: "Display network socket information",
+        category: "networking",
+        syntax: "ss -{options}",
+        parameters: {
+          options: {
+            type: "text",
+            label: "SS Options",
+            default: "tuln",
+            required: true,
+            placeholder: "e.g., tuln, -a, -p"
+          }
+        }
+      },
+
+      // PROCESS MANAGEMENT COMMANDS
+      ps: {
+        name: "Process List",
+        description: "Display running processes",
+        category: "processes",
+        syntax: "ps -{format} {sort}",
+        parameters: {
+          format: {
+            type: "select",
+            label: "Output Format",
+            default: "aux",
+            required: true,
+            options: [
+              { value: "aux", label: "All processes (BSD style)" },
+              { value: "ef", label: "All processes (System V style)" },
+              { value: "u", label: "User processes" }
+            ]
+          },
+          sort: {
+            type: "select",
+            label: "Sort By",
+            default: "",
+            required: false,
+            options: [
+              { value: "", label: "Default" },
+              { value: "--sort=-%cpu", label: "CPU usage (descending)" },
+              { value: "--sort=-%mem", label: "Memory usage (descending)" }
+            ]
+          }
+        }
+      },
+
+      top: {
+        name: "Process Monitor",
+        description: "Display and update running processes",
+        category: "processes",
+        syntax: "top -b -n {iterations}",
+        parameters: {
+          iterations: {
+            type: "number",
+            label: "Iterations",
+            default: 1,
+            min: 1,
+            max: 10,
+            required: true
+          }
+        }
+      },
+
+      // SECURITY COMMANDS
+      iptables: {
+        name: "Firewall Rules",
+        description: "Display iptables firewall rules",
+        category: "security",
+        syntax: "iptables -{chain} -L -{format}",
+        parameters: {
+          chain: {
+            type: "select",
+            label: "Chain",
+            default: "",
+            required: false,
+            options: [
+              { value: "", label: "All chains" },
+              { value: "INPUT", label: "INPUT chain" },
+              { value: "OUTPUT", label: "OUTPUT chain" },
+              { value: "FORWARD", label: "FORWARD chain" }
+            ]
+          },
+          format: {
+            type: "select",
+            label: "Output Format",
+            default: "n",
+            required: true,
+            options: [
+              { value: "n", label: "Numeric (no DNS lookup)" },
+              { value: "v", label: "Verbose" },
+              { value: "nv", label: "Numeric and verbose" }
+            ]
+          }
+        },
+        warnings: ["Requires root privileges to modify firewall rules"]
+      },
+
+      ufw: {
+        name: "UFW Firewall Status",
+        description: "Check Uncomplicated Firewall status and rules",
+        category: "security",
+        syntax: "ufw {action}",
+        parameters: {
+          action: {
+            type: "select",
+            label: "Action",
+            default: "status",
+            required: true,
+            options: [
+              { value: "status", label: "Show status" },
+              { value: "status verbose", label: "Show verbose status" },
+              { value: "status numbered", label: "Show numbered rules" }
+            ]
+          }
+        }
+      },
+
+      // MONITORING COMMANDS
+      iostat: {
+        name: "I/O Statistics",
+        description: "Monitor disk I/O and CPU statistics",
+        category: "monitoring",
+        syntax: "iostat -{options} {interval} {count}",
+        parameters: {
+          options: {
+            type: "select",
+            label: "Iostat Options",
+            default: "x",
+            required: true,
+            options: [
+              { value: "x", label: "Extended" },
+              { value: "d", label: "Device stats" },
+              { value: "m", label: "Metrics" }
+            ]
+          },
+          interval: {
+            type: "number",
+            label: "Interval",
+            default: 1,
+            min: 1,
+            max: 60,
+            required: true,
+            unit: "seconds"
+          },
+          count: {
+            type: "number",
+            label: "Count",
+            default: 1,
+            min: 1,
+            max: 10,
+            required: true
+          }
+        }
+      },
+
+      vmstat: {
+        name: "Virtual Memory Statistics",
+        description: "Monitor virtual memory, processes, and CPU activity",
+        category: "monitoring",
+        syntax: "vmstat -{options} {interval} {count}",
+        parameters: {
+          options: {
+            type: "select",
+            label: "Vmstat Options",
+            default: "a",
+            required: true,
+            options: [
+              { value: "a", label: "Active memory" },
+              { value: "s", label: "Stats summary" },
+              { value: "d", label: "Disk stats" }
+            ]
+          },
+          interval: {
+            type: "number",
+            label: "Interval",
+            default: 1,
+            min: 1,
+            max: 60,
+            required: true,
+            unit: "seconds"
+          },
+          count: {
+            type: "number",
+            label: "Count",
+            default: 1,
+            min: 1,
+            max: 10,
+            required: true
+          }
+        }
+      },
+
+      netstat: {
+        name: "Network Statistics",
+        description: "Display network connections and statistics",
+        category: "monitoring",
+        syntax: "netstat -{options}",
+        parameters: {
+          options: {
+            type: "select",
+            label: "Netstat Options",
+            default: "tuln",
+            required: true,
+            options: [
+              { value: "tuln", label: "TCP/UDP listening ports" },
+              { value: "an", label: "All connections" },
+              { value: "i", label: "Interface statistics" }
+            ]
+          }
+        }
+      },
+
+      // FILE SYSTEM COMMANDS
+      lsblk: {
+        name: "Block Device List",
+        description: "List block devices and disk partitions",
+        category: "storage",
+        syntax: "lsblk -{options}",
+        parameters: {
+          options: {
+            type: "select",
+            label: "Lsblk Options",
+            default: "f",
+            required: true,
+            options: [
+              { value: "f", label: "Filesystem info" },
+              { value: "m", label: "Major-minor numbers" },
+              { value: "d", label: "Disk devices only" }
+            ]
+          }
+        }
+      },
+
+      mount: {
+        name: "Mounted Filesystems",
+        description: "Display currently mounted filesystems",
+        category: "storage",
+        syntax: "mount -{options}",
+        parameters: {
+          options: {
+            type: "select",
+            label: "Display Options",
+            default: "",
+            required: false,
+            options: [
+              { value: "", label: "Standard format" },
+              { value: "l", label: "Verbose labels" }
+            ]
+          }
+        }
+      },
+
+      // SERVICE MANAGEMENT COMMANDS
+      systemctl: {
+        name: "Service Control",
+        description: "Control and monitor systemd services",
+        category: "services",
+        syntax: "systemctl {action} {service}",
+        parameters: {
+          action: {
+            type: "select",
+            label: "Action",
+            default: "status",
+            required: true,
+            options: [
+              { value: "status", label: "Show status" },
+              { value: "is-active", label: "Check if active" },
+              { value: "is-enabled", label: "Check if enabled" },
+              { value: "list-units", label: "List all units" },
+              { value: "list-failed", label: "List failed units" }
+            ]
+          }
+        },
+        variables: {
+          "{service}": {
+            required: false,
+            description: "Service name (default: all services)",
+            default: ""
+          }
+        },
+        warnings: ["Service management requires appropriate privileges"]
+      },
+
+      // LOG COMMANDS
+      journalctl: {
+        name: "System Journal Logs",
+        description: "Query systemd journal logs",
+        category: "logging",
+        syntax: "journalctl -{options} -n {lines}",
+        parameters: {
+          options: {
+            type: "text",
+            label: "Journal Options",
+            default: "xe",
+            required: true,
+            placeholder: "e.g., xe, unginx, f"
+          },
+          lines: {
+            type: "number",
+            label: "Number of Lines",
+            default: 50,
+            min: 10,
+            max: 500,
+            required: true
+          }
+        }
+      },
+
+      // PACKAGE MANAGEMENT COMMANDS
+      apt: {
+        name: "Package Management",
+        description: "Manage Debian/Ubuntu packages",
+        category: "packages",
+        syntax: "apt {action} {package}",
+        parameters: {
+          action: {
+            type: "select",
+            label: "Action",
+            default: "list",
+            required: true,
+            options: [
+              { value: "list", label: "List packages" },
+              { value: "search", label: "Search packages" },
+              { value: "show", label: "Show package info" },
+              { value: "policy", label: "Show package policy" }
+            ]
+          }
+        },
+        variables: {
+          "{package}": {
+            required: false,
+            description: "Package name or search pattern",
+            default: ""
+          }
+        },
+        warnings: ["Only read-only operations are supported for safety"]
+      },
+
+      // TIME AND DATE COMMANDS
+      timedatectl: {
+        name: "Time and Date Settings",
+        description: "Control system time and date settings",
+        category: "system",
+        syntax: "timedatectl {action}",
+        parameters: {
+          action: {
+            type: "select",
+            label: "Action",
+            default: "status",
+            required: true,
+            options: [
+              { value: "status", label: "Show time status" },
+              { value: "list-timezones", label: "List timezones" },
+              { value: "timesync-status", label: "Show time sync status" }
+            ]
+          }
+        }
       }
     }
   },
