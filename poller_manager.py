@@ -469,3 +469,12 @@ def get_poller_manager():
     if _poller_manager is None:
         _poller_manager = PollerManager()
     return _poller_manager
+
+def initialize_poller():
+    """Initialize the poller system"""
+    try:
+        manager = get_poller_manager()
+        return True
+    except Exception as e:
+        logger.error(f"Failed to initialize poller: {e}")
+        return False
