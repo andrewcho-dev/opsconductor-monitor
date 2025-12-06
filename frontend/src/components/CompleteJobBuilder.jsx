@@ -371,27 +371,214 @@ const CompleteJobBuilder = ({ job, onSave, onTest, onBack }) => {
       network: '10.127.0.0/24',
       parallel_threads: 20,
       batch_size: 50,
-      global_timeout: 300,
-      error_handling: 'continue',
-      logging: {
-        level: 'INFO',
-        file: '/var/log/poller.log',
-        format: 'json'
-      },
-      scheduling: {
-        enabled: true,
-        interval: 3600,
-        timezone: 'UTC',
-        retry_on_failure: true,
-        max_retries: 3
-      }
-    }
+      timeout_seconds: 300,
+      retry_attempts: 3,
+      error_handling: 'continue'
+    },
+    actions: []
   });
+  const [expandedActions, setExpandedActions] = useState(new Set());
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  
+  // State for intelligent target selection
+  const [availableTargets, setAvailableTargets] = useState({
+    network_ranges: [],
+    custom_groups: [],
+    network_groups: []
+  });
+  const [targetsLoading, setTargetsLoading] = useState(false);
+
+  // Fetch available targets from database
+  const fetchAvailableTargets = async () => {
+    setTargetsLoading(true);
+    try {
+      // Fetch network ranges from database
+      const networkResponse = await fetch('/api/network-ranges');
+      const networkData = await networkResponse.json();
+      
+      // Fetch custom groups from database  
+      const customGroupsResponse = await fetch('/api/custom-groups');
+      const customGroupsData = await customGroupsResponse.json();
+      
+      // Fetch network groups from database
+      const networkGroupsResponse = await fetch('/api/network-groups');
+      const networkGroupsData = await networkGroupsResponse.json();
+      
+      setAvailableTargets({
+        network_ranges: networkData.ranges || [],
+        custom_groups: customGroupsData.groups || [],
+        network_groups: networkGroupsData.groups || []
+      });
+    } catch (err) {
+      console.error('Failed to fetch available targets:', err);
+      // Set some demo data for development
+      setAvailableTargets({
+        network_ranges: [
+          '192.168.1.0/24',
+          '10.0.0.0/16', 
+          '172.16.0.0/12',
+          '192.168.10.0/24'
+        ],
+        custom_groups: [
+          'Production Servers',
+          'Development Environment',
+          'Test Network',
+          'DMZ Servers'
+        ],
+        network_groups: [
+          'Core Infrastructure',
+          'Edge Devices',
+          'Security Appliances',
+          'Monitoring Systems'
+        ]
+      });
+    } finally {
+      setTargetsLoading(false);
+    }
+  };
+
+  // Load available targets on component mount
+  useEffect(() => {
+    fetchAvailableTargets();
+  }, []);
 
   const [testMode, setTestMode] = useState(false);
   const [testActionIndex, setTestActionIndex] = useState(0);
   const [testInput, setTestInput] = useState('PING 192.168.1.1 (192.168.1.1): 56 data bytes\n64 bytes from 192.168.1.1: icmp_seq=1 ttl=64 time=0.123 ms\n64 bytes from 192.168.1.1: icmp_seq=2 ttl=64 time=0.456 ms');
   const [testResults, setTestResults] = useState([]);
+
+  // Intelligent Target Selection Component
+  const IntelligentTargetSelector = ({ action, actionIndex, updateAction }) => {
+    const [useExisting, setUseExisting] = useState(true);
+    const [selectedTarget, setSelectedTarget] = useState('');
+    
+    const targetType = action.targeting.source;
+    const targets = availableTargets[targetType] || [];
+    
+    const handleTargetSelection = (target) => {
+      setSelectedTarget(target);
+      if (targetType === 'network_range') {
+        updateAction(actionIndex, 'targeting.network_range', target);
+      } else if (targetType === 'custom_groups' || targetType === 'network_groups') {
+        updateAction(actionIndex, `targeting.${targetType}`, [target]);
+      }
+    };
+    
+    const handleCustomTarget = (value) => {
+      setSelectedTarget(value);
+      if (targetType === 'network_range') {
+        updateAction(actionIndex, 'targeting.network_range', value);
+      } else if (targetType === 'custom_groups' || targetType === 'network_groups') {
+        try {
+          updateAction(actionIndex, `targeting.${targetType}`, JSON.parse(value));
+        } catch (err) {
+          // Handle as single string if not valid JSON
+          updateAction(actionIndex, `targeting.${targetType}`, [value]);
+        }
+      }
+    };
+    
+    const getCurrentValue = () => {
+      if (targetType === 'network_range') {
+        return action.targeting.network_range || '';
+      } else if (targetType === 'custom_groups' || targetType === 'network_groups') {
+        const groups = action.targeting[targetType] || [];
+        return Array.isArray(groups) ? groups.join(', ') : groups;
+      }
+      return '';
+    };
+    
+    return (
+      <div className="space-y-2">
+        {/* Toggle between existing and custom */}
+        <div className="flex items-center gap-2 mb-2">
+          <label className="text-xs font-medium">Source:</label>
+          <div className="flex bg-gray-100 rounded p-1">
+            <button
+              onClick={() => setUseExisting(true)}
+              className={`px-2 py-1 text-xs rounded transition-colors ${
+                useExisting 
+                  ? 'bg-blue-500 text-white' 
+                  : 'text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              📋 Pick from Database
+            </button>
+            <button
+              onClick={() => setUseExisting(false)}
+              className={`px-2 py-1 text-xs rounded transition-colors ${
+                !useExisting 
+                  ? 'bg-blue-500 text-white' 
+                  : 'text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              ✏️ Create New
+            </button>
+          </div>
+        </div>
+        
+        {targetsLoading ? (
+          <div className="text-xs text-gray-500 italic">Loading available targets...</div>
+        ) : useExisting ? (
+          /* Pick from existing targets */
+          <div>
+            <label className="block text-xs font-medium mb-1">
+              Select {targetType.replace('_', ' ')} from database:
+            </label>
+            {targets.length > 0 ? (
+              <select
+                value={selectedTarget}
+                onChange={(e) => handleTargetSelection(e.target.value)}
+                className="w-full p-1 border rounded text-xs bg-gray-200 focus:bg-white focus:ring-1 focus:ring-blue-300"
+              >
+                <option value="">Choose from {targets.length} available...</option>
+                {targets.map((target, index) => (
+                  <option key={index} value={target}>
+                    {target}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="text-xs text-gray-500 italic bg-gray-50 p-2 rounded border">
+                No {targetType.replace('_', ' ')} found in database. Switch to "Create New" to add one.
+              </div>
+            )}
+          </div>
+        ) : (
+          /* Create custom target */
+          <div>
+            <label className="block text-xs font-medium mb-1">
+              Create new {targetType.replace('_', ' ')}:
+            </label>
+            {targetType === 'network_range' ? (
+              <input
+                type="text"
+                value={getCurrentValue()}
+                onChange={(e) => handleCustomTarget(e.target.value)}
+                placeholder="e.g., 192.168.1.0/24 or 10.0.0.1-10.0.0.100"
+                className="w-full p-1 border rounded text-xs bg-gray-200 focus:bg-white focus:ring-1 focus:ring-blue-300"
+              />
+            ) : (
+              <textarea
+                value={getCurrentValue()}
+                onChange={(e) => handleCustomTarget(e.target.value)}
+                placeholder={targetType === 'custom_groups' 
+                  ? 'Enter group names (one per line or JSON array)'
+                  : 'Enter network groups (one per line or JSON array)'
+                }
+                className="w-full p-1 border rounded font-mono text-xs bg-gray-200 focus:bg-white focus:ring-1 focus:ring-blue-300"
+                rows={2}
+              />
+            )}
+            <div className="text-xs text-gray-500 mt-1">
+              💡 This will be available for future jobs once saved
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const testRegexPatterns = () => {
     const action = currentJob.actions[testActionIndex];
@@ -880,83 +1067,56 @@ const CompleteJobBuilder = ({ job, onSave, onTest, onBack }) => {
                     <div className="grid grid-cols-1 gap-2 mb-2">
                       <div>
                         <label className="block text-xs font-medium mb-1">Target Source</label>
-                      <select
-                        value={action.targeting.source}
-                        onChange={(e) => updateAction(actionIndex, 'targeting.source', e.target.value)}
-                        className="w-full p-1 border rounded text-sm bg-gray-200 focus:bg-white focus:ring-2 focus:ring-blue-300"
-                      >
-                        <option value="network_range">Network Range</option>
-                        <option value="target_list">Target List</option>
-                        <option value="custom_groups">Custom Groups</option>
-                        <option value="network_groups">Network Groups</option>
-                        <option value="database_query">Database Query</option>
-                        <option value="file">File</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Target Configuration - Only show relevant fields */}
-                <div className="mb-2">
-                  <h4 className="text-xs font-bold mb-1">
-                    TARGETS
-                    <span className="text-xs font-normal text-gray-600 ml-1">
-                      (What devices this action runs on)
-                    </span>
-                  </h4>
-                  <div className="grid grid-cols-3 gap-2">
-                    {action.targeting.source === 'network_range' && (
+                        <select
+                          value={action.targeting.source}
+                          onChange={(e) => updateAction(actionIndex, 'targeting.source', e.target.value)}
+                          className="w-full p-1 border rounded text-xs bg-gray-200 focus:bg-white focus:ring-1 focus:ring-blue-300"
+                        >
+                          <option value="network_range">🌐 Network Range</option>
+                          <option value="target_list">📝 Target List</option>
+                          <option value="file">📁 File</option>
+                          <option value="custom_groups">👥 Custom Groups</option>
+                          <option value="network_groups">🔗 Network Groups</option>
+                        </select>
+                      </div>
+                      
+                      {/* Intelligent target selection for database-backed targets */}
+                      {(action.targeting.source === 'network_range' || 
+                        action.targeting.source === 'custom_groups' || 
+                        action.targeting.source === 'network_groups') && (
+                        <div>
+                          <IntelligentTargetSelector 
+                            action={action}
+                            actionIndex={actionIndex}
+                            updateAction={updateAction}
+                          />
+                        </div>
+                      )}
+                      
+                      {/* Traditional input for non-database targets */}
+                      {(action.targeting.source === 'target_list' || action.targeting.source === 'file') && (
+                        <div>
+                          <label className="block text-xs font-medium mb-1">
+                            {action.targeting.source === 'target_list' ? 'Target List' : 'File Path'} (one per line)
+                          </label>
+                          <textarea
+                            value={action.targeting.source === 'target_list' ? action.targeting.target_list : action.targeting.file_path}
+                            onChange={(e) => updateAction(actionIndex, action.targeting.source === 'target_list' ? 'targeting.target_list' : 'targeting.file_path', e.target.value)}
+                            className="w-full p-1 border rounded font-mono text-xs bg-gray-200 focus:bg-white focus:ring-1 focus:ring-blue-300"
+                            rows={2}
+                          />
+                        </div>
+                      )}
+                      
                       <div>
-                        <label className="block text-xs font-medium mb-1">Network Range</label>
+                        <label className="block text-xs font-medium mb-1">Max Concurrent</label>
                         <input
-                          type="text"
-                          value={action.targeting.network_range}
-                          onChange={(e) => updateAction(actionIndex, 'targeting.network_range', e.target.value)}
-                          className="w-full p-1 border rounded text-sm bg-gray-200 focus:bg-white focus:ring-2 focus:ring-blue-300"
+                          type="number"
+                          value={action.targeting.max_concurrent}
+                          onChange={(e) => updateAction(actionIndex, 'targeting.max_concurrent', parseInt(e.target.value))}
+                          className="w-full p-1 border rounded text-xs bg-gray-200 focus:bg-white focus:ring-1 focus:ring-blue-300"
                         />
                       </div>
-                    )}
-                    {(action.targeting.source === 'target_list' || action.targeting.source === 'file') && (
-                      <div className="col-span-2">
-                        <label className="block text-xs font-medium mb-1">
-                          {action.targeting.source === 'target_list' ? 'Target List' : 'File Path'} (one per line)
-                        </label>
-                        <textarea
-                          value={action.targeting.source === 'target_list' ? action.targeting.target_list : action.targeting.file_path}
-                          onChange={(e) => updateAction(actionIndex, action.targeting.source === 'target_list' ? 'targeting.target_list' : 'targeting.file_path', e.target.value)}
-                          className="w-full p-1 border rounded font-mono text-xs bg-gray-200 focus:bg-white focus:ring-2 focus:ring-blue-300"
-                          rows={2}
-                        />
-                      </div>
-                    )}
-                    {(action.targeting.source === 'custom_groups' || action.targeting.source === 'network_groups') && (
-                      <div className="col-span-2">
-                        <label className="block text-xs font-medium mb-1">
-                          {action.targeting.source === 'custom_groups' ? 'Custom' : 'Network'} Groups (JSON array)
-                        </label>
-                        <textarea
-                          value={JSON.stringify(action.targeting[action.targeting.source] || [], null, 2)}
-                          onChange={(e) => {
-                            try {
-                              updateAction(actionIndex, `targeting.${action.targeting.source}`, JSON.parse(e.target.value));
-                            } catch (err) {
-                              // Invalid JSON, don't update
-                            }
-                          }}
-                          className="w-full p-1 border rounded font-mono text-xs bg-gray-200 focus:bg-white focus:ring-2 focus:ring-blue-300"
-                          rows={2}
-                          placeholder='["group1", "group2"]'
-                        />
-                      </div>
-                    )}
-                    <div>
-                      <label className="block text-xs font-medium mb-1">Max Concurrent</label>
-                      <input
-                        type="number"
-                        value={action.targeting.max_concurrent}
-                        onChange={(e) => updateAction(actionIndex, 'targeting.max_concurrent', parseInt(e.target.value))}
-                        className="w-full p-1 border rounded text-sm bg-gray-200 focus:bg-white focus:ring-2 focus:ring-blue-300"
-                      />
                     </div>
                   </div>
                 </div>
