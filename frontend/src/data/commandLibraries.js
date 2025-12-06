@@ -833,6 +833,530 @@ export const COMMAND_LIBRARIES = {
             ]
           }
         }
+      },
+
+      // TEXT PROCESSING - ESSENTIAL SYSADMIN TOOLS
+      grep: {
+        name: "Text Pattern Search",
+        description: "Search for patterns in text files and output",
+        category: "text-processing",
+        syntax: "grep -{options} '{pattern}' {file}",
+        parameters: {
+          options: {
+            type: "text",
+            label: "Grep Options",
+            default: "i",
+            required: true,
+            placeholder: "e.g., i, r, n, v, w, E",
+            help: "i=ignore case, r=recursive, n=line numbers, v=invert, w=whole word, E=extended regex"
+          }
+        },
+        variables: {
+          "{pattern}": {
+            required: true,
+            description: "Search pattern or regex"
+          },
+          "{file}": {
+            required: true,
+            description: "File to search (use * for multiple files)"
+          }
+        },
+        examples: [
+          { command: "grep -i 'error' /var/log/syslog", description: "Search for errors in syslog" },
+          { command: "grep -r '192.168.1' /etc/", description: "Recursive search for IP in config files" }
+        ]
+      },
+
+      sed: {
+        name: "Stream Editor",
+        description: "Transform text using search and replace operations",
+        category: "text-processing",
+        syntax: "sed -{options} 's/{find}/{replace}/g' {file}",
+        parameters: {
+          options: {
+            type: "select",
+            label: "Operation Mode",
+            default: "",
+            required: false,
+            options: [
+              { value: "", label: "Replace and output" },
+              { value: "i", label: "Edit file in place (DANGER!)" }
+            ],
+            help: "WARNING: -i modifies the original file!"
+          }
+        },
+        variables: {
+          "{find}": {
+            required: true,
+            description: "Pattern to find"
+          },
+          "{replace}": {
+            required: true,
+            description: "Replacement text"
+          },
+          "{file}": {
+            required: true,
+            description: "Target file"
+          }
+        },
+        warnings: ["Use -i option with extreme caution - it modifies files in place"],
+        examples: [
+          { command: "sed 's/old_ip/new_ip/g' config.txt", description: "Replace IP addresses in config" },
+          { command: "sed 's/#.*//' /etc/fstab", description: "Remove comments from fstab" }
+        ]
+      },
+
+      awk: {
+        name: "Advanced Text Processing",
+        description: "Pattern scanning and text processing language",
+        category: "text-processing",
+        syntax: "awk '{pattern}' {file}",
+        parameters: {
+          pattern: {
+            type: "text",
+            label: "AWK Pattern",
+            default: "{print $1,$3}",
+            required: true,
+            placeholder: "e.g., {print $1}, '/error/ {print NR,$0}'",
+            help: "AWK script pattern (use single quotes in shell)"
+          }
+        },
+        variables: {
+          "{file}": {
+            required: true,
+            description: "File to process"
+          }
+        },
+        examples: [
+          { command: "awk '{print $1,$3}' access.log", description: "Extract columns 1 and 3 from log" },
+          { command: "awk '/error/ {print NR,$0}' logfile", description: "Show lines with 'error' and line numbers" }
+        ]
+      },
+
+      sort: {
+        name: "Text Line Sorting",
+        description: "Sort lines of text files",
+        category: "text-processing",
+        syntax: "sort -{options} {file}",
+        parameters: {
+          options: {
+            type: "text",
+            label: "Sort Options",
+            default: "n",
+            required: true,
+            placeholder: "e.g., n, r, k2, u",
+            help: "n=numeric, r=reverse, k2=sort by column 2, u=unique"
+          }
+        },
+        variables: {
+          "{file}": {
+            required: true,
+            description: "File to sort"
+          }
+        },
+        examples: [
+          { command: "sort -n numbers.txt", description: "Sort numbers numerically" },
+          { command: "sort -k2 -n users.txt", description: "Sort by second column numerically" }
+        ]
+      },
+
+      uniq: {
+        name: "Remove Duplicate Lines",
+        description: "Filter out duplicate adjacent lines",
+        category: "text-processing",
+        syntax: "uniq -{options} {file}",
+        parameters: {
+          options: {
+            type: "text",
+            label: "Uniq Options",
+            default: "c",
+            required: true,
+            placeholder: "e.g., c, d, u, f",
+            help: "c=count duplicates, d=show only duplicates, u=unique only, f=skip fields"
+          }
+        },
+        variables: {
+          "{file}": {
+            required: true,
+            description: "File to process"
+          }
+        },
+        examples: [
+          { command: "sort access.log | uniq -c", description: "Count occurrences of each line" },
+          { command: "uniq -d ip_list.txt", description: "Show only duplicate IPs" }
+        ]
+      },
+
+      // FILE MANAGEMENT - ESSENTIAL SYSADMIN TOOLS
+      find: {
+        name: "File Search",
+        description: "Search for files and directories",
+        category: "file-management",
+        syntax: "find {path} -{condition} '{value}'",
+        parameters: {
+          condition: {
+            type: "select",
+            label: "Search Condition",
+            default: "name",
+            required: true,
+            options: [
+              { value: "name", label: "Filename" },
+              { value: "type", label: "File type" },
+              { value: "size", label: "File size" },
+              { value: "mtime", label: "Modified time" },
+              { value: "perm", label: "Permissions" }
+            ]
+          }
+        },
+        variables: {
+          "{path}": {
+            required: true,
+            description: "Directory to search (use . for current)",
+            default: "."
+          },
+          "{value}": {
+            required: true,
+            description: "Search value (e.g., '*.log', f, +1M, -7, 755)"
+          }
+        },
+        examples: [
+          { command: "find . -name '*.log'", description: "Find all log files" },
+          { command: "find /var -size +100M", description: "Find files larger than 100MB" },
+          { command: "find /etc -mtime -7", description: "Find files modified in last 7 days" }
+        ]
+      },
+
+      rsync: {
+        name: "File Synchronization",
+        description: "Efficient file transfer and synchronization",
+        category: "file-management",
+        syntax: "rsync -{options} {source} {destination}",
+        parameters: {
+          options: {
+            type: "text",
+            label: "Rsync Options",
+            default: "avz",
+            required: true,
+            placeholder: "e.g., avz, avz --delete, avz --dry-run",
+            help: "a=archive, v=verbose, z=compress, --delete=remove dest extras"
+          }
+        },
+        variables: {
+          "{source}": {
+            required: true,
+            description: "Source directory or file"
+          },
+          "{destination}": {
+            required: true,
+            description: "Destination directory or remote: user@host:/path"
+          }
+        },
+        warnings: ["Test with --dry-run first to avoid data loss"],
+        examples: [
+          { command: "rsync -avz /data/ backup:/backup/", description: "Sync data directory to backup server" },
+          { command: "rsync -avz --delete src/ dst/", description: "Mirror directories (delete extras)" }
+        ]
+      },
+
+      tar: {
+        name: "Archive Creation",
+        description: "Create and extract tar archives",
+        category: "file-management",
+        syntax: "tar -{action}{options} {archive} {files}",
+        parameters: {
+          action: {
+            type: "select",
+            label: "Action",
+            default: "czf",
+            required: true,
+            options: [
+              { value: "czf", label: "Create compressed archive" },
+              { value: "xzf", label: "Extract compressed archive" },
+              { value: "tzf", label: "List archive contents" }
+            ]
+          }
+        },
+        variables: {
+          "{archive}": {
+            required: true,
+            description: "Archive filename (e.g., backup.tar.gz)"
+          },
+          "{files}": {
+            required: true,
+            description: "Files or directories to archive"
+          }
+        },
+        examples: [
+          { command: "tar -czf backup.tar.gz /home/user/", description: "Create compressed backup" },
+          { command: "tar -xzf backup.tar.gz", description: "Extract compressed archive" }
+        ]
+      },
+
+      // USER MANAGEMENT - ESSENTIAL SYSADMIN TOOLS
+      useradd: {
+        name: "Create User Account",
+        description: "Create new user accounts",
+        category: "user-management",
+        syntax: "sudo useradd -{options} {username}",
+        parameters: {
+          options: {
+            type: "text",
+            label: "User Options",
+            default: "m",
+            required: true,
+            placeholder: "e.g., m, s /bin/bash, g users, d /home/test",
+            help: "m=create home, s=shell, g=group, d=home directory"
+          }
+        },
+        variables: {
+          "{username}": {
+            required: true,
+            description: "New username"
+          }
+        },
+        warnings: ["Requires sudo/root privileges"],
+        examples: [
+          { command: "sudo useradd -m -s /bin/bash newuser", description: "Create user with home and bash shell" },
+          { command: "sudo useradd -m -d /opt/appuser appuser", description: "Create user with custom home directory" }
+        ]
+      },
+
+      passwd: {
+        name: "Change Password",
+        description: "Change user passwords",
+        category: "user-management",
+        syntax: "sudo passwd {username}",
+        parameters: {},
+        variables: {
+          "{username}": {
+            required: false,
+            description: "Username (default: current user)",
+            default: ""
+          }
+        },
+        warnings: ["Requires sudo/root privileges to change other users' passwords"],
+        examples: [
+          { command: "passwd", description: "Change your own password" },
+          { command: "sudo passwd username", description: "Change another user's password" }
+        ]
+      },
+
+      // NETWORK DIAGNOSTICS - ESSENTIAL ADMIN TOOLS
+      dig: {
+        name: "DNS Lookup",
+        description: "Advanced DNS query tool",
+        category: "network-diagnostics",
+        syntax: "dig {domain} {record_type}",
+        parameters: {
+          record_type: {
+            type: "select",
+            label: "Record Type",
+            default: "A",
+            required: false,
+            options: [
+              { value: "A", label: "A Record (IP address)" },
+              { value: "AAAA", label: "AAAA Record (IPv6)" },
+              { value: "MX", label: "MX Record (Mail)" },
+              { value: "NS", label: "NS Record (Nameserver)" },
+              { value: "TXT", label: "TXT Record" },
+              { value: "ANY", label: "All Records" }
+            ]
+          }
+        },
+        variables: {
+          "{domain}": {
+            required: true,
+            description: "Domain name to query"
+          }
+        },
+        examples: [
+          { command: "dig google.com A", description: "Get IP address for google.com" },
+          { command: "dig example.com MX", description: "Get mail servers for example.com" }
+        ]
+      },
+
+      nslookup: {
+        name: "DNS Query",
+        description: "Simple DNS query tool",
+        category: "network-diagnostics",
+        syntax: "nslookup {domain} {server}",
+        parameters: {},
+        variables: {
+          "{domain}": {
+            required: true,
+            description: "Domain name to query"
+          },
+          "{server}": {
+            required: false,
+            description: "DNS server to use (default: system DNS)",
+            default: ""
+          }
+        },
+        examples: [
+          { command: "nslookup google.com", description: "Query google.com DNS" },
+          { command: "nslookup google.com 8.8.8.8", description: "Query using Google DNS" }
+        ]
+      },
+
+      host: {
+        name: "Host Lookup",
+        description: "DNS lookup utility",
+        category: "network-diagnostics",
+        syntax: "host {domain} {server}",
+        parameters: {},
+        variables: {
+          "{domain}": {
+            required: true,
+            description: "Domain name or IP to lookup"
+          },
+          "{server}": {
+            required: false,
+            description: "DNS server to use",
+            default: ""
+          }
+        },
+        examples: [
+          { command: "host google.com", description: "Lookup google.com" },
+          { command: "host 8.8.8.8", description: "Reverse DNS lookup for 8.8.8.8" }
+        ]
+      },
+
+      tcpdump: {
+        name: "Packet Capture",
+        description: "Network packet analyzer and capturer",
+        category: "network-diagnostics",
+        syntax: "sudo tcpdump -{options} '{filter}'",
+        parameters: {
+          options: {
+            type: "text",
+            label: "Capture Options",
+            default: "i any -c 10",
+            required: true,
+            placeholder: "e.g., i eth0, c 100, w file.pcap, n",
+            help: "i=interface, c=count, w=write file, n=no DNS lookup"
+          }
+        },
+        variables: {
+          "{filter}": {
+            required: false,
+            description: "Packet filter (e.g., port 80, host 192.168.1.1)",
+            default: ""
+          }
+        },
+        warnings: ["Requires sudo/root privileges", "Can capture sensitive data", "May impact network performance"],
+        examples: [
+          { command: "sudo tcpdump -i any -c 10 port 80", description: "Capture 10 HTTP packets" },
+          { command: "sudo tcpdump -i eth0 host 192.168.1.100", description: "Capture traffic to/from specific host" }
+        ]
+      },
+
+      // PERFORMANCE MONITORING - ESSENTIAL ADMIN TOOLS
+      htop: {
+        name: "Interactive Process Viewer",
+        description: "Advanced process monitoring tool",
+        category: "performance",
+        syntax: "htop -{options}",
+        parameters: {
+          options: {
+            type: "text",
+            label: "Display Options",
+            default: "",
+            required: false,
+            placeholder: "e.g., u username, p PID, d delay",
+            help: "u=user filter, p=specific PID, d=update delay"
+          }
+        },
+        examples: [
+          { command: "htop", description: "Interactive process viewer" },
+          { command: "htop -u www-data", description: "Show processes for specific user" }
+        ]
+      },
+
+      lsof: {
+        name: "List Open Files",
+        description: "List files and processes using them",
+        category: "performance",
+        syntax: "lsof -{options} {target}",
+        parameters: {
+          options: {
+            type: "select",
+            label: "Filter Type",
+            default: "i",
+            required: true,
+            options: [
+              { value: "i", label: "Internet connections" },
+              { value: "p", label: "Process ID" },
+              { value: "u", label: "User" },
+              { value: "t", label: "TCP only" },
+              { value: "u", label: "UDP only" }
+            ]
+          }
+        },
+        variables: {
+          "{target}": {
+            required: true,
+            description: "Filter value (e.g., :80, 1234, username, TCP, UDP)"
+          }
+        },
+        examples: [
+          { command: "lsof -i :80", description: "Show processes using port 80" },
+          { command: "lsof -p 1234", description: "Show files opened by process 1234" }
+        ]
+      },
+
+      strace: {
+        name: "System Call Tracer",
+        description: "Trace system calls and signals",
+        category: "performance",
+        syntax: "strace -{options} -p {pid}",
+        parameters: {
+          options: {
+            type: "text",
+            label: "Trace Options",
+            default: "c",
+            required: true,
+            placeholder: "e.g., c, f, e trace=write, p PID",
+            help: "c=summary, f=follow forks, e=filter, p=process ID"
+          }
+        },
+        variables: {
+          "{pid}": {
+            required: false,
+            description: "Process ID to trace (or command to run)",
+            default: ""
+          }
+        },
+        warnings: ["Can significantly impact process performance", "Requires appropriate permissions"],
+        examples: [
+          { command: "strace -c -p 1234", description: "Show system call summary for process 1234" },
+          { command: "strace -f -e trace=write ls -la", description: "Trace write syscalls for ls command" }
+        ]
+      },
+
+      // CRON AND SCHEDULING - ESSENTIAL ADMIN TOOLS
+      crontab: {
+        name: "Cron Job Management",
+        description: "Manage scheduled cron jobs",
+        category: "scheduling",
+        syntax: "crontab -{action}",
+        parameters: {
+          action: {
+            type: "select",
+            label: "Action",
+            default: "l",
+            required: true,
+            options: [
+              { value: "l", label: "List cron jobs" },
+              { value: "e", label: "Edit cron jobs" },
+              { value: "r", label: "Remove all cron jobs" }
+            ]
+          }
+        },
+        warnings: ["Use -e with caution - opens editor for cron jobs", "-r removes ALL cron jobs"],
+        examples: [
+          { command: "crontab -l", description: "List current user's cron jobs" },
+          { command: "sudo crontab -l", description: "List root's cron jobs" }
+        ]
       }
     }
   },
