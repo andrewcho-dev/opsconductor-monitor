@@ -35,11 +35,41 @@ export function DeviceTable({
   const [sortConfig, setSortConfig] = useState({ key: "ip_address", direction: "asc" });
   const [visibleCount, setVisibleCount] = useState(100);
   
-  // Load footer filters from localStorage on mount
-  const [footerFilters, setFooterFilters] = useState(() => {
+  // Load service filters from localStorage on mount
+  const [serviceFilters, setServiceFilters] = useState(() => {
     try {
-      const saved = localStorage.getItem('deviceTableFooterFilters');
-      return saved ? JSON.parse(saved) : {
+      // Try new key first, then fall back to old key for migration
+      let saved = localStorage.getItem('deviceTableServiceFilters');
+      if (!saved) {
+        saved = localStorage.getItem('deviceTableFooterFilters');
+        if (saved) {
+          // Migrate to new key
+          localStorage.setItem('deviceTableServiceFilters', saved);
+          localStorage.removeItem('deviceTableFooterFilters');
+        }
+      }
+      
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Check if all filters are false (safe state) or if any are true (potentially problematic)
+        const hasActiveFilters = Object.values(parsed).some(active => active === true);
+        
+        // If all filters are active (which would hide everything), reset to safe defaults
+        if (hasActiveFilters && Object.values(parsed).every(active => active === true)) {
+          return {
+            group: false,
+            ping: false,
+            snmp: false,
+            ssh: false,
+            rdp: false,
+            any: false,
+          };
+        }
+        
+        return parsed;
+      }
+      
+      return {
         group: false,
         ping: false,
         snmp: false,
@@ -59,14 +89,14 @@ export function DeviceTable({
     }
   });
   
-  // Save footer filters to localStorage whenever they change
+  // Save service filters to localStorage whenever they change
   useEffect(() => {
     try {
-      localStorage.setItem('deviceTableFooterFilters', JSON.stringify(footerFilters));
+      localStorage.setItem('deviceTableServiceFilters', JSON.stringify(serviceFilters));
     } catch {
       // Ignore localStorage errors
     }
-  }, [footerFilters]);
+  }, [serviceFilters]);
   
   // Load expanded networks from localStorage on mount
   const [expandedNetworks, setExpandedNetworks] = useState(() => {
@@ -104,37 +134,47 @@ export function DeviceTable({
       );
     }
 
-    // Apply footer filters
-    const activeFilters = Object.entries(footerFilters).filter(([_, active]) => active);
+    // Apply service filters
+    const activeFilters = Object.entries(serviceFilters).filter(([_, active]) => active);
+    
+    // Debug logging for group filter
+    if (activeFilters.some(([service, _]) => service === 'group')) {
+      console.log('Group filter active:', { selectedGroup, groupDevicesLength: groupDevices?.length || 0 });
+    }
+    
     if (activeFilters.length > 0) {
       filtered = filtered.filter((device) => {
         return activeFilters.some(([service, _]) => {
           if (service === 'any') {
             // ANY filter: show devices that are not completely offline
-            const isCompletelyOffline = (device) => {
-              const pingOffline = !device.ping_status || device.ping_status.toUpperCase() !== 'YES';
-              const snmpOffline = !device.snmp_status || device.snmp_status.toUpperCase() !== 'YES';
-              const sshOffline = !device.ssh_status || device.ssh_status.toUpperCase() !== 'YES';
-              const rdpOffline = !device.rdp_status || device.rdp_status.toUpperCase() !== 'YES';
-              return pingOffline && snmpOffline && sshOffline && rdpOffline;
-            };
-            return !isCompletelyOffline(device);
+            const pingOffline = !device.ping_status || device.ping_status.toLowerCase() !== 'online';
+            const snmpOffline = !device.snmp_status || device.snmp_status.toUpperCase() !== 'YES';
+            const sshOffline = !device.ssh_status || device.ssh_status.toUpperCase() !== 'YES';
+            const rdpOffline = !device.rdp_status || device.rdp_status.toUpperCase() !== 'YES';
+            return !(pingOffline && snmpOffline && sshOffline && rdpOffline);
           } else if (service === 'ping') {
             return device.ping_status && (
-              device.ping_status.includes('RESPONDS') || 
-              device.ping_status.toUpperCase() === "YES" ||
-              device.ping_status.toLowerCase() === 'online'
+              device.ping_status.toLowerCase() === 'online' ||
+              device.ping_status.toUpperCase() === 'YES'
             );
           } else if (service === 'group') {
             // GROUP filter: show only devices in the selected group
-            if (selectedGroup.type === "custom" && groupDevices.length > 0) {
-              const groupIpSet = new Set(groupDevices.map(d => d.ip_address));
-              return groupIpSet.has(device.ip_address);
+            if (selectedGroup.type === "custom") {
+              // For custom groups, check if device IP is in the group devices list
+              if (groupDevices && groupDevices.length > 0) {
+                const groupIpSet = new Set(groupDevices.map(d => d.ip_address || d));
+                return groupIpSet.has(device.ip_address);
+              } else {
+                // If no group devices loaded, don't filter (show all)
+                console.log('No group devices loaded for custom group, showing all devices');
+                return true;
+              }
             }
             if (selectedGroup.type === "network") {
               return device.network_range === selectedGroup.name;
             }
-            return false; // No group selected or "All Devices"
+            // If "All Devices" selected or no valid group, show all devices
+            return selectedGroup.name === "All Devices";
           } else {
             // For SNMP, SSH, RDP - filter for "YES" (positive status)
             const status = device[`${service}_status`];
@@ -145,7 +185,7 @@ export function DeviceTable({
     }
 
     return filtered;
-  }, [devices, search, footerFilters, selectedGroup, groupDevices]);
+  }, [devices, search, serviceFilters, selectedGroup, groupDevices]);
 
   // Group devices by network and create hierarchical structure
   const groupedDevices = useMemo(() => {
@@ -256,15 +296,15 @@ export function DeviceTable({
     }));
   };
 
-  const toggleFooterFilter = (filter) => {
-    setFooterFilters((prev) => ({
+  const toggleServiceFilter = (filter) => {
+    setServiceFilters((prev) => ({
       ...prev,
       [filter]: !prev[filter],
     }));
   };
 
   const clearAllFilters = () => {
-    setFooterFilters({
+    setServiceFilters({
       group: false,
       ping: false,
       snmp: false,
@@ -464,10 +504,10 @@ export function DeviceTable({
             >
               ALL
             </button>
-            {Object.entries(footerFilters).map(([service, active]) => (
+            {Object.entries(serviceFilters).map(([service, active]) => (
               <button
                 key={service}
-                onClick={() => toggleFooterFilter(service)}
+                onClick={() => toggleServiceFilter(service)}
                 className={cn(
                   "px-3 py-1 text-sm border rounded-md transition-colors",
                   active
@@ -482,6 +522,11 @@ export function DeviceTable({
           <div className="text-sm text-gray-500">
             {filteredDevices.length} devices
             {selectedDevices.size > 0 && ` • ${selectedDevices.size} selected`}
+            {devices.length > 0 && filteredDevices.length === 0 && (
+              <span className="ml-2 text-yellow-600">
+                (All devices hidden by filters - click ALL to clear)
+              </span>
+            )}
           </div>
         </div>
       </div>

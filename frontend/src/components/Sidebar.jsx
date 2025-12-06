@@ -53,9 +53,9 @@ export function Sidebar({
 
         {/* Custom Groups */}
         <div className="mt-4">
-          <button
+          <div
             onClick={() => toggleSection('custom')}
-            className="flex items-center justify-between px-3 py-2 w-full hover:bg-gray-100 rounded-lg transition-colors"
+            className="flex items-center justify-between px-3 py-2 w-full hover:bg-gray-100 rounded-lg text-left cursor-pointer"
           >
             <div className="flex items-center gap-2 text-sm font-semibold text-gray-500 uppercase tracking-wider">
               {expandedSections.custom ? (
@@ -76,7 +76,7 @@ export function Sidebar({
             >
               <Plus className="w-4 h-4" />
             </button>
-          </button>
+          </div>
 
           {expandedSections.custom && (
             <div className="ml-2 space-y-1">

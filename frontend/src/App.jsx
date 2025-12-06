@@ -7,7 +7,7 @@ import { GroupModal } from "./components/GroupModal";
 import { SettingsModal } from "./components/SettingsModal";
 import { DeviceDetail } from "./pages/DeviceDetail";
 import { Settings } from "./pages/Settings";
-import { Poller } from "./pages/Poller";
+import Poller from "./pages/Poller";
 import { Topology } from "./pages/Topology";
 import { PowerTrends } from "./pages/PowerTrends";
 import { useDevices, useGroups, useScanProgress } from "./hooks/useDevices";
@@ -242,15 +242,24 @@ function AppContent() {
       try {
         const groupDeviceData = await fetchApi(`/device_groups/${group.id}/devices`);
 
+        console.log('Group device data from API:', groupDeviceData);
+        console.log('Main devices array length:', devices.length);
+
         // Filter to only include devices that exist in the main devices array
         const deviceIpSet = new Set(devices.map(d => d.ip_address));
-        const validGroupDevices = groupDeviceData.filter(device => deviceIpSet.has(device.ip_address));
+        const validGroupDevices = groupDeviceData.filter(device => {
+          const deviceIp = device.ip_address || device; // Handle both string and object formats
+          return deviceIpSet.has(deviceIp);
+        });
+
+        console.log('Valid group devices found:', validGroupDevices.length);
 
         setGroupDevices(validGroupDevices);
         // Initialize modified devices with current group devices
-        const deviceIps = new Set(validGroupDevices.map(d => d.ip_address));
+        const deviceIps = new Set(validGroupDevices.map(d => d.ip_address || d));
         setModifiedGroupDevices(deviceIps);
       } catch (error) {
+        console.error('Error loading group devices:', error);
         setGroupDevices([]);
         setModifiedGroupDevices(new Set());
       }

@@ -18,9 +18,31 @@ from scan_routes import (
     get_network_groups,
 )
 from settings_routes import get_settings_route, save_settings_route, test_settings_route
+from poller_routes import (
+    get_poller_status,
+    get_poller_configs,
+    save_poller_config,
+    start_discovery_poller,
+    stop_discovery_poller,
+    save_discovery_config,
+    start_interface_poller,
+    stop_interface_poller,
+    save_interface_config,
+    start_optical_poller,
+    stop_optical_poller,
+    save_optical_config,
+    run_all_pollers,
+    get_poller_logs,
+    clear_poller_logs,
+    get_poller_statistics,
+    test_discovery_scan,
+    test_interface_scan,
+    test_optical_scan,
+    initialize_poller_system,
+)
 
 app = Flask(__name__, static_folder='.')
-CORS(app, origins=['http://localhost:5173', 'http://192.168.10.50:5173'])
+CORS(app, origins=['http://localhost:3000', 'http://192.168.10.50:3000', 'http://localhost:5173', 'http://192.168.10.50:5173'])
 
 # Static files
 @app.route('/static/<path:filename>')
@@ -144,6 +166,83 @@ def get_combined_interfaces_route():
 @app.route('/network_groups', methods=['GET'])
 def get_network_groups_route():
     return get_network_groups()
+
+# Poller System Routes
+@app.route('/poller/status', methods=['GET'])
+def poller_status_route():
+    return get_poller_status()
+
+@app.route('/poller/config', methods=['GET'])
+def poller_configs_route():
+    return get_poller_configs()
+
+@app.route('/poller/config', methods=['POST'])
+def poller_save_config_route():
+    return save_poller_config()
+
+@app.route('/poller/discovery/start', methods=['POST'])
+def poller_start_discovery_route():
+    return start_discovery_poller()
+
+@app.route('/poller/discovery/stop', methods=['POST'])
+def poller_stop_discovery_route():
+    return stop_discovery_poller()
+
+@app.route('/poller/discovery/config', methods=['POST'])
+def poller_save_discovery_config_route():
+    return save_discovery_config()
+
+@app.route('/poller/discovery/test', methods=['POST'])
+def poller_test_discovery_route():
+    return test_discovery_scan()
+
+@app.route('/poller/interface/start', methods=['POST'])
+def poller_start_interface_route():
+    return start_interface_poller()
+
+@app.route('/poller/interface/stop', methods=['POST'])
+def poller_stop_interface_route():
+    return stop_interface_poller()
+
+@app.route('/poller/interface/config', methods=['POST'])
+def poller_save_interface_config_route():
+    return save_interface_config()
+
+@app.route('/poller/interface/test', methods=['POST'])
+def poller_test_interface_route():
+    return test_interface_scan()
+
+@app.route('/poller/optical/start', methods=['POST'])
+def poller_start_optical_route():
+    return start_optical_poller()
+
+@app.route('/poller/optical/stop', methods=['POST'])
+def poller_stop_optical_route():
+    return stop_optical_poller()
+
+@app.route('/poller/optical/config', methods=['POST'])
+def poller_save_optical_config_route():
+    return save_optical_config()
+
+@app.route('/poller/optical/test', methods=['POST'])
+def poller_test_optical_route():
+    return test_optical_scan()
+
+@app.route('/poller/run_all', methods=['POST'])
+def poller_run_all_route():
+    return run_all_pollers()
+
+@app.route('/poller/logs', methods=['GET'])
+def poller_logs_route():
+    return get_poller_logs()
+
+@app.route('/poller/logs/clear', methods=['POST'])
+def poller_clear_logs_route():
+    return clear_poller_logs()
+
+@app.route('/poller/statistics', methods=['GET'])
+def poller_statistics_route():
+    return get_poller_statistics()
 
 @app.route('/topology_data', methods=['POST'])
 def topology_data():
@@ -507,4 +606,14 @@ def get_group_devices(group_id):
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    # Initialize poller system
+    try:
+        poller_success = initialize_poller_system()
+        if poller_success:
+            print("✅ Poller system initialized successfully")
+        else:
+            print("⚠️ Poller system initialization failed")
+    except Exception as e:
+        print(f"❌ Poller system initialization error: {e}")
+    
+    app.run(host='0.0.0.0', port=5000, debug=True)
