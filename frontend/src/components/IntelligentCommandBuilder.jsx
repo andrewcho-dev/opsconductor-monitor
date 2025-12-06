@@ -6,6 +6,7 @@ console.log('IntelligentCommandBuilder component loading...');
 const IntelligentCommandBuilder = ({ action, actionIndex, updateAction }) => {
   const [selectedPlatform, setSelectedPlatform] = useState('ubuntu-20.04');
   const [selectedCommand, setSelectedCommand] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
   const [commandData, setCommandData] = useState({});
   const [validationResults, setValidationResults] = useState({});
   const [showPreview, setShowPreview] = useState(true);
@@ -98,6 +99,31 @@ const IntelligentCommandBuilder = ({ action, actionIndex, updateAction }) => {
     return result;
   };
 
+  const getCategoryIcon = (category) => {
+    const icons = {
+      'discovery': '🔍',
+      'scanning': '📡',
+      'system': '💻',
+      'networking': '🌐',
+      'processes': '⚙️',
+      'security': '🔒',
+      'monitoring': '📊',
+      'storage': '💾',
+      'services': '🛠️',
+      'logging': '📝',
+      'packages': '📦',
+      'text-processing': '📝',
+      'file-management': '📁',
+      'user-management': '👤',
+      'network-diagnostics': '🩺',
+      'performance': '⚡',
+      'scheduling': '⏰',
+      'web': '🌍',
+      'other': '📋'
+    };
+    return icons[category] || '📋';
+  };
+
   const handlePlatformChange = (platform) => {
     setSelectedPlatform(platform);
     setSelectedCommand('');
@@ -126,6 +152,11 @@ const IntelligentCommandBuilder = ({ action, actionIndex, updateAction }) => {
       });
       updateAction(actionIndex, 'login_method.parameters', initialParams);
     }
+  };
+
+  const handleCategoryChange = (category) => {
+    setSelectedCategory(category);
+    setSelectedCommand(''); // Reset command when category changes
   };
 
   const handleParameterChange = (key, value) => {
@@ -217,40 +248,109 @@ const IntelligentCommandBuilder = ({ action, actionIndex, updateAction }) => {
         </div>
       </div>
 
-      {/* Command Selection */}
-      <div className="bg-white rounded shadow p-4">
-        <h4 className="text-sm font-bold mb-3 flex items-center gap-2">
+      {/* Command Selection - COMPACT VERSION */}
+      <div className="bg-white rounded shadow p-3">
+        <h4 className="text-sm font-bold mb-2 flex items-center gap-2">
           <span>⚡</span> COMMAND SELECTION
           <span className="text-xs font-normal text-gray-600 ml-1">
             (What to execute)
           </span>
         </h4>
         
-        <div className="space-y-3">
-          {Object.entries(commandsByCategory).map(([category, commands]) => (
-            <div key={category} className="border rounded p-3">
-              <h5 className="text-xs font-bold mb-2 text-gray-700 uppercase">
-                {category.replace(/_/g, ' ')}
-              </h5>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {commands.map(command => (
-                  <button
-                    key={command.id}
-                    onClick={() => handleCommandChange(command.id)}
-                    className={`p-2 text-left border rounded text-xs transition-colors ${
-                      selectedCommand === command.id
-                        ? 'bg-blue-500 text-white border-blue-600'
-                        : 'bg-gray-50 hover:bg-gray-100 border-gray-300'
-                    }`}
-                  >
-                    <div className="font-medium">{command.name}</div>
-                    <div className="text-xs opacity-75 mt-1">{command.description}</div>
-                  </button>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">
+          <div>
+            <label className="block text-xs font-medium mb-1">Category</label>
+            <select
+              value={selectedCategory}
+              onChange={(e) => handleCategoryChange(e.target.value)}
+              className="w-full p-1 border rounded text-xs bg-gray-200 focus:bg-white focus:ring-1 focus:ring-blue-300"
+            >
+              <option value="all">📋 All Categories</option>
+              {Object.keys(commandsByCategory).map(category => (
+                <option key={category} value={category}>
+                  {getCategoryIcon(category)} {category.replace(/_/g, ' ').toUpperCase()}
+                </option>
+              ))}
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-xs font-medium mb-1">Command</label>
+            <select
+              value={selectedCommand}
+              onChange={(e) => handleCommandChange(e.target.value)}
+              className="w-full p-1 border rounded text-xs bg-gray-200 focus:bg-white focus:ring-1 focus:ring-blue-300"
+            >
+              <option value="">Select a command...</option>
+              {selectedCategory === 'all' 
+                ? Object.values(commandsByCategory).flat().map(command => (
+                    <option key={command.id} value={command.id}>
+                      {command.name}
+                    </option>
+                  ))
+                : commandsByCategory[selectedCategory]?.map(command => (
+                    <option key={command.id} value={command.id}>
+                      {command.name}
+                    </option>
+                  ))
+              }
+            </select>
+          </div>
+        </div>
+
+        {/* Compact Command Info */}
+        {selectedCommand && commandData.name && (
+          <div className="bg-blue-50 border border-blue-200 rounded p-2 text-xs">
+            <div className="flex items-start gap-2">
+              <span className="text-blue-600">ℹ️</span>
+              <div className="flex-1">
+                <div className="font-medium text-blue-800">{commandData.name}</div>
+                <div className="text-blue-600 mt-1">{commandData.description}</div>
+                {commandData.syntax && (
+                  <div className="mt-1 font-mono text-blue-700 bg-blue-100 p-1 rounded">
+                    Syntax: {commandData.syntax}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Compact Command List for Quick Reference */}
+        {selectedCategory === 'all' && (
+          <div className="mt-2">
+            <div className="text-xs font-medium text-gray-600 mb-1">Quick Reference:</div>
+            <div className="max-h-32 overflow-y-auto border rounded bg-gray-50 p-1">
+              <div className="grid grid-cols-2 gap-1 text-xs">
+                {Object.entries(commandsByCategory).slice(0, 4).map(([category, commands]) => (
+                  <div key={category} className="col-span-1">
+                    <div className="font-medium text-gray-700 mb-1">
+                      {getCategoryIcon(category)} {category.replace(/_/g, ' ')}
+                    </div>
+                    {commands.slice(0, 3).map(command => (
+                      <button
+                        key={command.id}
+                        onClick={() => handleCommandChange(command.id)}
+                        className={`block w-full text-left p-1 rounded border transition-colors ${
+                          selectedCommand === command.id
+                            ? 'bg-blue-500 text-white border-blue-600'
+                            : 'bg-white hover:bg-gray-100 border-gray-200'
+                        }`}
+                      >
+                        <div className="font-medium">{command.name}</div>
+                      </button>
+                    ))}
+                    {commands.length > 3 && (
+                      <div className="text-xs text-gray-500 italic p-1">
+                        +{commands.length - 3} more...
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
             </div>
-          ))}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Command Configuration */}
