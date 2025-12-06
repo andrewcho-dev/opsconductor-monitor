@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { COMMAND_LIBRARIES, getCommandLibrary, getAvailablePlatforms, getCommand } from '../data/commandLibraries';
 
+console.log('IntelligentCommandBuilder component loading...');
+
 const IntelligentCommandBuilder = ({ action, actionIndex, updateAction }) => {
   const [selectedPlatform, setSelectedPlatform] = useState('ubuntu-20.04');
   const [selectedCommand, setSelectedCommand] = useState('');

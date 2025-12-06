@@ -2,7 +2,49 @@ import React, { useState, useEffect } from 'react';
 import IntelligentCommandBuilder from './IntelligentCommandBuilder';
 import { getCommand } from '../data/commandLibraries';
 
+// Error Boundary Component
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('CompleteJobBuilder Error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="bg-red-50 border border-red-200 rounded p-6 m-4">
+          <h3 className="text-red-800 font-bold text-lg mb-2">⚠️ Component Error</h3>
+          <p className="text-red-600 mb-4">Something went wrong loading the Job Builder.</p>
+          <details className="text-sm text-gray-600">
+            <summary className="cursor-pointer font-medium mb-2">Error Details</summary>
+            <pre className="bg-red-100 p-2 rounded text-xs overflow-auto">
+              {this.state.error?.toString()}
+            </pre>
+          </details>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="mt-4 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+          >
+            Refresh Page
+          </button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 const CompleteJobBuilder = ({ job, onSave, onTest, onBack }) => {
+  const [isLoading, setIsLoading] = useState(true);
   const [currentJob, setCurrentJob] = useState(job || {
     job_id: 'discovery',
     name: 'Network Discovery',
@@ -549,6 +591,12 @@ const CompleteJobBuilder = ({ job, onSave, onTest, onBack }) => {
     ]);
   };
 
+  // Set loading to false after component mounts
+  useEffect(() => {
+    console.log('CompleteJobBuilder component mounted');
+    setIsLoading(false);
+  }, []);
+
   const getActionType = (action) => {
     // Automatically determine action type based on login method and configuration
     const method = action.login_method?.type;
@@ -595,7 +643,16 @@ const CompleteJobBuilder = ({ job, onSave, onTest, onBack }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 p-2">
+    <ErrorBoundary>
+      {isLoading ? (
+        <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+          <div className="bg-white rounded shadow p-6 text-center">
+            <div className="text-lg font-medium mb-2">Loading Job Builder...</div>
+            <div className="text-sm text-gray-600">Please wait while we initialize the intelligent command system.</div>
+          </div>
+        </div>
+      ) : (
+        <div className="min-h-screen bg-gray-100 p-2">
       <div className="w-full">
         {/* Header - Spans full width */}
         <div className="bg-white rounded shadow p-3 mb-2">
@@ -1209,7 +1266,8 @@ const CompleteJobBuilder = ({ job, onSave, onTest, onBack }) => {
           </div>
         </div>
       </div>
-    </div>
+      )}
+    </ErrorBoundary>
   );
 };
 

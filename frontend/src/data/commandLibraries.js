@@ -1,6 +1,8 @@
 // Multi-Platform Command Libraries
 // Ubuntu Linux (Local OpsConductor Server) and Ciena SAOS Switch Commands
 
+console.log('Command libraries loading...');
+
 export const COMMAND_LIBRARIES = {
   'ubuntu-20.04': {
     name: "Ubuntu Linux 20.04 (Local)",
