@@ -861,7 +861,8 @@ const CompleteJobBuilder = ({ job, onSave, onTest, onBack }) => {
         </div>
       ) : (
         <div className="min-h-screen bg-gray-100 p-2">
-      <div className="w-full">
+          <div className="w-full">
+            <div>
         {/* Header - Spans full width */}
         <div className="bg-white rounded shadow p-3 mb-2">
           <div className="flex justify-between items-center">
@@ -1295,7 +1296,6 @@ const CompleteJobBuilder = ({ job, onSave, onTest, onBack }) => {
                     </div>
                   </div>
                 </details>
-              </div>
             </details>
           ))}
         </div>
@@ -1445,7 +1445,9 @@ const CompleteJobBuilder = ({ job, onSave, onTest, onBack }) => {
               </div>
             )}
           </div>
+          </div>
         </div>
+      </div>
       </div>
     </ErrorBoundary>
   );
