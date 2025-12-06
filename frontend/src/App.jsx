@@ -401,6 +401,7 @@ function AppContent() {
         <Route path="/device/:ip" element={<DeviceDetail />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/poller" element={<Poller />} />
+        <Route path="/job-builder" element={<Poller openJobBuilder={true} />} />
         <Route path="/topology" element={<Topology />} />
         <Route path="/power-trends" element={<PowerTrends />} />
         <Route path="*" element={<Navigate to="/" replace />} />

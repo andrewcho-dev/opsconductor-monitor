@@ -1266,7 +1266,7 @@ const CompleteJobBuilder = ({ job, onSave, onTest, onBack }) => {
           </div>
         </div>
       </div>
-      )}
+        )}
     </ErrorBoundary>
   );
 };

@@ -4,7 +4,7 @@ import { Play, Square, RefreshCw, Plus, Trash2, Save, TestTube, Settings } from 
 import { cn } from '../lib/utils';
 import CompleteJobBuilder from '../components/CompleteJobBuilder';
 
-const Poller = () => {
+const Poller = ({ openJobBuilder = false }) => {
   const [status, setStatus] = useState({
     discovery: { active: false, next_run: null },
     interface: { active: false, next_run: null },
@@ -13,7 +13,7 @@ const Poller = () => {
     execution_log: []
   });
   const [logs, setLogs] = useState([]);
-  const [showJobBuilder, setShowJobBuilder] = useState(false);
+  const [showJobBuilder, setShowJobBuilder] = useState(openJobBuilder);
   const [editingJob, setEditingJob] = useState(null);
   const [jobs, setJobs] = useState([
     {
