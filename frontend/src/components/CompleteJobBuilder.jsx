@@ -378,7 +378,6 @@ const CompleteJobBuilder = ({ job, onSave, onTest, onBack }) => {
     actions: []
   });
   const [expandedActions, setExpandedActions] = useState(new Set());
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   
   // State for intelligent target selection
@@ -1426,8 +1425,6 @@ const CompleteJobBuilder = ({ job, onSave, onTest, onBack }) => {
           </div>
         </div>
       </div>
-      </div>
-        )}
     </ErrorBoundary>
   );
 };
