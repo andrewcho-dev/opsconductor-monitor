@@ -3,6 +3,7 @@ import IntelligentCommandBuilder from '../../IntelligentCommandBuilder';
 import { ActionTargetsSection } from './ActionTargetsSection';
 import { ActionResultsSection } from './ActionResultsSection';
 import { ActionAdvancedSection } from './ActionAdvancedSection';
+import { ActionNotificationsSection } from './ActionNotificationsSection';
 import TargetsAdvancedModal from './TargetsAdvancedModal';
 import { getActionDisplayName } from '../utils/actionHelpers';
 
@@ -104,20 +105,28 @@ export const ActionCard = ({
       </summary>
 
       <div className="space-y-4 p-3 text-sm">
-        <IntelligentCommandBuilder action={action} actionIndex={index} updateAction={updateAction} />
-
-        <section className="space-y-2 rounded border border-blue-200 bg-blue-50 p-2">
-          <ActionTargetsSection
-            action={action}
-            actionIndex={index}
-            updateAction={updateAction}
-            onOpenModal={() => onOpenTargetModal(index)}
-            onOpenAdvanced={() => setShowTargetsAdvanced(true)}
-          />
-        </section>
+        <IntelligentCommandBuilder action={action} actionIndex={index} updateAction={updateAction}>
+          <section className="bg-white rounded shadow p-3 h-full">
+            <ActionTargetsSection
+              action={action}
+              actionIndex={index}
+              updateAction={updateAction}
+              onOpenModal={() => onOpenTargetModal(index)}
+              onOpenAdvanced={() => setShowTargetsAdvanced(true)}
+            />
+          </section>
+        </IntelligentCommandBuilder>
 
         <section className="space-y-2 rounded border border-green-200 bg-green-50 p-2">
           <ActionResultsSection action={action} actionIndex={index} updateAction={updateAction} />
+        </section>
+
+        <section className="space-y-2 rounded border border-yellow-200 bg-yellow-50 p-2">
+          <ActionNotificationsSection
+            action={action}
+            actionIndex={index}
+            updateAction={updateAction}
+          />
         </section>
 
         <section className="space-y-2 rounded border border-purple-200 bg-purple-50 p-2">

@@ -14,6 +14,8 @@ from apscheduler.triggers.interval import IntervalTrigger
 from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR, EVENT_JOB_MISSED
 
 from database import db
+from config import get_settings
+from notification_service import send_notification
 from scan_routes import _run_scan_async, _run_ssh_scan_async
 from config import get_settings
 
@@ -24,12 +26,46 @@ logger = logging.getLogger(__name__)
 def run_discovery_scan(config: Dict[str, Any]) -> Dict[str, Any]:
     """GENERIC discovery scan using the new generic job scheduler"""
     try:
-        from generic_job_scheduler import run_generic_discovery_job
-        return run_generic_discovery_job(config)
+        start_time = datetime.now()
+
+        try:
+            # Run the generic discovery job which will populate the devices table
+            from generic_job_scheduler import run_generic_discovery_job
+            run_generic_discovery_job(config)
+        except Exception as e:
+            logger.error(f"Generic discovery scan failed: {e}")
+            # Fallback to original method if generic fails
+            return _run_original_discovery_scan(config)
+
+        # Build summary from the database so the result shape matches
+        # _run_original_discovery_scan and the execution log helpers.
+        devices = db.get_all_devices()
+        online_devices = [d for d in devices if d.get('ping_status') == 'online']
+
+        end_time = datetime.now()
+        duration = (end_time - start_time).total_seconds()
+
+        result = {
+            'scan_type': 'discovery',
+            'network_range': config.get('network', '10.127.0.0/24'),
+            'started_at': start_time.isoformat(),
+            'finished_at': end_time.isoformat(),
+            'duration_seconds': duration,
+            'devices_found': len(devices),
+            'online_devices': len(online_devices),
+            'new_devices': [d['ip_address'] for d in online_devices if d.get('ip_address')],
+            'config': config,
+        }
+
+        logger.info(
+            "Discovery scan (generic scheduler) completed: "
+            f"{len(devices)} devices found, {len(online_devices)} online"
+        )
+
+        return result
     except Exception as e:
-        logger.error(f"Generic discovery scan failed: {e}")
-        # Fallback to original method if generic fails
-        return _run_original_discovery_scan(config)
+        logger.error(f"Discovery scan failed: {e}")
+        raise
 
 def _run_original_discovery_scan(config: Dict[str, Any]) -> Dict[str, Any]:
     """REAL discovery scan that actually scans the network"""
@@ -147,7 +183,7 @@ def run_optical_scan(config: Dict[str, Any]) -> Dict[str, Any]:
                 query = """
                     SELECT * FROM optical_power_history 
                     WHERE ip_address = %s 
-                    ORDER BY timestamp DESC 
+                    ORDER BY measurement_timestamp DESC 
                     LIMIT 1
                 """
                 history = db.execute_query(query, (device['ip_address'],))
@@ -161,7 +197,7 @@ def run_optical_scan(config: Dict[str, Any]) -> Dict[str, Any]:
                         'power_rx': latest.get('rx_power'),
                         'power_tx': latest.get('tx_power'),
                         'temperature': latest.get('temperature'),
-                        'timestamp': latest.get('timestamp')
+                        'timestamp': latest.get('measurement_timestamp')
                     })
                     
                     # Check for alerts
@@ -234,6 +270,9 @@ class PollerManager:
             
             # Record job execution in database
             self._record_job_execution(job_type, status, event.exception)
+
+            # Optionally send notifications based on global settings
+            self._maybe_send_notification(job_type, status)
             
         except Exception as e:
             logger.error(f"Failed to handle job event: {e}")
@@ -263,6 +302,45 @@ class PollerManager:
             logger.error(f"Failed to record job execution: {e}")
             import traceback
             traceback.print_exc()
+
+    def _maybe_send_notification(self, job_type: str, status: str) -> None:
+        """Send a notification for poller jobs based on global settings.
+
+        Uses Apprise via notification_service.send_notification. Targets and
+        per-job-type notification flags are read from config.json via
+        get_settings(). This is intentionally simple and global; per-action
+        notifications from the Job Builder are handled separately.
+        """
+
+        try:
+            settings = get_settings()
+
+            if not settings.get('notifications_enabled'):
+                return
+
+            # Determine if this job type should notify for this status
+            key_suffix = 'success' if status == 'success' else 'error'
+            flag_key = f"notify_{job_type}_on_{key_suffix}"
+            if not settings.get(flag_key, False):
+                return
+
+            raw_targets = settings.get('notification_targets', '') or ''
+            targets = [
+                line.strip()
+                for line in raw_targets.replace(',', '\n').split('\n')
+                if line.strip()
+            ]
+
+            if not targets:
+                return
+
+            title = f"Poller job {job_type} {status}"
+            body = f"Poller job '{job_type}' completed with status: {status}."
+
+            send_notification(targets=targets, title=title, body=body, tag=f"poller.{job_type}.{status}")
+
+        except Exception as e:
+            logger.error(f"Failed to send poller notification: {e}")
     
     def add_job(self, job_type: str, config: Dict[str, Any]):
         """Add a polling job"""
@@ -369,12 +447,15 @@ class PollerManager:
             execution_log = []
             for record in history:
                 # Parse result to get processing details
-                result_data = record.get('result', {})
+                result_data = record.get('result')
                 if isinstance(result_data, str):
                     try:
                         result_data = eval(result_data)
-                    except:
+                    except Exception:
                         result_data = {}
+                # Ensure we always pass a dict into _get_brief_status
+                if not isinstance(result_data, dict):
+                    result_data = {}
                 
                 # Generate brief status based on job type and result
                 brief_status = self._get_brief_status(record['job_type'], result_data)
@@ -441,6 +522,38 @@ class PollerManager:
         except Exception as e:
             logger.error(f"Failed to generate brief status: {e}")
             return "Completed"
+    
+    def start_job(self, job_type: str, config: Dict[str, Any]) -> bool:
+        """Public API used by poller_routes to start a poller job.
+
+        Ensures the scheduler is running, schedules the job with the given
+        configuration, and records the config in self.jobs so that
+        get_job_status() can report it accurately.
+        """
+        try:
+            # Make sure scheduler is up
+            self.start_scheduler()
+
+            # Add or replace the scheduled job
+            self.add_job(job_type, config)
+
+            # Track latest config in-memory
+            self.jobs[job_type] = config
+            logger.info(f"Started {job_type} poller job with config: {config}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to start {job_type} poller job: {e}")
+            return False
+
+    def stop_job(self, job_type: str) -> bool:
+        """Public API used by poller_routes to stop a poller job."""
+        try:
+            self.remove_job(job_type)
+            logger.info(f"Stopped {job_type} poller job")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to stop {job_type} poller job: {e}")
+            return False
     
     def start_scheduler(self):
         """Start the scheduler"""

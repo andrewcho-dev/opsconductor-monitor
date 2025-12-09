@@ -64,9 +64,9 @@ export const ActionTargetsSection = ({
   return (
     <section className="space-y-2">
       <div className="flex items-center justify-between">
-        <h4 className="text-xs font-bold uppercase tracking-wide text-gray-600 flex items-center gap-1">
+        <h4 className="text-sm font-bold flex items-center gap-2">
           <span>🎯</span>
-          <span>Targets</span>
+          <span>TARGETS</span>
         </h4>
         {onOpenAdvanced && (
           <button
@@ -83,7 +83,7 @@ export const ActionTargetsSection = ({
       <button
         type="button"
         onClick={() => onOpenModal(actionIndex)}
-        className="w-full text-left text-xs px-2 py-2 border rounded bg-gray-50 hover:bg-gray-100"
+        className="w-full text-left text-xs px-2 py-2 border rounded bg-gray-200 hover:bg-white focus:bg-white focus:ring-1 focus:ring-blue-300"
       >
         <span className="block text-gray-800 truncate">{formatCurrentSelection(action)}</span>
       </button>

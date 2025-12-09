@@ -2,8 +2,12 @@
 """Main Flask application - clean and minimal"""
 
 import json
+from datetime import datetime
+
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
+from celery.result import AsyncResult
+
 from database import db
 from scan_routes import (
     start_scan,
@@ -40,6 +44,9 @@ from poller_routes import (
     test_optical_scan,
     initialize_poller_system,
 )
+from notification_service import send_notification
+from generic_job_scheduler import run_job_builder_job
+from celery_app import celery_app
 
 app = Flask(__name__, static_folder='.')
 CORS(app, origins=['http://localhost:3000', 'http://192.168.10.50:3000', 'http://localhost:5173', 'http://192.168.10.50:5173'])
@@ -81,6 +88,169 @@ def get_data():
     """Get all scan results"""
     try:
         return jsonify(db.get_all_devices())
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/scheduler/jobs/<name>/executions/clear', methods=['POST'])
+def api_scheduler_job_executions_clear(name):
+    """Clear execution history for a scheduler job.
+
+    Optional JSON body:
+      - status: if provided, only executions with this status are cleared.
+    """
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        status = data.get('status')
+        if status:
+            status = str(status).strip()
+        db.clear_scheduler_job_executions(job_name=name, status=status)
+        return jsonify({'status': 'ok'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/scheduler/queues', methods=['GET'])
+def api_scheduler_queues():
+    """Return basic Celery queue/worker status (active/reserved/scheduled)."""
+    try:
+        insp = celery_app.control.inspect()
+
+        if not insp:
+            # No workers or broker not reachable; return empty stats instead of 500
+            return jsonify({
+                'workers': [],
+                'active_total': 0,
+                'reserved_total': 0,
+                'scheduled_total': 0,
+                'active_by_worker': {},
+                'reserved_by_worker': {},
+                'scheduled_by_worker': {},
+            })
+
+        try:
+            active = insp.active() or {}
+            reserved = insp.reserved() or {}
+            scheduled = insp.scheduled() or {}
+        except Exception:
+            # If Celery inspect calls fail (e.g. broker down), return empty stats
+            return jsonify({
+                'workers': [],
+                'active_total': 0,
+                'reserved_total': 0,
+                'scheduled_total': 0,
+                'active_by_worker': {},
+                'reserved_by_worker': {},
+                'scheduled_by_worker': {},
+            })
+
+        def summarize(mapping):
+            total = 0
+            by_worker = {}
+            for worker, tasks in (mapping or {}).items():
+                count = len(tasks or [])
+                total += count
+                by_worker[worker] = count
+            return total, by_worker
+
+        active_total, active_by_worker = summarize(active)
+        reserved_total, reserved_by_worker = summarize(reserved)
+        scheduled_total, scheduled_by_worker = summarize(scheduled)
+
+        workers = sorted(set(list(active_by_worker.keys()) + list(reserved_by_worker.keys()) + list(scheduled_by_worker.keys())))
+
+        return jsonify({
+            'workers': workers,
+            'active_total': active_total,
+            'reserved_total': reserved_total,
+            'scheduled_total': scheduled_total,
+            'active_by_worker': active_by_worker,
+            'reserved_by_worker': reserved_by_worker,
+            'scheduled_by_worker': scheduled_by_worker,
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/scheduler/jobs/<name>/executions', methods=['GET'])
+def api_scheduler_job_executions(name):
+    """Return recent execution history for a given scheduler job name."""
+    try:
+        try:
+            limit = int(request.args.get('limit', 100))
+        except Exception:
+            limit = 100
+
+        rows = db.get_scheduler_job_executions(job_name=name, limit=limit)
+        executions = []
+        for row in rows:
+            executions.append({
+                'id': row['id'],
+                'job_name': row['job_name'],
+                'task_name': row['task_name'],
+                'task_id': row['task_id'],
+                'status': row['status'],
+                'started_at': row['started_at'].isoformat() if row['started_at'] else None,
+                'finished_at': row['finished_at'].isoformat() if row['finished_at'] else None,
+                'error_message': row['error_message'],
+                'result': row.get('result'),
+            })
+
+        return jsonify({'executions': executions})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/jobs/run', methods=['POST'])
+def api_jobs_run():
+    """Enqueue a Job Builder style job definition as a Celery task.
+
+    Expects JSON payload containing at minimum:
+      - job_id: string
+      - name: string
+      - actions: list of Job Builder actions
+
+    The job is executed asynchronously by the `opsconductor.jobbuilder.run`
+    Celery task. This endpoint returns a task_id that the frontend can use
+    with /api/jobs/status/<task_id> to query progress and results.
+    """
+    try:
+        job_def = request.get_json(force=True, silent=True) or {}
+
+        actions = job_def.get('actions') or []
+        if not isinstance(actions, list) or not actions:
+            return jsonify({'error': 'job definition must include a non-empty actions list'}), 400
+
+        async_result = celery_app.send_task('opsconductor.jobbuilder.run', args=[job_def])
+
+        return jsonify({
+            'status': 'queued',
+            'task_id': async_result.id,
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/jobs/status/<task_id>', methods=['GET'])
+def api_jobs_status(task_id):
+    """Return Celery task state and result for a previously enqueued job."""
+    try:
+        result = AsyncResult(task_id, app=celery_app)
+
+        response = {
+            'task_id': task_id,
+            'state': result.state,
+            'ready': result.ready(),
+        }
+
+        if result.ready():
+            if result.successful():
+                response['result'] = result.result
+            else:
+                # When failed, result.result is usually an exception instance
+                response['error'] = str(result.result)
+
+        return jsonify(response)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -227,6 +397,37 @@ def api_network_groups():
         return jsonify({'groups': groups})
     except Exception as e:
         return jsonify({'error': str(e), 'groups': []}), 500
+
+
+@app.route('/api/notify/test', methods=['POST'])
+def api_notify_test():
+    """Send a test notification using Apprise.
+
+    Expects JSON payload with:
+      - targets: list of Apprise URLs (required)
+      - title: optional title string
+      - body: optional body string
+      - tag: optional tag/context string
+    """
+
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        targets = data.get('targets') or []
+        title = data.get('title') or 'OpsConductor Test Notification'
+        body = data.get('body') or 'This is a test notification from OpsConductor.'
+        tag = data.get('tag') or 'test'
+
+        if not isinstance(targets, list) or not targets:
+            return jsonify({'error': 'targets must be a non-empty list of Apprise URLs'}), 400
+
+        ok = send_notification(targets=targets, title=title, body=body, tag=tag)
+
+        if not ok:
+            return jsonify({'error': 'Notification send failed or no valid targets'}), 500
+
+        return jsonify({'status': 'ok'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 # Poller System Routes
 @app.route('/poller/status', methods=['GET'])
@@ -503,6 +704,178 @@ def get_device_groups():
             })
             
         return jsonify(group_list)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# Generic Celery-based scheduler management APIs
+
+def _serialize_scheduler_job(row):
+    """Convert a scheduler_jobs row to a JSON-serializable dict."""
+    return {
+        'name': row['name'],
+        'task_name': row['task_name'],
+        'config': row.get('config') or {},
+        'enabled': row.get('enabled', False),
+        'schedule_type': row.get('schedule_type') or 'interval',
+        'interval_seconds': row.get('interval_seconds'),
+        'cron_expression': row.get('cron_expression'),
+        'start_at': row['start_at'].isoformat() if row.get('start_at') else None,
+        'end_at': row['end_at'].isoformat() if row.get('end_at') else None,
+        'max_runs': row.get('max_runs'),
+        'run_count': row.get('run_count'),
+        'last_run_at': row['last_run_at'].isoformat() if row.get('last_run_at') else None,
+        'next_run_at': row['next_run_at'].isoformat() if row.get('next_run_at') else None,
+        'created_at': row['created_at'].isoformat() if row.get('created_at') else None,
+        'updated_at': row['updated_at'].isoformat() if row.get('updated_at') else None,
+    }
+
+
+@app.route('/api/scheduler/jobs', methods=['GET'])
+def api_scheduler_jobs_list():
+    """List generic scheduler jobs for the Celery-based scheduler.
+
+    Optional query param:
+      - enabled=true/false to filter by enabled flag.
+    """
+    try:
+        enabled_param = request.args.get('enabled')
+        enabled = None
+        if enabled_param is not None:
+            enabled_param = enabled_param.strip().lower()
+            enabled = enabled_param in ('1', 'true', 'yes', 'on')
+
+        rows = db.get_scheduler_jobs(enabled=enabled)
+        jobs = [_serialize_scheduler_job(r) for r in rows]
+        return jsonify({'jobs': jobs})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/scheduler/jobs', methods=['POST'])
+def api_scheduler_jobs_upsert():
+    """Create or update a scheduler job definition.
+
+    Expected JSON body:
+      - name: unique job name (required)
+      - task_name: Celery task name string (required)
+      - schedule_type: "interval" or "cron" (optional, default "interval")
+      - interval_seconds: number of seconds between runs (required for interval)
+      - cron_expression: cron string (required for cron)
+      - start_at: ISO timestamp string for first allowed run (optional)
+      - end_at: ISO timestamp string for last allowed run (optional)
+      - max_runs: integer max number of runs (optional)
+      - enabled: bool (optional, default True)
+      - next_run_at: ISO timestamp string (optional; if omitted, will be NULL
+        and treated as due on next scheduler tick)
+    """
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+
+        name = (data.get('name') or '').strip()
+        task_name = (data.get('task_name') or '').strip()
+        if not name or not task_name:
+            return jsonify({'error': 'name and task_name are required'}), 400
+
+        schedule_type = (data.get('schedule_type') or 'interval').strip().lower()
+        if schedule_type not in ('interval', 'cron'):
+            return jsonify({'error': 'schedule_type must be "interval" or "cron"'}), 400
+
+        interval_seconds = None
+        cron_expression = None
+
+        if schedule_type == 'interval':
+            try:
+                interval_seconds = int(data.get('interval_seconds'))
+            except Exception:
+                return jsonify({'error': 'interval_seconds must be an integer for interval schedules'}), 400
+            if interval_seconds <= 0:
+                return jsonify({'error': 'interval_seconds must be > 0'}), 400
+        else:
+            cron_expression = (data.get('cron_expression') or '').strip()
+            if not cron_expression:
+                return jsonify({'error': 'cron_expression is required for cron schedules'}), 400
+
+        enabled = bool(data.get('enabled', True))
+        config = data.get('config') or {}
+
+        def parse_dt(field):
+            value = data.get(field)
+            if not value:
+                return None
+            try:
+                return datetime.fromisoformat(value)
+            except Exception:
+                raise ValueError(f"{field} must be ISO 8601 timestamp")
+
+        try:
+            start_at = parse_dt('start_at')
+            end_at = parse_dt('end_at')
+            next_run_at = parse_dt('next_run_at')
+        except ValueError as ve:
+            return jsonify({'error': str(ve)}), 400
+
+        max_runs = data.get('max_runs')
+        if max_runs is not None:
+            try:
+                max_runs = int(max_runs)
+            except Exception:
+                return jsonify({'error': 'max_runs must be an integer if provided'}), 400
+
+        row = db.upsert_scheduler_job(
+            name=name,
+            task_name=task_name,
+            config=config,
+            interval_seconds=interval_seconds,
+            enabled=enabled,
+            next_run_at=next_run_at,
+            schedule_type=schedule_type,
+            cron_expression=cron_expression,
+            start_at=start_at,
+            end_at=end_at,
+            max_runs=max_runs,
+        )
+
+        if not row:
+            return jsonify({'error': 'Failed to save scheduler job'}), 500
+
+        return jsonify({'job': _serialize_scheduler_job(row)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/scheduler/jobs/<name>/run-once', methods=['POST'])
+def api_scheduler_jobs_run_once(name):
+    """Enqueue a one-off run of the named scheduler job's Celery task."""
+    try:
+        job = db.get_scheduler_job_by_name(name)
+        if not job:
+            return jsonify({'error': f'No scheduler job found with name {name}'}), 404
+
+        cfg = job.get('config') or {}
+        task_name = job['task_name']
+        now = datetime.utcnow()
+
+        async_result = celery_app.send_task(task_name, args=[cfg])
+
+        # Record this execution as queued so later updates from the task
+        # (running/success/failed) have a row to update.
+        db.create_scheduler_job_execution(
+            job_name=name,
+            task_name=task_name,
+            task_id=async_result.id,
+            status='queued',
+            started_at=now,
+            error_message=None,
+            result={'config': cfg},
+        )
+
+        return jsonify({
+            'status': 'queued',
+            'job_name': name,
+            'task_name': task_name,
+            'task_id': async_result.id,
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

@@ -230,6 +230,45 @@ class DatabaseManager:
             details JSONB
         )
         """
+
+        # Generic scheduler jobs table for Celery-based scheduling
+        create_scheduler_jobs_table = """
+        CREATE TABLE IF NOT EXISTS scheduler_jobs (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(100) NOT NULL UNIQUE,
+            task_name VARCHAR(200) NOT NULL,
+            config JSONB,
+            enabled BOOLEAN DEFAULT FALSE,
+            -- "interval" (every N seconds) or "cron" (cron_expression)
+            schedule_type VARCHAR(20) DEFAULT 'interval',
+            interval_seconds INTEGER,
+            cron_expression VARCHAR(200),
+            start_at TIMESTAMP,
+            end_at TIMESTAMP,
+            max_runs INTEGER,
+            run_count INTEGER DEFAULT 0,
+            last_run_at TIMESTAMP,
+            next_run_at TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+
+        # Execution history for scheduler jobs
+        create_scheduler_job_executions_table = """
+        CREATE TABLE IF NOT EXISTS scheduler_job_executions (
+            id SERIAL PRIMARY KEY,
+            job_name VARCHAR(100) NOT NULL,
+            task_name VARCHAR(200) NOT NULL,
+            task_id VARCHAR(255) NOT NULL,
+            status VARCHAR(20) NOT NULL,
+            started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            finished_at TIMESTAMP,
+            error_message TEXT,
+            result JSONB,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
         
         self.execute_query(create_scan_results_table, fetch=False)
         self.execute_query(create_interface_scans_table, fetch=False)
@@ -241,6 +280,34 @@ class DatabaseManager:
         self.execute_query(create_group_devices_table, fetch=False)
         self.execute_query(create_poller_status_table, fetch=False)
         self.execute_query(create_poller_logs_table, fetch=False)
+        self.execute_query(create_scheduler_jobs_table, fetch=False)
+        self.execute_query(create_scheduler_job_executions_table, fetch=False)
+
+        # Ensure new scheduler_jobs columns exist on older databases
+        try:
+            self.execute_query("ALTER TABLE scheduler_jobs ADD COLUMN schedule_type VARCHAR(20) DEFAULT 'interval'", fetch=False)
+        except:
+            pass
+        try:
+            self.execute_query("ALTER TABLE scheduler_jobs ADD COLUMN cron_expression VARCHAR(200)", fetch=False)
+        except:
+            pass
+        try:
+            self.execute_query("ALTER TABLE scheduler_jobs ADD COLUMN start_at TIMESTAMP", fetch=False)
+        except:
+            pass
+        try:
+            self.execute_query("ALTER TABLE scheduler_jobs ADD COLUMN end_at TIMESTAMP", fetch=False)
+        except:
+            pass
+        try:
+            self.execute_query("ALTER TABLE scheduler_jobs ADD COLUMN max_runs INTEGER", fetch=False)
+        except:
+            pass
+        try:
+            self.execute_query("ALTER TABLE scheduler_jobs ADD COLUMN run_count INTEGER DEFAULT 0", fetch=False)
+        except:
+            pass
         
         # Add RDP column if it doesn't exist
         try:
@@ -320,6 +387,207 @@ class DatabaseManager:
         
         for index_query in create_indexes:
             self.execute_query(index_query, fetch=False)
+
+    def upsert_scheduler_job(self, name, task_name, config, interval_seconds=None,
+                             enabled=True, next_run_at=None, schedule_type='interval',
+                             cron_expression=None, start_at=None, end_at=None,
+                             max_runs=None):
+        """Create or update a scheduler job by name.
+
+        Returns the row (as a DictRow) for convenience.
+        """
+        query = """
+            INSERT INTO scheduler_jobs (
+                name, task_name, config, enabled,
+                schedule_type, interval_seconds, cron_expression,
+                start_at, end_at, max_runs,
+                last_run_at, next_run_at
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NULL, %s)
+            ON CONFLICT (name)
+            DO UPDATE SET
+                task_name = EXCLUDED.task_name,
+                config = EXCLUDED.config,
+                enabled = EXCLUDED.enabled,
+                schedule_type = EXCLUDED.schedule_type,
+                interval_seconds = EXCLUDED.interval_seconds,
+                cron_expression = EXCLUDED.cron_expression,
+                start_at = EXCLUDED.start_at,
+                end_at = EXCLUDED.end_at,
+                max_runs = EXCLUDED.max_runs,
+                next_run_at = EXCLUDED.next_run_at,
+                updated_at = CURRENT_TIMESTAMP
+            RETURNING *
+        """
+
+        params = (
+            name,
+            task_name,
+            json.dumps(config) if config is not None else None,
+            enabled,
+            schedule_type,
+            interval_seconds,
+            cron_expression,
+            start_at,
+            end_at,
+            max_runs,
+            next_run_at,
+        )
+        rows = self.execute_query(query, params)
+        return rows[0] if rows else None
+
+    def get_scheduler_jobs(self, enabled=None):
+        """Return all scheduler jobs, optionally filtered by enabled flag."""
+        query = "SELECT * FROM scheduler_jobs"
+        params = []
+        if enabled is not None:
+            query += " WHERE enabled = %s"
+            params.append(enabled)
+        query += " ORDER BY name"
+
+        rows = self.execute_query(query, tuple(params))
+        # Parse JSON config if stored as text
+        for row in rows:
+            cfg = row.get("config")
+            if isinstance(cfg, str):
+                try:
+                    row["config"] = json.loads(cfg)
+                except Exception:
+                    row["config"] = None
+        return rows
+
+    def get_scheduler_job_by_name(self, name):
+        """Return a single scheduler job by name, or None if not found."""
+        query = "SELECT * FROM scheduler_jobs WHERE name = %s"
+        rows = self.execute_query(query, (name,))
+        if not rows:
+            return None
+        row = rows[0]
+        cfg = row.get("config")
+        if isinstance(cfg, str):
+            try:
+                row["config"] = json.loads(cfg)
+            except Exception:
+                row["config"] = None
+        return row
+
+    def get_due_scheduler_jobs(self, now):
+        """Return enabled scheduler jobs whose next_run_at is due (<= now or NULL)."""
+        query = """\
+            SELECT * FROM scheduler_jobs
+            WHERE enabled = TRUE
+              AND (start_at IS NULL OR start_at <= %s)
+              AND (end_at IS NULL OR end_at >= %s)
+              AND (max_runs IS NULL OR COALESCE(run_count, 0) < max_runs)
+              AND (next_run_at IS NULL OR next_run_at <= %s)
+            ORDER BY next_run_at NULLS FIRST
+        """
+        rows = self.execute_query(query, (now, now, now))
+        for row in rows:
+            cfg = row.get("config")
+            if isinstance(cfg, str):
+                try:
+                    row["config"] = json.loads(cfg)
+                except Exception:
+                    row["config"] = None
+        return rows
+
+    def mark_scheduler_job_run(self, name, last_run_at, next_run_at):
+        """Update last/next run timestamps for a scheduler job."""
+        query = """\
+            UPDATE scheduler_jobs
+            SET last_run_at = %s,
+                next_run_at = %s,
+                run_count = COALESCE(run_count, 0) + 1,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE name = %s
+        """
+        return self.execute_query(query, (last_run_at, next_run_at, name), fetch=False)
+    
+    def create_scheduler_job_execution(self, job_name, task_name, task_id, status,
+                                       started_at=None, error_message=None, result=None):
+        """Insert a new scheduler job execution record."""
+        query = """
+            INSERT INTO scheduler_job_executions
+                (job_name, task_name, task_id, status, started_at, error_message, result)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """
+        payload = json.dumps(result) if result is not None else None
+        return self.execute_query(
+            query,
+            (job_name, task_name, task_id, status, started_at, error_message, payload),
+            fetch=False,
+        )
+
+    def update_scheduler_job_execution(self, task_id, status,
+                                       finished_at=None, error_message=None, result=None):
+        """Update status and optional fields for an existing execution by task_id."""
+        query = """
+            UPDATE scheduler_job_executions
+            SET status = %s,
+                finished_at = COALESCE(%s, finished_at),
+                error_message = COALESCE(%s, error_message),
+                result = COALESCE(%s, result)
+            WHERE task_id = %s
+        """
+        payload = json.dumps(result) if result is not None else None
+        return self.execute_query(
+            query,
+            (status, finished_at, error_message, payload, task_id),
+            fetch=False,
+        )
+
+    def get_scheduler_job_executions(self, job_name=None, limit=100):
+        """Return recent scheduler job executions, optionally filtered by job_name."""
+        query = "SELECT * FROM scheduler_job_executions"
+        params = []
+        if job_name:
+            query += " WHERE job_name = %s"
+            params.append(job_name)
+        query += " ORDER BY started_at DESC LIMIT %s"
+        params.append(limit)
+
+        rows = self.execute_query(query, tuple(params))
+        # Parse result JSON if stored as text
+        for row in rows:
+            res = row.get("result")
+            if isinstance(res, str):
+                try:
+                    row["result"] = json.loads(res)
+                except Exception:
+                    row["result"] = None
+        return rows
+
+    def clear_scheduler_job_executions(self, job_name=None, status=None):
+        """Delete scheduler job executions, optionally filtered by job_name and status."""
+        query = "DELETE FROM scheduler_job_executions"
+        clauses = []
+        params = []
+        if job_name:
+            clauses.append("job_name = %s")
+            params.append(job_name)
+        if status:
+            clauses.append("status = %s")
+            params.append(status)
+        if clauses:
+            query += " WHERE " + " AND ".join(clauses)
+        return self.execute_query(query, tuple(params), fetch=False)
+    
+    def mark_stale_scheduler_executions(self, timeout_seconds=600):
+        """Mark queued/running executions older than timeout_seconds as 'timeout'.
+
+        Returns the rows that were updated for visibility/metrics.
+        """
+        query = """
+            UPDATE scheduler_job_executions
+            SET status = 'timeout',
+                finished_at = COALESCE(finished_at, NOW()),
+                error_message = COALESCE(error_message, 'Timed out without completion')
+            WHERE status IN ('queued', 'running')
+              AND started_at < NOW() - (%s * INTERVAL '1 second')
+            RETURNING id, job_name, task_id
+        """
+        return self.execute_query(query, (timeout_seconds,))
     
     def get_scan_results(self):
         """Get all scan results (raw rows)"""

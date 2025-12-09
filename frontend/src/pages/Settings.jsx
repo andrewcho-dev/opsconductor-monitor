@@ -12,6 +12,7 @@ import {
   Shield,
   Monitor,
   Key,
+  Bell,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { fetchApi } from "../lib/utils";
@@ -56,6 +57,16 @@ export function Settings() {
     // General Settings
     max_threads: "100",
     completion_message: "Capability scan completed: {online}/{total} hosts online",
+
+    // Notification Settings (Apprise)
+    notifications_enabled: false,
+    notification_targets: "",
+    notify_discovery_on_success: false,
+    notify_discovery_on_error: true,
+    notify_interface_on_success: false,
+    notify_interface_on_error: true,
+    notify_optical_on_success: false,
+    notify_optical_on_error: true,
   });
 
   useEffect(() => {
@@ -96,6 +107,15 @@ export function Settings() {
         
         max_threads: data.max_threads || "100",
         completion_message: data.completion_message || "Capability scan completed: {online}/{total} hosts online",
+
+        notifications_enabled: data.notifications_enabled ?? false,
+        notification_targets: data.notification_targets || "",
+        notify_discovery_on_success: data.notify_discovery_on_success ?? false,
+        notify_discovery_on_error: data.notify_discovery_on_error ?? true,
+        notify_interface_on_success: data.notify_interface_on_success ?? false,
+        notify_interface_on_error: data.notify_interface_on_error ?? true,
+        notify_optical_on_success: data.notify_optical_on_success ?? false,
+        notify_optical_on_error: data.notify_optical_on_error ?? true,
       });
     } catch (err) {
       showStatus("Error loading settings: " + err.message, "error");
@@ -156,6 +176,15 @@ export function Settings() {
         
         max_threads: "100",
         completion_message: "Capability scan completed: {online}/{total} hosts online",
+
+        notifications_enabled: false,
+        notification_targets: "",
+        notify_discovery_on_success: false,
+        notify_discovery_on_error: true,
+        notify_interface_on_success: false,
+        notify_interface_on_error: true,
+        notify_optical_on_success: false,
+        notify_optical_on_error: true,
       });
       
       showStatus("Settings reset to defaults. Click \"Save\" to apply.", "success");
@@ -232,6 +261,15 @@ export function Settings() {
             
             max_threads: importedSettings.max_threads || "100",
             completion_message: importedSettings.completion_message || "Capability scan completed: {online}/{total} hosts online",
+
+            notifications_enabled: importedSettings.notifications_enabled ?? false,
+            notification_targets: importedSettings.notification_targets || "",
+            notify_discovery_on_success: importedSettings.notify_discovery_on_success ?? false,
+            notify_discovery_on_error: importedSettings.notify_discovery_on_error ?? true,
+            notify_interface_on_success: importedSettings.notify_interface_on_success ?? false,
+            notify_interface_on_error: importedSettings.notify_interface_on_error ?? true,
+            notify_optical_on_success: importedSettings.notify_optical_on_success ?? false,
+            notify_optical_on_error: importedSettings.notify_optical_on_error ?? true,
           });
           
           showStatus("Settings imported successfully! Click \"Save\" to apply.", "success");
@@ -518,6 +556,98 @@ export function Settings() {
                 onChange={(e) => updateSetting("rdp_fail_status", e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Notification Settings */}
+      <div className="bg-white p-4 rounded-lg shadow mb-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Bell className="w-5 h-5 text-yellow-600" />
+          <h3 className="text-lg font-semibold text-gray-800">Notifications</h3>
+        </div>
+        <div className="space-y-3">
+          <label className="flex items-center gap-2 text-sm text-gray-800">
+            <input
+              type="checkbox"
+              checked={!!settings.notifications_enabled}
+              onChange={(e) => updateSetting("notifications_enabled", e.target.checked)}
+            />
+            <span>Enable notifications for poller jobs</span>
+          </label>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Apprise target URLs (one per line)
+            </label>
+            <textarea
+              className="w-full min-h-[80px] px-3 py-2 border border-gray-300 rounded-lg font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={settings.notification_targets}
+              onChange={(e) => updateSetting("notification_targets", e.target.value)}
+              placeholder={"mailtos://user:pass@smtp.example.com?from=you@example.com&to=dest@example.com\nslack://...\nmsteams://..."}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-gray-800">
+            <div className="space-y-1">
+              <div className="font-semibold">Discovery job</div>
+              <label className="flex items-center gap-1">
+                <input
+                  type="checkbox"
+                  checked={!!settings.notify_discovery_on_success}
+                  onChange={(e) => updateSetting("notify_discovery_on_success", e.target.checked)}
+                />
+                <span>On success</span>
+              </label>
+              <label className="flex items-center gap-1">
+                <input
+                  type="checkbox"
+                  checked={!!settings.notify_discovery_on_error}
+                  onChange={(e) => updateSetting("notify_discovery_on_error", e.target.checked)}
+                />
+                <span>On error</span>
+              </label>
+            </div>
+
+            <div className="space-y-1">
+              <div className="font-semibold">Interface job</div>
+              <label className="flex items-center gap-1">
+                <input
+                  type="checkbox"
+                  checked={!!settings.notify_interface_on_success}
+                  onChange={(e) => updateSetting("notify_interface_on_success", e.target.checked)}
+                />
+                <span>On success</span>
+              </label>
+              <label className="flex items-center gap-1">
+                <input
+                  type="checkbox"
+                  checked={!!settings.notify_interface_on_error}
+                  onChange={(e) => updateSetting("notify_interface_on_error", e.target.checked)}
+                />
+                <span>On error</span>
+              </label>
+            </div>
+
+            <div className="space-y-1">
+              <div className="font-semibold">Optical job</div>
+              <label className="flex items-center gap-1">
+                <input
+                  type="checkbox"
+                  checked={!!settings.notify_optical_on_success}
+                  onChange={(e) => updateSetting("notify_optical_on_success", e.target.checked)}
+                />
+                <span>On success</span>
+              </label>
+              <label className="flex items-center gap-1">
+                <input
+                  type="checkbox"
+                  checked={!!settings.notify_optical_on_error}
+                  onChange={(e) => updateSetting("notify_optical_on_error", e.target.checked)}
+                />
+                <span>On error</span>
+              </label>
             </div>
           </div>
         </div>

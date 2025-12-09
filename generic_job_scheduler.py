@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import Dict, Any, List, Callable
 from database import db
 from scan_routes import ping_fast, check_snmp_agent, check_port_fast
+from notification_service import send_notification
 
 class GenericJobScheduler:
     """Generic job scheduler that supports any kind of action"""
@@ -51,6 +52,9 @@ class GenericJobScheduler:
                 action_result = self._execute_action(action, job_definition.get('config', {}))
                 results[f'action_{action["type"]}'] = action_result
                 results['actions_completed'] += 1
+
+                # Per-action notifications for Job Builder style jobs
+                self._maybe_send_action_notification(job_definition, action, action_result)
                 
                 if action_result.get('error'):
                     results['errors'].append(f"Action {action['type']}: {action_result['error']}")
@@ -94,6 +98,51 @@ class GenericJobScheduler:
             
         except Exception as e:
             return {'error': str(e)}
+
+    def _maybe_send_action_notification(self, job_definition: Dict[str, Any], action: Dict[str, Any], action_result: Dict[str, Any]):
+        """Send per-action notifications based on action.notifications config."""
+        try:
+            notifications = action.get('notifications') or {}
+            if not notifications.get('enabled'):
+                return
+
+            targets = notifications.get('targets') or []
+            if not targets:
+                return
+
+            has_error = bool(action_result.get('error'))
+            successful = action_result.get('successful_results', 0) > 0 and not has_error
+
+            if has_error and not notifications.get('on_failure', True):
+                return
+            if successful and not notifications.get('on_success'):
+                return
+            if not successful and not has_error and not notifications.get('on_failure', True):
+                return
+
+            status = 'FAILED' if has_error or not successful else 'SUCCEEDED'
+            job_name = job_definition.get('name', job_definition.get('job_id', 'job'))
+            action_type = action.get('type', 'action')
+
+            title = f"Job '{job_name}' action {action_type} {status}"
+
+            if has_error:
+                error_msg = action_result.get('error', 'Unknown error')
+                body = f"Action {action_type} in job '{job_name}' failed. Error: {error_msg}"
+            else:
+                body = (
+                    f"Action {action_type} in job '{job_name}' completed. "
+                    f"Targets processed: {action_result.get('targets_processed', 0)}, "
+                    f"successful results: {action_result.get('successful_results', 0)}."
+                )
+
+            tag_status = 'error' if has_error or not successful else 'success'
+            tag = f"job_builder.{job_definition.get('job_id', 'job')}.{action_type}.{tag_status}"
+
+            send_notification(targets=targets, title=title, body=body, tag=tag)
+        except Exception:
+            # Notification failures should never break job execution
+            pass
     
     def _execute_on_target(self, target: str, action: Dict[str, Any], job_config: Dict[str, Any]) -> Dict[str, Any]:
         """Execute action on a single target"""
@@ -408,3 +457,80 @@ def run_generic_discovery_job(config: Dict[str, Any]) -> Dict[str, Any]:
     job_def['config'].update(config)
     
     return scheduler.execute_job(job_def)
+
+
+def _translate_builder_action(action: Dict[str, Any]) -> Dict[str, Any]:
+    """Translate a Job Builder style action into the generic scheduler format."""
+    login = action.get('login_method') or {}
+    targeting = action.get('targeting') or {}
+    execution = action.get('execution') or {}
+
+    login_type = login.get('type') or login.get('platform') or 'ping'
+
+    if login_type == 'ping':
+        result_parser = 'ping_result'
+    elif login_type == 'snmp':
+        result_parser = 'snmp_result'
+    elif login_type in ('ssh_port', 'rdp_port'):
+        result_parser = 'port_result'
+    else:
+        result_parser = 'default'
+
+    target_source = targeting.get('source', 'network_range')
+
+    return {
+        'type': action.get('type', login_type),
+        'login_method': login_type,
+        'command': login.get('command', ''),
+        'target_source': target_source,
+        'result_parser': result_parser,
+        'database_table': (action.get('database') or {}).get('table', 'devices'),
+        'timeout': execution.get('timeout', 5),
+        'notifications': action.get('notifications') or {},
+    }
+
+
+def run_job_builder_job(job_definition: Dict[str, Any]) -> Dict[str, Any]:
+    """Run a Job Builder style job definition using the generic scheduler.
+
+    This adapts the richer Job Builder schema into the simpler generic
+    scheduler format so we can reuse the same execution engine and
+    database mappings while supporting per-action notifications.
+    """
+    scheduler = GenericJobScheduler()
+
+    actions = []
+    for action in job_definition.get('actions', []):
+        if not action.get('enabled', True):
+            continue
+        try:
+            actions.append(_translate_builder_action(action))
+        except Exception:
+            continue
+
+    config = job_definition.get('config', {}) or {}
+
+    if 'network' not in config:
+        for action in job_definition.get('actions', []):
+            targeting = action.get('targeting') or {}
+            if targeting.get('network_range'):
+                config['network'] = targeting['network_range']
+                break
+    if 'network' not in config:
+        config['network'] = '10.127.0.0/24'
+
+    for action in job_definition.get('actions', []):
+        targeting = action.get('targeting') or {}
+        if targeting.get('source') == 'custom_list' and targeting.get('target_list'):
+            config['custom_targets'] = targeting['target_list']
+            break
+
+    generic_job = {
+        'job_id': job_definition.get('job_id', 'job_builder'),
+        'name': job_definition.get('name', 'Job Builder Job'),
+        'description': job_definition.get('description', ''),
+        'actions': actions,
+        'config': config,
+    }
+
+    return scheduler.execute_job(generic_job)

@@ -32,7 +32,16 @@ def get_settings():
             "rdp_success_status": "YES",
             "rdp_fail_status": "NO",
             "max_threads": "100",
-            "completion_message": "Capability scan completed: {online}/{total} hosts online"
+            "completion_message": "Capability scan completed: {online}/{total} hosts online",
+            # Notification settings (Apprise)
+            "notifications_enabled": False,
+            "notification_targets": "",
+            "notify_discovery_on_success": False,
+            "notify_discovery_on_error": True,
+            "notify_interface_on_success": False,
+            "notify_interface_on_error": True,
+            "notify_optical_on_success": False,
+            "notify_optical_on_error": True,
         }
 
 def save_settings(data):
@@ -60,7 +69,16 @@ def save_settings(data):
         "rdp_success_status": data.get('rdp_success_status', 'YES'),
         "rdp_fail_status": data.get('rdp_fail_status', 'NO'),
         "max_threads": data.get('max_threads', '100'),
-        "completion_message": data.get('completion_message', 'Capability scan completed: {online}/{total} hosts online')
+        "completion_message": data.get('completion_message', 'Capability scan completed: {online}/{total} hosts online'),
+        # Notification settings (Apprise)
+        "notifications_enabled": bool(data.get('notifications_enabled', False)),
+        "notification_targets": data.get('notification_targets', ''),
+        "notify_discovery_on_success": bool(data.get('notify_discovery_on_success', False)),
+        "notify_discovery_on_error": bool(data.get('notify_discovery_on_error', True)),
+        "notify_interface_on_success": bool(data.get('notify_interface_on_success', False)),
+        "notify_interface_on_error": bool(data.get('notify_interface_on_error', True)),
+        "notify_optical_on_success": bool(data.get('notify_optical_on_success', False)),
+        "notify_optical_on_error": bool(data.get('notify_optical_on_error', True)),
     }
     
     with open('config.json', 'w') as f:

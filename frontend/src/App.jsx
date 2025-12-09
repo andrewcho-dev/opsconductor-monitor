@@ -10,6 +10,7 @@ import { Settings } from "./pages/Settings";
 import Poller from "./pages/Poller";
 import { Topology } from "./pages/Topology";
 import { PowerTrends } from "./pages/PowerTrends";
+import { Scheduler } from "./pages/Scheduler";
 import { useDevices, useGroups, useScanProgress } from "./hooks/useDevices";
 import { fetchApi } from "./lib/utils";
 
@@ -404,6 +405,7 @@ function AppContent() {
         <Route path="/job-builder" element={<Poller openJobBuilder={true} />} />
         <Route path="/topology" element={<Topology />} />
         <Route path="/power-trends" element={<PowerTrends />} />
+        <Route path="/scheduler" element={<Scheduler />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
   );

@@ -55,6 +55,7 @@ const Poller = ({ openJobBuilder = false }) => {
   const [logs, setLogs] = useState([]);
   const [showJobBuilder, setShowJobBuilder] = useState(false);
   const [editingJob, setEditingJob] = useState(null);
+  const [jobRunResult, setJobRunResult] = useState(null);
   
   // Handle openJobBuilder prop safely
   useEffect(() => {
@@ -138,6 +139,7 @@ const Poller = ({ openJobBuilder = false }) => {
       const result = await response.json();
       if (response.ok) {
         addLog('info', `Started ${jobId} poller`);
+        updateJob(jobId, 'enabled', true);
         refreshStatus();
       } else {
         addLog('error', `Failed to start ${jobId}: ${result.error}`);
@@ -153,6 +155,7 @@ const Poller = ({ openJobBuilder = false }) => {
       const result = await response.json();
       if (response.ok) {
         addLog('info', `Stopped ${jobId} poller`);
+        updateJob(jobId, 'enabled', false);
         refreshStatus();
       } else {
         addLog('error', `Failed to stop ${jobId}: ${result.error}`);
@@ -164,15 +167,19 @@ const Poller = ({ openJobBuilder = false }) => {
 
   const testJob = async (jobId) => {
     try {
+      console.log('Poller test click received:', { jobId });
       const response = await fetch(`/poller/${jobId}/test`, { method: 'POST' });
       const result = await response.json();
       if (response.ok) {
+        console.log('Poller test succeeded:', { jobId, result });
         addLog('success', `${jobId} test completed successfully`);
         refreshStatus();
       } else {
+        console.error('Poller test failed (non-OK response):', { jobId, status: response.status, result });
         addLog('error', `${jobId} test failed: ${result.error}`);
       }
     } catch (error) {
+      console.error('Poller test failed (network or parse error):', { jobId, error });
       addLog('error', `Error testing ${jobId}: ${error.message}`);
     }
   };
@@ -800,11 +807,30 @@ const Poller = ({ openJobBuilder = false }) => {
               }}
               onSave={(job) => {
                 console.log('Saving COMPLETE job:', job);
+                addLog('info', `Saved job builder definition: ${job.name || job.job_id || 'job'}`);
                 setShowJobBuilder(false);
                 setEditingJob(null);
               }}
-              onTest={(job) => {
-                console.log('Testing COMPLETE job:', job);
+              onTest={async (job) => {
+                try {
+                  addLog('info', `Running job builder test for ${job.name || job.job_id || 'job'}...`);
+                  const response = await fetch('/api/jobs/run', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(job)
+                  });
+                  const data = await response.json();
+                  if (response.ok) {
+                    console.log('Job Builder run result:', data);
+                    setJobRunResult(data);
+                    addLog('success', `Job builder run completed: ${job.name || job.job_id || 'job'}`);
+                  } else {
+                    const msg = data?.error || 'Unknown error';
+                    addLog('error', `Job builder run failed: ${msg}`);
+                  }
+                } catch (err) {
+                  addLog('error', `Job builder run error: ${err.message || err}`);
+                }
               }}
               onBack={() => {
                 setShowJobBuilder(false);
@@ -812,6 +838,74 @@ const Poller = ({ openJobBuilder = false }) => {
               }}
             />
             </ErrorBoundary>
+          </div>
+        </div>
+      )}
+      {jobRunResult && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center">
+          <div className="bg-white rounded-lg shadow-lg max-w-3xl w-full mx-4 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-semibold text-gray-900">
+                Job Builder Run Result
+              </h2>
+              <button
+                onClick={() => setJobRunResult(null)}
+                className="px-3 py-1 text-sm rounded bg-gray-200 hover:bg-gray-300"
+              >
+                Close
+              </button>
+            </div>
+            <div className="text-xs text-gray-600 mb-2">
+              <div>Job ID: {jobRunResult.job_id}</div>
+              <div>Job Name: {jobRunResult.job_name}</div>
+              <div>
+                Started: {jobRunResult.started_at} &nbsp;|&nbsp; Finished: {jobRunResult.finished_at}
+              </div>
+              <div>
+                Actions Completed: {jobRunResult.actions_completed} / {jobRunResult.total_actions}
+              </div>
+              {jobRunResult.errors && jobRunResult.errors.length > 0 && (
+                <div className="mt-1 text-red-600">
+                  Errors:
+                  <ul className="list-disc list-inside">
+                    {jobRunResult.errors.map((e, idx) => (
+                      <li key={idx}>{e}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+            <div className="border-t pt-2 mt-2">
+              <h3 className="text-sm font-semibold text-gray-800 mb-2">Action Summary</h3>
+              <div className="max-h-64 overflow-auto border rounded">
+                <table className="min-w-full text-xs">
+                  <thead className="bg-gray-100 text-gray-700">
+                    <tr>
+                      <th className="px-2 py-1 text-left">Action</th>
+                      <th className="px-2 py-1 text-right">Targets</th>
+                      <th className="px-2 py-1 text-right">Successful</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(jobRunResult)
+                      .filter(([key]) => key.startsWith('action_'))
+                      .map(([key, value]) => (
+                        <tr key={key} className="border-t">
+                          <td className="px-2 py-1 text-gray-800">
+                            {value.action_type || key.replace('action_', '')}
+                          </td>
+                          <td className="px-2 py-1 text-right">
+                            {value.targets_processed ?? '-'}
+                          </td>
+                          <td className="px-2 py-1 text-right">
+                            {value.successful_results ?? '-'}
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
       )}

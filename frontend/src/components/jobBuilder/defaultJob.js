@@ -16,6 +16,12 @@ export const createEmptyAction = () => ({
       output_regex: 'bytes from .*: icmp_seq=\\d+ ttl=\\d+ time=([0-9.]+)'
     }
   },
+  notifications: {
+    enabled: false,
+    on_success: false,
+    on_failure: true,
+    targets: []
+  },
   targeting: {
     source: 'network_groups',
     network_range: '10.127.0.0/24',
@@ -142,6 +148,12 @@ export const DEFAULT_JOB = {
           last_seen: 'TIMESTAMP'
         },
         indexes: ['ip_address', 'last_seen']
+      },
+      notifications: {
+        enabled: false,
+        on_success: false,
+        on_failure: true,
+        targets: []
       }
     },
     {
@@ -239,6 +251,12 @@ export const DEFAULT_JOB = {
           last_seen: 'TIMESTAMP'
         },
         indexes: ['ip_address', 'hostname']
+      },
+      notifications: {
+        enabled: false,
+        on_success: false,
+        on_failure: true,
+        targets: []
       }
     },
     {
@@ -319,6 +337,12 @@ export const DEFAULT_JOB = {
           last_seen: 'TIMESTAMP'
         },
         indexes: ['ip_address', 'ssh_status']
+      },
+      notifications: {
+        enabled: false,
+        on_success: false,
+        on_failure: true,
+        targets: []
       }
     },
     {
@@ -399,6 +423,12 @@ export const DEFAULT_JOB = {
           last_seen: 'TIMESTAMP'
         },
         indexes: ['ip_address', 'rdp_status']
+      },
+      notifications: {
+        enabled: false,
+        on_success: false,
+        on_failure: true,
+        targets: []
       }
     }
   ],

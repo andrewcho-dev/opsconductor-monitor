@@ -3,7 +3,60 @@ import { COMMAND_LIBRARIES, getCommandLibrary, getAvailablePlatforms, getCommand
 
 console.log('IntelligentCommandBuilder component loading...');
 
-const IntelligentCommandBuilder = ({ action, actionIndex, updateAction }) => {
+// Map many low-level categories into a smaller set of logical groups for the UI
+const RAW_CATEGORY_TO_GROUP = {
+  discovery: 'discovery_scanning',
+  scanning: 'discovery_scanning',
+  system: 'system_processes',
+  processes: 'system_processes',
+  networking: 'networking_diagnostics',
+  'network-diagnostics': 'networking_diagnostics',
+  security: 'security_monitoring',
+  monitoring: 'security_monitoring',
+  storage: 'storage_files',
+  'file-management': 'storage_files',
+  logging: 'text_logs',
+  'text-processing': 'text_logs',
+  services: 'services_scheduling',
+  scheduling: 'services_scheduling',
+  packages: 'packages_software',
+  'user-management': 'users_access',
+  web: 'web_apis',
+  other: 'other'
+};
+
+const CATEGORY_GROUP_META = {
+  discovery_scanning: { label: 'Discovery & Scanning', icon: '🔍' },
+  system_processes: { label: 'System & Processes', icon: '💻' },
+  networking_diagnostics: { label: 'Networking & Diagnostics', icon: '🌐' },
+  security_monitoring: { label: 'Security & Monitoring', icon: '🔒' },
+  storage_files: { label: 'Storage & Files', icon: '💾' },
+  services_scheduling: { label: 'Services & Scheduling', icon: '🛠️' },
+  packages_software: { label: 'Packages & Software', icon: '📦' },
+  text_logs: { label: 'Text & Logs', icon: '📝' },
+  users_access: { label: 'Users & Access', icon: '👤' },
+  web_apis: { label: 'Web & APIs', icon: '🌍' },
+  other: { label: 'Other', icon: '📋' }
+};
+
+const mapCategoryToGroup = (rawCategory) => {
+  if (!rawCategory) return 'other';
+  return RAW_CATEGORY_TO_GROUP[rawCategory] || 'other';
+};
+
+const getCategoryLabel = (categoryKey) => {
+  const meta = CATEGORY_GROUP_META[categoryKey];
+  if (meta) return meta.label;
+  return (categoryKey || 'other').replace(/[_-]/g, ' ').toUpperCase();
+};
+
+const getCategoryIcon = (categoryKey) => {
+  const meta = CATEGORY_GROUP_META[categoryKey];
+  if (meta) return meta.icon;
+  return '📋';
+};
+
+const IntelligentCommandBuilder = ({ action, actionIndex, updateAction, children }) => {
   const [selectedPlatform, setSelectedPlatform] = useState('ubuntu-20.04');
   const [selectedCommand, setSelectedCommand] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -11,6 +64,8 @@ const IntelligentCommandBuilder = ({ action, actionIndex, updateAction }) => {
   const [validationResults, setValidationResults] = useState({});
   const [showPreview, setShowPreview] = useState(true);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showOriginPicker, setShowOriginPicker] = useState(false);
+  const [showCommandPicker, setShowCommandPicker] = useState(false);
 
   // Initialize platform and command from existing action
   useEffect(() => {
@@ -27,7 +82,7 @@ const IntelligentCommandBuilder = ({ action, actionIndex, updateAction }) => {
     const library = getCommandLibrary(selectedPlatform);
     const command = library?.commands?.[selectedCommand];
     setCommandData(command || {});
-    
+
     // Initialize parameter values
     if (command && !action.login_method?.parameters) {
       const initialParams = {};
@@ -100,31 +155,6 @@ const IntelligentCommandBuilder = ({ action, actionIndex, updateAction }) => {
     return result;
   };
 
-  const getCategoryIcon = (category) => {
-    const icons = {
-      'discovery': '🔍',
-      'scanning': '📡',
-      'system': '💻',
-      'networking': '🌐',
-      'processes': '⚙️',
-      'security': '🔒',
-      'monitoring': '📊',
-      'storage': '💾',
-      'services': '🛠️',
-      'logging': '📝',
-      'packages': '📦',
-      'text-processing': '📝',
-      'file-management': '📁',
-      'user-management': '👤',
-      'network-diagnostics': '🩺',
-      'performance': '⚡',
-      'scheduling': '⏰',
-      'web': '🌍',
-      'other': '📋'
-    };
-    return icons[category] || '📋';
-  };
-
   const handlePlatformChange = (platform) => {
     setSelectedPlatform(platform);
     setSelectedCommand('');
@@ -136,15 +166,15 @@ const IntelligentCommandBuilder = ({ action, actionIndex, updateAction }) => {
   const handleCommandChange = (commandId) => {
     setSelectedCommand(commandId);
     const command = getCommand(selectedPlatform, commandId);
-    
+
     updateAction(actionIndex, 'login_method.platform', selectedPlatform);
     updateAction(actionIndex, 'login_method.command_id', commandId);
     updateAction(actionIndex, 'login_method.command_template', command?.syntax || '');
-    
+
     // Auto-update action type based on command
     const actionType = commandId.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
     updateAction(actionIndex, 'type', actionType);
-    
+
     // Initialize parameters
     if (command?.parameters) {
       const initialParams = {};
@@ -168,18 +198,18 @@ const IntelligentCommandBuilder = ({ action, actionIndex, updateAction }) => {
 
   const generateCommandPreview = () => {
     if (!commandData.syntax) return '';
-    
+
     let command = commandData.syntax;
     const params = action.login_method?.parameters || {};
-    
+
     // Replace parameter placeholders
     Object.entries(params).forEach(([key, value]) => {
       command = command.replace(new RegExp(`{${key}}`, 'g'), value || `{${key}}`);
     });
-    
+
     // Replace variable placeholders
     command = command.replace('{target}', '{target}');
-    
+
     return command;
   };
 
@@ -202,121 +232,238 @@ const IntelligentCommandBuilder = ({ action, actionIndex, updateAction }) => {
     }
   };
 
+  const platforms = getAvailablePlatforms();
   const currentLibrary = getCommandLibrary(selectedPlatform);
   const availableCommands = Object.entries(currentLibrary?.commands || {});
 
-  // Group commands by category
+  // Group commands by consolidated category groups for a simpler UI
   const commandsByCategory = availableCommands.reduce((groups, [id, command]) => {
-    const category = command.category || 'other';
-    if (!groups[category]) groups[category] = [];
-    groups[category].push({ id, ...command });
+    const rawCategory = command.category || 'other';
+    const groupKey = mapCategoryToGroup(rawCategory);
+    if (!groups[groupKey]) groups[groupKey] = [];
+    groups[groupKey].push({ id, ...command, rawCategory, category: groupKey });
     return groups;
   }, {});
 
+  const allCommandsFlat = Object.entries(commandsByCategory).flatMap(([groupKey, cmds]) =>
+    cmds.map((cmd) => ({ ...cmd, category: groupKey }))
+  );
+
+  const visibleCommands =
+    selectedCategory === 'all'
+      ? allCommandsFlat
+      : allCommandsFlat.filter((cmd) => cmd.category === selectedCategory);
+
+  const currentPlatform =
+    platforms.find((platform) => platform.id === selectedPlatform) || platforms[0] || null;
+  const originSummary = currentPlatform
+    ? `${currentPlatform.icon ? `${currentPlatform.icon} ` : ''}${currentPlatform.name || currentPlatform.id}`
+    : 'Select origin';
+
+  const commandSummary =
+    selectedCommand && commandData?.name
+      ? commandData.name
+      : selectedCommand
+      ? selectedCommand
+      : 'Select command';
+
   return (
     <div className="space-y-4">
-      {/* Platform Selection */}
-      <div className="bg-white rounded shadow p-4">
-        <h4 className="text-sm font-bold mb-3 flex items-center gap-2">
-          <span>🌐</span> EXECUTION PLATFORM
-          <span className="text-xs font-normal text-gray-600 ml-1">
-            (Where this command will run)
-          </span>
-        </h4>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-medium mb-1">Platform</label>
-            <select
-              value={selectedPlatform}
-              onChange={(e) => handlePlatformChange(e.target.value)}
-              className="w-full p-2 border rounded text-sm bg-gray-200 focus:bg-white focus:ring-2 focus:ring-blue-300"
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 items-stretch">
+        {/* Origin (Execution Platform) */}
+        <div className="bg-white rounded shadow p-4 h-full">
+          <h4 className="text-sm font-bold mb-3 flex items-center gap-2">
+            <span>🌐</span> ORIGIN
+          </h4>
+
+          <button
+            type="button"
+            onClick={() => setShowOriginPicker(true)}
+            className="w-full text-left text-xs px-2 py-2 border rounded bg-gray-200 hover:bg-white focus:bg-white focus:ring-1 focus:ring-blue-300"
+          >
+            <span className="block text-gray-800 truncate">{originSummary}</span>
+          </button>
+        </div>
+
+        {/* Command - COMPACT VERSION */}
+        <div className="bg-white rounded shadow p-3 h-full">
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-sm font-bold flex items-center gap-2">
+              <span>⚡</span> COMMAND
+            </h4>
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(true)}
+              disabled={!selectedCommand}
+              className="p-1 rounded-full text-blue-600 hover:bg-blue-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Advanced command settings"
             >
-              {getAvailablePlatforms().map(platform => (
-                <option key={platform.id} value={platform.id}>
-                  {platform.icon} {platform.name}
-                </option>
-              ))}
-            </select>
+              ⚙️
+            </button>
           </div>
-          
-          <div>
-            <label className="block text-xs font-medium mb-1">Platform Info</label>
-            <div className="w-full p-2 border rounded text-sm bg-gray-100 text-gray-600">
-              {currentLibrary?.description}
+
+          <button
+            type="button"
+            onClick={() => setShowCommandPicker(true)}
+            className="w-full text-left text-xs px-2 py-2 border rounded bg-gray-200 hover:bg-white focus:bg-white focus:ring-1 focus:ring-blue-300"
+          >
+            <span className="block text-gray-800 truncate">{commandSummary}</span>
+          </button>
+
+          {/* Compact Command Info: show ONLY the concrete command that will run */}
+          {selectedCommand && commandData.syntax && (
+            <div className="mt-2 rounded border border-gray-700 bg-gray-900 px-2 py-1 text-[11px] font-mono text-green-400 overflow-x-auto whitespace-nowrap">
+              {generateCommandPreview()}
+            </div>
+          )}
+        </div>
+
+        {children && (
+          <div>{children}</div>
+        )}
+      </div>
+
+      {showOriginPicker && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setShowOriginPicker(false)} />
+          <div className="relative z-50 w-full max-w-md bg-white rounded-lg shadow-xl border border-gray-200 p-4 space-y-3">
+            <div className="flex items-center justify-between border-b pb-2">
+              <h4 className="text-sm font-bold flex items-center gap-2">
+                <span>🌐</span> Select Origin
+              </h4>
+              <button
+                type="button"
+                onClick={() => setShowOriginPicker(false)}
+                className="text-gray-500 hover:text-gray-700 text-sm"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="space-y-1 text-sm">
+              {platforms.map((platform) => (
+                <button
+                  key={platform.id}
+                  type="button"
+                  onClick={() => {
+                    handlePlatformChange(platform.id);
+                    setShowOriginPicker(false);
+                  }}
+                  className={`w-full text-left px-3 py-2 rounded border mb-1 ${
+                    platform.id === selectedPlatform
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  <span className="truncate">
+                    {platform.icon} {platform.name}
+                  </span>
+                </button>
+              ))}
             </div>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Command Selection - COMPACT VERSION */}
-      <div className="bg-white rounded shadow p-3">
-        <div className="flex items-center justify-between mb-2">
-          <h4 className="text-sm font-bold flex items-center gap-2">
-            <span>⚡</span> COMMAND SELECTION
-            <span className="text-xs font-normal text-gray-600 ml-1">
-              (What to execute)
-            </span>
-          </h4>
-          <button
-            type="button"
-            onClick={() => setShowAdvanced(true)}
-            disabled={!selectedCommand}
-            className="p-1 rounded-full text-blue-600 hover:bg-blue-50 disabled:opacity-40 disabled:cursor-not-allowed"
-            title="Advanced command settings"
-          >
-            ⚙️
-          </button>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">
-          <div>
-            <label className="block text-xs font-medium mb-1">Category</label>
-            <select
-              value={selectedCategory}
-              onChange={(e) => handleCategoryChange(e.target.value)}
-              className="w-full p-1 border rounded text-xs bg-gray-200 focus:bg-white focus:ring-1 focus:ring-blue-300"
-            >
-              <option value="all">📋 All Categories</option>
-              {Object.keys(commandsByCategory).map(category => (
-                <option key={category} value={category}>
-                  {getCategoryIcon(category)} {category.replace(/_/g, ' ').toUpperCase()}
-                </option>
-              ))}
-            </select>
-          </div>
-          
-          <div>
-            <label className="block text-xs font-medium mb-1">Command</label>
-            <select
-              value={selectedCommand}
-              onChange={(e) => handleCommandChange(e.target.value)}
-              className="w-full p-1 border rounded text-xs bg-gray-200 focus:bg-white focus:ring-1 focus:ring-blue-300"
-            >
-              <option value="">Select a command...</option>
-              {selectedCategory === 'all' 
-                ? Object.values(commandsByCategory).flat().map(command => (
-                    <option key={command.id} value={command.id}>
-                      {command.name}
-                    </option>
-                  ))
-                : commandsByCategory[selectedCategory]?.map(command => (
-                    <option key={command.id} value={command.id}>
-                      {command.name}
-                    </option>
-                  ))
-              }
-            </select>
-          </div>
-        </div>
+      {showCommandPicker && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/60"
+            onClick={() => setShowCommandPicker(false)}
+          />
+          <div className="relative z-50 w-full max-w-6xl bg-white rounded-lg shadow-xl border border-gray-200 p-4 space-y-3 max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between border-b pb-2">
+              <h4 className="text-sm font-bold flex items-center gap-2">
+                <span>⚡</span> Select Command
+              </h4>
+              <button
+                type="button"
+                onClick={() => setShowCommandPicker(false)}
+                className="text-gray-500 hover:text-gray-700 text-sm"
+              >
+                ✕
+              </button>
+            </div>
 
-        {/* Compact Command Info: show ONLY the concrete command that will run */}
-        {selectedCommand && commandData.syntax && (
-          <div className="mt-2 rounded border border-gray-700 bg-gray-900 px-2 py-1 text-[11px] font-mono text-green-400 overflow-x-auto whitespace-nowrap">
-            {generateCommandPreview()}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <div className="space-y-1 h-full flex flex-col">
+                <div className="text-xs font-semibold text-gray-600">Categories</div>
+                <div className="border rounded p-2 h-[60vh] overflow-y-auto pr-1 flex flex-col gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategory('all')}
+                    className={`px-2 py-1 text-left text-xs rounded border ${
+                      selectedCategory === 'all'
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200 hover:bg-gray-50'
+                    }`}
+                  >
+                    <span>📋 All</span>
+                  </button>
+                  {Object.keys(commandsByCategory).map((category) => (
+                    <button
+                      key={category}
+                      type="button"
+                      onClick={() => setSelectedCategory(category)}
+                      className={`px-2 py-1 text-left text-xs rounded border ${
+                        selectedCategory === category
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      <span>
+                        {getCategoryIcon(category)} {getCategoryLabel(category)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="md:col-span-3 flex flex-col h-full">
+                <div className="flex items-center justify-between mb-1">
+                  <div className="text-xs font-semibold text-gray-600">Commands</div>
+                </div>
+                <div className="border rounded p-2 h-[60vh] overflow-y-auto space-y-1 text-xs">
+                  {visibleCommands.map((cmd) => (
+                    <button
+                      key={cmd.id}
+                      type="button"
+                      onClick={() => {
+                        handleCommandChange(cmd.id);
+                        setShowCommandPicker(false);
+                      }}
+                      className={`w-full text-left px-3 py-1 rounded border ${
+                        cmd.id === selectedCommand
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 w-full">
+                        <span
+                          className="text-xs font-semibold text-gray-900 truncate w-44"
+                          title={cmd.description || ''}
+                        >
+                          {cmd.name}
+                        </span>
+                        {cmd.description && (
+                          <span className="text-[11px] text-gray-600 truncate flex-1">
+                            {cmd.description}
+                          </span>
+                        )}
+                        <span className="text-[10px] uppercase text-gray-500 whitespace-nowrap">
+                          {getCategoryLabel(cmd.category || 'other')}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                  {visibleCommands.length === 0 && (
+                    <div className="text-xs text-gray-500">No commands available for this category.</div>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Advanced modal for command parameters + preview */}
       {showAdvanced && selectedCommand && commandData.name && (

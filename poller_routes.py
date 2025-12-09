@@ -160,12 +160,17 @@ def save_discovery_config():
 def start_interface_poller():
     """Start the interface polling job"""
     try:
-        config = db.get_poller_config('interface')
-        if not config:
-            return jsonify({'error': 'No configuration found for interface poller'}), 400
-        
+        # Use a sensible default config for now, mirroring test_interface_scan
+        config = {
+            'enabled': True,
+            'interval': 1800,
+            'targets': 'all',
+            'custom': '',
+            'retention': 7
+        }
+
         manager = get_poller_manager()
-        success = manager.start_job('interface', config['config'])
+        success = manager.start_job('interface', config)
         
         if success:
             return jsonify({'success': True, 'message': 'Interface poller started successfully'})
@@ -214,12 +219,17 @@ def save_interface_config():
 def start_optical_poller():
     """Start the optical power polling job"""
     try:
-        config = db.get_poller_config('optical')
-        if not config:
-            return jsonify({'error': 'No configuration found for optical poller'}), 400
-        
+        # Use a sensible default config for now, mirroring test_optical_scan
+        config = {
+            'enabled': True,
+            'interval': 300,
+            'targets': 'all',
+            'retention': 90,
+            'temperature_threshold': 70
+        }
+
         manager = get_poller_manager()
-        success = manager.start_job('optical', config['config'])
+        success = manager.start_job('optical', config)
         
         if success:
             return jsonify({'success': True, 'message': 'Optical power poller started successfully'})

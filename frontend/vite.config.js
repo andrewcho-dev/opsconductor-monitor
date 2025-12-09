@@ -26,6 +26,16 @@ export default defineConfig({
       '/api/network-ranges': 'http://192.168.10.50:5000',
       '/api/custom-groups': 'http://192.168.10.50:5000',
       '/api/network-groups': 'http://192.168.10.50:5000',
+      '/api/notify/test': 'http://192.168.10.50:5000',
+      '/api/jobs/run': 'http://192.168.10.50:5000',
+      '/poller/status': 'http://192.168.10.50:5000',
+      '/poller/logs': 'http://192.168.10.50:5000',
+      '/poller/discovery': 'http://192.168.10.50:5000',
+      '/poller/interface': 'http://192.168.10.50:5000',
+      '/poller/optical': 'http://192.168.10.50:5000',
+      '/poller/run_all': 'http://192.168.10.50:5000',
+      '/poller/statistics': 'http://192.168.10.50:5000',
+      '/poller/logs/clear': 'http://192.168.10.50:5000',
     }
   },
   build: {
