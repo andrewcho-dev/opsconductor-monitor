@@ -42,11 +42,11 @@ const JobNavHeader = ({ active }) => {
         </button>
         <button
           type="button"
-          onClick={() => navigate('/poller')}
-          className={linkClasses('poller')}
+          onClick={() => navigate('/scheduler')}
+          className={linkClasses('scheduler')}
         >
           <Activity className="w-4 h-4" />
-          <span>Poller Jobs</span>
+          <span>Scheduler</span>
         </button>
       </div>
     </div>

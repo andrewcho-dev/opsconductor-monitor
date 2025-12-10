@@ -7,7 +7,7 @@ import { GroupModal } from "./components/GroupModal";
 import { SettingsModal } from "./components/SettingsModal";
 import { DeviceDetail } from "./pages/DeviceDetail";
 import { Settings } from "./pages/Settings";
-import Poller from "./pages/Poller";
+// Legacy Poller page removed - now redirects to /scheduler
 import { Topology } from "./pages/Topology";
 import { PowerTrends } from "./pages/PowerTrends";
 import { Scheduler } from "./pages/Scheduler";
@@ -402,7 +402,7 @@ function AppContent() {
         } />
         <Route path="/device/:ip" element={<DeviceDetail />} />
         <Route path="/settings" element={<Settings />} />
-        <Route path="/poller" element={<Poller />} />
+        <Route path="/poller" element={<Navigate to="/scheduler" replace />} />
         <Route path="/job-definitions" element={<JobDefinitions />} />
         <Route path="/job-builder" element={<JobDefinitions />} />
         <Route path="/topology" element={<Topology />} />

@@ -163,11 +163,11 @@ export function ScanProgress({ progress, onStartScan, onRefresh, onOpenSettings,
           </button>
 
           <button
-            onClick={() => navigate("/poller")}
+            onClick={() => navigate("/scheduler")}
             className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
           >
             <Network className="w-4 h-4" />
-            POLLER
+            SCHEDULER
           </button>
 
           <button

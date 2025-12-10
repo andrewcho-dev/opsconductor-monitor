@@ -1,0 +1,20 @@
+[Unit]
+Description=OpsConductor Monitor Celery Beat Scheduler
+After=network.target postgresql.service redis.service opsconductor-worker.service
+Wants=postgresql.service redis.service
+
+[Service]
+Type=simple
+User=opsconductor
+Group=opsconductor
+WorkingDirectory=/home/opsconductor/opsconductor-monitor/CascadeProjects/windsurf-project
+Environment="PATH=/home/opsconductor/.local/bin:/usr/local/bin:/usr/bin:/bin"
+ExecStart=/home/opsconductor/.local/bin/celery -A celery_app beat \
+    --loglevel=info
+ExecStop=/bin/kill -s TERM $MAINPID
+Restart=always
+RestartSec=10
+KillMode=mixed
+
+[Install]
+WantedBy=multi-user.target

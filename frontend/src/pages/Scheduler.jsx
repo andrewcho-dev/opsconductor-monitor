@@ -7,7 +7,6 @@ export function Scheduler() {
   const navigate = useNavigate();
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [selectedJob, setSelectedJob] = useState(null);
   const [executions, setExecutions] = useState([]);
@@ -17,18 +16,7 @@ export function Scheduler() {
   const [queueStatus, setQueueStatus] = useState(null);
   const [loadingQueues, setLoadingQueues] = useState(false);
   const runOnceRefreshRef = useRef(null);
-  const [form, setForm] = useState({
-    name: "",
-    task_name: "",
-    interval_seconds: 60,
-    schedule_type: "interval",
-    cron_expression: "",
-    start_at: "",
-    end_at: "",
-    max_runs: "",
-    enabled: true,
-    config: "{}",
-  });
+  // Scheduler is read-only for job structure; creation/editing happens via Job Builder.
 
   const formatLocalTime = (value) => {
     if (!value) return "—";
@@ -152,91 +140,28 @@ export function Scheduler() {
     };
   }, []);
 
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setForm((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
-    }));
-  };
-
-  const handleEditJob = (job) => {
-    handleSelectJob(job);
-    setForm({
-      name: job.name,
-      task_name: job.task_name,
-      interval_seconds: job.interval_seconds || 60,
-      schedule_type: job.schedule_type || "interval",
-      cron_expression: job.cron_expression || "",
-      start_at: job.start_at || "",
-      end_at: job.end_at || "",
-      max_runs: job.max_runs != null ? String(job.max_runs) : "",
-      enabled: job.enabled,
-      config: JSON.stringify(job.config || {}, null, 2),
-    });
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleDeleteJob = async (name) => {
+    if (!name) return;
+    if (!window.confirm(`Delete scheduler job "${name}"? This cannot be undone.`)) {
+      return;
+    }
     try {
-      setSaving(true);
       setError(null);
-
-      let parsedConfig = {};
-      if (form.config && form.config.trim()) {
-        try {
-          parsedConfig = JSON.parse(form.config);
-        } catch (err) {
-          alert("Config must be valid JSON");
-          return;
-        }
-      }
-
-      const payload = {
-        name: form.name.trim(),
-        task_name: form.task_name.trim(),
-        schedule_type: form.schedule_type,
-        interval_seconds:
-          form.schedule_type === "interval"
-            ? Number(form.interval_seconds) || 0
-            : null,
-        cron_expression:
-          form.schedule_type === "cron"
-            ? (form.cron_expression || "").trim()
-            : null,
-        start_at: form.start_at || null,
-        end_at: form.end_at || null,
-        max_runs: form.max_runs ? Number(form.max_runs) : null,
-        enabled: !!form.enabled,
-        config: parsedConfig,
-      };
-
-      if (!payload.name || !payload.task_name) {
-        alert("name and task_name are required");
-        return;
-      }
-
-      if (form.schedule_type === "interval" && !payload.interval_seconds) {
-        alert("interval_seconds is required for interval schedules");
-        return;
-      }
-
-      if (form.schedule_type === "cron" && !payload.cron_expression) {
-        alert("cron_expression is required for cron schedules");
-        return;
-      }
-
-      await fetchApi("/api/scheduler/jobs", {
-        method: "POST",
-        body: JSON.stringify(payload),
+      await fetchApi(`/api/scheduler/jobs/${encodeURIComponent(name)}`, {
+        method: "DELETE",
       });
+
+      if (selectedJob === name) {
+        setSelectedJob(null);
+        setExecutions([]);
+        setSelectedExecution(null);
+        setShowRawPayload(false);
+      }
 
       await loadJobs();
     } catch (err) {
-      console.error("Failed to save scheduler job", err);
-      setError(err.message || "Failed to save job");
-    } finally {
-      setSaving(false);
+      console.error("Failed to delete scheduler job", err);
+      setError(err.message || "Failed to delete job");
     }
   };
 
@@ -401,8 +326,8 @@ export function Scheduler() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
+        <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
+          <div className="lg:col-span-1">
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
                 <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
@@ -503,15 +428,6 @@ export function Scheduler() {
                         </td>
                         <td className="px-4 py-2 text-right space-x-2 whitespace-nowrap">
                           <button
-                            className="px-2 py-1 text-xs rounded border border-gray-300 text-gray-700 hover:bg-gray-100"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleEditJob(job);
-                            }}
-                          >
-                            Edit
-                          </button>
-                          <button
                             className="px-2 py-1 text-xs rounded border border-blue-500 text-blue-600 hover:bg-blue-50"
                             onClick={(e) => {
                               e.stopPropagation();
@@ -532,6 +448,15 @@ export function Scheduler() {
                                 Job Def
                               </button>
                             )}
+                          <button
+                            className="px-2 py-1 text-xs rounded border border-red-500 text-red-700 hover:bg-red-50"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteJob(job.name);
+                            }}
+                          >
+                            Delete
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -637,177 +562,6 @@ export function Scheduler() {
                   </table>
                 </div>
               </div>
-            </div>
-          </div>
-
-          <div>
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-200">
-                <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
-                  Create / Edit Job
-                </h2>
-              </div>
-              <form onSubmit={handleSubmit} className="p-4 space-y-3 text-sm">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Name
-                  </label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={form.name}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="e.g. discovery-hourly"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Task Name
-                  </label>
-                  <input
-                    type="text"
-                    name="task_name"
-                    value={form.task_name}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="e.g. opsconductor.discovery.run"
-                  />
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <div className="flex-1">
-                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                      Schedule Type
-                    </label>
-                    <select
-                      name="schedule_type"
-                      value={form.schedule_type}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="interval">Interval</option>
-                      <option value="cron">Cron</option>
-                    </select>
-                  </div>
-                  <div className="pt-5 flex items-center gap-2">
-                    <input
-                      id="enabled"
-                      type="checkbox"
-                      name="enabled"
-                      checked={form.enabled}
-                      onChange={handleChange}
-                      className="h-4 w-4 text-blue-600 border-gray-300 rounded"
-                    />
-                    <label
-                      htmlFor="enabled"
-                      className="text-xs font-medium text-gray-700"
-                    >
-                      Enabled
-                    </label>
-                  </div>
-                </div>
-
-                {form.schedule_type === "interval" && (
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                      Interval (seconds)
-                    </label>
-                    <input
-                      type="number"
-                      name="interval_seconds"
-                      min={1}
-                      value={form.interval_seconds}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                )}
-
-                {form.schedule_type === "cron" && (
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                      Cron Expression
-                    </label>
-                    <input
-                      type="text"
-                      name="cron_expression"
-                      value={form.cron_expression}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="e.g. 0 2 * * * (daily at 02:00)"
-                    />
-                    <p className="mt-1 text-[11px] text-gray-500">
-                      Supports standard 5-field cron. Examples: "0 2 * * *"
-                      (daily at 02:00), "0 0 1 * *" (first of month at midnight).
-                    </p>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                      Start At
-                    </label>
-                    <input
-                      type="datetime-local"
-                      name="start_at"
-                      value={form.start_at}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                      End At
-                    </label>
-                    <input
-                      type="datetime-local"
-                      name="end_at"
-                      value={form.end_at}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                      Max Runs
-                    </label>
-                    <input
-                      type="number"
-                      name="max_runs"
-                      min={1}
-                      value={form.max_runs}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="unlimited"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Config (JSON)
-                  </label>
-                  <textarea
-                    name="config"
-                    value={form.config}
-                    onChange={handleChange}
-                    rows={8}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="{}"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="w-full mt-2 px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {saving ? "Saving..." : "Save Job"}
-                </button>
-              </form>
             </div>
           </div>
         </div>
@@ -926,34 +680,114 @@ export function Scheduler() {
                   </div>
                   {selectedExecution.result ? (
                     <div className="mt-1 space-y-3">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-[11px]">
-                        {selectedExecution.result.host && (
+                      {/* Job Builder style results */}
+                      {selectedExecution.result.job_name && (
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-[11px]">
+                          <div>
+                            <div className="text-gray-500">Job Name</div>
+                            <div className="font-mono break-all">
+                              {selectedExecution.result.job_name}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-gray-500">Actions</div>
+                            <div className="font-mono">
+                              {selectedExecution.result.actions_completed || 0} / {selectedExecution.result.total_actions || 0}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-gray-500">Duration</div>
+                            <div className="font-mono">
+                              {selectedExecution.result.duration_seconds?.toFixed(3) || selectedExecution.result.metrics?.duration_seconds?.toFixed(3) || "—"}s
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-gray-500">Errors</div>
+                            <div className="font-mono">
+                              {selectedExecution.result.errors?.length || 0}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Action results summary */}
+                      {Object.keys(selectedExecution.result)
+                        .filter((k) => k.startsWith("action_"))
+                        .map((actionKey) => {
+                          const action = selectedExecution.result[actionKey];
+                          return (
+                            <div key={actionKey} className="border border-gray-200 rounded p-2 text-[11px]">
+                              <div className="font-semibold text-gray-700 mb-1">
+                                {actionKey.replace("action_", "").toUpperCase()} Action
+                              </div>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                <div>
+                                  <div className="text-gray-500">Type</div>
+                                  <div className="font-mono">{action.action_type || "—"}</div>
+                                </div>
+                                <div>
+                                  <div className="text-gray-500">Targets</div>
+                                  <div className="font-mono">{action.targets_processed || 0}</div>
+                                </div>
+                                <div>
+                                  <div className="text-gray-500">Successful</div>
+                                  <div className="font-mono text-green-600">{action.successful_results || 0}</div>
+                                </div>
+                                {action.failed_results > 0 && (
+                                  <div>
+                                    <div className="text-gray-500">Failed</div>
+                                    <div className="font-mono text-red-600">{action.failed_results}</div>
+                                  </div>
+                                )}
+                              </div>
+                              {action.results && action.results.length > 0 && (
+                                <div className="mt-2">
+                                  <div className="text-gray-500 mb-1">Results ({action.results.length})</div>
+                                  <div className="max-h-32 overflow-y-auto bg-gray-50 rounded p-1">
+                                    {action.results.slice(0, 10).map((r, i) => (
+                                      <div key={i} className="font-mono text-[10px] py-0.5 border-b border-gray-100 last:border-0">
+                                        {r.ip_address || r.host || "—"}: {r.ping_status || r.status || "—"}
+                                      </div>
+                                    ))}
+                                    {action.results.length > 10 && (
+                                      <div className="text-gray-400 text-[10px] py-0.5">
+                                        ... and {action.results.length - 10} more
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+
+                      {/* Legacy ping_host style results */}
+                      {selectedExecution.result.host && (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-[11px]">
                           <div>
                             <div className="text-gray-500">Host</div>
                             <div className="font-mono break-all">
                               {selectedExecution.result.host}
                             </div>
                           </div>
-                        )}
-                        {typeof selectedExecution.result.count !==
-                          "undefined" && (
-                          <div>
-                            <div className="text-gray-500">Count</div>
-                            <div className="font-mono">
-                              {selectedExecution.result.count}
+                          {typeof selectedExecution.result.count !== "undefined" && (
+                            <div>
+                              <div className="text-gray-500">Count</div>
+                              <div className="font-mono">
+                                {selectedExecution.result.count}
+                              </div>
                             </div>
-                          </div>
-                        )}
-                        {typeof selectedExecution.result.returncode !==
-                          "undefined" && (
-                          <div>
-                            <div className="text-gray-500">Return Code</div>
-                            <div className="font-mono">
-                              {selectedExecution.result.returncode}
+                          )}
+                          {typeof selectedExecution.result.returncode !== "undefined" && (
+                            <div>
+                              <div className="text-gray-500">Return Code</div>
+                              <div className="font-mono">
+                                {selectedExecution.result.returncode}
+                              </div>
                             </div>
-                          </div>
-                        )}
-                      </div>
+                          )}
+                        </div>
+                      )}
 
                       {(selectedExecution.result.stdout ||
                         selectedExecution.result.stderr) && (

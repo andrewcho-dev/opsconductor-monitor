@@ -126,16 +126,33 @@ export function useScanProgress() {
   });
 
   useEffect(() => {
-    const interval = setInterval(async () => {
+    let errorCount = 0;
+    let intervalId = null;
+
+    const poll = async () => {
       try {
         const data = await fetchApi("/progress");
         setProgress(data);
+        errorCount = 0; // reset on success
       } catch (err) {
-        // Ignore errors for progress polling
+        errorCount++;
+        // Stop polling after 3 consecutive failures to avoid spamming
+        if (errorCount >= 3 && intervalId) {
+          clearInterval(intervalId);
+          intervalId = null;
+          console.warn("Progress polling stopped after repeated failures");
+        }
       }
-    }, 1000);
+    };
 
-    return () => clearInterval(interval);
+    // Poll every 5 seconds instead of 1 second
+    intervalId = setInterval(poll, 5000);
+    // Initial fetch
+    poll();
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
   }, []);
 
   const startScan = async () => {

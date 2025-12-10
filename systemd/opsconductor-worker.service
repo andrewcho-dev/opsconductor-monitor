@@ -1,0 +1,22 @@
+[Unit]
+Description=OpsConductor Monitor Celery Worker
+After=network.target postgresql.service redis.service
+Wants=postgresql.service redis.service
+
+[Service]
+Type=simple
+User=opsconductor
+Group=opsconductor
+WorkingDirectory=/home/opsconductor/opsconductor-monitor/CascadeProjects/windsurf-project
+Environment="PATH=/home/opsconductor/.local/bin:/usr/local/bin:/usr/bin:/bin"
+ExecStart=/home/opsconductor/.local/bin/celery -A celery_app worker \
+    --loglevel=info \
+    --concurrency=4 \
+    -n worker@%%h
+ExecStop=/bin/kill -s TERM $MAINPID
+Restart=always
+RestartSec=10
+KillMode=mixed
+
+[Install]
+WantedBy=multi-user.target

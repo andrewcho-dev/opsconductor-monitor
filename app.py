@@ -23,28 +23,6 @@ from scan_routes import (
     get_network_groups,
 )
 from settings_routes import get_settings_route, save_settings_route, test_settings_route
-from poller_routes import (
-    get_poller_status,
-    get_poller_configs,
-    save_poller_config,
-    start_discovery_poller,
-    stop_discovery_poller,
-    save_discovery_config,
-    start_interface_poller,
-    stop_interface_poller,
-    save_interface_config,
-    start_optical_poller,
-    stop_optical_poller,
-    save_optical_config,
-    run_all_pollers,
-    get_poller_logs,
-    clear_poller_logs,
-    get_poller_statistics,
-    test_discovery_scan,
-    test_interface_scan,
-    test_optical_scan,
-    initialize_poller_system,
-)
 from notification_service import send_notification
 from generic_job_scheduler import run_job_builder_job
 from celery_app import celery_app
@@ -687,83 +665,6 @@ def api_notify_test():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# Poller System Routes
-@app.route('/poller/status', methods=['GET'])
-def poller_status_route():
-    return get_poller_status()
-
-@app.route('/poller/config', methods=['GET'])
-def poller_configs_route():
-    return get_poller_configs()
-
-@app.route('/poller/config', methods=['POST'])
-def poller_save_config_route():
-    return save_poller_config()
-
-@app.route('/poller/discovery/start', methods=['POST'])
-def poller_start_discovery_route():
-    return start_discovery_poller()
-
-@app.route('/poller/discovery/stop', methods=['POST'])
-def poller_stop_discovery_route():
-    return stop_discovery_poller()
-
-@app.route('/poller/discovery/config', methods=['POST'])
-def poller_save_discovery_config_route():
-    return save_discovery_config()
-
-@app.route('/poller/discovery/test', methods=['POST'])
-def poller_test_discovery_route():
-    return test_discovery_scan()
-
-@app.route('/poller/interface/start', methods=['POST'])
-def poller_start_interface_route():
-    return start_interface_poller()
-
-@app.route('/poller/interface/stop', methods=['POST'])
-def poller_stop_interface_route():
-    return stop_interface_poller()
-
-@app.route('/poller/interface/config', methods=['POST'])
-def poller_save_interface_config_route():
-    return save_interface_config()
-
-@app.route('/poller/interface/test', methods=['POST'])
-def poller_test_interface_route():
-    return test_interface_scan()
-
-@app.route('/poller/optical/start', methods=['POST'])
-def poller_start_optical_route():
-    return start_optical_poller()
-
-@app.route('/poller/optical/stop', methods=['POST'])
-def poller_stop_optical_route():
-    return stop_optical_poller()
-
-@app.route('/poller/optical/config', methods=['POST'])
-def poller_save_optical_config_route():
-    return save_optical_config()
-
-@app.route('/poller/optical/test', methods=['POST'])
-def poller_test_optical_route():
-    return test_optical_scan()
-
-@app.route('/poller/run_all', methods=['POST'])
-def poller_run_all_route():
-    return run_all_pollers()
-
-@app.route('/poller/logs', methods=['GET'])
-def poller_logs_route():
-    return get_poller_logs()
-
-@app.route('/poller/logs/clear', methods=['POST'])
-def poller_clear_logs_route():
-    return clear_poller_logs()
-
-@app.route('/poller/statistics', methods=['GET'])
-def poller_statistics_route():
-    return get_poller_statistics()
-
 @app.route('/topology_data', methods=['POST'])
 def topology_data():
     """Get topology data for selected devices"""
@@ -943,6 +844,712 @@ def test():
     return "Server is working"
 
 
+DISCOVERY_JOB_DEFINITION_ID = "11111111-1111-1111-1111-111111111111"
+DISCOVERY_SCHEDULER_JOB_NAME = "discovery.scan.generic"
+
+PING_JOB_DEFINITION_ID = "22222222-2222-2222-2222-222222222222"
+PING_SCHEDULER_JOB_NAME = "system.ping.generic"
+
+
+DISCOVERY_BUILDER_DEFINITION = {
+    "job_id": "network_discovery",
+    "name": "Network Discovery",
+    "description": "Discover devices on network using ping, SNMP, SSH, and RDP",
+    "actions": [
+        {
+            "type": "ping",
+            "enabled": True,
+            "login_method": {
+                "type": "ping",
+            },
+            "targeting": {
+                "source": "network_range",
+                "network_range": "10.127.0.0/24",
+            },
+            "execution": {
+                "timeout": 1,
+            },
+            "result_parsing": {},
+            "database": {
+                "table": "devices",
+            },
+            "notifications": {
+                "enabled": False,
+                "on_success": False,
+                "on_failure": True,
+                "targets": [],
+            },
+        },
+        {
+            "type": "snmp_scan",
+            "enabled": True,
+            "login_method": {
+                "type": "snmp",
+            },
+            "targeting": {
+                "source": "network_range",
+                "network_range": "10.127.0.0/24",
+            },
+            "execution": {
+                "timeout": 3,
+            },
+            "result_parsing": {},
+            "database": {
+                "table": "devices",
+            },
+            "notifications": {
+                "enabled": False,
+                "on_success": False,
+                "on_failure": True,
+                "targets": [],
+            },
+        },
+        {
+            "type": "ssh_scan",
+            "enabled": True,
+            "login_method": {
+                "type": "ssh_port",
+            },
+            "targeting": {
+                "source": "network_range",
+                "network_range": "10.127.0.0/24",
+            },
+            "execution": {
+                "timeout": 5,
+            },
+            "result_parsing": {},
+            "database": {
+                "table": "devices",
+            },
+            "notifications": {
+                "enabled": False,
+                "on_success": False,
+                "on_failure": True,
+                "targets": [],
+            },
+        },
+        {
+            "type": "rdp_scan",
+            "enabled": True,
+            "login_method": {
+                "type": "rdp_port",
+            },
+            "targeting": {
+                "source": "network_range",
+                "network_range": "10.127.0.0/24",
+            },
+            "execution": {
+                "timeout": 3,
+            },
+            "result_parsing": {},
+            "database": {
+                "table": "devices",
+            },
+            "notifications": {
+                "enabled": False,
+                "on_success": False,
+                "on_failure": True,
+                "targets": [],
+            },
+        },
+    ],
+    "config": {
+        "network": "10.127.0.0/24",
+        "parallel_threads": 20,
+        "batch_size": 50,
+        "timeout_seconds": 300,
+        "retry_attempts": 3,
+        "error_handling": "continue",
+    },
+}
+
+
+def ensure_generic_discovery_job_and_schedule():
+    """Seed a Builder-style discovery job definition and scheduler job.
+
+    Stores DISCOVERY_BUILDER_DEFINITION as a job_definitions row and
+    creates a scheduler_jobs row that runs opsconductor.job.run with
+    a {job_definition_id, overrides} payload – the same shape produced
+    by the Job Builder + /api/job-definitions/<id>/schedule.
+    """
+    try:
+        db.upsert_job_definition(
+            id=DISCOVERY_JOB_DEFINITION_ID,
+            name="System: Network Discovery",
+            description="System discovery job using the Job Builder schema (ping/SNMP/SSH/RDP)",
+            definition=DISCOVERY_BUILDER_DEFINITION,
+            enabled=True,
+        )
+
+        default_overrides = {
+            "network": "10.127.0.0/24",
+            "parallel_threads": 20,
+            "batch_size": 50,
+            "retention": 30,
+            "ping": True,
+            "snmp": True,
+            "ssh": True,
+            "rdp": False,
+        }
+
+        db.upsert_scheduler_job(
+            name=DISCOVERY_SCHEDULER_JOB_NAME,
+            task_name="opsconductor.job.run",
+            config={
+                "job_definition_id": DISCOVERY_JOB_DEFINITION_ID,
+                "overrides": default_overrides,
+            },
+            interval_seconds=3600,
+            enabled=False,  # start disabled; user can enable/edit via Scheduler UI
+            next_run_at=None,
+            schedule_type="interval",
+            cron_expression=None,
+            start_at=None,
+            end_at=None,
+            max_runs=None,
+        )
+    except Exception:
+        # Seeding must never break app startup
+        pass
+
+
+ensure_generic_discovery_job_and_schedule()
+
+
+PING_BUILDER_DEFINITION = {
+    "job_id": "ping_host",
+    "name": "Ping Host",
+    "description": "Ping one or more hosts using the generic scheduler",
+    "actions": [
+        {
+            "type": "ping",
+            "enabled": True,
+            "login_method": {
+                "type": "ping",
+            },
+            "targeting": {
+                "source": "custom_list",
+                "target_list": "10.127.0.1",
+            },
+            "execution": {
+                "timeout": 2,
+            },
+            "result_parsing": {},
+            "database": {
+                "table": "devices",
+            },
+            "notifications": {
+                "enabled": False,
+                "on_success": False,
+                "on_failure": True,
+                "targets": [],
+            },
+        }
+    ],
+    "config": {
+        "network": "10.127.0.1/32",
+        "parallel_threads": 1,
+        "batch_size": 1,
+        "timeout_seconds": 30,
+        "retry_attempts": 1,
+        "error_handling": "continue",
+    },
+}
+
+
+def ensure_ping_job_and_schedule():
+    try:
+        db.upsert_job_definition(
+            id=PING_JOB_DEFINITION_ID,
+            name="System: Ping Host",
+            description="System ping job using the Job Builder schema",
+            definition=PING_BUILDER_DEFINITION,
+            enabled=True,
+        )
+
+        default_overrides = {
+            "network": "10.127.0.1/32",
+        }
+
+        db.upsert_scheduler_job(
+            name=PING_SCHEDULER_JOB_NAME,
+            task_name="opsconductor.job.run",
+            config={
+                "job_definition_id": PING_JOB_DEFINITION_ID,
+                "overrides": default_overrides,
+            },
+            interval_seconds=300,
+            enabled=False,
+            next_run_at=None,
+            schedule_type="interval",
+            cron_expression=None,
+            start_at=None,
+            end_at=None,
+            max_runs=None,
+        )
+    except Exception:
+        pass
+
+
+ensure_ping_job_and_schedule()
+
+
+# ============================================================================
+# Interface Scan Job Definition (replaces legacy interface poller)
+# ============================================================================
+INTERFACE_JOB_DEFINITION_ID = "33333333-3333-3333-3333-333333333333"
+INTERFACE_SCHEDULER_JOB_NAME = "system.interface.scan"
+
+INTERFACE_BUILDER_DEFINITION = {
+    "job_id": "interface_scan",
+    "name": "Interface Scan",
+    "description": "Collect interface data from Ciena devices with SSH access. Runs port xcvr show, port show, and LLDP neighbor discovery.",
+    "actions": [
+        {
+            "type": "interface_scan",
+            "enabled": True,
+            "login_method": {
+                "type": "ssh",
+                "username": "",  # Uses settings
+                "password": "",  # Uses settings
+                "port": 22,
+            },
+            "targeting": {
+                "source": "database_query",
+                "query": "SELECT ip_address FROM scan_results WHERE ssh_status = 'YES'",
+            },
+            "execution": {
+                "timeout": 30,
+                # Multi-command workflow: commands run in sequence per target
+                "commands": [
+                    {
+                        "id": "port_xcvr_show",
+                        "command": "port xcvr show",
+                        "parser": "port_xcvr_parser",
+                        "store_as": "interfaces",
+                    },
+                    {
+                        "id": "port_show",
+                        "command": "port show",
+                        "parser": "port_show_parser",
+                        "store_as": "port_status",
+                    },
+                    {
+                        "id": "lldp_neighbors",
+                        "command": "lldp show neighbors",
+                        "parser": "lldp_parser",
+                        "store_as": "lldp_neighbors",
+                    },
+                ],
+            },
+            "result_parsing": {
+                # Named parsers for each command
+                "parsers": {
+                    "port_xcvr_parser": {
+                        "type": "builtin",
+                        "name": "ciena_port_xcvr_show",
+                    },
+                    "port_show_parser": {
+                        "type": "builtin",
+                        "name": "ciena_port_show",
+                    },
+                    "lldp_parser": {
+                        "type": "builtin",
+                        "name": "ciena_lldp_neighbors",
+                    },
+                },
+            },
+            "database": {
+                # Write to ssh_cli_scans table
+                "tables": [
+                    {
+                        "table": "ssh_cli_scans",
+                        "source": "interfaces",
+                        "operation": "upsert",
+                        "key_fields": ["ip_address", "interface_index"],
+                    },
+                ],
+            },
+            "notifications": {
+                "enabled": False,
+                "on_success": False,
+                "on_failure": True,
+                "targets": [],
+            },
+        }
+    ],
+    "config": {
+        "parallel_threads": 10,
+        "batch_size": 20,
+        "timeout_seconds": 300,
+        "retry_attempts": 2,
+        "error_handling": "continue",
+    },
+}
+
+
+def ensure_interface_job_and_schedule():
+    """Seed a Builder-style interface scan job definition and scheduler job."""
+    try:
+        db.upsert_job_definition(
+            id=INTERFACE_JOB_DEFINITION_ID,
+            name="System: Interface Scan",
+            description="System interface scan job - collects interface data via SSH from devices",
+            definition=INTERFACE_BUILDER_DEFINITION,
+            enabled=True,
+        )
+
+        db.upsert_scheduler_job(
+            name=INTERFACE_SCHEDULER_JOB_NAME,
+            task_name="opsconductor.job.run",
+            config={
+                "job_definition_id": INTERFACE_JOB_DEFINITION_ID,
+                "overrides": {},
+            },
+            interval_seconds=1800,  # 30 minutes
+            enabled=False,
+            next_run_at=None,
+            schedule_type="interval",
+            cron_expression=None,
+            start_at=None,
+            end_at=None,
+            max_runs=None,
+        )
+    except Exception:
+        pass
+
+
+ensure_interface_job_and_schedule()
+
+
+# ============================================================================
+# Job 1: Interface Discovery (fast - collects interface list and basic info)
+# ============================================================================
+INTERFACE_DISCOVERY_JOB_ID = "44444444-4444-4444-4444-444444444444"
+INTERFACE_DISCOVERY_SCHEDULER_NAME = "system.interface.discovery"
+
+INTERFACE_DISCOVERY_DEFINITION = {
+    "job_id": "interface_discovery",
+    "name": "Interface Discovery",
+    "description": "Discover all interfaces on Ciena devices. Runs port xcvr show and port show to build interface inventory.",
+    "actions": [
+        {
+            "type": "interface_discovery",
+            "enabled": True,
+            "login_method": {
+                "type": "ssh",
+                "username": "",
+                "password": "",
+                "port": 22,
+            },
+            "targeting": {
+                "source": "database_query",
+                "query": "SELECT ip_address FROM scan_results WHERE ssh_status = 'YES'",
+            },
+            "execution": {
+                "timeout": 30,
+                "commands": [
+                    {
+                        "id": "port_xcvr_show",
+                        "command": "port xcvr show",
+                        "parser": "port_xcvr_parser",
+                        "store_as": "interfaces",
+                    },
+                    {
+                        "id": "port_show",
+                        "command": "port show",
+                        "parser": "port_show_parser",
+                        "store_as": "port_status",
+                    },
+                ],
+            },
+            "result_parsing": {
+                "parsers": {
+                    "port_xcvr_parser": {
+                        "type": "builtin",
+                        "name": "ciena_port_xcvr_show",
+                    },
+                    "port_show_parser": {
+                        "type": "builtin",
+                        "name": "ciena_port_show",
+                    },
+                },
+            },
+            "database": {
+                "tables": [
+                    {
+                        "table": "ssh_cli_scans",
+                        "source": "interfaces",
+                        "operation": "upsert",
+                        "key_fields": ["ip_address", "interface_index"],
+                    },
+                ],
+            },
+            "notifications": {
+                "enabled": False,
+            },
+        }
+    ],
+    "config": {
+        "parallel_threads": 10,
+        "batch_size": 20,
+        "timeout_seconds": 300,  # 5 minutes
+        "retry_attempts": 2,
+        "error_handling": "continue",
+    },
+}
+
+# ============================================================================
+# Job 2: LLDP Neighbor Discovery (fast - discovers network topology)
+# ============================================================================
+LLDP_DISCOVERY_JOB_ID = "55555555-5555-5555-5555-555555555555"
+LLDP_DISCOVERY_SCHEDULER_NAME = "system.lldp.discovery"
+
+LLDP_DISCOVERY_DEFINITION = {
+    "job_id": "lldp_discovery",
+    "name": "LLDP Neighbor Discovery",
+    "description": "Discover LLDP neighbors on all devices to map network topology.",
+    "actions": [
+        {
+            "type": "lldp_discovery",
+            "enabled": True,
+            "login_method": {
+                "type": "ssh",
+                "username": "",
+                "password": "",
+                "port": 22,
+            },
+            "targeting": {
+                "source": "database_query",
+                "query": "SELECT ip_address FROM scan_results WHERE ssh_status = 'YES'",
+            },
+            "execution": {
+                "timeout": 30,
+                "commands": [
+                    {
+                        "id": "lldp_neighbors",
+                        "command": "lldp show neighbors",
+                        "parser": "lldp_parser",
+                        "store_as": "lldp_neighbors",
+                    },
+                ],
+            },
+            "result_parsing": {
+                "parsers": {
+                    "lldp_parser": {
+                        "type": "builtin",
+                        "name": "ciena_lldp_neighbors",
+                    },
+                },
+            },
+            "database": {
+                "tables": [
+                    {
+                        "table": "ssh_cli_scans",
+                        "source": "lldp_neighbors",
+                        "operation": "update_lldp",  # Special operation to update LLDP fields only
+                    },
+                ],
+            },
+            "notifications": {
+                "enabled": False,
+            },
+        }
+    ],
+    "config": {
+        "parallel_threads": 10,
+        "batch_size": 20,
+        "timeout_seconds": 300,  # 5 minutes
+        "retry_attempts": 2,
+        "error_handling": "continue",
+    },
+}
+
+# ============================================================================
+# Job 3: Optical Power Monitoring (slow - detailed diagnostics for optical ports only)
+# ============================================================================
+OPTICAL_POWER_JOB_ID = "66666666-6666-6666-6666-666666666666"
+OPTICAL_POWER_SCHEDULER_NAME = "system.optical.power"
+
+OPTICAL_POWER_DEFINITION = {
+    "job_id": "optical_power_monitoring",
+    "name": "Optical Power Monitoring",
+    "description": "Monitor optical power levels on all optical interfaces. Queries database for optical ports and runs detailed diagnostics.",
+    "actions": [
+        {
+            "type": "optical_power_monitoring",
+            "enabled": True,
+            "login_method": {
+                "type": "ssh",
+                "username": "",
+                "password": "",
+                "port": 22,
+            },
+            "targeting": {
+                "source": "database_query",
+                "query": "SELECT DISTINCT ip_address FROM ssh_cli_scans WHERE is_optical = true",
+            },
+            "execution": {
+                "timeout": 30,
+                "commands": [
+                    {
+                        "id": "get_optical_ports",
+                        "command": "port xcvr show",
+                        "parser": "port_xcvr_parser",
+                        "store_as": "interfaces",
+                    },
+                    {
+                        "id": "port_diagnostics",
+                        "command": "port xcvr show port {cli_port} diagnostics",
+                        "foreach": "interfaces",
+                        "filter": {"is_optical": True},
+                        "parser": "port_diagnostics_parser",
+                    },
+                ],
+            },
+            "result_parsing": {
+                "parsers": {
+                    "port_xcvr_parser": {
+                        "type": "builtin",
+                        "name": "ciena_port_xcvr_show",
+                    },
+                    "port_diagnostics_parser": {
+                        "type": "builtin",
+                        "name": "ciena_port_xcvr_diagnostics",
+                    },
+                },
+            },
+            "database": {
+                "tables": [
+                    {
+                        "table": "optical_power_history",
+                        "source": "interfaces",
+                        "filter": {"is_optical": True, "has_power_reading": True},
+                        "operation": "insert",
+                    },
+                ],
+            },
+            "notifications": {
+                "enabled": True,
+                "on_success": False,
+                "on_failure": True,
+                "targets": [],
+                "thresholds": {
+                    "temperature_high": 70,
+                    "rx_power_low": -30,
+                    "tx_power_low": -10,
+                },
+            },
+        }
+    ],
+    "config": {
+        "parallel_threads": 5,
+        "batch_size": 10,
+        "timeout_seconds": 1200,  # 20 minutes
+        "retry_attempts": 2,
+        "error_handling": "continue",
+    },
+}
+
+
+def ensure_interface_discovery_job():
+    """Seed Interface Discovery job - fast interface inventory scan."""
+    try:
+        db.upsert_job_definition(
+            id=INTERFACE_DISCOVERY_JOB_ID,
+            name="System: Interface Discovery",
+            description="Discover all interfaces on network devices (port xcvr show + port show)",
+            definition=INTERFACE_DISCOVERY_DEFINITION,
+            enabled=True,
+        )
+
+        db.upsert_scheduler_job(
+            name=INTERFACE_DISCOVERY_SCHEDULER_NAME,
+            task_name="opsconductor.job.run",
+            config={
+                "job_definition_id": INTERFACE_DISCOVERY_JOB_ID,
+                "overrides": {},
+            },
+            interval_seconds=900,  # 15 minutes
+            enabled=False,
+            next_run_at=None,
+            schedule_type="interval",
+            cron_expression=None,
+            start_at=None,
+            end_at=None,
+            max_runs=None,
+        )
+    except Exception:
+        pass
+
+
+def ensure_lldp_discovery_job():
+    """Seed LLDP Discovery job - fast topology mapping."""
+    try:
+        db.upsert_job_definition(
+            id=LLDP_DISCOVERY_JOB_ID,
+            name="System: LLDP Neighbor Discovery",
+            description="Discover LLDP neighbors to map network topology",
+            definition=LLDP_DISCOVERY_DEFINITION,
+            enabled=True,
+        )
+
+        db.upsert_scheduler_job(
+            name=LLDP_DISCOVERY_SCHEDULER_NAME,
+            task_name="opsconductor.job.run",
+            config={
+                "job_definition_id": LLDP_DISCOVERY_JOB_ID,
+                "overrides": {},
+            },
+            interval_seconds=900,  # 15 minutes (offset from interface discovery)
+            enabled=False,
+            next_run_at=None,
+            schedule_type="interval",
+            cron_expression=None,
+            start_at=None,
+            end_at=None,
+            max_runs=None,
+        )
+    except Exception:
+        pass
+
+
+def ensure_optical_power_job():
+    """Seed Optical Power Monitoring job - detailed optical diagnostics."""
+    try:
+        db.upsert_job_definition(
+            id=OPTICAL_POWER_JOB_ID,
+            name="System: Optical Power Monitoring",
+            description="Monitor optical power levels on all optical interfaces (per-port diagnostics)",
+            definition=OPTICAL_POWER_DEFINITION,
+            enabled=True,
+        )
+
+        db.upsert_scheduler_job(
+            name=OPTICAL_POWER_SCHEDULER_NAME,
+            task_name="opsconductor.job.run",
+            config={
+                "job_definition_id": OPTICAL_POWER_JOB_ID,
+                "overrides": {},
+            },
+            interval_seconds=1800,  # 30 minutes (less frequent, more intensive)
+            enabled=False,
+            next_run_at=None,
+            schedule_type="interval",
+            cron_expression=None,
+            start_at=None,
+            end_at=None,
+            max_runs=None,
+        )
+    except Exception:
+        pass
+
+
+ensure_interface_discovery_job()
+ensure_lldp_discovery_job()
+ensure_optical_power_job()
+
+
 # Device Groups API Routes
 @app.route('/device_groups', methods=['GET'])
 def get_device_groups():
@@ -1098,6 +1705,18 @@ def api_scheduler_jobs_upsert():
             return jsonify({'error': 'Failed to save scheduler job'}), 500
 
         return jsonify({'job': _serialize_scheduler_job(row)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/scheduler/jobs/<name>', methods=['DELETE'])
+def api_scheduler_jobs_delete(name):
+    """Delete a scheduler job by name."""
+    try:
+        ok = db.delete_scheduler_job(name)
+        if not ok:
+            return jsonify({'error': 'Failed to delete scheduler job'}), 500
+        return jsonify({'status': 'deleted'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -1298,14 +1917,5 @@ def get_group_devices(group_id):
 
 
 if __name__ == '__main__':
-    # Initialize poller system
-    try:
-        poller_success = initialize_poller_system()
-        if poller_success:
-            print("✅ Poller system initialized successfully")
-        else:
-            print("⚠️ Poller system initialization failed")
-    except Exception as e:
-        print(f"❌ Poller system initialization error: {e}")
-    
+    print("✅ Starting OpsConductor Monitor (Celery-based scheduler)")
     app.run(host='0.0.0.0', port=5000, debug=True)

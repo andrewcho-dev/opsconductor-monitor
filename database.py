@@ -486,6 +486,11 @@ class DatabaseManager:
                 row["config"] = None
         return row
 
+    def delete_scheduler_job(self, name):
+        """Delete a scheduler job by name. Returns True on success, None on error."""
+        query = "DELETE FROM scheduler_jobs WHERE name = %s"
+        return self.execute_query(query, (name,), fetch=False)
+
     def get_due_scheduler_jobs(self, now):
         """Return enabled scheduler jobs whose next_run_at is due (<= now or NULL)."""
         query = """\

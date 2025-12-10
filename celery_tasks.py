@@ -1,12 +1,16 @@
 """Celery tasks for OpsConductor Monitor.
 
-This module defines Celery tasks that wrap the existing discovery,
-interface, optical, and Job Builder execution logic so they can be
-run asynchronously and on a schedule via Celery Beat.
+This module defines Celery tasks for the unified job execution system.
+All jobs (discovery, interface, optical, ping, etc.) are now executed
+via the generic `opsconductor.job.run` task which reads job definitions
+from the database and executes them using the GenericJobScheduler.
 
-At this stage the tasks are thin wrappers; we will extend them to
-record richer history and integrate tightly with poller_job_history
-once the basic wiring is verified.
+Key tasks:
+- opsconductor.job.run: Unified executor for all job definitions
+- opsconductor.jobbuilder.run: Ad-hoc Job Builder execution
+- opsconductor.scheduler.tick: Celery Beat dispatcher for scheduled jobs
+- opsconductor.ping: Health check task
+- opsconductor.ping_host: Simple ping utility task
 """
 
 from __future__ import annotations
@@ -22,8 +26,6 @@ from croniter import croniter
 
 from celery_app import celery_app
 from database import db
-
-from poller_manager import run_discovery_scan, run_interface_scan, run_optical_scan
 from generic_job_scheduler import run_job_builder_job, run_job_spec
 
 
@@ -147,58 +149,20 @@ def ping_host_task(config: Dict[str, Any]) -> Dict[str, Any]:
         raise
 
 
-@celery_app.task(name="opsconductor.discovery.run")
-def run_discovery_task(config: Dict[str, Any]) -> Dict[str, Any]:
-    """Run a discovery scan via the existing poller_manager helper."""
-    task_id = run_discovery_task.request.id
-    worker_host = getattr(run_discovery_task.request, "hostname", "unknown")
-    # Mark as running
-    db.update_scheduler_job_execution(task_id, status="running")
-    try:
-        result = run_discovery_scan(config or {})
-        exec_meta = {
-            "task_id": task_id,
-            "worker_hostname": worker_host,
-            "worker_pid": os.getpid(),
-        }
-        try:
-            delivery = getattr(run_discovery_task.request, "delivery_info", None) or {}
-            exec_meta["queue"] = delivery.get("routing_key")
-            exec_meta["delivery_info"] = delivery
-        except Exception:
-            pass
-        try:
-            # Attach execution metadata without mutating the original result
-            payload = dict(result)
-            payload["execution_meta"] = exec_meta
-        except Exception:
-            payload = {"result": result, "execution_meta": exec_meta}
-
-        db.update_scheduler_job_execution(
-            task_id,
-            status="success",
-            finished_at=datetime.utcnow(),
-            result=payload,
-        )
-        return result
-    except Exception as exc:
-        db.update_scheduler_job_execution(
-            task_id,
-            status="failed",
-            finished_at=datetime.utcnow(),
-            error_message=str(exc),
-        )
-        raise
-
-
 @celery_app.task(name="opsconductor.job.run")
 def run_job_task(config: Dict[str, Any]) -> Dict[str, Any]:
-    """Generic executor for Job Builder-style job definitions.
+    """Generic executor for stored job definitions.
 
     Config keys:
       - job_definition_id: UUID of the job_definitions row (required)
       - overrides: optional dict of runtime overrides to merge into
         the stored job definition's config.
+
+    The stored definition can be either a high-level Job Builder-style
+    spec (actions with nested login_method/targeting/execution blocks)
+    or a pre-translated generic job spec compatible with
+    GenericJobScheduler. We detect the shape at runtime and delegate to
+    run_job_builder_job or run_job_spec accordingly.
     """
     task_id = run_job_task.request.id
     worker_host = getattr(run_job_task.request, "hostname", "unknown")
@@ -219,8 +183,6 @@ def run_job_task(config: Dict[str, Any]) -> Dict[str, Any]:
         if not isinstance(definition, dict):
             raise ValueError("job_definition.definition must be a JSON object")
 
-        # Allow scheduler/job-specific overrides to adjust the base definition's
-        # config without mutating the stored definition.
         overrides = (config or {}).get("overrides") or {}
 
         job_spec = dict(definition)
@@ -228,11 +190,27 @@ def run_job_task(config: Dict[str, Any]) -> Dict[str, Any]:
         merged_config = {**base_config, **(overrides or {})}
         job_spec["config"] = merged_config
 
-        # Ensure identity fields are present for logging/metrics.
         job_spec.setdefault("job_id", str(job_def.get("id")))
         job_spec.setdefault("name", job_def.get("name"))
 
-        result = run_job_spec(job_spec)
+        actions = job_spec.get("actions") or []
+        is_builder_style = False
+        for action in actions:
+            lm = action.get("login_method")
+            if isinstance(lm, dict):
+                is_builder_style = True
+                break
+
+        logger.error(f"[CELERY_DEBUG] Job {job_def.get('name')}: {len(actions)} actions, is_builder_style={is_builder_style}")
+        if actions:
+            logger.error(f"[CELERY_DEBUG] First action: type={actions[0].get('type')}, login_method type={type(actions[0].get('login_method'))}")
+            exec_cfg = actions[0].get('execution', {})
+            logger.error(f"[CELERY_DEBUG] First action execution keys: {list(exec_cfg.keys())}")
+
+        if is_builder_style:
+            result = run_job_builder_job(job_spec)
+        else:
+            result = run_job_spec(job_spec)
 
         delivery = getattr(run_job_task.request, "delivery_info", None) or {}
         exec_meta = {
@@ -295,90 +273,6 @@ def run_job_task(config: Dict[str, Any]) -> Dict[str, Any]:
             )
         except Exception:
             pass
-        raise
-
-
-@celery_app.task(name="opsconductor.interface.run")
-def run_interface_task(config: Dict[str, Any]) -> Dict[str, Any]:
-    """Run an interface scan via the existing poller_manager helper."""
-    task_id = run_interface_task.request.id
-    worker_host = getattr(run_interface_task.request, "hostname", "unknown")
-    db.update_scheduler_job_execution(task_id, status="running")
-    try:
-        result = run_interface_scan(config or {})
-        exec_meta = {
-            "task_id": task_id,
-            "worker_hostname": worker_host,
-            "worker_pid": os.getpid(),
-        }
-        try:
-            delivery = getattr(run_interface_task.request, "delivery_info", None) or {}
-            exec_meta["queue"] = delivery.get("routing_key")
-            exec_meta["delivery_info"] = delivery
-        except Exception:
-            pass
-        try:
-            payload = dict(result)
-            payload["execution_meta"] = exec_meta
-        except Exception:
-            payload = {"result": result, "execution_meta": exec_meta}
-
-        db.update_scheduler_job_execution(
-            task_id,
-            status="success",
-            finished_at=datetime.utcnow(),
-            result=payload,
-        )
-        return result
-    except Exception as exc:
-        db.update_scheduler_job_execution(
-            task_id,
-            status="failed",
-            finished_at=datetime.utcnow(),
-            error_message=str(exc),
-        )
-        raise
-
-
-@celery_app.task(name="opsconductor.optical.run")
-def run_optical_task(config: Dict[str, Any]) -> Dict[str, Any]:
-    """Run an optical scan via the existing poller_manager helper."""
-    task_id = run_optical_task.request.id
-    worker_host = getattr(run_optical_task.request, "hostname", "unknown")
-    db.update_scheduler_job_execution(task_id, status="running")
-    try:
-        result = run_optical_scan(config or {})
-        exec_meta = {
-            "task_id": task_id,
-            "worker_hostname": worker_host,
-            "worker_pid": os.getpid(),
-        }
-        try:
-            delivery = getattr(run_optical_task.request, "delivery_info", None) or {}
-            exec_meta["queue"] = delivery.get("routing_key")
-            exec_meta["delivery_info"] = delivery
-        except Exception:
-            pass
-        try:
-            payload = dict(result)
-            payload["execution_meta"] = exec_meta
-        except Exception:
-            payload = {"result": result, "execution_meta": exec_meta}
-
-        db.update_scheduler_job_execution(
-            task_id,
-            status="success",
-            finished_at=datetime.utcnow(),
-            result=payload,
-        )
-        return result
-    except Exception as exc:
-        db.update_scheduler_job_execution(
-            task_id,
-            status="failed",
-            finished_at=datetime.utcnow(),
-            error_message=str(exc),
-        )
         raise
 
 
@@ -534,9 +428,9 @@ def scheduler_tick() -> Dict[str, Any]:
         except Exception:
             pass
     # Mark any long-lived queued/running executions as timed out so the UI
-    # does not show them as permanently queued. Use a short timeout so jobs
-    # that never actually start quickly transition to a clear 'timeout' state.
-    timed_out = db.mark_stale_scheduler_executions(timeout_seconds=30) or []
+    # does not show them as permanently queued. Use 10 minutes for queued jobs
+    # (running jobs get 4x = 40 minutes before timeout).
+    timed_out = db.mark_stale_scheduler_executions(timeout_seconds=600) or []
 
     try:
         if timed_out:

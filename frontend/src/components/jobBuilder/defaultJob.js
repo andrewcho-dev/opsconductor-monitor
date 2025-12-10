@@ -2,6 +2,7 @@ export const createEmptyAction = () => ({
   type: 'ping',
   enabled: true,
   login_method: {
+    type: 'ping',
     platform: 'ubuntu-20.04',
     command_id: 'ping',
     command_template: 'ping -c {count} -W {timeout} -i {interval} {target}',
@@ -72,6 +73,7 @@ export const DEFAULT_JOB = {
       type: 'ping',
       enabled: true,
       login_method: {
+        type: 'ping',
         platform: 'ubuntu-20.04',
         command_id: 'ping',
         command_template: 'ping -c {count} -W {timeout} -i {interval} {target}',
