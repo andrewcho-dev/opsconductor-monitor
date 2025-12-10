@@ -132,6 +132,7 @@ def api_scheduler_queues():
             active = insp.active() or {}
             reserved = insp.reserved() or {}
             scheduled = insp.scheduled() or {}
+            stats = insp.stats() or {}
         except Exception:
             # If Celery inspect calls fail (e.g. broker down), return empty stats
             return jsonify({
@@ -157,7 +158,27 @@ def api_scheduler_queues():
         reserved_total, reserved_by_worker = summarize(reserved)
         scheduled_total, scheduled_by_worker = summarize(scheduled)
 
-        workers = sorted(set(list(active_by_worker.keys()) + list(reserved_by_worker.keys()) + list(scheduled_by_worker.keys())))
+        workers = sorted(set(list(active_by_worker.keys()) + list(reserved_by_worker.keys()) + list(scheduled_by_worker.keys()) + list((stats or {}).keys())))
+
+        # Build richer per-worker details including approximate concurrency where available.
+        worker_details = {}
+        for w in workers:
+            s = (stats or {}).get(w) or {}
+            pool = s.get('pool') or {}
+            # Celery stats usually expose either max-concurrency or a processes list.
+            concurrency = pool.get('max-concurrency')
+            if concurrency is None:
+                procs = pool.get('processes') or []
+                try:
+                    concurrency = len(procs)
+                except Exception:
+                    concurrency = None
+            worker_details[w] = {
+                'concurrency': concurrency,
+                'active': active_by_worker.get(w, 0),
+                'reserved': reserved_by_worker.get(w, 0),
+                'scheduled': scheduled_by_worker.get(w, 0),
+            }
 
         return jsonify({
             'workers': workers,
@@ -167,6 +188,7 @@ def api_scheduler_queues():
             'active_by_worker': active_by_worker,
             'reserved_by_worker': reserved_by_worker,
             'scheduled_by_worker': scheduled_by_worker,
+            'worker_details': worker_details,
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500

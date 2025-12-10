@@ -578,16 +578,29 @@ class DatabaseManager:
 
         Returns the rows that were updated for visibility/metrics.
         """
+        # We treat queued vs running differently:
+        # - queued: should flip to timeout quickly if the worker never starts it
+        # - running: is allowed a longer window before being considered hung
+        queue_timeout = int(timeout_seconds)
+        run_timeout = int(timeout_seconds) * 4
         query = """
             UPDATE scheduler_job_executions
             SET status = 'timeout',
                 finished_at = COALESCE(finished_at, NOW()),
-                error_message = COALESCE(error_message, 'Timed out without completion')
-            WHERE status IN ('queued', 'running')
-              AND started_at < NOW() - (%s * INTERVAL '1 second')
+                error_message = COALESCE(
+                    error_message,
+                    'Timed out without completion (job never finished running; likely worker or queue issue)'
+                )
+            WHERE (
+                    status = 'queued'
+                AND started_at < (NOW() AT TIME ZONE 'UTC') - ((%s || ' seconds')::interval)
+            ) OR (
+                    status = 'running'
+                AND started_at < (NOW() AT TIME ZONE 'UTC') - ((%s || ' seconds')::interval)
+            )
             RETURNING id, job_name, task_id
         """
-        return self.execute_query(query, (timeout_seconds,))
+        return self.execute_query(query, (str(queue_timeout), str(run_timeout)))
     
     def get_scan_results(self):
         """Get all scan results (raw rows)"""

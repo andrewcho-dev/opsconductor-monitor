@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { fetchApi } from "../lib/utils";
 
 export function Scheduler() {
@@ -9,8 +9,11 @@ export function Scheduler() {
   const [selectedJob, setSelectedJob] = useState(null);
   const [executions, setExecutions] = useState([]);
   const [loadingExecutions, setLoadingExecutions] = useState(false);
+  const [selectedExecution, setSelectedExecution] = useState(null);
+  const [showRawPayload, setShowRawPayload] = useState(false);
   const [queueStatus, setQueueStatus] = useState(null);
   const [loadingQueues, setLoadingQueues] = useState(false);
+  const runOnceRefreshRef = useRef(null);
   const [form, setForm] = useState({
     name: "",
     task_name: "",
@@ -41,6 +44,17 @@ export function Scheduler() {
       return value;
     }
   };
+
+  const workers = queueStatus?.workers || [];
+  let totalProcs = 0;
+  if (queueStatus?.worker_details) {
+    for (const w of workers) {
+      const conc = queueStatus.worker_details[w]?.concurrency;
+      if (typeof conc === "number") {
+        totalProcs += conc;
+      }
+    }
+  }
 
   const loadJobs = async () => {
     try {
@@ -73,6 +87,8 @@ export function Scheduler() {
   const loadExecutions = async (jobName) => {
     if (!jobName) {
       setExecutions([]);
+      setSelectedExecution(null);
+      setShowRawPayload(false);
       return;
     }
     try {
@@ -86,6 +102,14 @@ export function Scheduler() {
     } finally {
       setLoadingExecutions(false);
     }
+  };
+
+  const handleSelectJob = (job) => {
+    if (!job) return;
+    setSelectedJob(job.name);
+    setSelectedExecution(null);
+    setShowRawPayload(false);
+    loadExecutions(job.name);
   };
 
   const clearExecutions = async () => {
@@ -106,6 +130,11 @@ export function Scheduler() {
   useEffect(() => {
     loadJobs();
     loadQueues();
+    return () => {
+      if (runOnceRefreshRef.current) {
+        clearTimeout(runOnceRefreshRef.current);
+      }
+    };
   }, []);
 
   const handleChange = (e) => {
@@ -117,8 +146,7 @@ export function Scheduler() {
   };
 
   const handleEditJob = (job) => {
-    setSelectedJob(job.name);
-    loadExecutions(job.name);
+    handleSelectJob(job);
     setForm({
       name: job.name,
       task_name: job.task_name,
@@ -202,6 +230,18 @@ export function Scheduler() {
       // We don't know when the job will finish, but we can refresh metadata
       await loadJobs();
       await loadExecutions(name);
+
+      // Lightweight auto-refresh: one more execution refresh after a short delay
+      // so the user sees queued -> success/failed without manual clicking.
+      if (runOnceRefreshRef.current) {
+        clearTimeout(runOnceRefreshRef.current);
+      }
+      runOnceRefreshRef.current = setTimeout(() => {
+        // Only refresh if this job is still selected so we don't surprise the user
+        if (selectedJob === name) {
+          loadExecutions(name);
+        }
+      }, 6000);
     } catch (err) {
       console.error("Failed to run job once", err);
       setError(err.message || "Failed to run job");
@@ -213,51 +253,86 @@ export function Scheduler() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-800">Scheduler</h1>
         <button
-          onClick={loadJobs}
+          onClick={async () => {
+            await loadJobs();
+            await loadQueues();
+            if (selectedJob) {
+              await loadExecutions(selectedJob);
+            }
+          }}
           className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 bg-white hover:bg-gray-50"
           disabled={loading}
         >
           {loading ? "Refreshing..." : "Refresh"}
         </button>
       </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 px-4 py-3 text-xs text-gray-700">
-          <div className="flex items-center justify-between mb-1">
-            <span className="font-semibold text-gray-800">Queue Status</span>
-            <button
-              onClick={loadQueues}
-              className="px-2 py-0.5 text-[11px] font-medium rounded border border-gray-300 bg-white hover:bg-gray-50"
-              disabled={loadingQueues}
-            >
-              {loadingQueues ? "Refreshing..." : "Refresh"}
-            </button>
-          </div>
-          {queueStatus ? (
-            <>
-              <div className="flex gap-3 mb-2">
-                <span>Active: <span className="font-semibold">{queueStatus.active_total}</span></span>
-                <span>Reserved: <span className="font-semibold">{queueStatus.reserved_total}</span></span>
-                <span>Scheduled: <span className="font-semibold">{queueStatus.scheduled_total}</span></span>
-              </div>
-              <div className="space-y-1">
-                {(queueStatus.workers || []).length === 0 && (
-                  <div className="text-[11px] text-gray-400">No workers reported. Is the Celery worker running?</div>
-                )}
-                {(queueStatus.workers || []).map((w) => (
-                  <div key={w} className="flex justify-between text-[11px]">
-                    <span className="truncate mr-2">{w}</span>
-                    <span className="text-gray-500">
-                      A:{queueStatus.active_by_worker?.[w] || 0} · R:{queueStatus.reserved_by_worker?.[w] || 0} · S:{queueStatus.scheduled_by_worker?.[w] || 0}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="text-[11px] text-gray-400">Queue status not available.</div>
-          )}
+      <div className="mt-4 bg-white rounded-xl shadow-sm border border-gray-200 px-4 py-3 text-xs text-gray-700">
+        <div className="flex items-center justify-between mb-1">
+          <span className="font-semibold text-gray-800">Queue Status</span>
+          <span className="text-[11px] text-gray-400">Updated when you click Refresh above</span>
         </div>
+        {queueStatus ? (
+          <>
+            <div className="flex flex-wrap gap-3 mb-2">
+              <span>Active: <span className="font-semibold">{queueStatus.active_total}</span></span>
+              <span>Reserved: <span className="font-semibold">{queueStatus.reserved_total}</span></span>
+              <span>Scheduled: <span className="font-semibold">{queueStatus.scheduled_total}</span></span>
+              <span>Workers: <span className="font-semibold">{workers.length}</span></span>
+              {totalProcs > 0 && (
+                <span>Procs: <span className="font-semibold">{totalProcs}</span></span>
+              )}
+            </div>
+            <div className="mt-1">
+              {workers.length === 0 && (
+                <div className="text-[11px] text-gray-400">No workers reported. Is the Celery worker running?</div>
+              )}
+              {workers.length > 0 && (
+                <div className="mt-1 flex gap-3 overflow-x-auto pb-1">
+                  {workers.map((w) => {
+                    const details = queueStatus.worker_details?.[w] || {};
+                    const conc = details.concurrency;
+                    const active =
+                      details.active ??
+                      (queueStatus.active_by_worker && queueStatus.active_by_worker[w] != null
+                        ? queueStatus.active_by_worker[w]
+                        : 0);
+                    const reserved =
+                      details.reserved ??
+                      (queueStatus.reserved_by_worker && queueStatus.reserved_by_worker[w] != null
+                        ? queueStatus.reserved_by_worker[w]
+                        : 0);
+                    const scheduled =
+                      details.scheduled ??
+                      (queueStatus.scheduled_by_worker && queueStatus.scheduled_by_worker[w] != null
+                        ? queueStatus.scheduled_by_worker[w]
+                        : 0);
+
+                    return (
+                      <div
+                        key={w}
+                        className="min-w-[180px] border border-gray-200 rounded-lg px-3 py-2 bg-white shadow-xs text-[11px] flex flex-col gap-1"
+                      >
+                        <div className="font-mono text-gray-800 truncate" title={w}>{w}</div>
+                        <div className="text-gray-500">
+                          {typeof conc === "number" && (
+                            <span className="mr-2">procs:{conc}</span>
+                          )}
+                        </div>
+                        <div className="text-gray-500 flex flex-wrap gap-2">
+                          <span>Active:{active}</span>
+                          <span>Reserved:{reserved}</span>
+                          <span>Scheduled:{scheduled}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="text-[11px] text-gray-400">Queue status not available.</div>
+        )}
       </div>
 
       {error && (
@@ -296,7 +371,11 @@ export function Scheduler() {
                     </tr>
                   )}
                   {jobs.map((job) => (
-                    <tr key={job.name} className="border-t border-gray-100 hover:bg-gray-50">
+                    <tr
+                      key={job.name}
+                      className="border-t border-gray-100 hover:bg-gray-50 cursor-pointer"
+                      onClick={() => handleSelectJob(job)}
+                    >
                       <td className="px-4 py-2 font-medium text-gray-800 whitespace-nowrap">{job.name}</td>
                       <td className="px-4 py-2 text-gray-700 whitespace-nowrap">{job.task_name}</td>
                       <td className="px-4 py-2 text-gray-700 whitespace-nowrap text-xs">
@@ -326,13 +405,19 @@ export function Scheduler() {
                       <td className="px-4 py-2 text-right space-x-2 whitespace-nowrap">
                         <button
                           className="px-2 py-1 text-xs rounded border border-gray-300 text-gray-700 hover:bg-gray-100"
-                          onClick={() => handleEditJob(job)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditJob(job);
+                          }}
                         >
                           Edit
                         </button>
                         <button
                           className="px-2 py-1 text-xs rounded border border-blue-500 text-blue-600 hover:bg-blue-50"
-                          onClick={() => handleRunOnce(job.name)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRunOnce(job.name);
+                          }}
                         >
                           Run Once
                         </button>
@@ -351,13 +436,6 @@ export function Scheduler() {
               </h2>
               {selectedJob && (
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => loadExecutions(selectedJob)}
-                    className="px-3 py-1 text-xs font-medium rounded border border-gray-300 bg-white hover:bg-gray-50"
-                    disabled={loadingExecutions}
-                  >
-                    {loadingExecutions ? "Refreshing..." : "Refresh"}
-                  </button>
                   <button
                     onClick={clearExecutions}
                     className="px-3 py-1 text-xs font-medium rounded border border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
@@ -387,7 +465,14 @@ export function Scheduler() {
                     </tr>
                   )}
                   {executions.map((exec) => (
-                    <tr key={exec.id} className="border-t border-gray-100 hover:bg-gray-50">
+                    <tr
+                      key={exec.id}
+                      className="border-t border-gray-100 hover:bg-gray-50 cursor-pointer"
+                      onClick={() => {
+                        setSelectedExecution(exec);
+                        setShowRawPayload(false);
+                      }}
+                    >
                       <td className="px-3 py-2 whitespace-nowrap">
                         <span
                           className={`inline-flex items-center px-2 py-0.5 rounded-full font-medium ${
@@ -568,6 +653,152 @@ export function Scheduler() {
           </div>
         </div>
       </div>
+
+      {selectedExecution && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onClick={() => {
+            setSelectedExecution(null);
+            setShowRawPayload(false);
+          }}
+        >
+          <div
+            className="bg-white rounded-xl shadow-xl max-w-3xl w-full mx-4 max-h-[80vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+              <div className="font-semibold text-gray-800 text-sm">
+                Execution Details – ID {selectedExecution.id} ({selectedExecution.status})
+              </div>
+              <button
+                className="px-3 py-1 text-[11px] rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
+                onClick={() => {
+                  setSelectedExecution(null);
+                  setShowRawPayload(false);
+                }}
+              >
+                Close
+              </button>
+            </div>
+            <div className="px-4 py-3 space-y-3 text-xs overflow-y-auto">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <div className="text-[11px] text-gray-500">Started</div>
+                  <div className="font-mono">{formatLocalTime(selectedExecution.started_at)}</div>
+                </div>
+                <div>
+                  <div className="text-[11px] text-gray-500">Finished</div>
+                  <div className="font-mono">{formatLocalTime(selectedExecution.finished_at)}</div>
+                </div>
+                <div>
+                  <div className="text-[11px] text-gray-500">Task ID</div>
+                  <div className="font-mono break-all">{selectedExecution.task_id}</div>
+                </div>
+              </div>
+              {selectedExecution.result && selectedExecution.result.execution_meta && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <div className="text-[11px] text-gray-500">Worker</div>
+                    <div className="font-mono break-all">
+                      {selectedExecution.result.execution_meta.worker_hostname || "unknown"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] text-gray-500">Worker PID</div>
+                    <div className="font-mono break-all">
+                      {typeof selectedExecution.result.execution_meta.worker_pid !== "undefined"
+                        ? selectedExecution.result.execution_meta.worker_pid
+                        : ""}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] text-gray-500">Queue</div>
+                    <div className="font-mono break-all">
+                      {selectedExecution.result.execution_meta.queue || ""}
+                    </div>
+                  </div>
+                </div>
+              )}
+              {selectedExecution.error_message && (
+                <div>
+                  <div className="text-[11px] text-red-600 font-semibold">Error</div>
+                  <pre className="mt-1 p-2 bg-red-50 border border-red-200 rounded text-[11px] whitespace-pre-wrap break-all">
+                    {selectedExecution.error_message}
+                  </pre>
+                </div>
+              )}
+              <div>
+                <div className="text-[11px] text-gray-500 font-semibold">Result</div>
+                {selectedExecution.result ? (
+                  <div className="mt-1 space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-[11px]">
+                      {selectedExecution.result.host && (
+                        <div>
+                          <div className="text-gray-500">Host</div>
+                          <div className="font-mono break-all">{selectedExecution.result.host}</div>
+                        </div>
+                      )}
+                      {typeof selectedExecution.result.count !== "undefined" && (
+                        <div>
+                          <div className="text-gray-500">Count</div>
+                          <div className="font-mono">{selectedExecution.result.count}</div>
+                        </div>
+                      )}
+                      {typeof selectedExecution.result.returncode !== "undefined" && (
+                        <div>
+                          <div className="text-gray-500">Return Code</div>
+                          <div className="font-mono">{selectedExecution.result.returncode}</div>
+                        </div>
+                      )}
+                    </div>
+
+                    {(selectedExecution.result.stdout || selectedExecution.result.stderr) && (
+                      <div className="space-y-3 text-[11px]">
+                        {selectedExecution.result.stdout && (
+                          <div>
+                            <div className="text-gray-500 font-semibold mb-1">Stdout</div>
+                            <pre className="p-2 bg-gray-50 border border-gray-200 rounded whitespace-pre overflow-x-auto">
+                              {selectedExecution.result.stdout}
+                            </pre>
+                          </div>
+                        )}
+                        {selectedExecution.result.stderr && (
+                          <div>
+                            <div className="text-gray-500 font-semibold mb-1">Stderr</div>
+                            <pre className="p-2 bg-gray-50 border border-gray-200 rounded whitespace-pre overflow-x-auto">
+                              {selectedExecution.result.stderr}
+                            </pre>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="text-[11px] text-gray-500 font-semibold">Raw Payload</div>
+                        <button
+                          type="button"
+                          className="text-[11px] text-blue-600 hover:underline"
+                          onClick={() => setShowRawPayload((prev) => !prev)}
+                        >
+                          {showRawPayload ? "Hide" : "Show"}
+                        </button>
+                      </div>
+                      {showRawPayload && (
+                        <pre className="p-2 bg-white border border-gray-200 rounded text-[11px] whitespace-pre-wrap overflow-x-auto">
+                          {JSON.stringify(selectedExecution.result, null, 2)}
+                        </pre>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-1 text-[11px] text-gray-400">No result payload recorded for this execution.</div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

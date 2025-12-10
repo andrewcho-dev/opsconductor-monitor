@@ -33,6 +33,22 @@ def _make_celery() -> Celery:
         result_serializer="json",
         timezone=os.getenv("CELERY_TIMEZONE", "UTC"),
         enable_utc=True,
+        # Make worker behavior more predictable and resilient.
+        # - worker_prefetch_multiplier=1 prevents a single worker from
+        #   hoarding tasks and starving others.
+        # - task_acks_late=True ensures tasks are only ACKed after the
+        #   work is done so crashes cause re-delivery.
+        # - task_reject_on_worker_lost=True makes sure tasks return to
+        #   the queue if a worker process disappears.
+        worker_prefetch_multiplier=1,
+        task_acks_late=True,
+        task_reject_on_worker_lost=True,
+        # Visibility timeout should be comfortably larger than any
+        # expected task runtime so Celery can recover tasks from
+        # lost workers instead of dropping them.
+        broker_transport_options={
+            "visibility_timeout": int(os.getenv("CELERY_VISIBILITY_TIMEOUT", "3600")),
+        },
         # Celery Beat schedule: run the generic scheduler tick task
         # every 30 seconds to dispatch due jobs from scheduler_jobs.
         beat_schedule={
