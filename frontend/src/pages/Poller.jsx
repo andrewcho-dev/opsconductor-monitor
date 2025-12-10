@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Play, Square, RefreshCw, Plus, Trash2, Save, TestTube, Settings } from 'lucide-react';
 import { cn } from '../lib/utils';
 import CompleteJobBuilder from '../components/jobBuilder/CompleteJobBuilder';
+import JobNavHeader from '../components/JobNavHeader';
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component {
@@ -274,6 +275,7 @@ const Poller = ({ openJobBuilder = false }) => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <JobNavHeader active="poller" />
       {/* Navigation Header */}
       <div className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="flex items-center justify-between">
