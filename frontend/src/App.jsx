@@ -11,6 +11,7 @@ import Poller from "./pages/Poller";
 import { Topology } from "./pages/Topology";
 import { PowerTrends } from "./pages/PowerTrends";
 import { Scheduler } from "./pages/Scheduler";
+import JobDefinitions from "./pages/JobDefinitions";
 import { useDevices, useGroups, useScanProgress } from "./hooks/useDevices";
 import { fetchApi } from "./lib/utils";
 
@@ -402,7 +403,8 @@ function AppContent() {
         <Route path="/device/:ip" element={<DeviceDetail />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/poller" element={<Poller />} />
-        <Route path="/job-builder" element={<Poller openJobBuilder={true} />} />
+        <Route path="/job-definitions" element={<JobDefinitions />} />
+        <Route path="/job-builder" element={<JobDefinitions />} />
         <Route path="/topology" element={<Topology />} />
         <Route path="/power-trends" element={<PowerTrends />} />
         <Route path="/scheduler" element={<Scheduler />} />

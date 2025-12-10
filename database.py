@@ -269,6 +269,20 @@ class DatabaseManager:
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """
+
+        # Job Builder-style generic job definitions. These represent the
+        # logical job that the generic executor Celery task will run.
+        create_job_definitions_table = """
+        CREATE TABLE IF NOT EXISTS job_definitions (
+            id UUID PRIMARY KEY,
+            name VARCHAR(200) NOT NULL UNIQUE,
+            description TEXT,
+            definition JSONB NOT NULL,
+            enabled BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
         
         self.execute_query(create_scan_results_table, fetch=False)
         self.execute_query(create_interface_scans_table, fetch=False)
@@ -282,6 +296,7 @@ class DatabaseManager:
         self.execute_query(create_poller_logs_table, fetch=False)
         self.execute_query(create_scheduler_jobs_table, fetch=False)
         self.execute_query(create_scheduler_job_executions_table, fetch=False)
+        self.execute_query(create_job_definitions_table, fetch=False)
 
         # Ensure new scheduler_jobs columns exist on older databases
         try:
@@ -601,7 +616,70 @@ class DatabaseManager:
             RETURNING id, job_name, task_id
         """
         return self.execute_query(query, (str(queue_timeout), str(run_timeout)))
-    
+
+    def upsert_job_definition(self, id, name, description, definition, enabled=True):
+        """Create or update a Job Builder-style job definition.
+
+        The definition is stored as JSONB in the job_definitions table.
+        """
+        query = """
+            INSERT INTO job_definitions (id, name, description, definition, enabled)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (id)
+            DO UPDATE SET
+                name = EXCLUDED.name,
+                description = EXCLUDED.description,
+                definition = EXCLUDED.definition,
+                enabled = EXCLUDED.enabled,
+                updated_at = CURRENT_TIMESTAMP
+            RETURNING *
+        """
+        payload = json.dumps(definition) if definition is not None else json.dumps({})
+        rows = self.execute_query(query, (id, name, description, payload, enabled))
+        if not rows:
+            return None
+        row = rows[0]
+        try:
+            definition_value = row.get("definition")
+            if isinstance(definition_value, str):
+                row["definition"] = json.loads(definition_value)
+        except Exception:
+            row["definition"] = None
+        return row
+
+    def get_job_definition(self, id):
+        """Return a single job definition by UUID, or None if not found."""
+        query = "SELECT * FROM job_definitions WHERE id = %s"
+        rows = self.execute_query(query, (id,))
+        if not rows:
+            return None
+        row = rows[0]
+        try:
+            definition_value = row.get("definition")
+            if isinstance(definition_value, str):
+                row["definition"] = json.loads(definition_value)
+        except Exception:
+            row["definition"] = None
+        return row
+
+    def list_job_definitions(self):
+        """Return all job definitions ordered by name."""
+        query = "SELECT * FROM job_definitions ORDER BY name"
+        rows = self.execute_query(query)
+        for row in rows:
+            try:
+                definition_value = row.get("definition")
+                if isinstance(definition_value, str):
+                    row["definition"] = json.loads(definition_value)
+            except Exception:
+                row["definition"] = None
+        return rows
+
+    def delete_job_definition(self, id):
+        """Delete a job definition by UUID."""
+        query = "DELETE FROM job_definitions WHERE id = %s"
+        return self.execute_query(query, (id,), fetch=False)
+
     def get_scan_results(self):
         """Get all scan results (raw rows)"""
         query = 'SELECT ip_address, network_range, ping_status, scan_timestamp, snmp_status, ssh_status, rdp_status, snmp_hostname, snmp_description, snmp_contact, snmp_location, snmp_uptime, snmp_vendor_oid FROM scan_results ORDER BY network_range, ip_address::inet'

@@ -2,6 +2,7 @@
 """Main Flask application - clean and minimal"""
 
 import json
+import uuid
 from datetime import datetime
 
 from flask import Flask, jsonify, request, send_from_directory
@@ -88,6 +89,241 @@ def get_data():
     """Get all scan results"""
     try:
         return jsonify(db.get_all_devices())
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# Job Definitions (Job Builder) APIs
+
+def _serialize_job_definition(row):
+    return {
+        'id': str(row.get('id')) if row.get('id') is not None else None,
+        'name': row.get('name'),
+        'description': row.get('description') or '',
+        'enabled': bool(row.get('enabled', True)),
+        'definition': row.get('definition') or {},
+        'created_at': row.get('created_at').isoformat() if row.get('created_at') else None,
+        'updated_at': row.get('updated_at').isoformat() if row.get('updated_at') else None,
+    }
+
+
+@app.route('/api/job-definitions', methods=['GET'])
+def api_job_definitions_list():
+    """List all Job Builder-style job definitions."""
+    try:
+        rows = db.list_job_definitions()
+        jobs = [_serialize_job_definition(r) for r in rows]
+        return jsonify({'jobs': jobs})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/job-definitions', methods=['POST'])
+def api_job_definitions_create():
+    """Create or update a job definition.
+
+    Expected JSON body:
+      - id: optional UUID string; if omitted a new UUID will be generated
+      - name: job name (required)
+      - description: optional description
+      - enabled: optional bool (default True)
+      - definition: JSON object representing the job spec (required)
+    """
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+
+        raw_id = (data.get('id') or '').strip() or None
+        if raw_id:
+            try:
+                job_id = str(uuid.UUID(raw_id))
+            except Exception:
+                return jsonify({'error': 'id must be a valid UUID string if provided'}), 400
+        else:
+            job_id = str(uuid.uuid4())
+
+        name = (data.get('name') or '').strip()
+        if not name:
+            return jsonify({'error': 'name is required'}), 400
+
+        description = data.get('description') or ''
+        enabled = bool(data.get('enabled', True))
+        definition = data.get('definition')
+        if not isinstance(definition, dict):
+            return jsonify({'error': 'definition must be a JSON object'}), 400
+
+        row = db.upsert_job_definition(
+            id=job_id,
+            name=name,
+            description=description,
+            definition=definition,
+            enabled=enabled,
+        )
+        if not row:
+            return jsonify({'error': 'Failed to save job definition'}), 500
+
+        return jsonify({'job': _serialize_job_definition(row)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/job-definitions/<job_id>', methods=['GET', 'PUT', 'DELETE'])
+def api_job_definitions_detail(job_id):
+    """Retrieve, update, or delete a single job definition by UUID."""
+    try:
+        try:
+            job_uuid = str(uuid.UUID(job_id))
+        except Exception:
+            return jsonify({'error': 'job_id must be a valid UUID'}), 400
+
+        if request.method == 'GET':
+            row = db.get_job_definition(job_uuid)
+            if not row:
+                return jsonify({'error': 'job definition not found'}), 404
+            return jsonify({'job': _serialize_job_definition(row)})
+
+        if request.method == 'DELETE':
+            ok = db.delete_job_definition(job_uuid)
+            if not ok:
+                # delete_job_definition returns True/None; treat None as failure
+                return jsonify({'error': 'Failed to delete job definition'}), 500
+            return jsonify({'status': 'deleted'})
+
+        # PUT update
+        data = request.get_json(force=True, silent=True) or {}
+
+        name = data.get('name')
+        description = data.get('description')
+        enabled = data.get('enabled')
+        definition = data.get('definition')
+
+        # Fetch existing so we can merge fields sensibly.
+        existing = db.get_job_definition(job_uuid)
+        if not existing:
+            return jsonify({'error': 'job definition not found'}), 404
+
+        new_name = (name if name is not None else existing.get('name')) or ''
+        if not new_name.strip():
+            return jsonify({'error': 'name is required'}), 400
+
+        final_definition = definition if definition is not None else existing.get('definition') or {}
+        if not isinstance(final_definition, dict):
+            return jsonify({'error': 'definition must be a JSON object'}), 400
+
+        final_description = description if description is not None else (existing.get('description') or '')
+        final_enabled = bool(enabled) if enabled is not None else bool(existing.get('enabled', True))
+
+        row = db.upsert_job_definition(
+            id=job_uuid,
+            name=new_name.strip(),
+            description=final_description,
+            definition=final_definition,
+            enabled=final_enabled,
+        )
+        if not row:
+            return jsonify({'error': 'Failed to update job definition'}), 500
+
+        return jsonify({'job': _serialize_job_definition(row)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/job-definitions/<job_id>/schedule', methods=['POST'])
+def api_job_definitions_schedule(job_id):
+    """Create or update a scheduler job that runs the given job definition.
+
+    Expected JSON body:
+      - scheduler_name: unique scheduler job name (required)
+      - schedule_type: "interval" or "cron" (default "interval")
+      - interval_seconds: integer (required for interval)
+      - cron_expression: string (required for cron)
+      - start_at, end_at, max_runs, enabled: same semantics as /api/scheduler/jobs
+      - overrides: optional dict of runtime overrides merged into definition.config
+    """
+    try:
+        try:
+            job_uuid = str(uuid.UUID(job_id))
+        except Exception:
+            return jsonify({'error': 'job_id must be a valid UUID'}), 400
+
+        job_def = db.get_job_definition(job_uuid)
+        if not job_def:
+            return jsonify({'error': 'job definition not found'}), 404
+
+        data = request.get_json(force=True, silent=True) or {}
+
+        scheduler_name = (data.get('scheduler_name') or '').strip()
+        if not scheduler_name:
+            return jsonify({'error': 'scheduler_name is required'}), 400
+
+        schedule_type = (data.get('schedule_type') or 'interval').strip().lower()
+        if schedule_type not in ('interval', 'cron'):
+            return jsonify({'error': 'schedule_type must be "interval" or "cron"'}), 400
+
+        interval_seconds = None
+        cron_expression = None
+        if schedule_type == 'interval':
+            try:
+                interval_seconds = int(data.get('interval_seconds'))
+            except Exception:
+                return jsonify({'error': 'interval_seconds must be an integer for interval schedules'}), 400
+            if interval_seconds <= 0:
+                return jsonify({'error': 'interval_seconds must be > 0'}), 400
+        else:
+            cron_expression = (data.get('cron_expression') or '').strip()
+            if not cron_expression:
+                return jsonify({'error': 'cron_expression is required for cron schedules'}), 400
+
+        enabled = bool(data.get('enabled', True))
+        overrides = data.get('overrides') or {}
+        if not isinstance(overrides, dict):
+            return jsonify({'error': 'overrides must be a JSON object if provided'}), 400
+
+        def parse_dt(field):
+            value = data.get(field)
+            if not value:
+                return None
+            try:
+                return datetime.fromisoformat(value)
+            except Exception:
+                raise ValueError(f"{field} must be ISO 8601 timestamp")
+
+        try:
+            start_at = parse_dt('start_at')
+            end_at = parse_dt('end_at')
+            next_run_at = parse_dt('next_run_at')
+        except ValueError as ve:
+            return jsonify({'error': str(ve)}), 400
+
+        max_runs = data.get('max_runs')
+        if max_runs is not None:
+            try:
+                max_runs = int(max_runs)
+            except Exception:
+                return jsonify({'error': 'max_runs must be an integer if provided'}), 400
+
+        config = {
+            'job_definition_id': job_uuid,
+            'overrides': overrides,
+        }
+
+        row = db.upsert_scheduler_job(
+            name=scheduler_name,
+            task_name='opsconductor.job.run',
+            config=config,
+            interval_seconds=interval_seconds,
+            enabled=enabled,
+            next_run_at=next_run_at,
+            schedule_type=schedule_type,
+            cron_expression=cron_expression,
+            start_at=start_at,
+            end_at=end_at,
+            max_runs=max_runs,
+        )
+
+        if not row:
+            return jsonify({'error': 'Failed to save scheduler job for job definition'}), 500
+
+        return jsonify({'job': _serialize_scheduler_job(row)})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

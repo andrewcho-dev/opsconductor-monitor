@@ -24,7 +24,7 @@ from celery_app import celery_app
 from database import db
 
 from poller_manager import run_discovery_scan, run_interface_scan, run_optical_scan
-from generic_job_scheduler import run_job_builder_job
+from generic_job_scheduler import run_job_builder_job, run_job_spec
 
 
 logger = logging.getLogger(__name__)
@@ -188,6 +188,113 @@ def run_discovery_task(config: Dict[str, Any]) -> Dict[str, Any]:
             finished_at=datetime.utcnow(),
             error_message=str(exc),
         )
+        raise
+
+
+@celery_app.task(name="opsconductor.job.run")
+def run_job_task(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Generic executor for Job Builder-style job definitions.
+
+    Config keys:
+      - job_definition_id: UUID of the job_definitions row (required)
+      - overrides: optional dict of runtime overrides to merge into
+        the stored job definition's config.
+    """
+    task_id = run_job_task.request.id
+    worker_host = getattr(run_job_task.request, "hostname", "unknown")
+
+    db.update_scheduler_job_execution(task_id, status="running")
+
+    started = datetime.utcnow()
+    try:
+        job_def_id = (config or {}).get("job_definition_id")
+        if not job_def_id:
+            raise ValueError("job_definition_id is required in config for opsconductor.job.run")
+
+        job_def = db.get_job_definition(job_def_id)
+        if not job_def:
+            raise ValueError(f"No job_definition found with id {job_def_id}")
+
+        definition = job_def.get("definition") or {}
+        if not isinstance(definition, dict):
+            raise ValueError("job_definition.definition must be a JSON object")
+
+        # Allow scheduler/job-specific overrides to adjust the base definition's
+        # config without mutating the stored definition.
+        overrides = (config or {}).get("overrides") or {}
+
+        job_spec = dict(definition)
+        base_config = dict(job_spec.get("config") or {})
+        merged_config = {**base_config, **(overrides or {})}
+        job_spec["config"] = merged_config
+
+        # Ensure identity fields are present for logging/metrics.
+        job_spec.setdefault("job_id", str(job_def.get("id")))
+        job_spec.setdefault("name", job_def.get("name"))
+
+        result = run_job_spec(job_spec)
+
+        delivery = getattr(run_job_task.request, "delivery_info", None) or {}
+        exec_meta = {
+            "task_id": task_id,
+            "worker_hostname": worker_host,
+            "worker_pid": os.getpid(),
+            "queue": delivery.get("routing_key"),
+            "delivery_info": delivery,
+        }
+
+        payload = dict(result) if isinstance(result, dict) else {"result": result}
+        payload["job_definition_id"] = str(job_def.get("id"))
+        payload["job_name"] = job_def.get("name")
+        payload["execution_meta"] = exec_meta
+        metrics = payload.get("metrics") or {}
+        if not isinstance(metrics, dict):
+            metrics = {"raw_metrics": metrics}
+        metrics.setdefault(
+            "duration_seconds",
+            (datetime.utcnow() - started).total_seconds(),
+        )
+        payload["metrics"] = metrics
+
+        status = payload.get("status") or ("success" if not payload.get("error") else "failed")
+
+        db.update_scheduler_job_execution(
+            task_id,
+            status=status,
+            finished_at=datetime.utcnow(),
+            error_message=payload.get("error") or None,
+            result=payload,
+        )
+
+        try:
+            logger.info(
+                "job_run_finish task_id=%s worker=%s job_definition_id=%s job_name=%s status=%s",
+                task_id,
+                worker_host,
+                job_def_id,
+                job_def.get("name"),
+                status,
+            )
+        except Exception:
+            pass
+
+        return payload
+    except Exception as exc:
+        db.update_scheduler_job_execution(
+            task_id,
+            status="failed",
+            finished_at=datetime.utcnow(),
+            error_message=str(exc),
+        )
+        try:
+            logger.exception(
+                "job_run_error task_id=%s worker=%s error=%s",
+                task_id,
+                worker_host,
+                str(exc),
+            )
+        except Exception:
+            pass
         raise
 
 

@@ -534,3 +534,14 @@ def run_job_builder_job(job_definition: Dict[str, Any]) -> Dict[str, Any]:
     }
 
     return scheduler.execute_job(generic_job)
+
+
+def run_job_spec(job_spec: Dict[str, Any]) -> Dict[str, Any]:
+    """Execute a generic job specification using GenericJobScheduler.
+
+    This is the canonical entrypoint for Celery-based execution of
+    Job Builder style definitions that have already been translated
+    into the GenericJobScheduler format (job_id, name, actions, config).
+    """
+    scheduler = GenericJobScheduler()
+    return scheduler.execute_job(job_spec)
