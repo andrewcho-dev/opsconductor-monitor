@@ -18,3 +18,7 @@ frontend/dist/
 
 # Local databases / data
 *.sqlite
+
+# Runtime state files
+celerybeat-schedule
+jobs.sqlite
