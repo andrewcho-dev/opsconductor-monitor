@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Network, AlertCircle } from "lucide-react";
+import { Network, AlertCircle, RefreshCw } from "lucide-react";
 import { cn } from "../lib/utils";
+import { PageHeader } from "../components/layout";
 
 // We'll use a simple implementation without vis.js for now
 // In a real implementation, you'd install vis-network or use a similar library
@@ -117,28 +118,30 @@ export function Topology() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gray-100">
-      {/* Header */}
-      <div className="bg-white p-4 border-b border-gray-200 flex-shrink-0">
-        <div className="flex items-center gap-4">
+    <div className="flex flex-col h-full">
+      <PageHeader
+        title="Network Topology"
+        description={`${nodes.length} nodes • ${edges.length} connections`}
+        icon={Network}
+        actions={
           <button
-            onClick={() => navigate("/")}
-            className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            onClick={() => {
+              const ipsParam = searchParams.get('ips');
+              if (ipsParam) {
+                try {
+                  const ipList = JSON.parse(decodeURIComponent(ipsParam));
+                  loadTopologyData(ipList);
+                } catch (e) {}
+              }
+            }}
+            disabled={loading}
+            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
           >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Main
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
           </button>
-          <div>
-            <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-              <Network className="w-5 h-5 text-blue-600" />
-              Network Topology
-            </h1>
-            <p className="text-sm text-gray-600">
-              Visualizing LLDP connections between selected devices
-            </p>
-          </div>
-        </div>
-      </div>
+        }
+      />
 
       {/* Content */}
       <div className="flex-1 relative bg-white m-4 rounded-lg shadow-sm border border-gray-200 overflow-hidden">

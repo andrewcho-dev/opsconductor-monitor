@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { Plus, RefreshCw, Trash2, Settings, Clock, Calendar, Zap, Play } from 'lucide-react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Plus, RefreshCw, Trash2, FileText, Clock, Calendar, Zap, Play, Settings } from 'lucide-react';
 import CompleteJobBuilder from '../components/jobBuilder/CompleteJobBuilder';
 import { fetchApi } from '../lib/utils';
-import JobNavHeader from '../components/JobNavHeader';
+import { PageHeader } from '../components/layout';
 
 const emptyScheduleForm = {
   scheduler_name: '',
@@ -19,6 +19,7 @@ const emptyScheduleForm = {
 };
 
 const JobDefinitions = () => {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -308,36 +309,31 @@ const JobDefinitions = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <JobNavHeader active="definitions" />
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Settings className="w-6 h-6 text-purple-600" />
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Job Definitions</h1>
-            <p className="text-sm text-gray-500">
-              Central library of reusable Job Builder definitions, fully integrated with the Celery scheduler.
-            </p>
+    <div className="flex flex-col h-full">
+      <PageHeader
+        title="Job Definitions"
+        description={`${jobs.length} definitions • Reusable automation templates`}
+        icon={FileText}
+        actions={
+          <div className="flex items-center gap-2">
+            <button
+              onClick={loadJobs}
+              disabled={loading}
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+            <button
+              onClick={openCreateJob}
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+            >
+              <Plus className="w-4 h-4" />
+              New Definition
+            </button>
           </div>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={loadJobs}
-            className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:bg-gray-100 rounded-lg border border-gray-200 text-sm"
-          >
-            <RefreshCw className="w-4 h-4" />
-            Refresh
-          </button>
-          <button
-            onClick={openCreateJob}
-            className="flex items-center gap-2 px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm"
-          >
-            <Plus className="w-4 h-4" />
-            New Job Definition
-          </button>
-        </div>
-      </div>
+        }
+      />
 
       {/* Main content */}
       <div className="flex-1 p-4 overflow-hidden">

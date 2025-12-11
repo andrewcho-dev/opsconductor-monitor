@@ -75,6 +75,16 @@ export function Sidebar({
             <span className="w-4 h-4 inline-flex items-center justify-center rounded-full bg-purple-50 text-purple-600 text-[10px] font-semibold">J</span>
             <span className="font-medium">Job Definitions</span>
           </button>
+          <button
+            onClick={() => navigate("/system")}
+            className={cn(
+              "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-sm transition-colors",
+              "hover:bg-gray-100 text-gray-700"
+            )}
+          >
+            <span className="w-4 h-4 inline-flex items-center justify-center rounded-full bg-gray-100 text-gray-600 text-[10px] font-semibold">⚙</span>
+            <span className="font-medium">System Settings</span>
+          </button>
         </div>
 
         {/* Custom Groups */}

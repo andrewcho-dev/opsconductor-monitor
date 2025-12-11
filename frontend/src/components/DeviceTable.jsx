@@ -10,9 +10,10 @@ import {
   Eye,
   Trash2,
   Plus,
-  Filter,
   FolderOpen,
   FolderClosed,
+  Filter,
+  X,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 
@@ -27,76 +28,16 @@ export function DeviceTable({
   onDeleteDevice,
   onDeleteSelected,
   onAddSelectedToGroup,
-  selectedGroup,
-  groupDevices,
+  // Filter props
+  filterOptions,
+  currentFilter,
+  onFilterChange,
 }) {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: "ip_address", direction: "asc" });
   const [visibleCount, setVisibleCount] = useState(100);
-  
-  // Load service filters from localStorage on mount
-  const [serviceFilters, setServiceFilters] = useState(() => {
-    try {
-      // Try new key first, then fall back to old key for migration
-      let saved = localStorage.getItem('deviceTableServiceFilters');
-      if (!saved) {
-        saved = localStorage.getItem('deviceTableFooterFilters');
-        if (saved) {
-          // Migrate to new key
-          localStorage.setItem('deviceTableServiceFilters', saved);
-          localStorage.removeItem('deviceTableFooterFilters');
-        }
-      }
-      
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        // Check if all filters are false (safe state) or if any are true (potentially problematic)
-        const hasActiveFilters = Object.values(parsed).some(active => active === true);
-        
-        // If all filters are active (which would hide everything), reset to safe defaults
-        if (hasActiveFilters && Object.values(parsed).every(active => active === true)) {
-          return {
-            group: false,
-            ping: false,
-            snmp: false,
-            ssh: false,
-            rdp: false,
-            any: false,
-          };
-        }
-        
-        return parsed;
-      }
-      
-      return {
-        group: false,
-        ping: false,
-        snmp: false,
-        ssh: false,
-        rdp: false,
-        any: false,
-      };
-    } catch {
-      return {
-        group: false,
-        ping: false,
-        snmp: false,
-        ssh: false,
-        rdp: false,
-        any: false,
-      };
-    }
-  });
-  
-  // Save service filters to localStorage whenever they change
-  useEffect(() => {
-    try {
-      localStorage.setItem('deviceTableServiceFilters', JSON.stringify(serviceFilters));
-    } catch {
-      // Ignore localStorage errors
-    }
-  }, [serviceFilters]);
+  const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
   
   // Load expanded networks from localStorage on mount
   const [expandedNetworks, setExpandedNetworks] = useState(() => {
@@ -134,58 +75,8 @@ export function DeviceTable({
       );
     }
 
-    // Apply service filters
-    const activeFilters = Object.entries(serviceFilters).filter(([_, active]) => active);
-    
-    // Debug logging for group filter
-    if (activeFilters.some(([service, _]) => service === 'group')) {
-      console.log('Group filter active:', { selectedGroup, groupDevicesLength: groupDevices?.length || 0 });
-    }
-    
-    if (activeFilters.length > 0) {
-      filtered = filtered.filter((device) => {
-        return activeFilters.some(([service, _]) => {
-          if (service === 'any') {
-            // ANY filter: show devices that are not completely offline
-            const pingOffline = !device.ping_status || device.ping_status.toLowerCase() !== 'online';
-            const snmpOffline = !device.snmp_status || device.snmp_status.toUpperCase() !== 'YES';
-            const sshOffline = !device.ssh_status || device.ssh_status.toUpperCase() !== 'YES';
-            const rdpOffline = !device.rdp_status || device.rdp_status.toUpperCase() !== 'YES';
-            return !(pingOffline && snmpOffline && sshOffline && rdpOffline);
-          } else if (service === 'ping') {
-            return device.ping_status && (
-              device.ping_status.toLowerCase() === 'online' ||
-              device.ping_status.toUpperCase() === 'YES'
-            );
-          } else if (service === 'group') {
-            // GROUP filter: show only devices in the selected group
-            if (selectedGroup.type === "custom") {
-              // For custom groups, check if device IP is in the group devices list
-              if (groupDevices && groupDevices.length > 0) {
-                const groupIpSet = new Set(groupDevices.map(d => d.ip_address || d));
-                return groupIpSet.has(device.ip_address);
-              } else {
-                // If no group devices loaded, don't filter (show all)
-                console.log('No group devices loaded for custom group, showing all devices');
-                return true;
-              }
-            }
-            if (selectedGroup.type === "network") {
-              return device.network_range === selectedGroup.name;
-            }
-            // If "All Devices" selected or no valid group, show all devices
-            return selectedGroup.name === "All Devices";
-          } else {
-            // For SNMP, SSH, RDP - filter for "YES" (positive status)
-            const status = device[`${service}_status`];
-            return status && status.toUpperCase() === "YES";
-          }
-        });
-      });
-    }
-
     return filtered;
-  }, [devices, search, serviceFilters, selectedGroup, groupDevices]);
+  }, [devices, search]);
 
   // Group devices by network and create hierarchical structure
   const groupedDevices = useMemo(() => {
@@ -294,24 +185,6 @@ export function DeviceTable({
       key,
       direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc",
     }));
-  };
-
-  const toggleServiceFilter = (filter) => {
-    setServiceFilters((prev) => ({
-      ...prev,
-      [filter]: !prev[filter],
-    }));
-  };
-
-  const clearAllFilters = () => {
-    setServiceFilters({
-      group: false,
-      ping: false,
-      snmp: false,
-      ssh: false,
-      rdp: false,
-      any: false,
-    });
   };
 
   const SortIcon = ({ columnKey }) => {
@@ -447,87 +320,162 @@ export function DeviceTable({
     );
   }
 
+  // Build filter dropdown content
+  const renderFilterDropdown = () => {
+    if (!filterOptions || !onFilterChange) return null;
+    
+    return (
+      <div className="absolute top-full left-0 mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-20 py-1 max-h-72 overflow-y-auto">
+        <button
+          onClick={() => { onFilterChange({ type: "all", label: "All Devices" }); setFilterDropdownOpen(false); }}
+          className={cn(
+            "w-full text-left px-3 py-2 text-sm hover:bg-gray-50",
+            currentFilter?.type === "all" && "bg-blue-50 text-blue-700"
+          )}
+        >
+          All Devices ({filterOptions.totalCount})
+        </button>
+
+        {filterOptions.customGroups?.length > 0 && (
+          <>
+            <div className="px-3 py-1.5 text-xs font-semibold text-gray-400 uppercase border-t border-gray-100 mt-1">
+              Custom Groups
+            </div>
+            {filterOptions.customGroups.map((group) => (
+              <button
+                key={group.id}
+                onClick={() => { 
+                  onFilterChange({ type: "custom", id: group.id, label: group.group_name }); 
+                  setFilterDropdownOpen(false); 
+                }}
+                className={cn(
+                  "w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center justify-between",
+                  currentFilter?.type === "custom" && currentFilter?.id === group.id && "bg-blue-50 text-blue-700"
+                )}
+              >
+                <span className="truncate">{group.group_name}</span>
+                <span className="text-xs text-gray-400">{group.device_count || 0}</span>
+              </button>
+            ))}
+          </>
+        )}
+
+        {filterOptions.networkGroups?.length > 0 && (
+          <>
+            <div className="px-3 py-1.5 text-xs font-semibold text-gray-400 uppercase border-t border-gray-100 mt-1">
+              By Network
+            </div>
+            {filterOptions.networkGroups.map((group) => (
+              <button
+                key={group.network_range}
+                onClick={() => { 
+                  onFilterChange({ type: "network", id: group.network_range, label: group.network_range }); 
+                  setFilterDropdownOpen(false); 
+                }}
+                className={cn(
+                  "w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center justify-between",
+                  currentFilter?.type === "network" && currentFilter?.id === group.network_range && "bg-blue-50 text-blue-700"
+                )}
+              >
+                <span className="truncate">{group.network_range}</span>
+                <span className="text-xs text-gray-400">{group.device_count || 0}</span>
+              </button>
+            ))}
+          </>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="flex flex-col h-full">
-      {/* Search and action bar */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-white">
-        <div className="flex items-center gap-4">
+      {/* Search, filter, and action bar */}
+      <div className="flex items-center justify-between p-3 border-b border-gray-200 bg-gray-50">
+        <div className="flex items-center gap-3">
+          {/* Search */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Search devices..."
+              placeholder="Search..."
               value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-              }}
-              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-64"
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 pr-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-44"
             />
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={onAddSelectedToGroup}
-              disabled={selectedDevices.size === 0}
-              className={cn(
-                "px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1",
-                selectedDevices.size > 0
-                  ? "bg-blue-600 text-white hover:bg-blue-700"
-                  : "bg-gray-100 text-gray-400 cursor-not-allowed"
-              )}
-            >
-              <Plus className="w-4 h-4" />
-              Add to Group
-            </button>
-            <button
-              onClick={onDeleteSelected}
-              disabled={selectedDevices.size === 0}
-              className={cn(
-                "px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1",
-                selectedDevices.size > 0
-                  ? "bg-red-600 text-white hover:bg-red-700"
-                  : "bg-gray-100 text-gray-400 cursor-not-allowed"
-              )}
-            >
-              <Trash2 className="w-4 h-4" />
-              Delete
-            </button>
-          </div>
-        </div>
-        
-        {/* Right side - Filters and count */}
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-500 mr-2">Filters:</span>
-            <button
-              onClick={() => clearAllFilters()}
-              className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50"
-            >
-              ALL
-            </button>
-            {Object.entries(serviceFilters).map(([service, active]) => (
+
+          {/* Filter Dropdown */}
+          {filterOptions && onFilterChange && (
+            <div className="relative">
               <button
-                key={service}
-                onClick={() => toggleServiceFilter(service)}
+                onClick={() => setFilterDropdownOpen(!filterDropdownOpen)}
                 className={cn(
-                  "px-3 py-1 text-sm border rounded-md transition-colors",
-                  active
-                    ? "bg-blue-100 border-blue-300 text-blue-700"
-                    : "border-gray-300 hover:bg-gray-50"
+                  "flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg border transition-colors",
+                  currentFilter?.type !== "all"
+                    ? "bg-blue-50 border-blue-200 text-blue-700"
+                    : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
                 )}
               >
-                {service.toUpperCase()}
+                <Filter className="w-4 h-4" />
+                <span className="max-w-28 truncate">{currentFilter?.label || "All Devices"}</span>
+                <ChevronDown className="w-3 h-3" />
               </button>
-            ))}
-          </div>
-          <div className="text-sm text-gray-500">
-            {filteredDevices.length} devices
-            {selectedDevices.size > 0 && ` • ${selectedDevices.size} selected`}
-            {devices.length > 0 && filteredDevices.length === 0 && (
-              <span className="ml-2 text-yellow-600">
-                (All devices hidden by filters - click ALL to clear)
-              </span>
+
+              {filterDropdownOpen && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setFilterDropdownOpen(false)} />
+                  {renderFilterDropdown()}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Clear Filter */}
+          {currentFilter?.type !== "all" && (
+            <button
+              onClick={() => onFilterChange({ type: "all", label: "All Devices" })}
+              className="flex items-center gap-1 px-2 py-1 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
+            >
+              <X className="w-3 h-3" />
+              Clear
+            </button>
+          )}
+
+          <div className="h-5 w-px bg-gray-300" />
+
+          {/* Actions */}
+          <button
+            onClick={onAddSelectedToGroup}
+            disabled={selectedDevices.size === 0}
+            className={cn(
+              "px-2.5 py-1.5 rounded text-sm font-medium transition-colors flex items-center gap-1",
+              selectedDevices.size > 0
+                ? "bg-blue-600 text-white hover:bg-blue-700"
+                : "bg-gray-200 text-gray-400 cursor-not-allowed"
             )}
-          </div>
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Add to Group
+          </button>
+          <button
+            onClick={onDeleteSelected}
+            disabled={selectedDevices.size === 0}
+            className={cn(
+              "px-2.5 py-1.5 rounded text-sm font-medium transition-colors flex items-center gap-1",
+              selectedDevices.size > 0
+                ? "bg-red-600 text-white hover:bg-red-700"
+                : "bg-gray-200 text-gray-400 cursor-not-allowed"
+            )}
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Delete
+          </button>
+        </div>
+        
+        {/* Right side - Count */}
+        <div className="text-sm text-gray-500">
+          {filteredDevices.length} devices
+          {selectedDevices.size > 0 && <span className="text-blue-600 font-medium"> ({selectedDevices.size} selected)</span>}
         </div>
       </div>
 

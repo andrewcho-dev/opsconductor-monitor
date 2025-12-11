@@ -1,7 +1,27 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchApi } from "../lib/utils";
-import JobNavHeader from "../components/JobNavHeader";
+import { PageHeader } from "../components/layout";
+import { 
+  CalendarClock, 
+  RefreshCw, 
+  Play, 
+  Trash2, 
+  Clock, 
+  CheckCircle, 
+  XCircle,
+  Search,
+  Filter,
+  ChevronDown,
+  X,
+  Tag,
+  ExternalLink,
+  History,
+  Settings,
+  AlertCircle,
+  Loader2
+} from "lucide-react";
+import { cn } from "../lib/utils";
 
 export function Scheduler() {
   const navigate = useNavigate();
@@ -13,16 +33,20 @@ export function Scheduler() {
   const [loadingExecutions, setLoadingExecutions] = useState(false);
   const [selectedExecution, setSelectedExecution] = useState(null);
   const [showRawPayload, setShowRawPayload] = useState(false);
-  const [queueStatus, setQueueStatus] = useState(null);
-  const [loadingQueues, setLoadingQueues] = useState(false);
   const runOnceRefreshRef = useRef(null);
-  // Scheduler is read-only for job structure; creation/editing happens via Job Builder.
 
+  // Filter state
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all"); // all, enabled, disabled
+  const [tagFilter, setTagFilter] = useState(null);
+  const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
+  const [sortConfig, setSortConfig] = useState({ key: "name", direction: "asc" });
+
+  // Helper functions
   const formatLocalTime = (value) => {
     if (!value) return "—";
     try {
       let iso = value;
-      // If the backend sends a naive ISO string (no timezone), assume UTC.
       const isoLike = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,6})?)?$/;
       const hasZone = /[Zz]|[+-]\d{2}:?\d{2}$/.test(iso);
       if (isoLike.test(iso) && !hasZone) {
@@ -36,24 +60,151 @@ export function Scheduler() {
     }
   };
 
-  const openJobDefinitionFromConfig = (job) => {
-    if (!job || job.task_name !== "opsconductor.job.run") return;
-    const jobDefId = job?.config?.job_definition_id;
-    if (!jobDefId) return;
-    navigate(`/job-definitions?id=${encodeURIComponent(jobDefId)}`);
+  const formatShortTime = (value) => {
+    if (!value) return "—";
+    try {
+      let iso = value;
+      const isoLike = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,6})?)?$/;
+      const hasZone = /[Zz]|[+-]\d{2}:?\d{2}$/.test(iso);
+      if (isoLike.test(iso) && !hasZone) {
+        iso = iso + "Z";
+      }
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return value;
+      // Format: "Dec 10, 1:45 PM"
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' + 
+             d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    } catch {
+      return value;
+    }
   };
 
-  const workers = queueStatus?.workers || [];
-  let totalProcs = 0;
-  if (queueStatus?.worker_details) {
-    for (const w of workers) {
-      const conc = queueStatus.worker_details[w]?.concurrency;
-      if (typeof conc === "number") {
-        totalProcs += conc;
-      }
+  const formatSchedule = (job) => {
+    if (job.schedule_type === "cron") {
+      return job.cron_expression || "cron";
     }
-  }
+    if (job.interval_seconds) {
+      const secs = job.interval_seconds;
+      if (secs < 60) return `Every ${secs}s`;
+      if (secs < 3600) return `Every ${Math.round(secs / 60)}m`;
+      if (secs < 86400) return `Every ${Math.round(secs / 3600)}h`;
+      return `Every ${Math.round(secs / 86400)}d`;
+    }
+    return "—";
+  };
 
+  const getJobStatus = (job) => {
+    if (!job.enabled) return "disabled";
+    // Check if running based on recent execution
+    const recentExec = executions.find(e => e.status === "running");
+    if (recentExec && selectedJob === job.name) return "running";
+    return "idle";
+  };
+
+  // Extract all unique tags from jobs
+  const allTags = useMemo(() => {
+    const tags = new Set();
+    jobs.forEach(job => {
+      (job.tags || []).forEach(tag => tags.add(tag));
+    });
+    return Array.from(tags).sort();
+  }, [jobs]);
+
+  // Filter and sort jobs
+  const filteredJobs = useMemo(() => {
+    let filtered = jobs;
+
+    // Search filter
+    if (search) {
+      const searchLower = search.toLowerCase();
+      filtered = filtered.filter(job => 
+        job.name?.toLowerCase().includes(searchLower) ||
+        (job.tags || []).some(t => t.toLowerCase().includes(searchLower))
+      );
+    }
+
+    // Status filter
+    if (statusFilter === "enabled") {
+      filtered = filtered.filter(job => job.enabled);
+    } else if (statusFilter === "disabled") {
+      filtered = filtered.filter(job => !job.enabled);
+    }
+
+    // Tag filter
+    if (tagFilter) {
+      filtered = filtered.filter(job => (job.tags || []).includes(tagFilter));
+    }
+
+    // Sort
+    filtered = [...filtered].sort((a, b) => {
+      let aVal, bVal;
+      switch (sortConfig.key) {
+        case "tags":
+          aVal = (a.tags || []).join(",").toLowerCase();
+          bVal = (b.tags || []).join(",").toLowerCase();
+          break;
+        case "name":
+          aVal = a.name?.toLowerCase() || "";
+          bVal = b.name?.toLowerCase() || "";
+          break;
+        case "schedule":
+          aVal = a.interval_seconds || 0;
+          bVal = b.interval_seconds || 0;
+          break;
+        case "next_run":
+          aVal = a.next_run_at || "";
+          bVal = b.next_run_at || "";
+          break;
+        case "last_run":
+          aVal = a.last_run_at || "";
+          bVal = b.last_run_at || "";
+          break;
+        case "enabled":
+          aVal = a.enabled ? 1 : 0;
+          bVal = b.enabled ? 1 : 0;
+          break;
+        default:
+          aVal = a.name?.toLowerCase() || "";
+          bVal = b.name?.toLowerCase() || "";
+      }
+      if (aVal < bVal) return sortConfig.direction === "asc" ? -1 : 1;
+      if (aVal > bVal) return sortConfig.direction === "asc" ? 1 : -1;
+      return 0;
+    });
+
+    return filtered;
+  }, [jobs, search, statusFilter, tagFilter, sortConfig]);
+
+  const handleSort = (key) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc"
+    }));
+  };
+
+  const SortHeader = ({ label, sortKey, className = "" }) => (
+    <th
+      className={cn(
+        "px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer hover:bg-gray-100 select-none",
+        className
+      )}
+      onClick={() => handleSort(sortKey)}
+    >
+      <div className="flex items-center gap-1">
+        {label}
+        {sortConfig.key === sortKey && (
+          <span className="text-blue-600">{sortConfig.direction === "asc" ? "↑" : "↓"}</span>
+        )}
+      </div>
+    </th>
+  );
+
+  // Count running jobs
+  const runningCount = useMemo(() => {
+    return jobs.filter(j => j.enabled).length;
+  }, [jobs]);
+
+  // API functions
   const loadJobs = async () => {
     try {
       setLoading(true);
@@ -65,20 +216,6 @@ export function Scheduler() {
       setError(err.message || "Failed to load jobs");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadQueues = async () => {
-    try {
-      setLoadingQueues(true);
-      const data = await fetchApi("/api/scheduler/queues");
-      setQueueStatus(data);
-    } catch (err) {
-      console.error("Failed to load queue status", err);
-      // Don't overwrite main error unless nothing there
-      setError((prev) => prev || err.message || "Failed to load queue status");
-    } finally {
-      setLoadingQueues(false);
     }
   };
 
@@ -106,10 +243,17 @@ export function Scheduler() {
 
   const handleSelectJob = (job) => {
     if (!job) return;
-    setSelectedJob(job.name);
+    setSelectedJob(job);
     setSelectedExecution(null);
     setShowRawPayload(false);
     loadExecutions(job.name);
+  };
+
+  const handleCloseDetail = () => {
+    setSelectedJob(null);
+    setExecutions([]);
+    setSelectedExecution(null);
+    setShowRawPayload(false);
   };
 
   const clearExecutions = async () => {
@@ -117,13 +261,10 @@ export function Scheduler() {
     try {
       setError(null);
       await fetchApi(
-        `/api/scheduler/jobs/${encodeURIComponent(selectedJob)}/executions/clear`,
-        {
-          method: "POST",
-          body: JSON.stringify({}),
-        }
+        `/api/scheduler/jobs/${encodeURIComponent(selectedJob.name)}/executions/clear`,
+        { method: "POST", body: JSON.stringify({}) }
       );
-      await loadExecutions(selectedJob);
+      await loadExecutions(selectedJob.name);
     } catch (err) {
       console.error("Failed to clear executions", err);
       setError(err.message || "Failed to clear executions");
@@ -132,7 +273,6 @@ export function Scheduler() {
 
   useEffect(() => {
     loadJobs();
-    loadQueues();
     return () => {
       if (runOnceRefreshRef.current) {
         clearTimeout(runOnceRefreshRef.current);
@@ -150,18 +290,28 @@ export function Scheduler() {
       await fetchApi(`/api/scheduler/jobs/${encodeURIComponent(name)}`, {
         method: "DELETE",
       });
-
-      if (selectedJob === name) {
-        setSelectedJob(null);
-        setExecutions([]);
-        setSelectedExecution(null);
-        setShowRawPayload(false);
+      if (selectedJob?.name === name) {
+        handleCloseDetail();
       }
-
       await loadJobs();
     } catch (err) {
       console.error("Failed to delete scheduler job", err);
       setError(err.message || "Failed to delete job");
+    }
+  };
+
+  const handleToggleEnabled = async (job, e) => {
+    e?.stopPropagation();
+    try {
+      setError(null);
+      await fetchApi(`/api/scheduler/jobs/${encodeURIComponent(job.name)}/toggle`, {
+        method: "POST",
+        body: JSON.stringify({ enabled: !job.enabled }),
+      });
+      await loadJobs();
+    } catch (err) {
+      console.error("Failed to toggle job", err);
+      setError(err.message || "Failed to toggle job");
     }
   };
 
@@ -170,22 +320,16 @@ export function Scheduler() {
       setError(null);
       await fetchApi(
         `/api/scheduler/jobs/${encodeURIComponent(name)}/run-once`,
-        {
-          method: "POST",
-        }
+        { method: "POST" }
       );
-      // We don't know when the job will finish, but we can refresh metadata
       await loadJobs();
       await loadExecutions(name);
 
-      // Lightweight auto-refresh: one more execution refresh after a short delay
-      // so the user sees queued -> success/failed without manual clicking.
       if (runOnceRefreshRef.current) {
         clearTimeout(runOnceRefreshRef.current);
       }
       runOnceRefreshRef.current = setTimeout(() => {
-        // Only refresh if this job is still selected so we don't surprise the user
-        if (selectedJob === name) {
+        if (selectedJob?.name === name) {
           loadExecutions(name);
         }
       }, 6000);
@@ -195,659 +339,538 @@ export function Scheduler() {
     }
   };
 
+  const handleRefresh = async () => {
+    await loadJobs();
+    if (selectedJob) {
+      await loadExecutions(selectedJob.name);
+    }
+  };
+
+  const openJobDefinition = (job) => {
+    if (!job || job.task_name !== "opsconductor.job.run") return;
+    const jobDefId = job?.config?.job_definition_id;
+    if (!jobDefId) return;
+    navigate(`/jobs/definitions?id=${encodeURIComponent(jobDefId)}`);
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <JobNavHeader active="scheduler" />
-      <div className="p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-800">Scheduler</h1>
-          <button
-            onClick={async () => {
-              await loadJobs();
-              await loadQueues();
-              if (selectedJob) {
-                await loadExecutions(selectedJob);
-              }
-            }}
-            className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 bg-white hover:bg-gray-50"
-            disabled={loading}
-          >
-            {loading ? "Refreshing..." : "Refresh"}
-          </button>
-        </div>
-
-        <div className="mt-4 bg-white rounded-xl shadow-sm border border-gray-200 px-4 py-3 text-xs text-gray-700">
-          <div className="flex items-center justify-between mb-1">
-            <span className="font-semibold text-gray-800">Queue Status</span>
-            <span className="text-[11px] text-gray-400">
-              Updated when you click Refresh above
-            </span>
+    <div className="flex flex-col h-full">
+      <PageHeader
+        title="Job Scheduler"
+        description={`${jobs.length} jobs • ${runningCount} enabled`}
+        icon={CalendarClock}
+        actions={
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate('/jobs/definitions')}
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+            >
+              <Settings className="w-4 h-4" />
+              Job Definitions
+            </button>
+            <button
+              onClick={handleRefresh}
+              disabled={loading}
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
           </div>
-          {queueStatus ? (
-            <>
-              <div className="flex flex-wrap gap-3 mb-2">
-                <span>
-                  Active:{" "}
-                  <span className="font-semibold">
-                    {queueStatus.active_total}
-                  </span>
-                </span>
-                <span>
-                  Reserved:{" "}
-                  <span className="font-semibold">
-                    {queueStatus.reserved_total}
-                  </span>
-                </span>
-                <span>
-                  Scheduled:{" "}
-                  <span className="font-semibold">
-                    {queueStatus.scheduled_total}
-                  </span>
-                </span>
-                <span>
-                  Workers:{" "}
-                  <span className="font-semibold">{workers.length}</span>
-                </span>
-                {totalProcs > 0 && (
-                  <span>
-                    Procs:{" "}
-                    <span className="font-semibold">{totalProcs}</span>
-                  </span>
-                )}
-              </div>
-              <div className="mt-1">
-                {workers.length === 0 && (
-                  <div className="text-[11px] text-gray-400">
-                    No workers reported. Is the Celery worker running?
-                  </div>
-                )}
-                {workers.length > 0 && (
-                  <div className="mt-1 flex gap-3 overflow-x-auto pb-1">
-                    {workers.map((w) => {
-                      const details = queueStatus.worker_details?.[w] || {};
-                      const conc = details.concurrency;
-                      const active =
-                        details.active ??
-                        (queueStatus.active_by_worker &&
-                        queueStatus.active_by_worker[w] != null
-                          ? queueStatus.active_by_worker[w]
-                          : 0);
-                      const reserved =
-                        details.reserved ??
-                        (queueStatus.reserved_by_worker &&
-                        queueStatus.reserved_by_worker[w] != null
-                          ? queueStatus.reserved_by_worker[w]
-                          : 0);
-                      const scheduled =
-                        details.scheduled ??
-                        (queueStatus.scheduled_by_worker &&
-                        queueStatus.scheduled_by_worker[w] != null
-                          ? queueStatus.scheduled_by_worker[w]
-                          : 0);
+        }
+      />
 
-                      return (
-                        <div
-                          key={w}
-                          className="min-w-[180px] border border-gray-200 rounded-lg px-3 py-2 bg-white shadow-xs text-[11px] flex flex-col gap-1"
+      <div className="flex-1 overflow-hidden p-4">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm h-full flex flex-col overflow-hidden">
+          {/* Table Header with Search and Filters */}
+          <div className="flex items-center justify-between p-3 border-b border-gray-200 bg-gray-50">
+            <div className="flex items-center gap-3">
+              {/* Search */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search jobs..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9 pr-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-48"
+                />
+              </div>
+
+              {/* Status Filter */}
+              <div className="relative">
+                <button
+                  onClick={() => setFilterDropdownOpen(!filterDropdownOpen)}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg border transition-colors",
+                    statusFilter !== "all" || tagFilter
+                      ? "bg-blue-50 border-blue-200 text-blue-700"
+                      : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
+                  )}
+                >
+                  <Filter className="w-4 h-4" />
+                  <span>
+                    {statusFilter === "all" && !tagFilter ? "All Jobs" : 
+                     statusFilter !== "all" ? statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1) :
+                     tagFilter ? `Tag: ${tagFilter}` : "Filter"}
+                  </span>
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+
+                {filterDropdownOpen && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setFilterDropdownOpen(false)} />
+                    <div className="absolute top-full left-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-20 py-1">
+                      <div className="px-3 py-1.5 text-xs font-semibold text-gray-400 uppercase">Status</div>
+                      {["all", "enabled", "disabled"].map((status) => (
+                        <button
+                          key={status}
+                          onClick={() => { setStatusFilter(status); setFilterDropdownOpen(false); }}
+                          className={cn(
+                            "w-full text-left px-3 py-2 text-sm hover:bg-gray-50",
+                            statusFilter === status && "bg-blue-50 text-blue-700"
+                          )}
                         >
-                          <div
-                            className="font-mono text-gray-800 truncate"
-                            title={w}
-                          >
-                            {w}
-                          </div>
-                          <div className="text-gray-500">
-                            {typeof conc === "number" && (
-                              <span className="mr-2">procs:{conc}</span>
-                            )}
-                          </div>
-                          <div className="text-gray-500 flex flex-wrap gap-2">
-                            <span>Active:{active}</span>
-                            <span>Reserved:{reserved}</span>
-                            <span>Scheduled:{scheduled}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                          {status.charAt(0).toUpperCase() + status.slice(1)}
+                        </button>
+                      ))}
+                      
+                      {allTags.length > 0 && (
+                        <>
+                          <div className="px-3 py-1.5 text-xs font-semibold text-gray-400 uppercase border-t border-gray-100 mt-1">Tags</div>
+                          {allTags.map((tag) => (
+                            <button
+                              key={tag}
+                              onClick={() => { setTagFilter(tagFilter === tag ? null : tag); setFilterDropdownOpen(false); }}
+                              className={cn(
+                                "w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2",
+                                tagFilter === tag && "bg-blue-50 text-blue-700"
+                              )}
+                            >
+                              <Tag className="w-3 h-3" />
+                              {tag}
+                            </button>
+                          ))}
+                        </>
+                      )}
+                    </div>
+                  </>
                 )}
               </div>
-            </>
-          ) : (
-            <div className="text-[11px] text-gray-400">
-              Queue status not available.
+
+              {/* Clear Filters */}
+              {(statusFilter !== "all" || tagFilter) && (
+                <button
+                  onClick={() => { setStatusFilter("all"); setTagFilter(null); }}
+                  className="flex items-center gap-1 px-2 py-1 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
+                >
+                  <X className="w-3 h-3" />
+                  Clear
+                </button>
+              )}
+            </div>
+
+            {/* Right side - Count */}
+            <div className="text-sm text-gray-500">
+              {filteredJobs.length} jobs
+            </div>
+          </div>
+
+          {error && (
+            <div className="p-3 bg-red-50 border-b border-red-200 text-red-800 text-sm flex items-center gap-2">
+              <AlertCircle className="w-4 h-4" />
+              {error}
             </div>
           )}
-        </div>
 
-        {error && (
-          <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm">
-            {error}
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
-                  Scheduled Jobs
-                </h2>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                        Name
-                      </th>
-                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                        Task
-                      </th>
-                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                        Schedule
-                      </th>
-                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                        Enabled
-                      </th>
-                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                        Last Run
-                      </th>
-                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                        Next Run
-                      </th>
-                      <th className="px-4 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {jobs.length === 0 && (
-                      <tr>
-                        <td
-                          colSpan={7}
-                          className="px-4 py-4 text-center text-gray-400 text-sm"
-                        >
-                          No scheduler jobs defined yet.
-                        </td>
-                      </tr>
+          {/* Job Table */}
+          <div className="flex-1 overflow-auto">
+            <table className="min-w-full text-sm table-fixed">
+              <thead className="bg-gray-50 sticky top-0 z-10">
+                <tr>
+                  <SortHeader label="Tags" sortKey="tags" className="w-40" />
+                  <SortHeader label="Job Name" sortKey="name" className="w-48" />
+                  <SortHeader label="Schedule" sortKey="schedule" className="w-28" />
+                  <SortHeader label="Next Run" sortKey="next_run" className="w-36" />
+                  <SortHeader label="Last Run" sortKey="last_run" className="w-36" />
+                  <SortHeader label="Enabled" sortKey="enabled" className="w-24 text-center" />
+                </tr>
+              </thead>
+              <tbody>
+                {loading && filteredJobs.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                      <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
+                      Loading jobs...
+                    </td>
+                  </tr>
+                )}
+                {!loading && filteredJobs.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                      {jobs.length === 0 ? "No scheduled jobs yet." : "No jobs match your filters."}
+                    </td>
+                  </tr>
+                )}
+                {filteredJobs.map((job) => (
+                  <tr
+                    key={job.name}
+                    className={cn(
+                      "border-t border-gray-100 hover:bg-blue-50 cursor-pointer transition-colors",
+                      selectedJob?.name === job.name && "bg-blue-50"
                     )}
-                    {jobs.map((job) => (
-                      <tr
-                        key={job.name}
-                        className="border-t border-gray-100 hover:bg-gray-50 cursor-pointer"
-                        onClick={() => handleSelectJob(job)}
+                    onClick={() => handleSelectJob(job)}
+                  >
+                    <td className="px-3 py-2">
+                      <div className="flex flex-wrap gap-1">
+                        {(job.tags || []).length > 0 ? (
+                          (job.tags || []).map((tag) => (
+                            <span
+                              key={tag}
+                              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700"
+                            >
+                              {tag}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2">
+                      <div 
+                        className="font-medium text-gray-900 truncate max-w-[180px]" 
+                        title={job.name}
                       >
-                        <td className="px-4 py-2 font-medium text-gray-800 whitespace-nowrap">
-                          {job.name}
-                        </td>
-                        <td className="px-4 py-2 text-gray-700 whitespace-nowrap">
-                          {job.task_name}
-                        </td>
-                        <td className="px-4 py-2 text-gray-700 whitespace-nowrap text-xs">
-                          {job.schedule_type === "cron"
-                            ? `cron: ${job.cron_expression || ""}`
-                            : job.interval_seconds
-                            ? `every ${job.interval_seconds}s`
-                            : "(interval not set)"}
-                          {job.task_name === "opsconductor.job.run" &&
-                            job.config?.job_definition_id && (
-                              <div className="mt-0.5 text-[10px] text-purple-700 flex items-center gap-1">
-                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-purple-50 border border-purple-200 font-medium">
-                                  Job Definition
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openJobDefinitionFromConfig(job);
-                                  }}
-                                  className="underline hover:no-underline"
-                                >
-                                  open
-                                </button>
-                              </div>
-                            )}
-                        </td>
-                        <td className="px-4 py-2">
-                          <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                              job.enabled
-                                ? "bg-green-50 text-green-700 border border-green-200"
-                                : "bg-gray-50 text-gray-600 border border-gray-200"
-                            }`}
-                          >
-                            {job.enabled ? "Enabled" : "Disabled"}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2 text-gray-600 whitespace-nowrap text-xs">
-                          {formatLocalTime(job.last_run_at)}
-                        </td>
-                        <td className="px-4 py-2 text-gray-600 whitespace-nowrap text-xs">
-                          {formatLocalTime(job.next_run_at)}
-                        </td>
-                        <td className="px-4 py-2 text-right space-x-2 whitespace-nowrap">
-                          <button
-                            className="px-2 py-1 text-xs rounded border border-blue-500 text-blue-600 hover:bg-blue-50"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRunOnce(job.name);
-                            }}
-                          >
-                            Run Once
-                          </button>
-                          {job.task_name === "opsconductor.job.run" &&
-                            job.config?.job_definition_id && (
-                              <button
-                                className="px-2 py-1 text-xs rounded border border-purple-500 text-purple-700 hover:bg-purple-50"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openJobDefinitionFromConfig(job);
-                                }}
-                              >
-                                Job Def
-                              </button>
-                            )}
-                          <button
-                            className="px-2 py-1 text-xs rounded border border-red-500 text-red-700 hover:bg-red-50"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteJob(job.name);
-                            }}
-                          >
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                        {job.name}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2 text-gray-600 text-xs">
+                      {formatSchedule(job)}
+                    </td>
+                    <td className="px-3 py-2 text-gray-600 text-xs whitespace-nowrap">
+                      {formatShortTime(job.next_run_at)}
+                    </td>
+                    <td className="px-3 py-2 text-xs whitespace-nowrap">
+                      <div className="flex items-center gap-1">
+                        {job.last_run_status === "success" && <CheckCircle className="w-3 h-3 text-green-500 flex-shrink-0" />}
+                        {job.last_run_status === "failed" && <XCircle className="w-3 h-3 text-red-500 flex-shrink-0" />}
+                        <span className="text-gray-600">{formatShortTime(job.last_run_at)}</span>
+                      </div>
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <button
+                        onClick={(e) => handleToggleEnabled(job, e)}
+                        className={cn(
+                          "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1",
+                          job.enabled ? "bg-green-500" : "bg-gray-300"
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform",
+                            job.enabled ? "translate-x-6" : "translate-x-1"
+                          )}
+                        />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
 
-              <div className="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-                  <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
-                    Execution History{selectedJob ? ` – ${selectedJob}` : ""}
-                  </h2>
-                  {selectedJob && (
-                    <div className="flex items-center gap-2">
+      {/* Job Detail Modal */}
+      {selectedJob && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={handleCloseDetail}>
+          <div 
+            className="bg-white rounded-xl shadow-2xl w-full max-w-6xl h-[calc(100vh-2rem)] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-gray-200 flex items-start justify-between">
+              <div className="flex-1 min-w-0">
+                <h2 className="text-xl font-semibold text-gray-900 truncate">{selectedJob.name}</h2>
+                <div className="flex items-center gap-3 mt-1">
+                  <span className={cn(
+                    "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
+                    selectedJob.enabled ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"
+                  )}>
+                    {selectedJob.enabled ? "Enabled" : "Disabled"}
+                  </span>
+                  <span className="text-sm text-gray-500">{formatSchedule(selectedJob)}</span>
+                  {(selectedJob.tags || []).map((tag) => (
+                    <span key={tag} className="px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <button
+                onClick={handleCloseDetail}
+                className="p-2 hover:bg-gray-100 rounded-lg ml-4"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Left Column - Actions & Info */}
+                <div className="space-y-4">
+                  {/* Quick Actions */}
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Actions</h3>
+                    <div className="space-y-2">
+                      <button
+                        onClick={() => handleRunOnce(selectedJob.name)}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                      >
+                        <Play className="w-4 h-4" />
+                        Run Now
+                      </button>
+                      <button
+                        onClick={(e) => handleToggleEnabled(selectedJob, e)}
+                        className={cn(
+                          "w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border",
+                          selectedJob.enabled
+                            ? "text-orange-700 bg-orange-50 border-orange-200 hover:bg-orange-100"
+                            : "text-green-700 bg-green-50 border-green-200 hover:bg-green-100"
+                        )}
+                      >
+                        {selectedJob.enabled ? "Disable Job" : "Enable Job"}
+                      </button>
+                      {selectedJob.task_name === "opsconductor.job.run" && selectedJob.config?.job_definition_id && (
+                        <button
+                          onClick={() => openJobDefinition(selectedJob)}
+                          className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                          Edit Job Definition
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleDeleteJob(selectedJob.name)}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-red-700 bg-white border border-red-200 rounded-lg hover:bg-red-50"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Delete Job
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Schedule Info */}
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Schedule Details</h3>
+                    <div className="space-y-3 text-sm">
+                      <div>
+                        <div className="text-xs text-gray-500 uppercase tracking-wide">Schedule Type</div>
+                        <div className="text-gray-900 font-medium mt-0.5">
+                          {selectedJob.schedule_type === "cron" ? "Cron Expression" : "Interval"}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-500 uppercase tracking-wide">
+                          {selectedJob.schedule_type === "cron" ? "Expression" : "Interval"}
+                        </div>
+                        <div className="text-gray-900 font-mono mt-0.5">
+                          {selectedJob.schedule_type === "cron" 
+                            ? selectedJob.cron_expression 
+                            : formatSchedule(selectedJob)}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-500 uppercase tracking-wide">Next Run</div>
+                        <div className="text-gray-900 mt-0.5">{formatLocalTime(selectedJob.next_run_at)}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-500 uppercase tracking-wide">Last Run</div>
+                        <div className="text-gray-900 mt-0.5">{formatLocalTime(selectedJob.last_run_at)}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column - Execution History */}
+                <div className="lg:col-span-2">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                      <History className="w-4 h-4" />
+                      Execution History
+                    </h3>
+                    {executions.length > 0 && (
                       <button
                         onClick={clearExecutions}
-                        className="px-3 py-1 text-xs font-medium rounded border border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                        className="text-xs text-red-600 hover:text-red-700 hover:underline"
                       >
                         Clear History
                       </button>
+                    )}
+                  </div>
+
+                  {loadingExecutions ? (
+                    <div className="text-center py-8 text-gray-400">
+                      <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
+                      Loading executions...
+                    </div>
+                  ) : executions.length === 0 ? (
+                    <div className="text-center py-8 text-gray-400 bg-gray-50 rounded-lg">
+                      No executions recorded yet
+                    </div>
+                  ) : (
+                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                      <table className="min-w-full text-sm">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
+                            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Started</th>
+                            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Duration</th>
+                            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Details</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {executions.slice(0, 15).map((exec) => {
+                            const duration = exec.started_at && exec.finished_at
+                              ? ((new Date(exec.finished_at) - new Date(exec.started_at)) / 1000).toFixed(1) + "s"
+                              : "—";
+                            return (
+                              <tr
+                                key={exec.id}
+                                onClick={() => setSelectedExecution(exec)}
+                                className="hover:bg-gray-50 cursor-pointer"
+                              >
+                                <td className="px-3 py-2">
+                                  <span className={cn(
+                                    "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
+                                    exec.status === "success" && "bg-green-100 text-green-700",
+                                    exec.status === "failed" && "bg-red-100 text-red-700",
+                                    exec.status === "running" && "bg-blue-100 text-blue-700",
+                                    !["success", "failed", "running"].includes(exec.status) && "bg-gray-100 text-gray-600"
+                                  )}>
+                                    {exec.status === "success" && <CheckCircle className="w-3 h-3" />}
+                                    {exec.status === "failed" && <XCircle className="w-3 h-3" />}
+                                    {exec.status === "running" && <Loader2 className="w-3 h-3 animate-spin" />}
+                                    {exec.status}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2 text-gray-600 text-xs whitespace-nowrap">
+                                  {formatShortTime(exec.started_at)}
+                                </td>
+                                <td className="px-3 py-2 text-gray-600 text-xs font-mono">
+                                  {duration}
+                                </td>
+                                <td className="px-3 py-2 text-xs text-blue-600 hover:underline">
+                                  View
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                      {executions.length > 15 && (
+                        <div className="px-3 py-2 text-xs text-gray-500 bg-gray-50 border-t border-gray-200">
+                          Showing 15 of {executions.length} executions
+                        </div>
+                      )}
                     </div>
                   )}
-                </div>
-                <div className="overflow-x-auto max-h-80">
-                  <table className="min-w-full text-xs">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide">
-                          Status
-                        </th>
-                        <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide">
-                          Started
-                        </th>
-                        <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide">
-                          Finished
-                        </th>
-                        <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide">
-                          Task ID
-                        </th>
-                        <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide">
-                          Error
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(!selectedJob || executions.length === 0) && (
-                        <tr>
-                          <td
-                            colSpan={5}
-                            className="px-3 py-3 text-center text-gray-400"
-                          >
-                            {selectedJob
-                              ? "No executions yet for this job."
-                              : "Select a job to view its execution history."}
-                          </td>
-                        </tr>
-                      )}
-                      {executions.map((exec) => (
-                        <tr
-                          key={exec.id}
-                          className="border-t border-gray-100 hover:bg-gray-50 cursor-pointer"
-                          onClick={() => {
-                            setSelectedExecution(exec);
-                            setShowRawPayload(false);
-                          }}
-                        >
-                          <td className="px-3 py-2 whitespace-nowrap">
-                            <span
-                              className={`inline-flex items-center px-2 py-0.5 rounded-full font-medium ${
-                                exec.status === "success"
-                                  ? "bg-green-50 text-green-700 border border-green-200"
-                                  : exec.status === "failed"
-                                  ? "bg-red-50 text-red-700 border border-red-200"
-                                  : exec.status === "running"
-                                  ? "bg-blue-50 text-blue-700 border border-blue-200"
-                                  : "bg-gray-50 text-gray-600 border border-gray-200"
-                              }`}
-                            >
-                              {exec.status}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-gray-700">
-                            {formatLocalTime(exec.started_at)}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-gray-700">
-                            {formatLocalTime(exec.finished_at)}
-                          </td>
-                          <td
-                            className="px-3 py-2 whitespace-nowrap text-gray-500 font-mono truncate max-w-xs"
-                            title={exec.task_id}
-                          >
-                            {exec.task_id}
-                          </td>
-                          <td
-                            className="px-3 py-2 whitespace-nowrap text-gray-700 max-w-xs truncate"
-                            title={exec.error_message || ""}
-                          >
-                            {exec.error_message || ""}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
                 </div>
               </div>
             </div>
           </div>
         </div>
+      )}
 
-        {selectedExecution && (
+      {/* Execution Detail Modal */}
+      {selectedExecution && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onClick={() => { setSelectedExecution(null); setShowRawPayload(false); }}
+        >
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-            onClick={() => {
-              setSelectedExecution(null);
-              setShowRawPayload(false);
-            }}
+            className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
           >
-            <div
-              className="bg-white rounded-xl shadow-xl max-w-3xl w-full mx-4 max-h-[80vh] flex flex-col"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-                <div className="font-semibold text-gray-800 text-sm">
-                  Execution Details – ID {selectedExecution.id} (
-                  {selectedExecution.status})
-                </div>
-                <div className="flex items-center gap-2">
-                  {selectedExecution.result &&
-                    selectedExecution.result.job_definition_id && (
-                      <button
-                        className="px-3 py-1 text-[11px] rounded border border-purple-500 text-purple-700 hover:bg-purple-50"
-                        onClick={() => {
-                          navigate(
-                            `/job-definitions?id=${encodeURIComponent(
-                              String(
-                                selectedExecution.result.job_definition_id
-                              )
-                            )}`
-                          );
-                        }}
-                      >
-                        Open Job Definition
-                      </button>
-                    )}
-                  <button
-                    className="px-3 py-1 text-[11px] rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
-                    onClick={() => {
-                      setSelectedExecution(null);
-                      setShowRawPayload(false);
-                    }}
-                  >
-                    Close
-                  </button>
-                </div>
+            <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {selectedExecution.status === "success" && <CheckCircle className="w-5 h-5 text-green-500" />}
+                {selectedExecution.status === "failed" && <XCircle className="w-5 h-5 text-red-500" />}
+                <span className="font-semibold text-gray-800">Execution #{selectedExecution.id}</span>
               </div>
-              <div className="px-4 py-3 space-y-3 text-xs overflow-y-auto">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div>
-                    <div className="text-[11px] text-gray-500">Started</div>
-                    <div className="font-mono">
-                      {formatLocalTime(selectedExecution.started_at)}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[11px] text-gray-500">Finished</div>
-                    <div className="font-mono">
-                      {formatLocalTime(selectedExecution.finished_at)}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[11px] text-gray-500">Task ID</div>
-                    <div className="font-mono break-all">
-                      {selectedExecution.task_id}
-                    </div>
-                  </div>
-                </div>
-                {selectedExecution.result &&
-                  selectedExecution.result.execution_meta && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      <div>
-                        <div className="text-[11px] text-gray-500">
-                          Worker
-                        </div>
-                        <div className="font-mono break-all">
-                          {selectedExecution.result.execution_meta
-                            .worker_hostname || "unknown"}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-[11px] text-gray-500">
-                          Worker PID
-                        </div>
-                        <div className="font-mono break-all">
-                          {typeof selectedExecution.result.execution_meta
-                            .worker_pid !== "undefined"
-                            ? selectedExecution.result.execution_meta.worker_pid
-                            : ""}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-[11px] text-gray-500">Queue</div>
-                        <div className="font-mono break-all">
-                          {selectedExecution.result.execution_meta.queue || ""}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                {selectedExecution.error_message && (
-                  <div>
-                    <div className="text-[11px] text-red-600 font-semibold">
-                      Error
-                    </div>
-                    <pre className="mt-1 p-2 bg-red-50 border border-red-200 rounded text-[11px] whitespace-pre-wrap break-all">
-                      {selectedExecution.error_message}
-                    </pre>
-                  </div>
-                )}
+              <button
+                onClick={() => { setSelectedExecution(null); setShowRawPayload(false); }}
+                className="p-1 hover:bg-gray-100 rounded"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <div className="p-4 space-y-4 overflow-y-auto text-sm">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <div className="text-[11px] text-gray-500 font-semibold">
-                    Result
+                  <div className="text-xs text-gray-500">Started</div>
+                  <div className="font-mono">{formatLocalTime(selectedExecution.started_at)}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500">Finished</div>
+                  <div className="font-mono">{formatLocalTime(selectedExecution.finished_at)}</div>
+                </div>
+              </div>
+
+              {selectedExecution.error_message && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                  <div className="text-xs text-red-600 font-semibold mb-1">Error</div>
+                  <pre className="text-xs text-red-800 whitespace-pre-wrap">{selectedExecution.error_message}</pre>
+                </div>
+              )}
+
+              {selectedExecution.result && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs text-gray-500 font-semibold">Result</span>
+                    <button
+                      onClick={() => setShowRawPayload(!showRawPayload)}
+                      className="text-xs text-blue-600 hover:underline"
+                    >
+                      {showRawPayload ? "Hide Raw" : "Show Raw"}
+                    </button>
                   </div>
-                  {selectedExecution.result ? (
-                    <div className="mt-1 space-y-3">
-                      {/* Job Builder style results */}
-                      {selectedExecution.result.job_name && (
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-[11px]">
-                          <div>
-                            <div className="text-gray-500">Job Name</div>
-                            <div className="font-mono break-all">
-                              {selectedExecution.result.job_name}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-gray-500">Actions</div>
-                            <div className="font-mono">
-                              {selectedExecution.result.actions_completed || 0} / {selectedExecution.result.total_actions || 0}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-gray-500">Duration</div>
-                            <div className="font-mono">
-                              {selectedExecution.result.duration_seconds?.toFixed(3) || selectedExecution.result.metrics?.duration_seconds?.toFixed(3) || "—"}s
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-gray-500">Errors</div>
-                            <div className="font-mono">
-                              {selectedExecution.result.errors?.length || 0}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Action results summary */}
-                      {Object.keys(selectedExecution.result)
-                        .filter((k) => k.startsWith("action_"))
-                        .map((actionKey) => {
-                          const action = selectedExecution.result[actionKey];
-                          return (
-                            <div key={actionKey} className="border border-gray-200 rounded p-2 text-[11px]">
-                              <div className="font-semibold text-gray-700 mb-1">
-                                {actionKey.replace("action_", "").toUpperCase()} Action
-                              </div>
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                                <div>
-                                  <div className="text-gray-500">Type</div>
-                                  <div className="font-mono">{action.action_type || "—"}</div>
-                                </div>
-                                <div>
-                                  <div className="text-gray-500">Targets</div>
-                                  <div className="font-mono">{action.targets_processed || 0}</div>
-                                </div>
-                                <div>
-                                  <div className="text-gray-500">Successful</div>
-                                  <div className="font-mono text-green-600">{action.successful_results || 0}</div>
-                                </div>
-                                {action.failed_results > 0 && (
-                                  <div>
-                                    <div className="text-gray-500">Failed</div>
-                                    <div className="font-mono text-red-600">{action.failed_results}</div>
-                                  </div>
-                                )}
-                              </div>
-                              {action.results && action.results.length > 0 && (
-                                <div className="mt-2">
-                                  <div className="text-gray-500 mb-1">Results ({action.results.length})</div>
-                                  <div className="max-h-32 overflow-y-auto bg-gray-50 rounded p-1">
-                                    {action.results.slice(0, 10).map((r, i) => (
-                                      <div key={i} className="font-mono text-[10px] py-0.5 border-b border-gray-100 last:border-0">
-                                        {r.ip_address || r.host || "—"}: {r.ping_status || r.status || "—"}
-                                      </div>
-                                    ))}
-                                    {action.results.length > 10 && (
-                                      <div className="text-gray-400 text-[10px] py-0.5">
-                                        ... and {action.results.length - 10} more
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-
-                      {/* Legacy ping_host style results */}
-                      {selectedExecution.result.host && (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-[11px]">
-                          <div>
-                            <div className="text-gray-500">Host</div>
-                            <div className="font-mono break-all">
-                              {selectedExecution.result.host}
-                            </div>
-                          </div>
-                          {typeof selectedExecution.result.count !== "undefined" && (
-                            <div>
-                              <div className="text-gray-500">Count</div>
-                              <div className="font-mono">
-                                {selectedExecution.result.count}
-                              </div>
-                            </div>
-                          )}
-                          {typeof selectedExecution.result.returncode !== "undefined" && (
-                            <div>
-                              <div className="text-gray-500">Return Code</div>
-                              <div className="font-mono">
-                                {selectedExecution.result.returncode}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {(selectedExecution.result.stdout ||
-                        selectedExecution.result.stderr) && (
-                        <div className="space-y-3 text-[11px]">
-                          {selectedExecution.result.stdout && (
-                            <div>
-                              <div className="text-gray-500 font-semibold mb-1">
-                                Stdout
-                              </div>
-                              <pre className="p-2 bg-gray-50 border border-gray-200 rounded whitespace-pre overflow-x-auto">
-                                {selectedExecution.result.stdout}
-                              </pre>
-                            </div>
-                          )}
-                          {selectedExecution.result.stderr && (
-                            <div>
-                              <div className="text-gray-500 font-semibold mb-1">
-                                Stderr
-                              </div>
-                              <pre className="p-2 bg-gray-50 border border-gray-200 rounded whitespace-pre overflow-x-auto">
-                                {selectedExecution.result.stderr}
-                              </pre>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="text-[11px] text-gray-500 font-semibold">
-                            Raw Payload
-                          </div>
-                          <button
-                            type="button"
-                            className="text-[11px] text-blue-600 hover:underline"
-                            onClick={() =>
-                              setShowRawPayload((prev) => !prev)
-                            }
-                          >
-                            {showRawPayload ? "Hide" : "Show"}
-                          </button>
-                        </div>
-                        {showRawPayload && (
-                          <pre className="p-2 bg-white border border-gray-200 rounded text-[11px] whitespace-pre-wrap overflow-x-auto">
-                            {JSON.stringify(selectedExecution.result, null, 2)}
-                          </pre>
-                        )}
-                      </div>
-                    </div>
+                  {showRawPayload ? (
+                    <pre className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-xs overflow-x-auto max-h-64">
+                      {JSON.stringify(selectedExecution.result, null, 2)}
+                    </pre>
                   ) : (
-                    <div className="mt-1 text-[11px] text-gray-400">
-                      No result payload recorded for this execution.
+                    <div className="bg-gray-50 rounded-lg p-3 text-xs space-y-2">
+                      {selectedExecution.result.job_name && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Job</span>
+                          <span>{selectedExecution.result.job_name}</span>
+                        </div>
+                      )}
+                      {selectedExecution.result.duration_seconds && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Duration</span>
+                          <span>{selectedExecution.result.duration_seconds.toFixed(2)}s</span>
+                        </div>
+                      )}
+                      {selectedExecution.result.actions_completed !== undefined && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Actions</span>
+                          <span>{selectedExecution.result.actions_completed}/{selectedExecution.result.total_actions}</span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
-              </div>
+              )}
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
+
+export default Scheduler;

@@ -3,13 +3,15 @@ import { useParams, useNavigate } from "react-router-dom";
 import {
   X,
   RefreshCw,
-  Database,
+  Server,
   Activity,
   AlertTriangle,
   CheckCircle,
   XCircle,
   TrendingUp,
+  ArrowLeft,
 } from "lucide-react";
+import { PageHeader } from "../components/layout";
 import { Line } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -365,28 +367,33 @@ export function DeviceDetail() {
   }
 
   return (
-    <div className="p-4 bg-gray-100 min-h-screen">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4 bg-white p-4 rounded-lg shadow">
-        <h1 className="text-xl font-bold text-gray-800">
-          Device Details - {ip}
-        </h1>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={loadDeviceData}
-            className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <RefreshCw className="w-4 h-4" />
-            Refresh
-          </button>
-          <button
-            onClick={() => navigate(-1)}
-            className="px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-          >
-            Close
-          </button>
-        </div>
-      </div>
+    <div className="flex flex-col h-full">
+      <PageHeader
+        title={device?.snmp_hostname || ip}
+        description={`${ip} • ${device?.ping_status === 'online' ? 'Online' : 'Offline'}`}
+        icon={Server}
+        actions={
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate('/inventory/devices')}
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back
+            </button>
+            <button
+              onClick={loadDeviceData}
+              disabled={loading}
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+          </div>
+        }
+      />
+      
+      <div className="flex-1 overflow-auto p-4 bg-gray-50">
 
       {/* Device Info and SNMP Info */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
@@ -725,6 +732,7 @@ export function DeviceDetail() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

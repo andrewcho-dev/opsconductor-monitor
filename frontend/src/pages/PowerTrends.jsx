@@ -1,15 +1,14 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
-  ArrowLeft,
-  TrendingUp,
-  Activity,
   Zap,
+  Activity,
   Thermometer,
   RefreshCw,
   AlertCircle,
   CheckCircle,
 } from "lucide-react";
+import { PageHeader } from "../components/layout";
 import { Line } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -502,38 +501,17 @@ export function PowerTrends() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-100">
-      {/* Header */}
-      <div className="bg-white p-4 border-b border-gray-200">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => navigate("/")}
-              className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back to Main
-            </button>
-            <div>
-              <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-blue-600" />
-                Optical Power Trends
-              </h1>
-              <p className="text-sm text-gray-600">
-                Analyze optical transceiver power levels and temperature trends over time
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Controls */}
-        <div className="flex items-center gap-4 mt-4 flex-wrap">
+    <div className="flex flex-col h-full">
+      <PageHeader
+        title="Optical Power Trends"
+        description={`${interfaces.length} interfaces • ${selectedInterfaces.size} selected`}
+        icon={Zap}
+        actions={
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700">Time Range:</label>
             <select
               value={timeRange}
               onChange={(e) => setTimeRange(parseInt(e.target.value))}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             >
               <option value={1}>Last 1 Hour</option>
               <option value={6}>Last 6 Hours</option>
@@ -541,33 +519,33 @@ export function PowerTrends() {
               <option value={168}>Last 7 Days</option>
               <option value={720}>Last 30 Days</option>
             </select>
+            <button
+              onClick={loadInterfaces}
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Refresh
+            </button>
+            <button
+              onClick={loadPowerHistory}
+              disabled={selectedInterfaces.size === 0 || loadingData}
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {loadingData ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                <>
+                  <Activity className="w-4 h-4" />
+                  Load Data
+                </>
+              )}
+            </button>
           </div>
-          <button
-            onClick={loadInterfaces}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-          >
-            <RefreshCw className="w-4 h-4" />
-            Refresh Interfaces
-          </button>
-          <button
-            onClick={loadPowerHistory}
-            disabled={selectedInterfaces.size === 0 || loadingData}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {loadingData ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                Loading...
-              </>
-            ) : (
-              <>
-                <Activity className="w-4 h-4" />
-                Load Power Data
-              </>
-            )}
-          </button>
-        </div>
-      </div>
+        }
+      />
 
       {/* Content */}
       <div className="flex-1 p-4">
