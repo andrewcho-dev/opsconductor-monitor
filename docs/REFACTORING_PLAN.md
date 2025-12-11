@@ -876,17 +876,24 @@ export function StatusBadge({ status, type }) {
 - [ ] 4.1.2 Action Handlers
 - [ ] 4.1.3 Simplify Celery Tasks
 
-### Phase 5: Frontend Refactor
-- [ ] 5.1 Create directory structure
-- [ ] 5.2.1 Base API Client
-- [ ] 5.2.2 Domain API Modules
-- [ ] 5.3.1 Generic Query Hook
-- [ ] 5.3.2 Polling Hook
-- [ ] 5.4.1 Common Table
-- [ ] 5.4.2 Common Modal
-- [ ] 5.4.3 Status Badge
-- [ ] 5.5.1 Optical Power Chart
-- [ ] 5.5.2 Time Range Selector
+### Phase 5: Frontend Refactor ✅ COMPLETED (2025-12-11)
+- [x] 5.1 Create directory structure (`frontend/src/api/`, `frontend/src/hooks/`, `frontend/src/components/common/`)
+- [x] 5.2.1 Base API Client (`frontend/src/api/client.js`)
+- [x] 5.2.2 Domain API Modules:
+  - `devices.js`: Device CRUD operations
+  - `groups.js`: Group management
+  - `jobs.js`: Job definitions
+  - `scheduler.js`: Scheduler jobs and executions
+  - `scans.js`: Interface scans and optical power
+- [x] 5.3.1 Generic Query Hook (`frontend/src/hooks/useApi.js`)
+- [x] 5.3.2 Polling Hook (`frontend/src/hooks/usePolling.js`)
+- [ ] 5.4.1 Common Table (pending - existing DeviceTable can be generalized)
+- [x] 5.4.2 Common Modal (`frontend/src/components/common/Modal.jsx`)
+- [x] 5.4.3 Status Badge (`frontend/src/components/common/StatusBadge.jsx`)
+- [x] 5.4.4 Loading Spinner (`frontend/src/components/common/LoadingSpinner.jsx`)
+- [x] 5.4.5 Error Message (`frontend/src/components/common/ErrorMessage.jsx`)
+- [ ] 5.5.1 Optical Power Chart (pending - existing in DeviceDetail)
+- [ ] 5.5.2 Time Range Selector (pending - existing in DeviceDetail)
 
 ### Phase 6: Testing & Documentation
 - [ ] 6.1.1 Repository Tests
