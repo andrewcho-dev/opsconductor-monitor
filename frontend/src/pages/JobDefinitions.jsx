@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Plus, RefreshCw, Trash2, FileText, Clock, Calendar, Zap, Play, Settings } from 'lucide-react';
 import CompleteJobBuilder from '../components/jobBuilder/CompleteJobBuilder';
-import { fetchApi } from '../lib/utils';
+import { fetchApi, formatLocalTime } from '../lib/utils';
 import { PageHeader } from '../components/layout';
 
 const emptyScheduleForm = {
@@ -197,7 +197,7 @@ const JobDefinitions = () => {
     setScheduleSuccess(null);
     setScheduleForm({
       ...emptyScheduleForm,
-      scheduler_name: `${job.name || 'job'}_${job.id}`,
+      scheduler_name: job.name || 'job',
     });
     setScheduleOpen(true);
   };
@@ -386,10 +386,10 @@ const JobDefinitions = () => {
                     )}
                     <div className="mt-1 flex items-center justify-between text-[10px] text-gray-400">
                       <span>
-                        Created {job.created_at ? new Date(job.created_at).toLocaleString() : 'n/a'}
+                        Created {job.created_at ? formatLocalTime(job.created_at) : 'n/a'}
                       </span>
                       <span>
-                        Updated {job.updated_at ? new Date(job.updated_at).toLocaleString() : 'n/a'}
+                        Updated {job.updated_at ? formatLocalTime(job.updated_at) : 'n/a'}
                       </span>
                     </div>
                   </button>

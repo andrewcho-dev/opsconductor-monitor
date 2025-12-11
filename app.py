@@ -296,6 +296,7 @@ def api_job_definitions_schedule(job_id):
             start_at=start_at,
             end_at=end_at,
             max_runs=max_runs,
+            job_definition_id=job_uuid,
         )
 
         if not row:
@@ -387,11 +388,47 @@ def api_scheduler_queues():
                     concurrency = len(procs)
                 except Exception:
                     concurrency = None
+            
+            # Extract active task details for this worker
+            active_tasks = []
+            for task in (active.get(w) or []):
+                task_info = {
+                    'id': task.get('id'),
+                    'name': task.get('name', 'unknown'),
+                    'args': task.get('args'),
+                    'kwargs': task.get('kwargs'),
+                    'time_start': task.get('time_start'),
+                }
+                # Try to extract job name from kwargs if available
+                kwargs = task.get('kwargs') or {}
+                if isinstance(kwargs, dict):
+                    job_name = kwargs.get('job_name') or kwargs.get('name')
+                    if job_name:
+                        task_info['job_name'] = job_name
+                
+                # For opsconductor.job.run tasks, look up job definition name from args
+                if task.get('name') == 'opsconductor.job.run':
+                    args = task.get('args') or []
+                    if args and isinstance(args[0], dict):
+                        job_def_id = args[0].get('job_definition_id')
+                        if job_def_id:
+                            task_info['job_definition_id'] = job_def_id
+                            # Look up the job definition name from DB
+                            try:
+                                job_def = db.get_job_definition(job_def_id)
+                                if job_def:
+                                    task_info['job_name'] = job_def.get('name') or job_def_id
+                            except Exception:
+                                pass
+                
+                active_tasks.append(task_info)
+            
             worker_details[w] = {
                 'concurrency': concurrency,
                 'active': active_by_worker.get(w, 0),
                 'reserved': reserved_by_worker.get(w, 0),
                 'scheduled': scheduled_by_worker.get(w, 0),
+                'active_tasks': active_tasks,
             }
 
         return jsonify({
@@ -430,6 +467,43 @@ def api_scheduler_job_executions(name):
                 'finished_at': row['finished_at'].isoformat() if row['finished_at'] else None,
                 'error_message': row['error_message'],
                 'result': row.get('result'),
+            })
+
+        return jsonify({'executions': executions})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/scheduler/executions/recent', methods=['GET'])
+def api_scheduler_recent_executions():
+    """Return recent execution history across all jobs."""
+    try:
+        try:
+            limit = int(request.args.get('limit', 20))
+        except Exception:
+            limit = 20
+
+        rows = db.get_scheduler_job_executions(job_name=None, limit=limit)
+        executions = []
+        for row in rows:
+            # Try to get a friendly job name from the job definition
+            job_display_name = row['job_name']
+            # Strip UUID suffix from job names
+            if job_display_name:
+                import re
+                job_display_name = re.sub(r'_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', '', job_display_name, flags=re.IGNORECASE)
+            
+            executions.append({
+                'id': row['id'],
+                'job_name': row['job_name'],
+                'job_display_name': job_display_name,
+                'task_name': row['task_name'],
+                'task_id': row['task_id'],
+                'status': row['status'],
+                'started_at': row['started_at'].isoformat() if row['started_at'] else None,
+                'finished_at': row['finished_at'].isoformat() if row['finished_at'] else None,
+                'error_message': row['error_message'],
+                'worker': row.get('worker'),
             })
 
         return jsonify({'executions': executions})
@@ -1581,6 +1655,7 @@ def _serialize_scheduler_job(row):
         'name': row['name'],
         'task_name': row['task_name'],
         'config': row.get('config') or {},
+        'job_definition_id': str(row['job_definition_id']) if row.get('job_definition_id') else None,
         'enabled': row.get('enabled', False),
         'schedule_type': row.get('schedule_type') or 'interval',
         'interval_seconds': row.get('interval_seconds'),

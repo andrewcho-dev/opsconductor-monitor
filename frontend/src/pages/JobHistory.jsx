@@ -12,7 +12,7 @@ import {
   AlertCircle,
   X
 } from "lucide-react";
-import { cn, fetchApi } from "../lib/utils";
+import { cn, fetchApi, formatLocalTime, formatShortTime, formatDuration } from "../lib/utils";
 import { PageHeader } from "../components/layout";
 
 export function JobHistory() {
@@ -88,46 +88,11 @@ export function JobHistory() {
     return filtered;
   }, [executions, search, statusFilter]);
 
-  const formatLocalTime = (value) => {
-    if (!value) return "—";
-    try {
-      const d = new Date(value);
-      return d.toLocaleString();
-    } catch {
-      return value;
-    }
-  };
-
   // Strip UUID suffix from job names
   const cleanJobName = (name) => {
     if (!name) return "—";
     return name.replace(/_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, '')
                .replace(/_[0-9a-f-]{20,}$/i, '');
-  };
-
-  const formatShortTime = (value) => {
-    if (!value) return "—";
-    try {
-      const d = new Date(value);
-      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' + 
-             d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-    } catch {
-      return value;
-    }
-  };
-
-  const formatDuration = (startedAt, finishedAt) => {
-    if (!startedAt || !finishedAt) return "—";
-    try {
-      const start = new Date(startedAt);
-      const end = new Date(finishedAt);
-      const diffSec = (end - start) / 1000;
-      if (diffSec < 1) return `${(diffSec * 1000).toFixed(0)}ms`;
-      if (diffSec < 60) return `${diffSec.toFixed(1)}s`;
-      return `${Math.floor(diffSec / 60)}m ${Math.floor(diffSec % 60)}s`;
-    } catch {
-      return "—";
-    }
   };
 
   // Stats

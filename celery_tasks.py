@@ -63,7 +63,7 @@ def ping_host_task(config: Dict[str, Any]) -> Dict[str, Any]:
         # Logging must never break task execution
         pass
 
-    db.update_scheduler_job_execution(task_id, status="running")
+    db.update_scheduler_job_execution(task_id, status="running", worker=worker_host)
 
     host = (config or {}).get("host") or "10.127.0.1"
     count = int((config or {}).get("count") or 5)
@@ -115,6 +115,7 @@ def ping_host_task(config: Dict[str, Any]) -> Dict[str, Any]:
             finished_at=datetime.utcnow(),
             error_message=None if success else (proc.stderr or "ping failed"),
             result=result,
+            worker=worker_host,
         )
         try:
             logger.info(
@@ -136,6 +137,7 @@ def ping_host_task(config: Dict[str, Any]) -> Dict[str, Any]:
             status="failed",
             finished_at=datetime.utcnow(),
             error_message=str(exc),
+            worker=worker_host,
         )
         try:
             logger.exception(
@@ -167,7 +169,7 @@ def run_job_task(config: Dict[str, Any]) -> Dict[str, Any]:
     task_id = run_job_task.request.id
     worker_host = getattr(run_job_task.request, "hostname", "unknown")
 
-    db.update_scheduler_job_execution(task_id, status="running")
+    db.update_scheduler_job_execution(task_id, status="running", worker=worker_host)
 
     started = datetime.utcnow()
     try:
@@ -242,6 +244,7 @@ def run_job_task(config: Dict[str, Any]) -> Dict[str, Any]:
             finished_at=datetime.utcnow(),
             error_message=payload.get("error") or None,
             result=payload,
+            worker=worker_host,
         )
 
         try:
@@ -263,6 +266,7 @@ def run_job_task(config: Dict[str, Any]) -> Dict[str, Any]:
             status="failed",
             finished_at=datetime.utcnow(),
             error_message=str(exc),
+            worker=worker_host,
         )
         try:
             logger.exception(
@@ -286,7 +290,7 @@ def run_job_builder_task(job_definition: Dict[str, Any]) -> Dict[str, Any]:
     """
     task_id = run_job_builder_task.request.id
     worker_host = getattr(run_job_builder_task.request, "hostname", "unknown")
-    db.update_scheduler_job_execution(task_id, status="running")
+    db.update_scheduler_job_execution(task_id, status="running", worker=worker_host)
     try:
         result = run_job_builder_job(job_definition or {})
         exec_meta = {
@@ -311,6 +315,7 @@ def run_job_builder_task(job_definition: Dict[str, Any]) -> Dict[str, Any]:
             status="success",
             finished_at=datetime.utcnow(),
             result=payload,
+            worker=worker_host,
         )
         return result
     except Exception as exc:
@@ -319,6 +324,7 @@ def run_job_builder_task(job_definition: Dict[str, Any]) -> Dict[str, Any]:
             status="failed",
             finished_at=datetime.utcnow(),
             error_message=str(exc),
+            worker=worker_host,
         )
         raise
 

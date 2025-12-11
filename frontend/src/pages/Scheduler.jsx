@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { fetchApi } from "../lib/utils";
+import { fetchApi, formatLocalTime, formatShortTime } from "../lib/utils";
 import { PageHeader } from "../components/layout";
 import { 
   CalendarClock, 
@@ -43,42 +43,6 @@ export function Scheduler() {
   const [sortConfig, setSortConfig] = useState({ key: "name", direction: "asc" });
 
   // Helper functions
-  const formatLocalTime = (value) => {
-    if (!value) return "—";
-    try {
-      let iso = value;
-      const isoLike = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,6})?)?$/;
-      const hasZone = /[Zz]|[+-]\d{2}:?\d{2}$/.test(iso);
-      if (isoLike.test(iso) && !hasZone) {
-        iso = iso + "Z";
-      }
-      const d = new Date(iso);
-      if (Number.isNaN(d.getTime())) return value;
-      return d.toLocaleString();
-    } catch {
-      return value;
-    }
-  };
-
-  const formatShortTime = (value) => {
-    if (!value) return "—";
-    try {
-      let iso = value;
-      const isoLike = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,6})?)?$/;
-      const hasZone = /[Zz]|[+-]\d{2}:?\d{2}$/.test(iso);
-      if (isoLike.test(iso) && !hasZone) {
-        iso = iso + "Z";
-      }
-      const d = new Date(iso);
-      if (Number.isNaN(d.getTime())) return value;
-      // Format: "Dec 10, 1:45 PM"
-      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' + 
-             d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-    } catch {
-      return value;
-    }
-  };
-
   const formatSchedule = (job) => {
     if (job.schedule_type === "cron") {
       return job.cron_expression || "cron";

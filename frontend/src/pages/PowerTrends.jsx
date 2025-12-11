@@ -22,7 +22,7 @@ import {
   TimeScale,
 } from "chart.js";
 import "chartjs-adapter-date-fns";
-import { cn } from "../lib/utils";
+import { cn, formatLocalTime } from "../lib/utils";
 
 ChartJS.register(
   CategoryScale,
@@ -385,7 +385,7 @@ export function PowerTrends() {
       },
       tooltip: {
         callbacks: {
-          title: (context) => new Date(context[0].parsed.x).toLocaleString(),
+          title: (context) => formatLocalTime(new Date(context[0].parsed.x)),
           label: (context) => {
             let label = context.dataset.label || '';
             if (label) label += ': ';

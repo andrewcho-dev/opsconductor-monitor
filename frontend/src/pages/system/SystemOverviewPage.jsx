@@ -12,7 +12,7 @@ import {
   XCircle,
   RefreshCw
 } from 'lucide-react';
-import { fetchApi } from '../../lib/utils';
+import { fetchApi, formatTimeOnly, formatShortTime, formatDuration } from '../../lib/utils';
 
 function StatusCard({ title, icon: Icon, status, details, color }) {
   const statusColors = {
@@ -61,6 +61,7 @@ export function SystemOverviewPage() {
   const [loading, setLoading] = useState(true);
   const [systemStatus, setSystemStatus] = useState(null);
   const [queueStatus, setQueueStatus] = useState(null);
+  const [recentExecutions, setRecentExecutions] = useState([]);
   const [error, setError] = useState(null);
 
   const loadStatus = async () => {
@@ -83,6 +84,15 @@ export function SystemOverviewPage() {
           scheduled: queues.scheduled_total || 0,
         }
       });
+      
+      // Load recent executions
+      try {
+        const execData = await fetchApi('/api/scheduler/executions/recent?limit=15');
+        setRecentExecutions(execData.executions || []);
+      } catch {
+        // Non-critical, just show empty
+        setRecentExecutions([]);
+      }
     } catch (err) {
       setError(err.message);
       setSystemStatus({
@@ -180,12 +190,13 @@ export function SystemOverviewPage() {
             <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {queueStatus.workers.map((worker) => {
                 const details = queueStatus.worker_details?.[worker] || {};
+                const activeTasks = details.active_tasks || [];
                 return (
                   <div key={worker} className="border border-gray-200 rounded-lg p-3">
                     <div className="font-mono text-sm text-gray-800 truncate mb-2" title={worker}>
                       {worker}
                     </div>
-                    <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div className="grid grid-cols-3 gap-2 text-xs mb-2">
                       <div>
                         <div className="text-gray-500">Concurrency</div>
                         <div className="font-semibold">{details.concurrency || '—'}</div>
@@ -199,6 +210,33 @@ export function SystemOverviewPage() {
                         <div className="font-semibold">{details.reserved || 0}</div>
                       </div>
                     </div>
+                    {/* Active Tasks */}
+                    {activeTasks.length > 0 && (
+                      <div className="mt-2 pt-2 border-t border-gray-100">
+                        <div className="text-[10px] text-gray-500 uppercase tracking-wide mb-1">Running Tasks</div>
+                        <div className="space-y-1">
+                          {activeTasks.map((task, idx) => {
+                            const taskName = task.job_name || task.name?.split('.').pop() || 'unknown';
+                            const startTime = task.time_start ? formatTimeOnly(new Date(task.time_start * 1000)) : null;
+                            return (
+                              <div key={task.id || idx} className="bg-blue-50 rounded px-2 py-1 text-xs">
+                                <div className="font-medium text-blue-800 truncate" title={task.name}>
+                                  {taskName}
+                                </div>
+                                {startTime && (
+                                  <div className="text-[10px] text-blue-600">Started: {startTime}</div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                    {details.active > 0 && activeTasks.length === 0 && (
+                      <div className="mt-2 pt-2 border-t border-gray-100">
+                        <div className="text-[10px] text-gray-400 italic">Task details loading...</div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -214,8 +252,52 @@ export function SystemOverviewPage() {
                 Recent Activity
               </h2>
             </div>
-            <div className="p-4 text-sm text-gray-500">
-              <p>Activity log will be displayed here...</p>
+            <div className="max-h-80 overflow-y-auto">
+              {recentExecutions.length === 0 ? (
+                <div className="p-4 text-sm text-gray-500">No recent activity</div>
+              ) : (
+                <table className="min-w-full text-xs">
+                  <thead className="bg-gray-50 sticky top-0">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-500 uppercase">Time</th>
+                      <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-500 uppercase">Job</th>
+                      <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-500 uppercase">Duration</th>
+                      <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-500 uppercase">Worker</th>
+                      <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-500 uppercase">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {recentExecutions.map((exec) => (
+                      <tr key={exec.id} className="hover:bg-gray-50">
+                        <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
+                          {formatShortTime(exec.started_at)}
+                        </td>
+                        <td className="px-3 py-2 text-gray-900 font-medium truncate max-w-[150px]" title={exec.job_name}>
+                          {exec.job_display_name || exec.job_name}
+                        </td>
+                        <td className="px-3 py-2 text-gray-600 font-mono">
+                          {formatDuration(exec.started_at, exec.finished_at)}
+                        </td>
+                        <td className="px-3 py-2 text-gray-500 truncate max-w-[100px]" title={exec.worker}>
+                          {exec.worker ? exec.worker.split('@')[0] : '—'}
+                        </td>
+                        <td className="px-3 py-2">
+                          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                            exec.status === 'success' ? 'bg-green-100 text-green-700' :
+                            exec.status === 'failed' ? 'bg-red-100 text-red-700' :
+                            exec.status === 'running' ? 'bg-blue-100 text-blue-700' :
+                            'bg-gray-100 text-gray-600'
+                          }`}>
+                            {exec.status === 'success' && <CheckCircle className="w-3 h-3" />}
+                            {exec.status === 'failed' && <XCircle className="w-3 h-3" />}
+                            {exec.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
 

@@ -12,7 +12,7 @@ import {
   Timer,
   Server
 } from "lucide-react";
-import { cn, fetchApi } from "../lib/utils";
+import { cn, fetchApi, formatTimeOnly, formatElapsedDuration, formatRelativeTime } from "../lib/utils";
 import { PageHeader } from "../components/layout";
 
 export function ActiveJobs() {
@@ -80,41 +80,6 @@ export function ActiveJobs() {
       loadData();
     } catch (err) {
       alert(`Failed to pause job: ${err.message}`);
-    }
-  };
-
-  const formatDuration = (startedAt) => {
-    if (!startedAt) return "—";
-    const start = new Date(startedAt);
-    const now = new Date();
-    const diffSec = Math.floor((now - start) / 1000);
-    if (diffSec < 60) return `${diffSec}s`;
-    if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ${diffSec % 60}s`;
-    return `${Math.floor(diffSec / 3600)}h ${Math.floor((diffSec % 3600) / 60)}m`;
-  };
-
-  const formatTime = (value) => {
-    if (!value) return "—";
-    try {
-      const d = new Date(value);
-      return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' });
-    } catch {
-      return value;
-    }
-  };
-
-  const formatRelativeTime = (value) => {
-    if (!value) return "—";
-    try {
-      const d = new Date(value);
-      const now = new Date();
-      const diffMs = d - now;
-      const diffSec = Math.floor(diffMs / 1000);
-      if (diffSec < 60) return `in ${diffSec}s`;
-      if (diffSec < 3600) return `in ${Math.floor(diffSec / 60)}m`;
-      return `in ${Math.floor(diffSec / 3600)}h`;
-    } catch {
-      return value;
     }
   };
 
@@ -220,7 +185,7 @@ export function ActiveJobs() {
                       <div className="flex-1 min-w-0">
                         <div className="text-xs font-medium text-gray-900 truncate" title={job.job_name || job.task_id}>{cleanJobName(job.job_name || job.task_id)}</div>
                         <div className="text-[10px] text-gray-500">
-                          {formatTime(job.started_at)} • {formatDuration(job.started_at)}
+                          {formatTimeOnly(job.started_at)} • {formatElapsedDuration(job.started_at)}
                         </div>
                       </div>
                       <button
@@ -263,7 +228,7 @@ export function ActiveJobs() {
                     <div className="flex items-center justify-between gap-2">
                       <div className="text-xs font-medium text-gray-900 truncate flex-1" title={job.name}>{cleanJobName(job.name)}</div>
                       <div className="text-[10px] text-gray-500 whitespace-nowrap">
-                        {formatTime(job.next_run_at)}
+                        {formatTimeOnly(job.next_run_at)}
                       </div>
                       <button
                         onClick={() => handlePauseQueued(job.name)}

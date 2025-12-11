@@ -238,6 +238,7 @@ class DatabaseManager:
             name VARCHAR(100) NOT NULL UNIQUE,
             task_name VARCHAR(200) NOT NULL,
             config JSONB,
+            job_definition_id UUID,
             enabled BOOLEAN DEFAULT FALSE,
             -- "interval" (every N seconds) or "cron" (cron_expression)
             schedule_type VARCHAR(20) DEFAULT 'interval',
@@ -266,6 +267,7 @@ class DatabaseManager:
             finished_at TIMESTAMP,
             error_message TEXT,
             result JSONB,
+            worker VARCHAR(200),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """
@@ -389,6 +391,18 @@ class DatabaseManager:
         except:
             pass
 
+        # Add worker column to scheduler_job_executions if it doesn't exist
+        try:
+            self.execute_query("ALTER TABLE scheduler_job_executions ADD COLUMN worker VARCHAR(200)", fetch=False)
+        except:
+            pass
+
+        # Add job_definition_id column to scheduler_jobs if it doesn't exist
+        try:
+            self.execute_query("ALTER TABLE scheduler_jobs ADD COLUMN job_definition_id UUID", fetch=False)
+        except:
+            pass
+
         # Ensure a unique constraint exists for (ip_address, interface_index)
         # Older databases may have been created without it.
         try:
@@ -406,23 +420,24 @@ class DatabaseManager:
     def upsert_scheduler_job(self, name, task_name, config, interval_seconds=None,
                              enabled=True, next_run_at=None, schedule_type='interval',
                              cron_expression=None, start_at=None, end_at=None,
-                             max_runs=None):
+                             max_runs=None, job_definition_id=None):
         """Create or update a scheduler job by name.
 
         Returns the row (as a DictRow) for convenience.
         """
         query = """
             INSERT INTO scheduler_jobs (
-                name, task_name, config, enabled,
+                name, task_name, config, job_definition_id, enabled,
                 schedule_type, interval_seconds, cron_expression,
                 start_at, end_at, max_runs,
                 last_run_at, next_run_at
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NULL, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NULL, %s)
             ON CONFLICT (name)
             DO UPDATE SET
                 task_name = EXCLUDED.task_name,
                 config = EXCLUDED.config,
+                job_definition_id = EXCLUDED.job_definition_id,
                 enabled = EXCLUDED.enabled,
                 schedule_type = EXCLUDED.schedule_type,
                 interval_seconds = EXCLUDED.interval_seconds,
@@ -439,6 +454,7 @@ class DatabaseManager:
             name,
             task_name,
             json.dumps(config) if config is not None else None,
+            job_definition_id,
             enabled,
             schedule_type,
             interval_seconds,
@@ -525,35 +541,36 @@ class DatabaseManager:
         return self.execute_query(query, (last_run_at, next_run_at, name), fetch=False)
     
     def create_scheduler_job_execution(self, job_name, task_name, task_id, status,
-                                       started_at=None, error_message=None, result=None):
+                                       started_at=None, error_message=None, result=None, worker=None):
         """Insert a new scheduler job execution record."""
         query = """
             INSERT INTO scheduler_job_executions
-                (job_name, task_name, task_id, status, started_at, error_message, result)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+                (job_name, task_name, task_id, status, started_at, error_message, result, worker)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """
         payload = json.dumps(result) if result is not None else None
         return self.execute_query(
             query,
-            (job_name, task_name, task_id, status, started_at, error_message, payload),
+            (job_name, task_name, task_id, status, started_at, error_message, payload, worker),
             fetch=False,
         )
 
     def update_scheduler_job_execution(self, task_id, status,
-                                       finished_at=None, error_message=None, result=None):
+                                       finished_at=None, error_message=None, result=None, worker=None):
         """Update status and optional fields for an existing execution by task_id."""
         query = """
             UPDATE scheduler_job_executions
             SET status = %s,
                 finished_at = COALESCE(%s, finished_at),
                 error_message = COALESCE(%s, error_message),
-                result = COALESCE(%s, result)
+                result = COALESCE(%s, result),
+                worker = COALESCE(%s, worker)
             WHERE task_id = %s
         """
         payload = json.dumps(result) if result is not None else None
         return self.execute_query(
             query,
-            (status, finished_at, error_message, payload, task_id),
+            (status, finished_at, error_message, payload, worker, task_id),
             fetch=False,
         )
 
@@ -606,17 +623,17 @@ class DatabaseManager:
         query = """
             UPDATE scheduler_job_executions
             SET status = 'timeout',
-                finished_at = COALESCE(finished_at, NOW()),
+                finished_at = COALESCE(finished_at, CURRENT_TIMESTAMP),
                 error_message = COALESCE(
                     error_message,
                     'Timed out without completion (job never finished running; likely worker or queue issue)'
                 )
             WHERE (
                     status = 'queued'
-                AND started_at < (NOW() AT TIME ZONE 'UTC') - ((%s || ' seconds')::interval)
+                AND started_at < CURRENT_TIMESTAMP - ((%s || ' seconds')::interval)
             ) OR (
                     status = 'running'
-                AND started_at < (NOW() AT TIME ZONE 'UTC') - ((%s || ' seconds')::interval)
+                AND started_at < CURRENT_TIMESTAMP - ((%s || ' seconds')::interval)
             )
             RETURNING id, job_name, task_id
         """

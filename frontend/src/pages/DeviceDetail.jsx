@@ -10,6 +10,7 @@ import {
   XCircle,
   TrendingUp,
   ArrowLeft,
+  Database,
 } from "lucide-react";
 import { PageHeader } from "../components/layout";
 import { Line } from "react-chartjs-2";
@@ -25,8 +26,7 @@ import {
   TimeScale,
 } from "chart.js";
 import "chartjs-adapter-date-fns";
-import { cn } from "../lib/utils";
-import { fetchApi } from "../lib/utils";
+import { cn, fetchApi, formatDetailedTime } from "../lib/utils";
 
 ChartJS.register(
   CategoryScale,
@@ -50,7 +50,8 @@ export function DeviceDetail() {
   const [currentOpticalInterface, setCurrentOpticalInterface] = useState(null);
   const [opticalHistory, setOpticalHistory] = useState([]);
   const [opticalLoading, setOpticalLoading] = useState(false);
-  const [selectedTimeRange, setSelectedTimeRange] = useState(8640); // Track selected time range in hours
+  const [selectedTimeRange, setSelectedTimeRange] = useState(720); // Time range in hours (default 30 days)
+  const [selectedTimescale, setSelectedTimescale] = useState('hour'); // Aggregation: 'minute', 'hour', 'day'
   const chartRef = useRef(null);
 
   useEffect(() => {
@@ -137,13 +138,15 @@ export function DeviceDetail() {
   const showOpticalHistory = async (interfaceIndex, interfaceName) => {
     setCurrentOpticalInterface({ ip, interfaceIndex, interfaceName });
     setOpticalModalOpen(true);
-    setSelectedTimeRange(8640); // Set default to 360 days
+    setSelectedTimeRange(720); // Default to 30 days
+    setSelectedTimescale('hour'); // Default to hourly aggregation
     // Don't load data here - wait for the useEffect to trigger
   };
 
   const closeOpticalModal = () => {
     setOpticalModalOpen(false);
-    setSelectedTimeRange(8640); // Reset to default when closing
+    setSelectedTimeRange(720);
+    setSelectedTimescale('hour');
     setOpticalHistory([]);
   };
 
@@ -229,61 +232,167 @@ export function DeviceDetail() {
     return "text-gray-500";
   };
 
-  const chartData = useMemo(() => {
-    if (opticalHistory.length === 0) {
-      return {
-        labels: [],
-        datasets: [],
-      };
+  // Aggregate data into Hi/Lo/Close buckets based on timescale
+  const aggregatedData = useMemo(() => {
+    if (opticalHistory.length === 0) return [];
+
+    const sorted = [...opticalHistory].sort(
+      (a, b) => new Date(a.measurement_timestamp) - new Date(b.measurement_timestamp)
+    );
+
+    // Determine bucket size in milliseconds
+    const bucketMs = {
+      'minute': 60 * 1000,
+      'hour': 60 * 60 * 1000,
+      'day': 24 * 60 * 60 * 1000,
+    }[selectedTimescale] || 60 * 60 * 1000;
+
+    const buckets = new Map();
+
+    for (const reading of sorted) {
+      const ts = new Date(reading.measurement_timestamp).getTime();
+      const bucketKey = Math.floor(ts / bucketMs) * bucketMs;
+
+      if (!buckets.has(bucketKey)) {
+        buckets.set(bucketKey, {
+          timestamp: new Date(bucketKey),
+          tx: { values: [], high: null, low: null, close: null },
+          rx: { values: [], high: null, low: null, close: null },
+          temp: { values: [], high: null, low: null, close: null },
+        });
+      }
+
+      const bucket = buckets.get(bucketKey);
+      if (reading.tx_power != null) bucket.tx.values.push(reading.tx_power);
+      if (reading.rx_power != null) bucket.rx.values.push(reading.rx_power);
+      if (reading.temperature != null) bucket.temp.values.push(reading.temperature);
     }
 
-    const data = {
-      labels: opticalHistory.map((h) => new Date(h.measurement_timestamp)),
-      datasets: [
-        {
-          label: "TX Power",
-          data: opticalHistory.map((h) => h.tx_power),
-          borderColor: "#007bff",
-          backgroundColor: "#007bff20",
-          borderWidth: 2,
-          pointRadius: 4,
-          tension: 0.1,
-          yAxisID: "y",
-        },
-        {
-          label: "RX Power",
-          data: opticalHistory.map((h) => h.rx_power),
-          borderColor: "#28a745",
-          backgroundColor: "#28a74520",
-          borderWidth: 2,
-          borderDash: [5, 5],
-          pointRadius: 4,
-          tension: 0.1,
-          yAxisID: "y",
-        },
-      ],
-    };
+    // Calculate hi/lo/close for each bucket
+    const result = [];
+    for (const [, bucket] of buckets) {
+      const calcHLC = (values) => {
+        if (values.length === 0) return { high: null, low: null, close: null };
+        return {
+          high: Math.max(...values),
+          low: Math.min(...values),
+          close: values[values.length - 1],
+        };
+      };
 
-    const hasTempData = opticalHistory.some((h) => h.temperature !== null && h.temperature !== undefined);
-    
+      result.push({
+        timestamp: bucket.timestamp,
+        tx: calcHLC(bucket.tx.values),
+        rx: calcHLC(bucket.rx.values),
+        temp: calcHLC(bucket.temp.values),
+      });
+    }
+
+    return result.sort((a, b) => a.timestamp - b.timestamp);
+  }, [opticalHistory, selectedTimescale]);
+
+  const chartData = useMemo(() => {
+    if (aggregatedData.length === 0) {
+      return { labels: [], datasets: [] };
+    }
+
+    const pointRadius = aggregatedData.length > 200 ? 0 : aggregatedData.length > 50 ? 1 : 2;
+
+    const datasets = [
+      // TX Power - Close line with Hi/Lo range
+      {
+        label: "TX Close",
+        data: aggregatedData.map((d) => d.tx.close),
+        borderColor: "#007bff",
+        backgroundColor: "#007bff20",
+        borderWidth: 2,
+        pointRadius: pointRadius,
+        tension: 0.1,
+        yAxisID: "y",
+      },
+      {
+        label: "TX High",
+        data: aggregatedData.map((d) => d.tx.high),
+        borderColor: "#007bff80",
+        backgroundColor: "transparent",
+        borderWidth: 1,
+        borderDash: [2, 2],
+        pointRadius: 0,
+        tension: 0.1,
+        yAxisID: "y",
+        fill: false,
+      },
+      {
+        label: "TX Low",
+        data: aggregatedData.map((d) => d.tx.low),
+        borderColor: "#007bff80",
+        backgroundColor: "#007bff15",
+        borderWidth: 1,
+        borderDash: [2, 2],
+        pointRadius: 0,
+        tension: 0.1,
+        yAxisID: "y",
+        fill: '-1', // Fill to previous dataset (TX High)
+      },
+      // RX Power - Close line with Hi/Lo range
+      {
+        label: "RX Close",
+        data: aggregatedData.map((d) => d.rx.close),
+        borderColor: "#28a745",
+        backgroundColor: "#28a74520",
+        borderWidth: 2,
+        pointRadius: pointRadius,
+        tension: 0.1,
+        yAxisID: "y",
+      },
+      {
+        label: "RX High",
+        data: aggregatedData.map((d) => d.rx.high),
+        borderColor: "#28a74580",
+        backgroundColor: "transparent",
+        borderWidth: 1,
+        borderDash: [2, 2],
+        pointRadius: 0,
+        tension: 0.1,
+        yAxisID: "y",
+        fill: false,
+      },
+      {
+        label: "RX Low",
+        data: aggregatedData.map((d) => d.rx.low),
+        borderColor: "#28a74580",
+        backgroundColor: "#28a74515",
+        borderWidth: 1,
+        borderDash: [2, 2],
+        pointRadius: 0,
+        tension: 0.1,
+        yAxisID: "y",
+        fill: '-1', // Fill to previous dataset (RX High)
+      },
+    ];
+
+    // Add temperature if available
+    const hasTempData = aggregatedData.some((d) => d.temp.close !== null);
     if (hasTempData) {
-      data.datasets.push({
-        label: "Temperature",
-        data: opticalHistory.map((h) => h.temperature),
+      datasets.push({
+        label: "Temp Close",
+        data: aggregatedData.map((d) => d.temp.close),
         borderColor: "#dc3545",
         backgroundColor: "#dc354520",
         borderWidth: 2,
-        borderDash: [2, 2],
-        pointRadius: 3,
+        pointRadius: pointRadius,
         tension: 0.1,
         yAxisID: "y1",
       });
     }
 
-    return data;
-  }, [opticalHistory]);
+    return {
+      labels: aggregatedData.map((d) => d.timestamp),
+      datasets,
+    };
+  }, [aggregatedData]);
 
-  const hasTempData = opticalHistory.some((h) => h.temperature !== null && h.temperature !== undefined);
+  const hasTempData = aggregatedData.some((d) => d.temp?.close !== null);
 
   const chartOptions = {
     responsive: true,
@@ -296,6 +405,24 @@ export function DeviceDetail() {
       legend: {
         display: true,
         position: "top",
+        onClick: (e, legendItem, legend) => {
+          const index = legendItem.datasetIndex;
+          const ci = legend.chart;
+          if (ci.isDatasetVisible(index)) {
+            ci.hide(index);
+            legendItem.hidden = true;
+          } else {
+            ci.show(index);
+            legendItem.hidden = false;
+          }
+        },
+        labels: {
+          usePointStyle: true,
+          padding: 15,
+          font: {
+            size: 12,
+          },
+        },
       },
     },
     scales: {
@@ -616,7 +743,7 @@ export function DeviceDetail() {
           <div className="bg-white rounded-xl shadow-xl w-full max-w-6xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-4 border-b border-gray-200">
               <h2 className="text-xl font-semibold text-gray-800">
-                Optical Power History - {currentOpticalInterface?.interface_name} ({currentOpticalInterface?.ip})
+                Optical Power History - {currentOpticalInterface?.interfaceName} ({currentOpticalInterface?.ip})
               </h2>
               <button
                 onClick={closeOpticalModal}
@@ -626,11 +753,48 @@ export function DeviceDetail() {
               </button>
             </div>
 
-            {/* Time Range Selector */}
-            <div className="p-4 border-b border-gray-200">
+            {/* Timescale and Time Range Selectors */}
+            <div className="p-4 border-b border-gray-200 space-y-3">
+              {/* Timescale (aggregation granularity) */}
               <div className="flex items-center justify-center gap-2">
-                <span className="font-medium text-gray-700">Time Range:</span>
-                {[1, 12, 24, 168, 720, 2160, 4320, 8640, 17280, 34560].map((hours) => (
+                <span className="font-medium text-gray-700 w-24">Timescale:</span>
+                {[
+                  { value: 'minute', label: 'Minutes' },
+                  { value: 'hour', label: 'Hours' },
+                  { value: 'day', label: 'Days' },
+                ].map(({ value, label }) => (
+                  <button
+                    key={value}
+                    onClick={() => setSelectedTimescale(value)}
+                    className={cn(
+                      "px-4 py-1 text-sm border rounded transition-colors",
+                      selectedTimescale === value
+                        ? "bg-purple-600 text-white border-purple-600"
+                        : "border-gray-300 hover:bg-gray-50"
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+                <span className="text-xs text-gray-500 ml-2">
+                  ({aggregatedData.length} data points)
+                </span>
+              </div>
+              
+              {/* Time Range */}
+              <div className="flex items-center justify-center gap-2">
+                <span className="font-medium text-gray-700 w-24">Range:</span>
+                {[
+                  { hours: 1, label: '1hr' },
+                  { hours: 6, label: '6hr' },
+                  { hours: 24, label: '1d' },
+                  { hours: 168, label: '7d' },
+                  { hours: 720, label: '30d' },
+                  { hours: 2160, label: '90d' },
+                  { hours: 4320, label: '180d' },
+                  { hours: 8640, label: '1yr' },
+                  { hours: 17280, label: '2yr' },
+                ].map(({ hours, label }) => (
                   <button
                     key={hours}
                     onClick={() => loadOpticalHistory(hours)}
@@ -641,16 +805,7 @@ export function DeviceDetail() {
                         : "border-gray-300 hover:bg-gray-50"
                     )}
                   >
-                    {hours === 1 ? "1hr" : 
-                     hours === 12 ? "12hr" : 
-                     hours === 24 ? "1day" : 
-                     hours === 168 ? "7day" : 
-                     hours === 720 ? "30day" : 
-                     hours === 2160 ? "90day" : 
-                     hours === 4320 ? "180day" : 
-                     hours === 8640 ? "360day" : 
-                     hours === 17280 ? "720day" : 
-                     hours === 34560 ? "1440day" : `${hours}hr`}
+                    {label}
                   </button>
                 ))}
               </div>
@@ -699,15 +854,7 @@ export function DeviceDetail() {
                         .map((reading, index) => (
                           <tr key={index}>
                             <td className="px-4 py-2 font-mono">
-                              {new Date(reading.measurement_timestamp).toLocaleString("en-US", {
-                                year: "numeric",
-                                month: "2-digit",
-                                day: "2-digit",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                                second: "2-digit",
-                                hour12: false,
-                              })}
+                              {formatDetailedTime(reading.measurement_timestamp)}
                             </td>
                             <td className="px-4 py-2 text-right font-mono">
                               {reading.tx_power ? reading.tx_power.toFixed(2) : "N/A"}
