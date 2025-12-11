@@ -23,7 +23,7 @@ def _make_celery() -> Celery:
         "opsconductor_monitor",
         broker=broker_url,
         backend=result_backend,
-        include=["celery_tasks"],
+        include=["backend.tasks.job_tasks"],
     )
 
     # Basic sensible defaults; we can tune later.

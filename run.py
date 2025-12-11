@@ -1,8 +1,8 @@
+#!/usr/bin/env python3
 """
-OpsConductor Application - Main Entry Point.
+OpsConductor Main Entry Point.
 
-This is the main entry point that uses the new modular backend.
-For backward compatibility, this file delegates to backend.app.
+This is the new modular entry point that uses the backend package.
 """
 
 import os
@@ -12,16 +12,13 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Load environment variables from .env if present
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ImportError:
-    pass
+from dotenv import load_dotenv
+load_dotenv()
 
-from backend.app import create_app, app
+from backend.app import create_app
 
-# Re-export the app for backward compatibility
-__all__ = ['app', 'create_app']
+# Create the application
+app = create_app()
 
 if __name__ == '__main__':
     # Get configuration from environment

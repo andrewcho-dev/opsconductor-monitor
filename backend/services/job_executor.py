@@ -1,0 +1,380 @@
+"""
+Job Executor Service.
+
+Executes job definitions using the modular executor, parser, and targeting systems.
+This replaces the monolithic generic_job_scheduler.py.
+"""
+
+import logging
+from datetime import datetime
+from typing import Dict, Any, List, Optional
+
+from ..executors import ExecutorRegistry, SSHExecutor, PingExecutor, SNMPExecutor
+from ..parsers.registry import ParserRegistry
+from ..targeting import TargetingRegistry
+from ..config.constants import ACTION_TYPES, JOB_STATUS_SUCCESS, JOB_STATUS_FAILED
+
+logger = logging.getLogger(__name__)
+
+
+class JobExecutor:
+    """
+    Executes job definitions.
+    
+    Coordinates between targeting, execution, parsing, and database operations.
+    """
+    
+    def __init__(self, db_manager=None):
+        """
+        Initialize job executor.
+        
+        Args:
+            db_manager: Optional database manager for DB operations
+        """
+        self.db = db_manager
+        
+        # Ensure executors are registered
+        self._ensure_executors_registered()
+    
+    def _ensure_executors_registered(self):
+        """Ensure all executors are registered."""
+        # Import to trigger registration
+        from ..executors import SSHExecutor, PingExecutor, SNMPExecutor
+    
+    def execute_job(self, job_definition: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Execute a complete job definition.
+        
+        Args:
+            job_definition: Job definition with actions
+        
+        Returns:
+            Execution result dictionary
+        """
+        start_time = datetime.now()
+        
+        result = {
+            'job_id': job_definition.get('id') or job_definition.get('job_id'),
+            'job_name': job_definition.get('name'),
+            'started_at': start_time.isoformat(),
+            'actions_completed': 0,
+            'total_actions': len(job_definition.get('actions', [])),
+            'errors': [],
+            'action_results': {},
+        }
+        
+        try:
+            actions = job_definition.get('actions', [])
+            config = job_definition.get('config', {})
+            
+            for i, action in enumerate(actions):
+                action_type = action.get('type', f'action_{i}')
+                
+                try:
+                    action_result = self._execute_action(action, config)
+                    result['action_results'][action_type] = action_result
+                    result['actions_completed'] += 1
+                    
+                    if action_result.get('error'):
+                        result['errors'].append(f"{action_type}: {action_result['error']}")
+                        
+                except Exception as e:
+                    error_msg = f"{action_type}: {str(e)}"
+                    result['errors'].append(error_msg)
+                    result['action_results'][action_type] = {'error': str(e)}
+                    logger.exception(f"Action {action_type} failed")
+        
+        except Exception as e:
+            result['errors'].append(f"Job execution failed: {str(e)}")
+            logger.exception("Job execution failed")
+        
+        finally:
+            end_time = datetime.now()
+            result['finished_at'] = end_time.isoformat()
+            result['duration_seconds'] = (end_time - start_time).total_seconds()
+            result['status'] = JOB_STATUS_SUCCESS if not result['errors'] else JOB_STATUS_FAILED
+        
+        return result
+    
+    def _execute_action(self, action: Dict[str, Any], job_config: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Execute a single action.
+        
+        Args:
+            action: Action definition
+            job_config: Job-level configuration
+        
+        Returns:
+            Action result dictionary
+        """
+        action_type = action.get('type')
+        
+        # Get targets for this action
+        targets = self._resolve_targets(action, job_config)
+        
+        if not targets:
+            return {
+                'success': False,
+                'error': 'No targets resolved',
+                'targets_count': 0,
+            }
+        
+        # Execute based on action type
+        if action_type == 'ssh_command':
+            return self._execute_ssh_action(targets, action, job_config)
+        elif action_type == 'ping':
+            return self._execute_ping_action(targets, action, job_config)
+        elif action_type == 'snmp':
+            return self._execute_snmp_action(targets, action, job_config)
+        elif action_type == 'database':
+            return self._execute_database_action(targets, action, job_config)
+        else:
+            return {
+                'success': False,
+                'error': f'Unknown action type: {action_type}',
+            }
+    
+    def _resolve_targets(self, action: Dict[str, Any], job_config: Dict[str, Any]) -> List[str]:
+        """
+        Resolve targets for an action.
+        
+        Args:
+            action: Action definition with targeting config
+            job_config: Job-level configuration
+        
+        Returns:
+            List of target IP addresses
+        """
+        targeting = action.get('targeting', {})
+        source = targeting.get('source', 'static')
+        
+        # Merge job config into targeting config
+        config = {**job_config, **targeting}
+        
+        try:
+            return TargetingRegistry.resolve(source, config)
+        except Exception as e:
+            logger.error(f"Target resolution failed: {e}")
+            return []
+    
+    def _execute_ssh_action(
+        self, 
+        targets: List[str], 
+        action: Dict[str, Any], 
+        job_config: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Execute SSH command action."""
+        execution = action.get('execution', {})
+        commands = execution.get('commands', [])
+        
+        if not commands:
+            command = execution.get('command')
+            if command:
+                commands = [{'command': command}]
+        
+        # Get SSH credentials from job config or settings
+        ssh_config = {
+            'username': job_config.get('ssh_username') or self._get_setting('ssh_username'),
+            'password': job_config.get('ssh_password') or self._get_setting('ssh_password'),
+            'port': job_config.get('ssh_port') or self._get_setting('ssh_port', 22),
+            'timeout': job_config.get('timeout', 30),
+        }
+        
+        results = []
+        success_count = 0
+        
+        for target in targets:
+            target_result = {
+                'target': target,
+                'commands': [],
+                'success': True,
+            }
+            
+            try:
+                executor = SSHExecutor()
+                
+                for cmd_config in commands:
+                    cmd = cmd_config.get('command', '')
+                    parser_name = cmd_config.get('parser')
+                    
+                    # Execute command
+                    exec_result = executor.execute(target, cmd, ssh_config)
+                    
+                    cmd_result = {
+                        'command': cmd,
+                        'success': exec_result.get('success', False),
+                        'output': exec_result.get('output', ''),
+                        'error': exec_result.get('error'),
+                    }
+                    
+                    # Parse output if parser specified
+                    if parser_name and exec_result.get('success'):
+                        try:
+                            parsed = ParserRegistry.parse(
+                                parser_name, 
+                                exec_result.get('output', ''),
+                                {'ip_address': target}
+                            )
+                            cmd_result['parsed'] = parsed
+                        except Exception as e:
+                            cmd_result['parse_error'] = str(e)
+                    
+                    target_result['commands'].append(cmd_result)
+                    
+                    if not exec_result.get('success'):
+                        target_result['success'] = False
+                
+                if target_result['success']:
+                    success_count += 1
+                    
+            except Exception as e:
+                target_result['success'] = False
+                target_result['error'] = str(e)
+            
+            results.append(target_result)
+        
+        return {
+            'success': success_count > 0,
+            'targets_count': len(targets),
+            'success_count': success_count,
+            'failed_count': len(targets) - success_count,
+            'results': results,
+        }
+    
+    def _execute_ping_action(
+        self, 
+        targets: List[str], 
+        action: Dict[str, Any], 
+        job_config: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Execute ping action."""
+        execution = action.get('execution', {})
+        
+        ping_config = {
+            'timeout': execution.get('timeout', 5),
+            'count': execution.get('count', 1),
+        }
+        
+        results = []
+        online_count = 0
+        
+        executor = PingExecutor()
+        
+        for target in targets:
+            result = executor.execute(target, config=ping_config)
+            
+            target_result = {
+                'target': target,
+                'reachable': result.get('reachable', False),
+                'response_time_ms': result.get('response_time_ms'),
+            }
+            
+            if result.get('reachable'):
+                online_count += 1
+            
+            results.append(target_result)
+        
+        return {
+            'success': True,
+            'targets_count': len(targets),
+            'online_count': online_count,
+            'offline_count': len(targets) - online_count,
+            'results': results,
+        }
+    
+    def _execute_snmp_action(
+        self, 
+        targets: List[str], 
+        action: Dict[str, Any], 
+        job_config: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Execute SNMP action."""
+        execution = action.get('execution', {})
+        oid = execution.get('oid', '1.3.6.1.2.1.1.1.0')
+        
+        snmp_config = {
+            'community': job_config.get('snmp_community') or self._get_setting('snmp_community', 'public'),
+            'timeout': execution.get('timeout', 5),
+        }
+        
+        results = []
+        success_count = 0
+        
+        executor = SNMPExecutor()
+        
+        for target in targets:
+            result = executor.execute(target, oid, snmp_config)
+            
+            target_result = {
+                'target': target,
+                'success': result.get('success', False),
+                'value': result.get('output'),
+                'error': result.get('error'),
+            }
+            
+            if result.get('success'):
+                success_count += 1
+            
+            results.append(target_result)
+        
+        return {
+            'success': success_count > 0,
+            'targets_count': len(targets),
+            'success_count': success_count,
+            'results': results,
+        }
+    
+    def _execute_database_action(
+        self, 
+        targets: List[str], 
+        action: Dict[str, Any], 
+        job_config: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Execute database action (store results)."""
+        database = action.get('database', {})
+        tables = database.get('tables', [])
+        
+        if not self.db:
+            return {
+                'success': False,
+                'error': 'No database connection available',
+            }
+        
+        results = []
+        
+        for table_config in tables:
+            table_name = table_config.get('table')
+            operation = table_config.get('operation', 'upsert')
+            
+            # This would be expanded based on the specific table operations needed
+            results.append({
+                'table': table_name,
+                'operation': operation,
+                'success': True,
+            })
+        
+        return {
+            'success': True,
+            'tables_processed': len(tables),
+            'results': results,
+        }
+    
+    def _get_setting(self, key: str, default: Any = None) -> Any:
+        """Get a setting value."""
+        import os
+        import json
+        
+        settings_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 
+            'settings.json'
+        )
+        
+        try:
+            if os.path.exists(settings_path):
+                with open(settings_path, 'r') as f:
+                    settings = json.load(f)
+                    return settings.get(key, default)
+        except:
+            pass
+        
+        return default

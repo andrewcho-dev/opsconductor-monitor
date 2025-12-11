@@ -1,3 +1,5 @@
-"""Backend tasks package - Celery task wrappers."""
+"""Backend tasks package - Celery tasks."""
 
-__all__ = []
+from .job_tasks import run_job, run_scheduled_job
+
+__all__ = ['run_job', 'run_scheduled_job']

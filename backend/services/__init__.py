@@ -6,6 +6,7 @@ from .group_service import GroupService
 from .job_service import JobService
 from .scheduler_service import SchedulerService
 from .scan_service import ScanService
+from .job_executor import JobExecutor
 
 __all__ = [
     'BaseService',
@@ -14,4 +15,5 @@ __all__ = [
     'JobService',
     'SchedulerService',
     'ScanService',
+    'JobExecutor',
 ]
