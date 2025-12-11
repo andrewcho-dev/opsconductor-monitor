@@ -848,21 +848,28 @@ export function StatusBadge({ status, type }) {
 - [x] 2.3.2 Executor Registry (`backend/executors/registry.py`)
 - [x] 2.4.1 Targeting Interface (`backend/targeting/base.py`)
 - [x] 2.4.2 Targeting Registry (`backend/targeting/registry.py`)
-- [ ] 2.2.2 Extract Ciena Parsers (pending - need to migrate from scan_routes.py)
-- [ ] 2.3.3 SSH Executor (pending - need to migrate from scan_routes.py)
-- [ ] 2.3.4 SNMP Executor (pending)
-- [ ] 2.3.5 Ping Executor (pending)
+- [x] 2.2.2 Extract Ciena Parsers (`backend/parsers/ciena/`) - COMPLETED 2025-12-11
+  - `port_xcvr.py`: CienaPortXcvrParser
+  - `port_show.py`: CienaPortShowParser  
+  - `port_diagnostics.py`: CienaPortDiagnosticsParser
+  - `lldp.py`: CienaLldpRemoteParser
+- [x] 2.3.3 SSH Executor (`backend/executors/ssh_executor.py`) - COMPLETED 2025-12-11
+- [x] 2.3.4 SNMP Executor (`backend/executors/snmp_executor.py`) - COMPLETED 2025-12-11
+- [x] 2.3.5 Ping Executor (`backend/executors/ping_executor.py`) - COMPLETED 2025-12-11
+- [x] 2.4.3 Targeting Strategies (`backend/targeting/strategies.py`) - COMPLETED 2025-12-11
+  - StaticTargeting, DatabaseQueryTargeting, GroupTargeting
+  - NetworkRangeTargeting, PreviousResultTargeting
 
-### Phase 3: Backend API Routes
-- [ ] 3.1.1 Device Routes Blueprint
-- [ ] 3.1.2 Groups Routes Blueprint
-- [ ] 3.1.3 Jobs Routes Blueprint
-- [ ] 3.1.4 Scheduler Routes Blueprint
-- [ ] 3.1.5 Scans Routes Blueprint
-- [ ] 3.1.6 System Routes Blueprint
-- [ ] 3.2.1 Application Factory
-- [ ] 3.2.2 Register Blueprints
-- [ ] 3.2.3 Global Error Handler
+### Phase 3: Backend API Routes ✅ COMPLETED (2025-12-11)
+- [x] 3.1.1 Device Routes Blueprint (`backend/api/devices.py`)
+- [x] 3.1.2 Groups Routes Blueprint (`backend/api/groups.py`)
+- [x] 3.1.3 Jobs Routes Blueprint (`backend/api/jobs.py`)
+- [x] 3.1.4 Scheduler Routes Blueprint (`backend/api/scheduler.py`)
+- [x] 3.1.5 Scans Routes Blueprint (`backend/api/scans.py`)
+- [ ] 3.1.6 System Routes Blueprint (pending)
+- [ ] 3.2.1 Application Factory (pending)
+- [x] 3.2.2 Register Blueprints (`backend/api/__init__.py:register_blueprints()`)
+- [x] 3.2.3 Global Error Handler (per-blueprint error handlers)
 
 ### Phase 4: Job Execution Refactor
 - [ ] 4.1.1 Job Executor
