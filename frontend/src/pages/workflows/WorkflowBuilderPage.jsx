@@ -151,9 +151,9 @@ const WorkflowBuilderPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="h-screen flex flex-col">
       <GlobalNav />
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 min-h-0">
         <WorkflowBuilder
           initialWorkflow={workflow}
           onSave={handleSave}

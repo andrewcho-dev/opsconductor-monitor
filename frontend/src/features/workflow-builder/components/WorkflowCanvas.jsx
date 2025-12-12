@@ -200,7 +200,8 @@ const WorkflowCanvasInner = ({
   return (
     <div 
       ref={reactFlowWrapper} 
-      className={cn('flex-1 h-full', className)}
+      className={cn('flex-1 h-full w-full', className)}
+      style={{ minHeight: '400px' }}
     >
       <ReactFlow
         nodes={flowNodes}
@@ -249,6 +250,7 @@ const WorkflowCanvasInner = ({
           nodeStrokeWidth={3}
           zoomable
           pannable
+          maskColor="rgba(59, 130, 246, 0.15)"
           style={{
             backgroundColor: '#F9FAFB',
             border: '1px solid #E5E7EB',

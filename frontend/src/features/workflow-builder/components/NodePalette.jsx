@@ -16,17 +16,28 @@ const NodePalette = ({ enabledPackages, onDragStart }) => {
     triggers: true,
     discovery: true,
     query: true,
+    configure: true,
     data: true,
     logic: true,
     notify: true,
   });
   const [showPackageFilter, setShowPackageFilter] = useState(false);
 
+  const enabledIds = useMemo(() => {
+    if (Array.isArray(enabledPackages) && enabledPackages.length > 0) {
+      return enabledPackages;
+    }
+    return undefined;
+  }, [enabledPackages]);
+
   // Get nodes organized by category
-  const nodesByCategory = useMemo(() => 
-    getNodesByCategory(enabledPackages),
-    [enabledPackages]
-  );
+  const nodesByCategory = useMemo(() => {
+    const byEnabled = getNodesByCategory(enabledIds);
+    if (byEnabled && Object.keys(byEnabled).length > 0) {
+      return byEnabled;
+    }
+    return getNodesByCategory(undefined);
+  }, [enabledIds]);
 
   // Filter nodes by search term
   const filteredCategories = useMemo(() => {
@@ -109,7 +120,7 @@ const NodePalette = ({ enabledPackages, onDragStart }) => {
               <label key={pkg.id} className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={enabledPackages?.includes(pkg.id) ?? true}
+                  checked={enabledIds?.includes(pkg.id) ?? true}
                   onChange={() => {/* TODO: Toggle package */}}
                   className="rounded text-blue-500"
                   disabled={pkg.isCore}

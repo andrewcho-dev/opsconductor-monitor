@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 3000,
+    strictPort: true,
     proxy: {
       '/data': 'http://192.168.10.50:5000',
       '/progress': 'http://192.168.10.50:5000',

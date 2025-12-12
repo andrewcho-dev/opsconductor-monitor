@@ -265,7 +265,7 @@ const WorkflowBuilder = ({
   }, []);
 
   return (
-    <div className="h-full flex flex-col bg-gray-100">
+    <div className="h-full w-full flex flex-col bg-gray-100">
       {/* Toolbar */}
       <WorkflowToolbar
         workflowName={workflow.name}
@@ -287,7 +287,7 @@ const WorkflowBuilder = ({
       />
 
       {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden min-h-0">
         {/* Node Palette */}
         <NodePalette
           enabledPackages={enabledPackages}
