@@ -47,7 +47,7 @@ class ExecutionRepository(BaseRepository):
             'task_id': task_id,
             'status': status,
             'config': json.dumps(config) if config else '{}',
-            'queued_at': datetime.utcnow()
+            'created_at': datetime.utcnow()
         }
         
         if worker:
@@ -128,6 +128,37 @@ class ExecutionRepository(BaseRepository):
         """
         return self.find_one({'task_id': task_id})
     
+    def get_by_id(self, execution_id: int) -> Optional[Dict]:
+        """
+        Get execution by ID.
+        
+        Args:
+            execution_id: Execution ID
+        
+        Returns:
+            Execution record or None
+        """
+        return self.find_one({'id': execution_id})
+    
+    def update_status(self, execution_id: int, status: str) -> bool:
+        """
+        Update execution status by ID.
+        
+        Args:
+            execution_id: Execution ID
+            status: New status
+        
+        Returns:
+            True if updated
+        """
+        query = """
+            UPDATE scheduler_job_executions
+            SET status = %s, finished_at = NOW()
+            WHERE id = %s
+        """
+        self.execute_query(query, (status, execution_id), fetch=False)
+        return True
+    
     def get_executions_for_job(
         self,
         job_name: str,
@@ -151,7 +182,7 @@ class ExecutionRepository(BaseRepository):
         
         return self.get_all(
             filters=filters,
-            order_by='queued_at DESC',
+            order_by='created_at DESC',
             limit=limit
         )
     
@@ -176,7 +207,7 @@ class ExecutionRepository(BaseRepository):
         
         return self.get_all(
             filters=filters if filters else None,
-            order_by='queued_at DESC',
+            order_by='created_at DESC',
             limit=limit
         )
     
@@ -209,7 +240,7 @@ class ExecutionRepository(BaseRepository):
             params.append(status)
         
         if before:
-            conditions.append('queued_at < %s')
+            conditions.append('created_at < %s')
             params.append(before)
         
         where_clause = ' AND '.join(conditions) if conditions else '1=1'
@@ -234,7 +265,7 @@ class ExecutionRepository(BaseRepository):
                 finished_at = NOW(),
                 error_message = 'Execution timed out'
             WHERE status IN ('running', 'queued')
-              AND queued_at < NOW() - INTERVAL '%s seconds'
+              AND created_at < NOW() - INTERVAL '%s seconds'
             RETURNING id
         """
         results = self.execute_query(query, (timeout_seconds,))
@@ -264,7 +295,7 @@ class ExecutionRepository(BaseRepository):
                 COUNT(*) FILTER (WHERE status = 'queued') as queued,
                 AVG(EXTRACT(EPOCH FROM (finished_at - started_at))) FILTER (WHERE finished_at IS NOT NULL AND started_at IS NOT NULL) as avg_duration
             FROM scheduler_job_executions
-            WHERE queued_at >= NOW() - INTERVAL '%s hours'
+            WHERE created_at >= NOW() - INTERVAL '%s hours'
             {job_filter}
         """
         

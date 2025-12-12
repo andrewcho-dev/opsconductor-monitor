@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   CheckCircle,
@@ -59,6 +59,7 @@ export function DeviceTable({
   }, [expandedNetworks]);
   
   const tableRef = useRef(null);
+  const loadMoreRef = useRef(null);
 
   const filteredDevices = useMemo(() => {
     let filtered = devices;
@@ -162,23 +163,28 @@ export function DeviceTable({
     });
   };
 
-  // Infinite scroll handler
+  // Infinite scroll using Intersection Observer
   useEffect(() => {
-    const handleScroll = () => {
-      if (tableRef.current) {
-        const { scrollTop, scrollHeight, clientHeight } = tableRef.current;
-        if (scrollHeight - scrollTop <= clientHeight * 1.5) {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && visibleCount < groupedDevices.length) {
           setVisibleCount(prev => Math.min(prev + 50, groupedDevices.length));
         }
+      },
+      { threshold: 0.1 }
+    );
+
+    const sentinel = loadMoreRef.current;
+    if (sentinel) {
+      observer.observe(sentinel);
+    }
+
+    return () => {
+      if (sentinel) {
+        observer.unobserve(sentinel);
       }
     };
-
-    const tableElement = tableRef.current;
-    if (tableElement) {
-      tableElement.addEventListener('scroll', handleScroll);
-      return () => tableElement.removeEventListener('scroll', handleScroll);
-    }
-  }, [groupedDevices.length]);
+  }, [groupedDevices.length, visibleCount]);
 
   const handleSort = (key) => {
     setSortConfig((prev) => ({
@@ -719,10 +725,13 @@ export function DeviceTable({
         </table>
       </div>
 
-              {/* Scroll indicator */}
+              {/* Infinite scroll sentinel */}
       {visibleDevices.length < groupedDevices.length && (
-        <div className="text-center py-4 text-sm text-gray-500">
-          Showing {visibleDevices.length} of {groupedDevices.length} entries (scroll to load more)
+        <div ref={loadMoreRef} className="text-center py-4 text-sm text-gray-500">
+          <div className="inline-flex items-center gap-2">
+            <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+            Loading more... ({visibleDevices.length} of {groupedDevices.length})
+          </div>
         </div>
       )}
     </div>

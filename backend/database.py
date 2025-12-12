@@ -63,11 +63,11 @@ class DatabaseConnection:
         finally:
             cursor.close()
     
-    def execute_query(self, query, params=None):
+    def execute_query(self, query, params=None, fetch=True):
         """Execute a query and return results."""
         with self.cursor() as cursor:
             cursor.execute(query, params)
-            if cursor.description:
+            if fetch and cursor.description:
                 return cursor.fetchall()
             return None
     

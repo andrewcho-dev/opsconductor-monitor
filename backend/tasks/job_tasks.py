@@ -34,7 +34,16 @@ def run_job(job_config):
     from ..repositories.execution_repo import ExecutionRepository
     
     db = DatabaseManager()
-    executor = JobExecutor(db)
+    
+    # Get task_id from Celery if available
+    task_id = None
+    execution_id = None
+    try:
+        from celery import current_task
+        if current_task:
+            task_id = current_task.request.id
+    except:
+        pass
     
     # Get job definition if job_definition_id provided
     job_definition = job_config
@@ -48,8 +57,12 @@ def run_job(job_config):
                 **job_def.get('definition', {}),
                 'id': job_def['id'],
                 'name': job_def['name'],
+                'job_definition_id': job_config['job_definition_id'],
                 'config': {**job_config, **job_def.get('definition', {}).get('config', {})},
             }
+    
+    # Create executor with audit logging context
+    executor = JobExecutor(db, task_id=task_id, execution_id=execution_id)
     
     # Execute the job
     result = executor.execute_job(job_definition)
@@ -82,19 +95,42 @@ def run_scheduled_job(job_name, task_id=None):
     if not job:
         return {'error': f'Job not found: {job_name}'}
     
-    # Create execution record
+    # Create execution record and get its ID for audit logging
+    execution_id = None
     if task_id:
-        execution_repo.create_execution(
+        execution = execution_repo.create_execution(
             job_name=job_name,
             task_name=job.get('task_name', 'opsconductor.job.run'),
             task_id=task_id,
             status='running',
             config=job.get('config'),
         )
+        if execution:
+            execution_id = execution.get('id')
     
     try:
-        # Run the job
-        result = run_job(job.get('config', {}))
+        # Get job definition if available
+        job_config = job.get('config', {})
+        job_definition = job_config
+        
+        if 'job_definition_id' in job_config:
+            from ..repositories.job_repo import JobDefinitionRepository
+            job_repo = JobDefinitionRepository(db)
+            job_def = job_repo.get_by_id(job_config['job_definition_id'])
+            if job_def:
+                job_definition = {
+                    **job_def.get('definition', {}),
+                    'id': job_def['id'],
+                    'name': job_def['name'],
+                    'job_definition_id': job_config['job_definition_id'],
+                    'config': {**job_config, **job_def.get('definition', {}).get('config', {})},
+                }
+        
+        # Create executor with audit logging context
+        executor = JobExecutor(db, task_id=task_id, execution_id=execution_id)
+        
+        # Execute the job
+        result = executor.execute_job(job_definition)
         
         # Update execution record
         if task_id:

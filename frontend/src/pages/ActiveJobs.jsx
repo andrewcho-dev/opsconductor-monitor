@@ -34,7 +34,7 @@ export function ActiveJobs() {
       // Fetch scheduled jobs for upcoming list
       const scheduledJobs = await fetchApi("/api/scheduler/jobs?enabled=true&limit=50");
       const now = new Date();
-      const upcoming = (scheduledJobs.jobs || [])
+      const upcoming = (scheduledJobs.data || scheduledJobs.jobs || [])
         .filter(j => j.next_run_at && new Date(j.next_run_at) > now)
         .sort((a, b) => new Date(a.next_run_at) - new Date(b.next_run_at))
         .slice(0, 20);

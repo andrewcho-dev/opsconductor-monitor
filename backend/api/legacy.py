@@ -245,9 +245,31 @@ def get_combined_interfaces():
 def get_power_history():
     """Get optical power history."""
     data = request.get_json() or {}
+    
+    # Support multiple input formats: ip, ip_list, ip_addresses
     ip = data.get('ip')
+    ip_list = data.get('ip_list') or data.get('ip_addresses') or []
     interface_index = data.get('interface_index')
     hours = data.get('hours', 24)
+    
+    # If ip_list provided, use first IP or aggregate
+    if not ip and ip_list:
+        if len(ip_list) == 1:
+            ip = ip_list[0]
+        else:
+            # Multiple IPs - aggregate history from all
+            db = get_db()
+            from ..repositories.scan_repo import OpticalPowerRepository
+            repo = OpticalPowerRepository(db)
+            
+            all_history = []
+            for device_ip in ip_list:
+                try:
+                    history = repo.get_power_history(device_ip, interface_index, hours)
+                    all_history.extend(history)
+                except Exception:
+                    pass
+            return jsonify({'history': all_history})
     
     if not ip:
         return jsonify({'error': 'No IP provided'}), 400
@@ -257,7 +279,7 @@ def get_power_history():
     repo = OpticalPowerRepository(db)
     
     history = repo.get_power_history(ip, interface_index, hours)
-    return jsonify(history)
+    return jsonify({'history': history})
 
 
 # ============================================================================

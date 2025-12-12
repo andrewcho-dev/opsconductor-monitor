@@ -18,7 +18,18 @@ frontend/dist/
 
 # Local databases / data
 *.sqlite
+data/*.json
 
 # Runtime state files
 celerybeat-schedule
 jobs.sqlite
+poller_jobs.sqlite
+
+# Logs directory
+logs/
+
+# Legacy archived files
+_legacy_html/
+
+# Config files with sensitive data
+config.json

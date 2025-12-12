@@ -76,8 +76,7 @@ export function Settings() {
   const loadSettings = async () => {
     try {
       setLoading(true);
-      const response = await fetch("/get_settings");
-      const data = await response.json();
+      const data = await fetchApi("/get_settings");
       
       setSettings({
         ping_command: data.ping_command || "ping",
@@ -127,18 +126,11 @@ export function Settings() {
   const saveSettings = async () => {
     try {
       setSaving(true);
-      const response = await fetch("/save_settings", {
+      const result = await fetchApi("/save_settings", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(settings),
       });
-      
-      const result = await response.json();
-      if (result.status === "success") {
-        showStatus("Settings saved successfully!", "success");
-      } else {
-        showStatus("Error saving settings: " + result.message, "error");
-      }
+      showStatus("Settings saved successfully!", "success");
     } catch (err) {
       showStatus("Error saving settings: " + err.message, "error");
     } finally {
@@ -196,14 +188,8 @@ export function Settings() {
       setTesting(true);
       showStatus("Testing settings...", "success");
       
-      const response = await fetch("/test_settings", { method: "POST" });
-      const result = await response.json();
-      
-      if (result.status === "success") {
-        showStatus("Settings test passed! All tools are accessible.", "success");
-      } else {
-        showStatus("Settings test failed: " + result.message, "error");
-      }
+      const result = await fetchApi("/test_settings", { method: "POST" });
+      showStatus("Settings test passed! All tools are accessible.", "success");
     } catch (err) {
       showStatus("Error testing settings: " + err.message, "error");
     } finally {

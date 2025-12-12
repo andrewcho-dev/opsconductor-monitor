@@ -90,12 +90,10 @@ export function NetworkSettings() {
       const network = settings.discovery_networks[0];
       const baseIp = network.split('/')[0].split('.').slice(0, 3).join('.') + '.1';
       
-      const response = await fetch('/ping_device', {
+      const data = await fetchApi('/ping_device', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ip_address: baseIp }),
       });
-      const data = await response.json();
       
       if (data.status === 'online') {
         setMessage({ type: 'success', text: `Ping test successful: ${baseIp} is reachable` });

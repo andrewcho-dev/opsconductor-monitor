@@ -7,6 +7,7 @@ from .job_repo import JobDefinitionRepository
 from .scheduler_repo import SchedulerJobRepository
 from .execution_repo import ExecutionRepository
 from .scan_repo import ScanRepository, OpticalPowerRepository
+from .audit_repo import JobAuditRepository
 
 __all__ = [
     'BaseRepository',
@@ -17,4 +18,5 @@ __all__ = [
     'ExecutionRepository',
     'ScanRepository',
     'OpticalPowerRepository',
+    'JobAuditRepository',
 ]

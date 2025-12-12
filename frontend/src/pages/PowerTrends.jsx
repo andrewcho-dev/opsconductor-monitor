@@ -22,7 +22,7 @@ import {
   TimeScale,
 } from "chart.js";
 import "chartjs-adapter-date-fns";
-import { cn, formatLocalTime } from "../lib/utils";
+import { cn, formatLocalTime, fetchApi } from "../lib/utils";
 
 ChartJS.register(
   CategoryScale,
@@ -72,16 +72,13 @@ export function PowerTrends() {
         return;
       }
 
-      const response = await fetch('/power_history', {
+      const data = await fetchApi('/power_history', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           ip_list: ipList,
           hours: 1  // Just to get interfaces
         }),
       });
-      
-      const data = await response.json();
       
       if (data.error) {
         throw new Error(data.error);
@@ -144,16 +141,13 @@ export function PowerTrends() {
         ipList = [];
       }
       
-      const response = await fetch('/power_history', {
+      const data = await fetchApi('/power_history', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           ip_list: ipList,
           hours: timeRange
         }),
       });
-      
-      const data = await response.json();
       
       if (data.error) {
         throw new Error(data.error);

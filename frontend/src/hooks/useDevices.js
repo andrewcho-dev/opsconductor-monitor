@@ -1,6 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
 import { fetchApi } from "../lib/utils";
 
+// Helper to extract data from new API response format
+const extractData = (response) => {
+  if (response && response.data !== undefined) {
+    return response.data;
+  }
+  return response;
+};
+
 export function useDevices() {
   const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -9,8 +17,8 @@ export function useDevices() {
   const fetchDevices = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await fetchApi("/data");
-      setDevices(data);
+      const response = await fetchApi("/api/devices");
+      setDevices(extractData(response) || []);
       setError(null);
     } catch (err) {
       setError(err.message);
@@ -35,15 +43,15 @@ export function useGroups() {
     try {
       setLoading(true);
       
-      // Fetch both custom groups and network groups in parallel
-      const [customData, networkData] = await Promise.all([
-        fetchApi("/device_groups?" + Date.now()),
-        fetchApi("/network_groups?" + Date.now())
+      // Fetch both custom groups and network groups in parallel using new API
+      const [customResponse, networkResponse] = await Promise.all([
+        fetchApi("/api/device_groups"),
+        fetchApi("/api/devices/summary/networks")
       ]);
       
       setGroups({
-        custom: customData || [],
-        network: networkData || []
+        custom: extractData(customResponse) || [],
+        network: extractData(networkResponse) || []
       });
       setError(null);
     } catch (err) {
@@ -60,20 +68,22 @@ export function useGroups() {
   }, [fetchGroups]);
 
   const createGroup = async (groupData) => {
-    // First create the group
-    const groupResponse = await fetchApi("/device_groups", {
+    // Create the group using new API
+    const response = await fetchApi("/api/device_groups", {
       method: "POST",
       body: JSON.stringify({
-        group_name: groupData.name,
+        name: groupData.name,
         description: groupData.description,
       }),
     });
     
+    const group = extractData(response);
+    
     // Then add devices to the group if any
     if (groupData.devices && groupData.devices.length > 0) {
-      const groupId = groupResponse.id || groupResponse.group_id;
+      const groupId = group?.id || group?.group_id;
       if (groupId) {
-        await fetchApi(`/device_groups/${groupId}/devices`, {
+        await fetchApi(`/api/device_groups/${groupId}/devices`, {
           method: "POST",
           body: JSON.stringify({
             ip_addresses: groupData.devices,
@@ -86,21 +96,19 @@ export function useGroups() {
   };
 
   const updateGroup = async (id, groupData) => {
-    await fetchApi(`/device_groups/${id}`, {
+    await fetchApi(`/api/device_groups/${id}`, {
       method: "PUT",
       body: JSON.stringify({
-        group_name: groupData.name,
+        name: groupData.name,
         description: groupData.description,
       }),
     });
-    
-    // TODO: Handle device updates for groups - might need to sync devices
     
     await fetchGroups();
   };
 
   const deleteGroup = async (id) => {
-    await fetchApi(`/device_groups/${id}`, {
+    await fetchApi(`/api/device_groups/${id}`, {
       method: "DELETE",
     });
     await fetchGroups();

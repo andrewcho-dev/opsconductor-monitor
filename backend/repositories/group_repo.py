@@ -144,7 +144,7 @@ class GroupRepository(BaseRepository):
                 sr.snmp_status,
                 sr.ssh_status
             FROM group_devices gd
-            JOIN scan_results sr ON gd.ip_address = sr.ip_address
+            JOIN scan_results sr ON gd.ip_address::inet = sr.ip_address
             WHERE gd.group_id = %s
             ORDER BY sr.ip_address
         """

@@ -1,7 +1,7 @@
 import { Play, RefreshCw, Settings, Network, Server, Terminal, Globe, Trash2, X, Filter } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
-import { cn } from "../lib/utils";
+import { cn, fetchApi } from "../lib/utils";
 
 export function ScanProgress({ progress, onStartScan, onRefresh, onOpenSettings, onSNMPScan, onSSHScan, onDeleteSelected }) {
   const navigate = useNavigate();
@@ -14,51 +14,37 @@ export function ScanProgress({ progress, onStartScan, onRefresh, onOpenSettings,
 
   const handleSNMPScan = async () => {
     try {
-      // For now, scan all SNMP devices (empty body)
-      // TODO: Add support for selected devices later
-      const response = await fetch("/snmp_scan", { 
+      const result = await fetchApi("/snmp_scan", { 
         method: "POST", 
-        headers: { "Content-Type": "application/json" }, 
         body: JSON.stringify({}) 
       });
-      const result = await response.json();
-      
-      if (response.ok) {
-        console.log("SNMP scan started:", result);
-        alert(`SNMP scan started: ${result.message}`);
-      } else if (response.status === 409) {
-        alert("Scan already in progress. Please wait for the current scan to complete.");
-      } else {
-        console.error("SNMP scan failed:", result);
-        alert("SNMP scan failed: " + (result.error || "Unknown error"));
-      }
+      console.log("SNMP scan started:", result);
+      alert(`SNMP scan started: ${result.message || 'Started'}`);
     } catch (err) {
       console.error("SNMP scan failed:", err);
-      alert("SNMP scan failed: " + err.message);
+      if (err.message?.includes('409')) {
+        alert("Scan already in progress. Please wait for the current scan to complete.");
+      } else {
+        alert("SNMP scan failed: " + err.message);
+      }
     }
   };
 
   const handleSSHScan = async () => {
     try {
-      const response = await fetch("/ssh_scan", { 
+      const result = await fetchApi("/ssh_scan", { 
         method: "POST", 
-        headers: { "Content-Type": "application/json" }, 
         body: JSON.stringify({}) 
       });
-      const result = await response.json();
-      
-      if (response.ok) {
-        console.log("SSH scan started:", result);
-        alert(`SSH scan started: ${result.message}`);
-      } else if (response.status === 409) {
-        alert("Scan already in progress. Please wait for the current scan to complete.");
-      } else {
-        console.error("SSH scan failed:", result);
-        alert("SSH scan failed: " + (result.error || "Unknown error"));
-      }
+      console.log("SSH scan started:", result);
+      alert(`SSH scan started: ${result.message || 'Started'}`);
     } catch (err) {
       console.error("SSH scan failed:", err);
-      alert("SSH scan failed: " + err.message);
+      if (err.message?.includes('409')) {
+        alert("Scan already in progress. Please wait for the current scan to complete.");
+      } else {
+        alert("SSH scan failed: " + err.message);
+      }
     }
   };
 
@@ -73,26 +59,20 @@ export function ScanProgress({ progress, onStartScan, onRefresh, onOpenSettings,
     }
     
     try {
-      const response = await fetch("/scan", { 
+      const result = await fetchApi("/scan", { 
         method: "POST", 
-        headers: { "Content-Type": "application/json" }, 
         body: JSON.stringify({ network_range: networkRange.trim() })
       });
-      const result = await response.json();
-      
-      if (response.ok) {
-        setShowScanModal(false);
-        if (onStartScan) onStartScan();
-        alert(`Network scan started: ${result.message}`);
-      } else if (response.status === 409) {
-        alert("Scan already in progress. Please wait for the current scan to complete.");
-      } else {
-        console.error("Scan failed:", result);
-        alert("Scan failed: " + (result.error || "Unknown error"));
-      }
+      setShowScanModal(false);
+      if (onStartScan) onStartScan();
+      alert(`Network scan started: ${result.message || 'Started'}`);
     } catch (err) {
       console.error("Scan failed:", err);
-      alert("Scan failed: " + err.message);
+      if (err.message?.includes('409')) {
+        alert("Scan already in progress. Please wait for the current scan to complete.");
+      } else {
+        alert("Scan failed: " + err.message);
+      }
     }
   };
 

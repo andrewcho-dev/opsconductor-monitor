@@ -45,9 +45,9 @@ const JobDefinitions = () => {
     setError(null);
     try {
       const data = await fetchApi('/api/job-definitions');
-      setJobs(data.jobs || []);
+      setJobs(data.data || data.jobs || []);
       const urlId = searchParams.get('id');
-      const list = data.jobs || [];
+      const list = data.data || data.jobs || [];
       if (urlId && list.some((j) => j.id === urlId)) {
         setSelectedJobId(urlId);
       } else if (!selectedJobId && list.length > 0) {
@@ -136,15 +136,10 @@ const JobDefinitions = () => {
     // This does NOT go through scheduler; it just runs the job spec once.
     try {
       setBuilderError(null);
-      const response = await fetch(`/api/jobs/run`, {
+      const data = await fetchApi(`/api/jobs/run`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(jobSpec),
       });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'Job test failed');
-      }
       console.log('Job definition test run result:', data);
     } catch (err) {
       setBuilderError(err.message || 'Failed to run job test');

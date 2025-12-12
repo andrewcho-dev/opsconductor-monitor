@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import IntelligentCommandBuilder from './IntelligentCommandBuilder';
 import { getCommand } from '../data/commandLibraries';
+import { fetchApi } from '../lib/utils';
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component {
@@ -392,22 +393,17 @@ const CompleteJobBuilder = ({ job, onSave, onTest, onBack }) => {
   const fetchAvailableTargets = async () => {
     setTargetsLoading(true);
     try {
-      // Fetch network ranges from database
-      const networkResponse = await fetch('/api/network-ranges');
-      const networkData = await networkResponse.json();
-      
-      // Fetch custom groups from database  
-      const customGroupsResponse = await fetch('/api/custom-groups');
-      const customGroupsData = await customGroupsResponse.json();
-      
-      // Fetch network groups from database
-      const networkGroupsResponse = await fetch('/api/network-groups');
-      const networkGroupsData = await networkGroupsResponse.json();
+      // Fetch network ranges, custom groups, and network groups in parallel
+      const [networkData, customGroupsData, networkGroupsData] = await Promise.all([
+        fetchApi('/api/network-ranges'),
+        fetchApi('/api/custom-groups'),
+        fetchApi('/api/network-groups')
+      ]);
       
       setAvailableTargets({
-        network_ranges: networkData.ranges || [],
-        custom_groups: customGroupsData.groups || [],
-        network_groups: networkGroupsData.groups || []
+        network_ranges: networkData.ranges || networkData.data || networkData || [],
+        custom_groups: customGroupsData.groups || customGroupsData.data || customGroupsData || [],
+        network_groups: networkGroupsData.groups || networkGroupsData.data || networkGroupsData || []
       });
     } catch (err) {
       console.error('Failed to fetch available targets:', err);

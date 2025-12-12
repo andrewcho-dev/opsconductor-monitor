@@ -21,6 +21,8 @@ export function JobHistory() {
   const [error, setError] = useState(null);
   const [selectedExecution, setSelectedExecution] = useState(null);
   const [showRawPayload, setShowRawPayload] = useState(false);
+  const [auditTrail, setAuditTrail] = useState([]);
+  const [loadingAudit, setLoadingAudit] = useState(false);
 
   // Filters
   const [search, setSearch] = useState("");
@@ -34,14 +36,14 @@ export function JobHistory() {
       
       // First get all jobs, then fetch executions for each
       const jobsData = await fetchApi("/api/scheduler/jobs");
-      const jobs = jobsData.jobs || [];
+      const jobs = jobsData.data || jobsData.jobs || [];
       
       // Fetch executions for each job (limit to first 20 jobs to avoid too many requests)
       const allExecutions = [];
       for (const job of jobs.slice(0, 20)) {
         try {
           const execData = await fetchApi(`/api/scheduler/jobs/${encodeURIComponent(job.name)}/executions?limit=20`);
-          const jobExecs = (execData.executions || []).map(e => ({
+          const jobExecs = (execData.data || execData.executions || []).map(e => ({
             ...e,
             job_name: job.name
           }));
@@ -69,6 +71,30 @@ export function JobHistory() {
   useEffect(() => {
     loadExecutions();
   }, []);
+
+  // Load audit trail when execution is selected
+  const loadAuditTrail = async (executionId) => {
+    if (!executionId) return;
+    
+    try {
+      setLoadingAudit(true);
+      const data = await fetchApi(`/api/scheduler/executions/${executionId}/audit`);
+      setAuditTrail(data.data || []);
+    } catch (err) {
+      console.error('Failed to load audit trail:', err);
+      setAuditTrail([]);
+    } finally {
+      setLoadingAudit(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedExecution?.id) {
+      loadAuditTrail(selectedExecution.id);
+    } else {
+      setAuditTrail([]);
+    }
+  }, [selectedExecution]);
 
   const filteredExecutions = useMemo(() => {
     let filtered = executions;
@@ -200,13 +226,13 @@ export function JobHistory() {
 
           {/* Table */}
           <div className="flex-1 overflow-auto">
-            <table className="min-w-full text-sm">
+            <table className="min-w-full text-sm font-mono">
               <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr>
-                  <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase w-24">Status</th>
-                  <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Job Name</th>
-                  <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase w-40">Started</th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase w-40">Timestamp</th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase w-56">Job Name</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase w-24">Duration</th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase w-24">Status</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase w-20">Details</th>
                 </tr>
               </thead>
@@ -229,33 +255,28 @@ export function JobHistory() {
                 {filteredExecutions.map((exec) => (
                   <tr
                     key={exec.id}
-                    className="border-t border-gray-100 hover:bg-gray-50 cursor-pointer"
+                    className="border-t border-gray-100 hover:bg-gray-50 cursor-pointer text-xs"
                     onClick={() => setSelectedExecution(exec)}
                   >
-                    <td className="px-4 py-2">
-                      <span className={cn(
-                        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
-                        exec.status === "success" && "bg-green-100 text-green-700",
-                        exec.status === "failed" && "bg-red-100 text-red-700",
-                        exec.status === "running" && "bg-blue-100 text-blue-700",
-                        !["success", "failed", "running"].includes(exec.status) && "bg-gray-100 text-gray-600"
-                      )}>
-                        {exec.status === "success" && <CheckCircle className="w-3 h-3" />}
-                        {exec.status === "failed" && <XCircle className="w-3 h-3" />}
-                        {exec.status === "running" && <Loader2 className="w-3 h-3 animate-spin" />}
-                        {exec.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2">
-                      <div className="text-sm font-medium text-gray-900 truncate max-w-xs" title={exec.job_name}>{cleanJobName(exec.job_name)}</div>
-                    </td>
-                    <td className="px-4 py-2 text-gray-600 text-xs whitespace-nowrap">
+                    <td className="px-4 py-2 text-gray-600 whitespace-nowrap">
                       {formatShortTime(exec.started_at)}
                     </td>
-                    <td className="px-4 py-2 text-gray-600 text-xs font-mono">
+                    <td className="px-4 py-2 w-56">
+                      <div className="text-gray-900 truncate" title={exec.job_name}>{cleanJobName(exec.job_name)}</div>
+                    </td>
+                    <td className="px-4 py-2 text-gray-600">
                       {formatDuration(exec.started_at, exec.finished_at)}
                     </td>
-                    <td className="px-4 py-2 text-xs text-blue-600 hover:underline">
+                    <td className={cn(
+                      "px-4 py-2",
+                      exec.status === "success" && "text-green-600",
+                      exec.status === "failed" && "text-red-600",
+                      exec.status === "running" && "text-blue-600",
+                      !["success", "failed", "running"].includes(exec.status) && "text-gray-600"
+                    )}>
+                      {exec.status}
+                    </td>
+                    <td className="px-4 py-2 text-blue-600 hover:underline">
                       View
                     </td>
                   </tr>
@@ -381,27 +402,55 @@ export function JobHistory() {
                               </span>
                             </div>
                             {actionData.results && actionData.results.length > 0 && (
-                              <div className="space-y-1 max-h-48 overflow-y-auto">
-                                {actionData.results.slice(0, 20).map((r, idx) => (
+                              <div className="space-y-1 max-h-64 overflow-y-auto">
+                                {actionData.results.map((r, idx) => {
+                                  const deviceIp = r.ip_address || r.target;
+                                  const hasOptical = r.optical_interfaces > 0;
+                                  return (
                                   <div key={idx} className="text-xs bg-white rounded px-2 py-1 flex items-center justify-between">
-                                    <span className="font-mono">{r.ip_address || r.hostname || r.target || JSON.stringify(r).slice(0, 50)}</span>
-                                    <span className={cn(
-                                      "px-1.5 py-0.5 rounded text-[10px] font-medium",
-                                      r.ping_status === 'online' && "bg-green-100 text-green-700",
-                                      r.ping_status === 'offline' && "bg-red-100 text-red-700",
-                                      r.status === 'success' && "bg-green-100 text-green-700",
-                                      r.status === 'error' && "bg-red-100 text-red-700",
-                                      !r.ping_status && !r.status && "bg-gray-100 text-gray-600"
-                                    )}>
-                                      {r.ping_status || r.status || 'done'}
-                                    </span>
+                                    <span className="font-mono">{deviceIp || r.hostname || JSON.stringify(r).slice(0, 50)}</span>
+                                    <div className="flex items-center gap-2">
+                                      {/* Show optical interfaces count with link if present */}
+                                      {r.optical_interfaces !== undefined && (
+                                        hasOptical && deviceIp ? (
+                                          <a 
+                                            href={`/inventory/devices/${deviceIp}?tab=optical`}
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="text-[10px] text-purple-600 font-medium hover:underline"
+                                          >
+                                            {r.optical_interfaces} optical →
+                                          </a>
+                                        ) : (
+                                          <span className="text-[10px] text-gray-400">
+                                            {r.optical_interfaces} optical
+                                          </span>
+                                        )
+                                      )}
+                                      {/* Show interface count if present */}
+                                      {r.interfaces !== undefined && (
+                                        <span className="text-[10px] text-gray-500">
+                                          {r.interfaces} intf
+                                        </span>
+                                      )}
+                                      {/* Status badge */}
+                                      <span className={cn(
+                                        "px-1.5 py-0.5 rounded text-[10px] font-medium",
+                                        (r.ping_status === 'online' || r.success === true) && "bg-green-100 text-green-700",
+                                        (r.ping_status === 'offline' || r.success === false) && "bg-red-100 text-red-700",
+                                        r.status === 'success' && "bg-green-100 text-green-700",
+                                        r.status === 'error' && "bg-red-100 text-red-700",
+                                        r.snmp_status === 'YES' && "bg-green-100 text-green-700",
+                                        r.snmp_status === 'NO' && "bg-red-100 text-red-700",
+                                        r.ssh_status === 'YES' && "bg-green-100 text-green-700",
+                                        r.ssh_status === 'NO' && "bg-red-100 text-red-700",
+                                        !r.ping_status && r.success === undefined && !r.status && !r.snmp_status && !r.ssh_status && "bg-gray-100 text-gray-600"
+                                      )}>
+                                        {r.ping_status || (r.success === true ? 'success' : r.success === false ? 'failed' : null) || r.status || r.snmp_status || r.ssh_status || 'done'}
+                                      </span>
+                                    </div>
                                   </div>
-                                ))}
-                                {actionData.results.length > 20 && (
-                                  <div className="text-[10px] text-gray-500 text-center">
-                                    ... and {actionData.results.length - 20} more
-                                  </div>
-                                )}
+                                  );
+                                })}
                               </div>
                             )}
                           </div>
@@ -420,6 +469,90 @@ export function JobHistory() {
                   )}
                 </div>
               )}
+
+              {/* Audit Trail - shows ALL events for this execution */}
+              <div className="border-t border-gray-200 pt-4 mt-4">
+                <div className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                  <Clock className="w-4 h-4" />
+                  Audit Trail (All Events)
+                  {loadingAudit && <Loader2 className="w-3 h-3 animate-spin" />}
+                </div>
+                {auditTrail.length > 0 ? (
+                  <div className="space-y-1 max-h-64 overflow-y-auto">
+                    {auditTrail.map((event, idx) => (
+                      <div 
+                        key={idx} 
+                        className={cn(
+                          "text-xs rounded px-2 py-1 flex items-start justify-between gap-2",
+                          event.event_type === 'job_started' && "bg-blue-50 border-l-2 border-blue-500",
+                          event.event_type === 'job_completed' && (event.success ? "bg-green-50 border-l-2 border-green-500" : "bg-red-50 border-l-2 border-red-500"),
+                          event.event_type === 'action_started' && "bg-indigo-50 border-l-2 border-indigo-400",
+                          event.event_type === 'action_completed' && (event.success ? "bg-indigo-50 border-l-2 border-indigo-500" : "bg-red-50 border-l-2 border-red-400"),
+                          event.event_type?.startsWith('db_') && "bg-purple-50 border-l-2 border-purple-500",
+                          event.event_type === 'error' && "bg-red-50 border-l-2 border-red-500",
+                          event.event_type === 'target_processed' && "bg-yellow-50 border-l-2 border-yellow-500"
+                        )}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-mono text-[10px] text-gray-500">
+                              {formatShortTime(event.event_timestamp)}
+                            </span>
+                            <span className={cn(
+                              "font-medium",
+                              event.event_type === 'job_started' && "text-blue-700",
+                              event.event_type === 'job_completed' && (event.success ? "text-green-700" : "text-red-700"),
+                              event.event_type === 'action_started' && "text-indigo-700",
+                              event.event_type === 'action_completed' && "text-indigo-700",
+                              event.event_type?.startsWith('db_') && "text-purple-700",
+                              event.event_type === 'error' && "text-red-700"
+                            )}>
+                              {event.event_type?.replace(/_/g, ' ')}
+                            </span>
+                            {event.action_name && (
+                              <span className="text-gray-600">→ {event.action_name}</span>
+                            )}
+                          </div>
+                          {/* Show event details from details JSON */}
+                          {event.details && (
+                            <div className="text-[10px] text-gray-600 mt-0.5">
+                              {typeof event.details === 'string' ? event.details : 
+                                Object.entries(typeof event.details === 'object' ? event.details : {})
+                                  .filter(([k, v]) => v !== null && v !== undefined)
+                                  .slice(0, 4)
+                                  .map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v).slice(0, 30) : v}`)
+                                  .join(' | ')
+                              }
+                            </div>
+                          )}
+                          {/* Database operation details */}
+                          {event.table_name && (
+                            <div className="text-[10px] text-purple-600 mt-0.5">
+                              {event.operation_type} on <span className="font-mono">{event.table_name}</span>
+                              {event.record_id && <span> → Record ID: <strong>{event.record_id}</strong></span>}
+                              {event.record_ids?.length > 0 && <span> → {event.record_ids.length} records: [{event.record_ids.slice(0, 5).join(', ')}{event.record_ids.length > 5 ? '...' : ''}]</span>}
+                            </div>
+                          )}
+                          {event.target_ip && (
+                            <div className="text-[10px] text-gray-500 font-mono">Target: {event.target_ip}</div>
+                          )}
+                          {event.error_message && (
+                            <div className="text-[10px] text-red-600 mt-0.5">Error: {event.error_message}</div>
+                          )}
+                        </div>
+                        {event.success === false && (
+                          <XCircle className="w-3 h-3 text-red-500 flex-shrink-0" />
+                        )}
+                        {event.success === true && event.event_type?.includes('completed') && (
+                          <CheckCircle className="w-3 h-3 text-green-500 flex-shrink-0" />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : !loadingAudit ? (
+                  <div className="text-xs text-gray-400 italic">No audit events recorded yet. Events will appear for new job executions.</div>
+                ) : null}
+              </div>
             </div>
           </div>
         </div>

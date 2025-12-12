@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { fetchApi } from '../../../lib/utils';
 
 export const ActionNotificationsSection = ({ action, actionIndex, updateAction }) => {
   const notifications = action.notifications || {
@@ -30,9 +31,8 @@ export const ActionNotificationsSection = ({ action, actionIndex, updateAction }
     setTestStatus('');
     setIsTesting(true);
     try {
-      const resp = await fetch('/api/notify/test', {
+      await fetchApi('/api/notify/test', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           targets: notifications.targets || [],
           title: `Action ${actionIndex + 1} notification test`,
@@ -40,14 +40,9 @@ export const ActionNotificationsSection = ({ action, actionIndex, updateAction }
           tag: 'jobbuilder.test'
         })
       });
-      const data = await resp.json().catch(() => ({}));
-      if (!resp.ok) {
-        setTestStatus(data.error || 'Notification test failed');
-      } else {
-        setTestStatus('Notification sent successfully');
-      }
+      setTestStatus('Notification sent successfully');
     } catch (err) {
-      setTestStatus('Notification test failed');
+      setTestStatus(err.message || 'Notification test failed');
     } finally {
       setIsTesting(false);
     }

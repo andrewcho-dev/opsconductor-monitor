@@ -181,6 +181,35 @@ def disable_job(name):
     return jsonify(success_response(job, message='Scheduler job disabled'))
 
 
+@scheduler_bp.route('/jobs/<name>/toggle', methods=['POST'])
+def toggle_job(name):
+    """
+    Toggle a scheduler job's enabled state.
+    
+    Args:
+        name: Job name
+    
+    Body:
+        enabled: New enabled state (boolean)
+    
+    Returns:
+        Updated job
+    """
+    service = get_scheduler_service()
+    data = request.get_json() or {}
+    
+    enabled = data.get('enabled')
+    if enabled is None:
+        # If not specified, toggle current state
+        current_job = service.get_job(name)
+        enabled = not current_job.get('enabled', True)
+    
+    job = service.set_enabled(name, enabled)
+    
+    message = 'Scheduler job enabled' if enabled else 'Scheduler job disabled'
+    return jsonify(success_response(job, message=message))
+
+
 @scheduler_bp.route('/jobs/<name>/run-once', methods=['POST'])
 def run_job_once(name):
     """
@@ -330,3 +359,149 @@ def mark_stale_executions():
     marked = service.mark_stale_executions(timeout)
     
     return jsonify(success_response({'marked': marked}, message=f'Marked {marked} stale executions'))
+
+
+@scheduler_bp.route('/executions/<int:execution_id>/cancel', methods=['POST'])
+def cancel_execution(execution_id):
+    """
+    Cancel a running execution.
+    
+    Args:
+        execution_id: Execution ID
+    
+    Returns:
+        Success message
+    """
+    service = get_scheduler_service()
+    
+    # Get the execution to find its task_id
+    from database import DatabaseManager
+    from ..repositories.execution_repo import ExecutionRepository
+    
+    db = DatabaseManager()
+    execution_repo = ExecutionRepository(db)
+    execution = execution_repo.get_by_id(execution_id)
+    
+    if not execution:
+        raise NotFoundError(f'Execution {execution_id} not found')
+    
+    task_id = execution.get('task_id')
+    
+    # Try to revoke the Celery task if we have a task_id
+    if task_id:
+        try:
+            from celery_app import celery
+            celery.control.revoke(task_id, terminate=True)
+        except Exception as e:
+            # Log but don't fail - task may have already completed
+            import logging
+            logging.warning(f"Failed to revoke task {task_id}: {e}")
+    
+    # Update execution status to cancelled
+    execution_repo.update_status(execution_id, 'cancelled')
+    
+    return jsonify(success_response(message='Execution cancelled'))
+
+
+@scheduler_bp.route('/queues', methods=['GET'])
+def get_queue_status():
+    """
+    Get Celery queue status.
+    
+    Returns:
+        Queue statistics including active, reserved, scheduled counts
+    """
+    try:
+        from celery_app import celery
+        
+        inspect = celery.control.inspect()
+        
+        # Get active tasks (currently executing)
+        active = inspect.active() or {}
+        active_total = sum(len(tasks) for tasks in active.values())
+        
+        # Get reserved tasks (received but not yet executing)
+        reserved = inspect.reserved() or {}
+        reserved_total = sum(len(tasks) for tasks in reserved.values())
+        
+        # Get scheduled tasks (eta/countdown)
+        scheduled = inspect.scheduled() or {}
+        scheduled_total = sum(len(tasks) for tasks in scheduled.values())
+        
+        return jsonify(success_response({
+            'active': active_total,
+            'active_total': active_total,
+            'active_by_worker': {k: len(v) for k, v in active.items()},
+            'reserved': reserved_total,
+            'reserved_total': reserved_total,
+            'scheduled': scheduled_total,
+            'scheduled_total': scheduled_total,
+        }))
+    except Exception as e:
+        # Return zeros if Celery is not available
+        return jsonify(success_response({
+            'active': 0,
+            'active_total': 0,
+            'active_by_worker': {},
+            'reserved': 0,
+            'reserved_total': 0,
+            'scheduled': 0,
+            'scheduled_total': 0,
+            'error': str(e)
+        }))
+
+
+@scheduler_bp.route('/executions/<int:execution_id>/audit', methods=['GET'])
+def get_execution_audit_trail(execution_id):
+    """
+    Get complete audit trail for an execution.
+    
+    Returns all events that occurred during the execution including:
+    - Job start/end timestamps
+    - Each action start/end
+    - Every database operation with record IDs
+    - All errors
+    
+    Args:
+        execution_id: Execution ID
+    
+    Returns:
+        List of audit events in chronological order
+    """
+    from database import get_db
+    from ..repositories.audit_repo import JobAuditRepository
+    
+    db = get_db()
+    audit_repo = JobAuditRepository(db)
+    
+    events = audit_repo.get_execution_audit_trail(execution_id=execution_id)
+    
+    return jsonify(success_response(events))
+
+
+@scheduler_bp.route('/executions/<int:execution_id>/db-operations', methods=['GET'])
+def get_execution_db_operations(execution_id):
+    """
+    Get all database operations for an execution.
+    
+    Returns only insert/update/delete events with links to affected records.
+    
+    Args:
+        execution_id: Execution ID
+    
+    Returns:
+        List of database operations with record references
+    """
+    from database import get_db
+    from ..repositories.audit_repo import JobAuditRepository
+    
+    db = get_db()
+    audit_repo = JobAuditRepository(db)
+    
+    operations = audit_repo.get_db_operations_for_execution(execution_id=execution_id)
+    affected_records = audit_repo.get_records_affected_by_execution(execution_id=execution_id)
+    
+    return jsonify(success_response({
+        'operations': operations,
+        'affected_records': affected_records
+    }))

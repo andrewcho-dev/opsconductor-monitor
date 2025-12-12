@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Network, AlertCircle, RefreshCw } from "lucide-react";
-import { cn } from "../lib/utils";
+import { cn, fetchApi } from "../lib/utils";
 import { PageHeader } from "../components/layout";
 
 // We'll use a simple implementation without vis.js for now
@@ -43,13 +43,10 @@ export function Topology() {
   const loadTopologyData = async (ipList) => {
     try {
       setLoading(true);
-      const response = await fetch('/topology_data', {
+      const data = await fetchApi('/topology_data', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ip_list: ipList }),
       });
-      
-      const data = await response.json();
       
       if (data.error) {
         setError(data.error);

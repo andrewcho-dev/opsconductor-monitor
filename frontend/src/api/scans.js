@@ -93,6 +93,33 @@ export async function cleanupOldData(opticalDays = 90) {
   return extractData(response);
 }
 
+/**
+ * Get scan progress
+ * @returns {Promise<Object>} Scan progress status
+ */
+export async function getProgress() {
+  const response = await apiClient.get('/progress');
+  return response;
+}
+
+/**
+ * Start a network scan
+ * @returns {Promise<Object>} Scan start result
+ */
+export async function startScan() {
+  const response = await apiClient.post('/scan');
+  return response;
+}
+
+/**
+ * Cancel running scan
+ * @returns {Promise<Object>} Cancel result
+ */
+export async function cancelScan() {
+  const response = await apiClient.post('/cancel_scan');
+  return response;
+}
+
 export default {
   getDeviceInterfaces,
   getOpticalInterfaces,
@@ -100,4 +127,7 @@ export default {
   getOpticalPowerHistoryBulk,
   getOpticalPowerTrends,
   cleanupOldData,
+  getProgress,
+  startScan,
+  cancelScan,
 };

@@ -77,9 +77,8 @@ export function SSHSettings() {
       setTesting(true);
       setMessage(null);
       
-      const response = await fetch('/test_ssh', {
+      const data = await fetchApi('/test_ssh', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ip_address: testIp,
           username: settings.ssh_username,
@@ -87,7 +86,6 @@ export function SSHSettings() {
           port: settings.ssh_port,
         }),
       });
-      const data = await response.json();
       
       if (data.success) {
         setMessage({ type: 'success', text: `SSH test successful: Connected to ${testIp}` });

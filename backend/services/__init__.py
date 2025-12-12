@@ -7,6 +7,7 @@ from .job_service import JobService
 from .scheduler_service import SchedulerService
 from .scan_service import ScanService
 from .job_executor import JobExecutor
+from .notification_service import NotificationService, send_notification
 
 __all__ = [
     'BaseService',
@@ -16,4 +17,6 @@ __all__ = [
     'SchedulerService',
     'ScanService',
     'JobExecutor',
+    'NotificationService',
+    'send_notification',
 ]

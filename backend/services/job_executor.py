@@ -24,14 +24,24 @@ class JobExecutor:
     Coordinates between targeting, execution, parsing, and database operations.
     """
     
-    def __init__(self, db_manager=None):
+    def __init__(self, db_manager=None, task_id: str = None, execution_id: int = None):
         """
         Initialize job executor.
         
         Args:
             db_manager: Optional database manager for DB operations
+            task_id: Celery task ID for audit logging
+            execution_id: Execution record ID for audit logging
         """
         self.db = db_manager
+        self.task_id = task_id
+        self.execution_id = execution_id
+        self.audit_repo = None
+        
+        # Initialize audit repository if db available
+        if db_manager:
+            from ..repositories.audit_repo import JobAuditRepository
+            self.audit_repo = JobAuditRepository(db_manager)
         
         # Ensure executors are registered
         self._ensure_executors_registered()
@@ -40,6 +50,19 @@ class JobExecutor:
         """Ensure all executors are registered."""
         # Import to trigger registration
         from ..executors import SSHExecutor, PingExecutor, SNMPExecutor
+    
+    def _log_audit(self, event_type: str, **kwargs):
+        """Log an audit event if audit repository is available."""
+        if self.audit_repo:
+            try:
+                self.audit_repo.log_event(
+                    event_type=event_type,
+                    execution_id=self.execution_id,
+                    task_id=self.task_id,
+                    **kwargs
+                )
+            except Exception as e:
+                logger.warning(f"Failed to log audit event: {e}")
     
     def execute_job(self, job_definition: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -52,16 +75,25 @@ class JobExecutor:
             Execution result dictionary
         """
         start_time = datetime.now()
+        job_name = job_definition.get('name')
         
         result = {
             'job_id': job_definition.get('id') or job_definition.get('job_id'),
-            'job_name': job_definition.get('name'),
+            'job_name': job_name,
+            'job_definition_id': job_definition.get('job_definition_id'),
             'started_at': start_time.isoformat(),
             'actions_completed': 0,
             'total_actions': len(job_definition.get('actions', [])),
             'errors': [],
-            'action_results': {},
+            'audit_events': [],  # Track audit event IDs for reference
         }
+        
+        # Log job started
+        self._log_audit('job_started', details={
+            'job_name': job_name,
+            'job_id': result['job_id'],
+            'total_actions': result['total_actions']
+        })
         
         try:
             actions = job_definition.get('actions', [])
@@ -69,11 +101,31 @@ class JobExecutor:
             
             for i, action in enumerate(actions):
                 action_type = action.get('type', f'action_{i}')
+                action_name = action.get('name', action_type)
+                
+                # Log action started
+                self._log_audit('action_started', 
+                    action_name=action_name,
+                    action_index=i,
+                    details={'action_type': action_type, 'config': action.get('execution', {})}
+                )
                 
                 try:
-                    action_result = self._execute_action(action, config)
-                    result['action_results'][action_type] = action_result
+                    action_result = self._execute_action(action, config, action_name, i)
+                    result[f'action_{action_name}'] = action_result
                     result['actions_completed'] += 1
+                    
+                    # Log action completed
+                    self._log_audit('action_completed',
+                        action_name=action_name,
+                        action_index=i,
+                        success=not action_result.get('error'),
+                        error_message=action_result.get('error'),
+                        details={
+                            'targets_processed': action_result.get('targets_processed', 0),
+                            'successful_results': action_result.get('successful_results', 0)
+                        }
+                    )
                     
                     if action_result.get('error'):
                         result['errors'].append(f"{action_type}: {action_result['error']}")
@@ -81,11 +133,20 @@ class JobExecutor:
                 except Exception as e:
                     error_msg = f"{action_type}: {str(e)}"
                     result['errors'].append(error_msg)
-                    result['action_results'][action_type] = {'error': str(e)}
+                    result[f'action_{action_name}'] = {'error': str(e)}
+                    
+                    # Log action error
+                    self._log_audit('action_completed',
+                        action_name=action_name,
+                        action_index=i,
+                        success=False,
+                        error_message=str(e)
+                    )
                     logger.exception(f"Action {action_type} failed")
         
         except Exception as e:
             result['errors'].append(f"Job execution failed: {str(e)}")
+            self._log_audit('error', error_message=str(e), details={'phase': 'job_execution'})
             logger.exception("Job execution failed")
         
         finally:
@@ -93,16 +154,35 @@ class JobExecutor:
             result['finished_at'] = end_time.isoformat()
             result['duration_seconds'] = (end_time - start_time).total_seconds()
             result['status'] = JOB_STATUS_SUCCESS if not result['errors'] else JOB_STATUS_FAILED
+            
+            # Log job completed
+            self._log_audit('job_completed',
+                success=result['status'] == JOB_STATUS_SUCCESS,
+                error_message='; '.join(result['errors']) if result['errors'] else None,
+                details={
+                    'duration_seconds': result['duration_seconds'],
+                    'actions_completed': result['actions_completed'],
+                    'total_actions': result['total_actions']
+                }
+            )
         
         return result
     
-    def _execute_action(self, action: Dict[str, Any], job_config: Dict[str, Any]) -> Dict[str, Any]:
+    def _execute_action(
+        self, 
+        action: Dict[str, Any], 
+        job_config: Dict[str, Any],
+        action_name: str = None,
+        action_index: int = None
+    ) -> Dict[str, Any]:
         """
         Execute a single action.
         
         Args:
             action: Action definition
             job_config: Job-level configuration
+            action_name: Name of the action for audit logging
+            action_index: Index of the action for audit logging
         
         Returns:
             Action result dictionary
@@ -121,13 +201,13 @@ class JobExecutor:
         
         # Execute based on action type
         if action_type == 'ssh_command':
-            return self._execute_ssh_action(targets, action, job_config)
+            return self._execute_ssh_action(targets, action, job_config, action_name)
         elif action_type == 'ping':
-            return self._execute_ping_action(targets, action, job_config)
+            return self._execute_ping_action(targets, action, job_config, action_name)
         elif action_type == 'snmp':
-            return self._execute_snmp_action(targets, action, job_config)
+            return self._execute_snmp_action(targets, action, job_config, action_name)
         elif action_type == 'database':
-            return self._execute_database_action(targets, action, job_config)
+            return self._execute_database_action(targets, action, job_config, action_name)
         else:
             return {
                 'success': False,
@@ -161,7 +241,8 @@ class JobExecutor:
         self, 
         targets: List[str], 
         action: Dict[str, Any], 
-        job_config: Dict[str, Any]
+        job_config: Dict[str, Any],
+        action_name: str = None
     ) -> Dict[str, Any]:
         """Execute SSH command action."""
         execution = action.get('execution', {})
@@ -245,7 +326,8 @@ class JobExecutor:
         self, 
         targets: List[str], 
         action: Dict[str, Any], 
-        job_config: Dict[str, Any]
+        job_config: Dict[str, Any],
+        action_name: str = None
     ) -> Dict[str, Any]:
         """Execute ping action."""
         execution = action.get('execution', {})
@@ -286,7 +368,8 @@ class JobExecutor:
         self, 
         targets: List[str], 
         action: Dict[str, Any], 
-        job_config: Dict[str, Any]
+        job_config: Dict[str, Any],
+        action_name: str = None
     ) -> Dict[str, Any]:
         """Execute SNMP action."""
         execution = action.get('execution', {})
@@ -328,7 +411,8 @@ class JobExecutor:
         self, 
         targets: List[str], 
         action: Dict[str, Any], 
-        job_config: Dict[str, Any]
+        job_config: Dict[str, Any],
+        action_name: str = None
     ) -> Dict[str, Any]:
         """Execute database action (store results)."""
         database = action.get('database', {})

@@ -43,8 +43,9 @@ export function GroupsPage() {
 
   const loadGroupDevices = async (groupId) => {
     try {
-      const data = await fetchApi(`/device_groups/${groupId}/devices`);
-      setGroupDevices(data || []);
+      const response = await fetchApi(`/api/device_groups/${groupId}/devices`);
+      const data = response.data || response || [];
+      setGroupDevices(data);
       setSelectedDevicesForGroup(new Set(data.map(d => d.ip_address || d)));
     } catch (err) {
       console.error("Failed to load group devices:", err);
@@ -99,12 +100,12 @@ export function GroupsPage() {
 
       // Remove devices
       for (const ip of toRemove) {
-        await fetchApi(`/device_groups/${selectedGroup.id}/devices/${ip}`, { method: 'DELETE' });
+        await fetchApi(`/api/device_groups/${selectedGroup.id}/devices/${ip}`, { method: 'DELETE' });
       }
       
       // Add devices
       if (toAdd.length > 0) {
-        await fetchApi(`/device_groups/${selectedGroup.id}/devices`, {
+        await fetchApi(`/api/device_groups/${selectedGroup.id}/devices`, {
           method: 'POST',
           body: JSON.stringify({ ip_addresses: toAdd })
         });

@@ -72,7 +72,11 @@ export function DeviceDetail() {
     try {
       setLoading(true);
       const allDevices = await fetchApi("/data");
-      const deviceData = allDevices.find((d) => d.ip_address === ip);
+      // Handle IP addresses that may have /32 suffix in database
+      const deviceData = allDevices.find((d) => {
+        const dbIp = d.ip_address?.replace(/\/\d+$/, ''); // Strip CIDR suffix
+        return dbIp === ip || d.ip_address === ip;
+      });
       
       if (deviceData) {
         setDevice(deviceData);
@@ -90,16 +94,16 @@ export function DeviceDetail() {
     if (!ip) return;
     
     try {
-      const response = await fetch("/get_combined_interfaces", {
+      const data = await fetchApi("/get_combined_interfaces", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ip, limit: 50 }),
       });
       
-      const data = await response.json();
+      // Backend returns array directly or {interfaces: [...]}
+      const interfaceList = Array.isArray(data) ? data : (data.interfaces || []);
       
-      if (data.interfaces && data.interfaces.length > 0) {
-        setInterfaces(data.interfaces.sort((a, b) => a.interface_index - b.interface_index));
+      if (interfaceList.length > 0) {
+        setInterfaces(interfaceList.sort((a, b) => a.interface_index - b.interface_index));
       } else {
         // Try SSH/CLI data
         loadSshCliDataOnly();
@@ -111,16 +115,16 @@ export function DeviceDetail() {
 
   const loadSshCliDataOnly = async () => {
     try {
-      const response = await fetch("/get_ssh_cli_interfaces", {
+      const data = await fetchApi("/get_ssh_cli_interfaces", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ip, limit: 50 }),
       });
       
-      const data = await response.json();
+      // Backend returns array directly or {interfaces: [...]}
+      const interfaceList = Array.isArray(data) ? data : (data.interfaces || []);
       
-      if (data.interfaces && data.interfaces.length > 0) {
-        setInterfaces(data.interfaces.sort((a, b) => a.interface_index - b.interface_index));
+      if (interfaceList.length > 0) {
+        setInterfaces(interfaceList.sort((a, b) => a.interface_index - b.interface_index));
       }
     } catch (err) {
       console.error("Error loading SSH/CLI data:", err);
@@ -157,17 +161,14 @@ export function DeviceDetail() {
     
     try {
       setOpticalLoading(true);
-      const response = await fetch("/power_history", {
+      const data = await fetchApi("/power_history", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ip_addresses: [currentOpticalInterface.ip],
           interface_index: currentOpticalInterface.interfaceIndex,
           hours,
         }),
       });
-      
-      const data = await response.json();
       setOpticalHistory(data.history || []);
     } catch (err) {
       console.error("Error loading optical history:", err);

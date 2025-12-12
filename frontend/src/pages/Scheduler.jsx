@@ -174,7 +174,7 @@ export function Scheduler() {
       setLoading(true);
       setError(null);
       const data = await fetchApi("/api/scheduler/jobs");
-      setJobs(data.jobs || []);
+      setJobs(data.data || data.jobs || []);
     } catch (err) {
       console.error("Failed to load scheduler jobs", err);
       setError(err.message || "Failed to load jobs");
@@ -196,7 +196,7 @@ export function Scheduler() {
       const data = await fetchApi(
         `/api/scheduler/jobs/${encodeURIComponent(jobName)}/executions?limit=50`
       );
-      setExecutions(data.executions || []);
+      setExecutions(data.data || data.executions || []);
     } catch (err) {
       console.error("Failed to load executions", err);
       setError(err.message || "Failed to load executions");

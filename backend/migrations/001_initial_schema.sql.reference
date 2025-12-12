@@ -1,0 +1,206 @@
+-- OpsConductor Initial Database Schema
+-- Migration: 001_initial_schema
+-- Created: 2025-12-11
+
+-- ============================================================================
+-- DEVICES TABLE
+-- Stores discovered network devices
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS devices (
+    id SERIAL PRIMARY KEY,
+    ip_address VARCHAR(45) NOT NULL UNIQUE,
+    hostname VARCHAR(255),
+    mac_address VARCHAR(17),
+    vendor VARCHAR(255),
+    device_type VARCHAR(100),
+    model VARCHAR(255),
+    serial_number VARCHAR(255),
+    software_version VARCHAR(100),
+    ping_status VARCHAR(20) DEFAULT 'unknown',
+    snmp_status VARCHAR(20) DEFAULT 'unknown',
+    ssh_status VARCHAR(20) DEFAULT 'unknown',
+    last_seen TIMESTAMP WITH TIME ZONE,
+    first_seen TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    metadata JSONB DEFAULT '{}'::jsonb
+);
+
+CREATE INDEX IF NOT EXISTS idx_devices_ip ON devices(ip_address);
+CREATE INDEX IF NOT EXISTS idx_devices_hostname ON devices(hostname);
+CREATE INDEX IF NOT EXISTS idx_devices_ping_status ON devices(ping_status);
+CREATE INDEX IF NOT EXISTS idx_devices_last_seen ON devices(last_seen);
+
+-- ============================================================================
+-- DEVICE GROUPS TABLE
+-- Custom groupings of devices
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS device_groups (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE,
+    description TEXT,
+    color VARCHAR(7) DEFAULT '#3B82F6',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================================================
+-- DEVICE GROUP MEMBERS TABLE
+-- Many-to-many relationship between devices and groups
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS device_group_members (
+    id SERIAL PRIMARY KEY,
+    group_id INTEGER NOT NULL REFERENCES device_groups(id) ON DELETE CASCADE,
+    device_ip VARCHAR(45) NOT NULL,
+    added_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(group_id, device_ip)
+);
+
+CREATE INDEX IF NOT EXISTS idx_dgm_group_id ON device_group_members(group_id);
+CREATE INDEX IF NOT EXISTS idx_dgm_device_ip ON device_group_members(device_ip);
+
+-- ============================================================================
+-- INTERFACE SCANS TABLE
+-- Stores interface scan results from SSH/SNMP
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS interface_scans (
+    id SERIAL PRIMARY KEY,
+    device_ip VARCHAR(45) NOT NULL,
+    interface_index INTEGER,
+    interface_name VARCHAR(100),
+    interface_type VARCHAR(50),
+    admin_status VARCHAR(20),
+    oper_status VARCHAR(20),
+    speed_mbps INTEGER,
+    mtu INTEGER,
+    mac_address VARCHAR(17),
+    description TEXT,
+    
+    -- Transceiver info
+    xcvr_type VARCHAR(100),
+    xcvr_vendor VARCHAR(100),
+    xcvr_part_number VARCHAR(100),
+    xcvr_serial_number VARCHAR(100),
+    xcvr_wavelength VARCHAR(50),
+    
+    -- LLDP neighbor info
+    lldp_remote_chassis_id VARCHAR(255),
+    lldp_remote_port VARCHAR(100),
+    lldp_remote_system_name VARCHAR(255),
+    lldp_remote_mgmt_addr VARCHAR(45),
+    
+    scan_type VARCHAR(20) DEFAULT 'ssh',
+    scanned_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    raw_data JSONB DEFAULT '{}'::jsonb
+);
+
+CREATE INDEX IF NOT EXISTS idx_iscans_device_ip ON interface_scans(device_ip);
+CREATE INDEX IF NOT EXISTS idx_iscans_scanned_at ON interface_scans(scanned_at);
+CREATE INDEX IF NOT EXISTS idx_iscans_interface_name ON interface_scans(interface_name);
+
+-- ============================================================================
+-- OPTICAL POWER READINGS TABLE
+-- Time-series data for optical power monitoring
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS optical_power_readings (
+    id SERIAL PRIMARY KEY,
+    device_ip VARCHAR(45) NOT NULL,
+    interface_index INTEGER,
+    interface_name VARCHAR(100),
+    tx_power_dbm DECIMAL(10, 4),
+    rx_power_dbm DECIMAL(10, 4),
+    temperature_c DECIMAL(10, 2),
+    voltage_v DECIMAL(10, 4),
+    bias_current_ma DECIMAL(10, 4),
+    recorded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_opr_device_ip ON optical_power_readings(device_ip);
+CREATE INDEX IF NOT EXISTS idx_opr_recorded_at ON optical_power_readings(recorded_at);
+CREATE INDEX IF NOT EXISTS idx_opr_device_interface ON optical_power_readings(device_ip, interface_index);
+
+-- ============================================================================
+-- JOB DEFINITIONS TABLE
+-- Stores job templates/definitions
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS job_definitions (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE,
+    description TEXT,
+    definition JSONB NOT NULL DEFAULT '{}'::jsonb,
+    enabled BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_jobdef_name ON job_definitions(name);
+CREATE INDEX IF NOT EXISTS idx_jobdef_enabled ON job_definitions(enabled);
+
+-- ============================================================================
+-- SCHEDULER JOBS TABLE
+-- Stores scheduled job configurations
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS scheduler_jobs (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE,
+    description TEXT,
+    task_name VARCHAR(255) NOT NULL,
+    config JSONB DEFAULT '{}'::jsonb,
+    schedule_type VARCHAR(50) DEFAULT 'interval',
+    interval_seconds INTEGER DEFAULT 300,
+    cron_expression VARCHAR(100),
+    enabled BOOLEAN DEFAULT true,
+    last_run_at TIMESTAMP WITH TIME ZONE,
+    next_run_at TIMESTAMP WITH TIME ZONE,
+    run_count INTEGER DEFAULT 0,
+    error_count INTEGER DEFAULT 0,
+    last_error TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_schjob_name ON scheduler_jobs(name);
+CREATE INDEX IF NOT EXISTS idx_schjob_enabled ON scheduler_jobs(enabled);
+CREATE INDEX IF NOT EXISTS idx_schjob_next_run ON scheduler_jobs(next_run_at);
+
+-- ============================================================================
+-- JOB EXECUTIONS TABLE
+-- Stores execution history for jobs
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS job_executions (
+    id SERIAL PRIMARY KEY,
+    job_name VARCHAR(255) NOT NULL,
+    task_name VARCHAR(255),
+    task_id VARCHAR(255),
+    status VARCHAR(50) DEFAULT 'pending',
+    started_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    finished_at TIMESTAMP WITH TIME ZONE,
+    duration_seconds DECIMAL(10, 3),
+    config JSONB DEFAULT '{}'::jsonb,
+    result JSONB DEFAULT '{}'::jsonb,
+    error_message TEXT,
+    targets_count INTEGER DEFAULT 0,
+    success_count INTEGER DEFAULT 0,
+    failed_count INTEGER DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_jobexec_job_name ON job_executions(job_name);
+CREATE INDEX IF NOT EXISTS idx_jobexec_status ON job_executions(status);
+CREATE INDEX IF NOT EXISTS idx_jobexec_started_at ON job_executions(started_at);
+CREATE INDEX IF NOT EXISTS idx_jobexec_task_id ON job_executions(task_id);
+
+-- ============================================================================
+-- SCHEMA VERSION TABLE
+-- Tracks applied migrations
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS schema_versions (
+    id SERIAL PRIMARY KEY,
+    version VARCHAR(50) NOT NULL UNIQUE,
+    description TEXT,
+    applied_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Record this migration
+INSERT INTO schema_versions (version, description) 
+VALUES ('001', 'Initial schema')
+ON CONFLICT (version) DO NOTHING;

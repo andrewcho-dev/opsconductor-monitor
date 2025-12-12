@@ -30,8 +30,9 @@ export function DevicesPage() {
 
   const loadCustomGroupDevices = async (groupId) => {
     try {
-      const data = await fetchApi(`/device_groups/${groupId}/devices`);
-      const ips = new Set(data.map(d => d.ip_address || d));
+      const response = await fetchApi(`/api/device_groups/${groupId}/devices`);
+      const data = response.data || response;
+      const ips = new Set((data || []).map(d => d.ip_address || d));
       setCustomGroupDeviceIps(ips);
     } catch (err) {
       console.error("Failed to load group devices:", err);
@@ -78,7 +79,11 @@ export function DevicesPage() {
     });
   };
 
-  const handleShowDetail = (ip) => navigate(`/inventory/devices/${ip}`);
+  const handleShowDetail = (ip) => {
+    // Strip /32 suffix if present for URL
+    const cleanIp = ip?.replace(/\/\d+$/, '');
+    navigate(`/inventory/devices/${cleanIp}`);
+  };
 
   const handleDeleteDevice = async (ip) => {
     if (confirm(`Delete device ${ip}?`)) {

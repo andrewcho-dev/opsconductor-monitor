@@ -118,3 +118,58 @@ def get_settings() -> Settings:
         Settings instance (cached)
     """
     return Settings()
+
+
+# JSON-based settings for backward compatibility with config.json
+import json
+
+def get_json_settings() -> dict:
+    """Get settings from JSON file (backward compatible)."""
+    config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'config.json')
+    default_settings = {
+        "ping_command": "ping",
+        "ping_count": "1",
+        "ping_timeout": "0.3",
+        "online_status": "online",
+        "offline_status": "offline",
+        "snmp_version": "2c",
+        "snmp_community": "public",
+        "snmp_port": "161",
+        "snmp_timeout": "1",
+        "snmp_success_status": "YES",
+        "snmp_fail_status": "NO",
+        "ssh_port": "22",
+        "ssh_timeout": "3",
+        "ssh_username": "admin",
+        "ssh_password": "admin",
+        "ssh_success_status": "YES",
+        "ssh_fail_status": "NO",
+        "rdp_port": "3389",
+        "rdp_timeout": "3",
+        "rdp_success_status": "YES",
+        "rdp_fail_status": "NO",
+        "max_threads": "100",
+        "completion_message": "Capability scan completed: {online}/{total} hosts online",
+        "notifications_enabled": False,
+        "notification_targets": "",
+        "notify_discovery_on_success": False,
+        "notify_discovery_on_error": True,
+        "notify_interface_on_success": False,
+        "notify_interface_on_error": True,
+        "notify_optical_on_success": False,
+        "notify_optical_on_error": True,
+    }
+    try:
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return default_settings
+
+
+def save_json_settings(data: dict) -> None:
+    """Save settings to JSON file (backward compatible)."""
+    config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'config.json')
+    with open(config_path, 'w') as f:
+        json.dump(data, f, indent=2)
