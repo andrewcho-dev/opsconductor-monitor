@@ -4,10 +4,10 @@ SNMP Node Executors
 Executors for SNMP operations.
 """
 
-import logging
 from typing import Dict, List, Any
+from ..logging_service import get_logger, LogSource
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__, LogSource.SNMP)
 
 
 class SNMPGetExecutor:
@@ -39,9 +39,21 @@ class SNMPGetExecutor:
         if not target:
             return {'error': 'No target specified', 'values': {}}
         
+        logger.info(
+            f"SNMP GET on {target}",
+            device_ip=target,
+            category='get',
+            details={'oids': oids, 'version': version}
+        )
+        
         try:
             # Try to use pysnmp if available
-            return self._snmp_get_pysnmp(target, community, oids, version)
+            result = self._snmp_get_pysnmp(target, community, oids, version)
+            if result.get('success'):
+                logger.info(f"SNMP GET succeeded on {target}", device_ip=target, category='get')
+            else:
+                logger.warning(f"SNMP GET failed on {target}: {result.get('error')}", device_ip=target, category='get')
+            return result
         except ImportError:
             # Fall back to snmpget command
             return self._snmp_get_command(target, community, oids, version)

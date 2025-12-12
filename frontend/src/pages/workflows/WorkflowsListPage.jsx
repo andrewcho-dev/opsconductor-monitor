@@ -4,7 +4,7 @@ import WorkflowsList from "./WorkflowsList";
 
 export function WorkflowsListPage() {
   return (
-    <PageLayout module="workflows">
+    <PageLayout module="workflows" fullWidth>
       <WorkflowsList />
     </PageLayout>
   );

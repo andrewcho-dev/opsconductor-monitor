@@ -54,9 +54,11 @@ export function GlobalNav() {
         className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
         onClick={() => navigate('/inventory/devices')}
       >
-        <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-          <Server className="w-5 h-5" />
-        </div>
+        <img 
+          src="/badge-light.svg" 
+          alt="OpsConductor" 
+          className="w-8 h-8"
+        />
         <div className="hidden sm:block">
           <div className="font-bold text-lg leading-tight">OpsConductor</div>
           <div className="text-xs text-slate-400 leading-tight">Network Monitor</div>

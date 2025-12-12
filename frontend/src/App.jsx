@@ -13,6 +13,7 @@ import { DashboardPage, TopologyPage, PowerTrendsPage, AlertsPage, ActiveJobsPag
 import { 
   SystemOverviewPage, 
   WorkersPage, 
+  AlertsPage as SystemAlertsPage,
   SettingsPage as SystemSettingsPage,
   NotificationsPage,
   CredentialsPage,
@@ -61,6 +62,7 @@ function App() {
         <Route path="/system" element={<Navigate to="/system/overview" replace />} />
         <Route path="/system/overview" element={<SystemOverviewPage />} />
         <Route path="/system/workers" element={<WorkersPage />} />
+        <Route path="/system/alerts" element={<SystemAlertsPage />} />
         <Route path="/system/settings" element={<SystemSettingsPage />}>
           <Route index element={<Navigate to="general" replace />} />
           <Route path="general" element={<GeneralSettings />} />

@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 def get_celery():
     """Get Celery app instance."""
     try:
-        from celery_app import celery
-        return celery
+        from celery_app import celery_app
+        return celery_app
     except ImportError:
         return None
 
@@ -172,3 +172,19 @@ if celery:
         from celery import current_task
         task_id = current_task.request.id if current_task else None
         return run_scheduled_job(job_name, task_id)
+    
+    @celery.task(name='opsconductor.alerts.evaluate')
+    def celery_evaluate_alerts():
+        """
+        Celery task to evaluate all alert rules.
+        
+        Should be scheduled to run periodically (e.g., every minute)
+        via Celery Beat or called manually.
+        """
+        from ..services.alert_service import AlertEvaluator
+        
+        evaluator = AlertEvaluator()
+        results = evaluator.evaluate_all_rules()
+        
+        logger.info(f"Alert evaluation complete: {results['evaluated']} rules, {results['alerts_created']} alerts created")
+        return results

@@ -4,10 +4,10 @@ SSH Node Executors
 Executors for SSH command execution.
 """
 
-import logging
 from typing import Dict, List, Any
+from ..logging_service import get_logger, LogSource
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__, LogSource.SSH)
 
 
 class SSHCommandExecutor:
@@ -44,8 +44,32 @@ class SSHCommandExecutor:
         if not command:
             return {'error': 'No command specified', 'output': ''}
         
+        logger.info(
+            f"Executing SSH command on {target}:{port}",
+            device_ip=target,
+            category='command',
+            details={'command': command[:100], 'username': username}
+        )
+        
         try:
-            return self._execute_ssh(target, port, username, password, command, timeout)
+            result = self._execute_ssh(target, port, username, password, command, timeout)
+            
+            if result.get('success'):
+                logger.info(
+                    f"SSH command succeeded on {target}",
+                    device_ip=target,
+                    category='command',
+                    details={'exit_code': result.get('exit_code')}
+                )
+            else:
+                logger.warning(
+                    f"SSH command failed on {target}: {result.get('error', 'unknown error')}",
+                    device_ip=target,
+                    category='command',
+                    details={'error': result.get('error'), 'exit_code': result.get('exit_code')}
+                )
+            
+            return result
         except ImportError:
             return {
                 'target': target,

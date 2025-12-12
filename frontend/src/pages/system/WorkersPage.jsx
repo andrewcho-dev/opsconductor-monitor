@@ -22,7 +22,8 @@ export function WorkersPage() {
     try {
       setLoading(true);
       setError(null);
-      const data = await fetchApi('/api/scheduler/queues');
+      const response = await fetchApi('/api/scheduler/queues');
+      const data = response.data || response;
       setQueueStatus(data);
     } catch (err) {
       setError(err.message);

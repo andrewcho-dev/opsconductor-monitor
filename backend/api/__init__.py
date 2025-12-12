@@ -9,6 +9,9 @@ from .settings import settings_bp
 from .system import system_bp
 from .legacy import legacy_bp
 from .workflows import workflows_bp, folders_bp, tags_bp, packages_bp
+from .logs import logs_bp
+from .alerts import alerts_bp
+from .notifications import notifications_bp
 
 __all__ = [
     'devices_bp',
@@ -23,6 +26,9 @@ __all__ = [
     'folders_bp',
     'tags_bp',
     'packages_bp',
+    'logs_bp',
+    'alerts_bp',
+    'notifications_bp',
     'register_blueprints',
 ]
 
@@ -51,3 +57,6 @@ def register_blueprints(app):
     app.register_blueprint(settings_bp)
     app.register_blueprint(system_bp)
     app.register_blueprint(legacy_bp)
+    app.register_blueprint(logs_bp)
+    app.register_blueprint(alerts_bp)
+    app.register_blueprint(notifications_bp)

@@ -227,13 +227,13 @@ def run_job_once(name):
     job = service.get_job(name)
     
     # Import celery and trigger task
-    from celery_app import celery
+    from celery_app import celery_app
     
     task_name = job.get('task_name', 'opsconductor.job.run')
     config = job.get('config', {})
     
     # Send task to celery
-    result = celery.send_task(task_name, args=[config])
+    result = celery_app.send_task(task_name, args=[config])
     
     return jsonify(success_response({
         'job_name': name,
@@ -390,8 +390,8 @@ def cancel_execution(execution_id):
     # Try to revoke the Celery task if we have a task_id
     if task_id:
         try:
-            from celery_app import celery
-            celery.control.revoke(task_id, terminate=True)
+            from celery_app import celery_app
+            celery_app.control.revoke(task_id, terminate=True)
         except Exception as e:
             # Log but don't fail - task may have already completed
             import logging
@@ -412,9 +412,9 @@ def get_queue_status():
         Queue statistics including active, reserved, scheduled counts
     """
     try:
-        from celery_app import celery
+        from celery_app import celery_app
         
-        inspect = celery.control.inspect()
+        inspect = celery_app.control.inspect()
         
         # Get active tasks (currently executing)
         active = inspect.active() or {}
@@ -428,7 +428,23 @@ def get_queue_status():
         scheduled = inspect.scheduled() or {}
         scheduled_total = sum(len(tasks) for tasks in scheduled.values())
         
+        # Get list of all workers from active, reserved, or scheduled
+        all_workers = set(active.keys()) | set(reserved.keys()) | set(scheduled.keys())
+        
+        # Build worker details
+        worker_details = {}
+        for worker in all_workers:
+            worker_details[worker] = {
+                'active': len(active.get(worker, [])),
+                'active_tasks': active.get(worker, []),
+                'reserved': len(reserved.get(worker, [])),
+                'scheduled': len(scheduled.get(worker, [])),
+                'concurrency': None,  # Would need stats() call
+            }
+        
         return jsonify(success_response({
+            'workers': list(all_workers),
+            'worker_details': worker_details,
             'active': active_total,
             'active_total': active_total,
             'active_by_worker': {k: len(v) for k, v in active.items()},

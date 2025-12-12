@@ -55,7 +55,11 @@ def _make_celery() -> Celery:
             "opsconductor-scheduler-tick": {
                 "task": "opsconductor.scheduler.tick",
                 "schedule": 30.0,
-            }
+            },
+            "opsconductor-alerts-evaluate": {
+                "task": "opsconductor.alerts.evaluate",
+                "schedule": 60.0,  # Every minute
+            },
         },
     )
 

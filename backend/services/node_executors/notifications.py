@@ -8,9 +8,195 @@ import json
 import logging
 import urllib.request
 import urllib.error
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 logger = logging.getLogger(__name__)
+
+
+class TemplatedNotificationExecutor:
+    """
+    Executor for sending templated notifications through configured channels.
+    
+    This executor uses the notification template system and can send to
+    any configured notification channel (Slack, Email, Webhook, etc.)
+    """
+    
+    def execute(self, node: Dict, context: Dict) -> Dict:
+        """
+        Send a notification using a template and configured channels.
+        
+        Node parameters:
+            template_id: ID of the template to use (optional)
+            template_name: Name of the template to use (optional)
+            channel_ids: List of channel IDs to send to (optional, uses all enabled if not specified)
+            title: Custom title (overrides template)
+            message: Custom message (overrides template)
+            variables: Additional variables to merge with context
+        
+        Args:
+            node: Node definition with parameters
+            context: Execution context with workflow variables
+        
+        Returns:
+            Notification result with sent status per channel
+        """
+        from backend.database import get_db
+        from backend.services.template_service import get_template_service, build_workflow_step_context
+        from backend.api.notifications import build_apprise_url
+        from backend.services.notification_service import NotificationService
+        
+        params = node.get('data', {}).get('parameters', {})
+        template_id = params.get('template_id')
+        template_name = params.get('template_name')
+        channel_ids = params.get('channel_ids', [])
+        custom_title = params.get('title', '')
+        custom_message = params.get('message', '')
+        extra_variables = params.get('variables', {})
+        
+        # Build context for template rendering
+        template_context = self._build_template_context(context, extra_variables)
+        
+        # Get title and body
+        title = custom_title
+        body = custom_message
+        
+        template_service = get_template_service()
+        
+        if not title or not body:
+            # Try to use template
+            if template_id:
+                rendered = template_service.render_template(template_id, template_context)
+                title = title or rendered.get('title', '')
+                body = body or rendered.get('body', '')
+            elif template_name:
+                rendered = template_service.render_template_by_name(template_name, template_context)
+                title = title or rendered.get('title', '')
+                body = body or rendered.get('body', '')
+            else:
+                # Use default workflow step template
+                rendered = template_service.render_template_by_name('Workflow Step Notification', template_context)
+                title = title or rendered.get('title', '')
+                body = body or rendered.get('body', '')
+        
+        # Substitute any remaining variables in custom title/message
+        if custom_title:
+            title = template_service.render(custom_title, template_context)
+        if custom_message:
+            body = template_service.render(custom_message, template_context)
+        
+        if not title:
+            title = f"Workflow Notification: {context.get('workflow_name', 'Unknown')}"
+        if not body:
+            body = "Workflow notification triggered."
+        
+        # Get channels to send to
+        db = get_db()
+        with db.cursor() as cursor:
+            if channel_ids:
+                cursor.execute("""
+                    SELECT id, name, channel_type, config
+                    FROM notification_channels
+                    WHERE id = ANY(%s) AND enabled = true
+                """, (channel_ids,))
+            else:
+                # Send to all enabled channels
+                cursor.execute("""
+                    SELECT id, name, channel_type, config
+                    FROM notification_channels
+                    WHERE enabled = true
+                """)
+            channels = [dict(row) for row in cursor.fetchall()]
+        
+        if not channels:
+            return {
+                'sent': False,
+                'error': 'No enabled notification channels found',
+                'title': title,
+            }
+        
+        # Send to each channel
+        results = []
+        for channel in channels:
+            config = channel['config']
+            if isinstance(config, str):
+                config = json.loads(config)
+            
+            apprise_url = build_apprise_url(channel['channel_type'], config)
+            if not apprise_url:
+                results.append({
+                    'channel': channel['name'],
+                    'sent': False,
+                    'error': 'Invalid channel configuration'
+                })
+                continue
+            
+            try:
+                service = NotificationService([apprise_url])
+                success = service.send(title=title, body=body)
+                
+                # Log to notification history
+                with db.cursor() as cursor:
+                    cursor.execute("""
+                        INSERT INTO notification_history 
+                        (channel_id, title, message, trigger_type, trigger_id, status)
+                        VALUES (%s, %s, %s, 'workflow', %s, %s)
+                    """, (
+                        channel['id'],
+                        title,
+                        body,
+                        context.get('execution_id', ''),
+                        'sent' if success else 'failed'
+                    ))
+                    db.get_connection().commit()
+                
+                results.append({
+                    'channel': channel['name'],
+                    'sent': success,
+                })
+            except Exception as e:
+                results.append({
+                    'channel': channel['name'],
+                    'sent': False,
+                    'error': str(e)
+                })
+        
+        successful = sum(1 for r in results if r.get('sent'))
+        
+        return {
+            'sent': successful > 0,
+            'title': title,
+            'channels_attempted': len(results),
+            'channels_successful': successful,
+            'results': results,
+        }
+    
+    def _build_template_context(self, context: Dict, extra_variables: Dict) -> Dict:
+        """Build template context from workflow execution context."""
+        # Merge workflow variables with extra variables
+        variables = {**context.get('variables', {}), **extra_variables}
+        
+        return {
+            'workflow': {
+                'id': context.get('workflow_id'),
+                'name': context.get('workflow_name', 'Unknown Workflow'),
+                'variables': variables,
+            },
+            'step': {
+                'id': context.get('current_node_id'),
+                'name': context.get('current_node_name', 'Notification'),
+                'status': 'running',
+                'message': extra_variables.get('message', ''),
+                'data': extra_variables,
+            },
+            'job': {
+                'id': context.get('execution_id'),
+                'name': context.get('workflow_name'),
+                'status': context.get('status', 'running'),
+                'started_at': context.get('started_at'),
+            },
+            # Also expose variables at top level for simple access
+            **variables,
+        }
 
 
 class SlackExecutor:

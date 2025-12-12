@@ -15,9 +15,11 @@ export function AboutPage() {
         {/* Version Info */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
           <div className="flex items-center gap-4 mb-6">
-            <div className="w-16 h-16 bg-blue-600 rounded-xl flex items-center justify-center">
-              <span className="text-white text-2xl font-bold">OC</span>
-            </div>
+            <img 
+              src="/badge-dark.svg" 
+              alt="OpsConductor" 
+              className="w-16 h-16"
+            />
             <div>
               <h2 className="text-2xl font-bold text-gray-900">OpsConductor Monitor</h2>
               <p className="text-gray-500">Network Monitoring & Automation Platform</p>

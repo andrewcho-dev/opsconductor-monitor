@@ -7,13 +7,15 @@ Handles control flow, error handling, and variable passing between nodes.
 
 import json
 import uuid
-import logging
 from datetime import datetime
 from typing import Dict, List, Any, Optional, Callable
 from dataclasses import dataclass, field
 from enum import Enum
 
-logger = logging.getLogger(__name__)
+from .logging_service import get_logger, LogSource
+from backend.utils.time import now_utc
+
+logger = get_logger(__name__, LogSource.WORKFLOW)
 
 
 class NodeStatus(Enum):
@@ -73,7 +75,7 @@ class WorkflowEngine:
         from .node_executors.snmp import SNMPGetExecutor, SNMPWalkExecutor
         from .node_executors.ssh import SSHCommandExecutor
         from .node_executors.database import DBQueryExecutor, DBUpsertExecutor
-        from .node_executors.notifications import SlackExecutor, EmailExecutor, WebhookExecutor
+        from .node_executors.notifications import SlackExecutor, EmailExecutor, WebhookExecutor, TemplatedNotificationExecutor
         
         # Create executor instances
         ping_exec = PingExecutor()
@@ -87,6 +89,7 @@ class WorkflowEngine:
         slack_exec = SlackExecutor()
         email_exec = EmailExecutor()
         webhook_exec = WebhookExecutor()
+        templated_notify_exec = TemplatedNotificationExecutor()
         
         self.node_executors = {
             # Triggers
@@ -125,6 +128,7 @@ class WorkflowEngine:
             'notify:email': lambda n, c: email_exec.execute(n, c),
             'notify:slack': lambda n, c: slack_exec.execute(n, c),
             'notify:webhook': lambda n, c: webhook_exec.execute(n, c),
+            'notify:send': lambda n, c: templated_notify_exec.execute(n, c),  # Templated notification
         }
     
     def register_executor(self, node_type: str, executor: Callable):
@@ -143,9 +147,14 @@ class WorkflowEngine:
             Execution result with status and node results
         """
         execution_id = str(uuid.uuid4())
-        started_at = datetime.utcnow()
+        started_at = now_utc()
         
-        logger.info(f"Starting workflow execution {execution_id} for workflow {workflow.get('id')}")
+        logger.info(
+            f"Starting workflow execution {execution_id} for workflow {workflow.get('id')}",
+            workflow_id=workflow.get('id'),
+            execution_id=execution_id,
+            category='execution'
+        )
         
         # Create execution context
         context = ExecutionContext(
@@ -185,7 +194,12 @@ class WorkflowEngine:
         ]
         
         if not start_nodes:
-            logger.warning("No start nodes found in workflow")
+            logger.warning(
+                "No start nodes found in workflow",
+                workflow_id=workflow.get('id'),
+                execution_id=execution_id,
+                category='execution'
+            )
             return self._create_execution_result(
                 execution_id, workflow.get('id'), started_at,
                 'failure', context, 'No start nodes found'
@@ -206,7 +220,12 @@ class WorkflowEngine:
             status = 'failure' if has_failures else 'success'
             
         except Exception as e:
-            logger.exception(f"Workflow execution failed: {e}")
+            logger.exception(
+                f"Workflow execution failed: {e}",
+                workflow_id=workflow.get('id'),
+                execution_id=execution_id,
+                category='execution'
+            )
             status = 'failure'
             context.variables['error'] = str(e)
         
@@ -276,9 +295,15 @@ class WorkflowEngine:
         node_id = node['id']
         node_type = node.get('data', {}).get('nodeType', 'unknown')
         
-        logger.info(f"Executing node {node_id} ({node_type})")
+        logger.info(
+            f"Executing node {node_id} ({node_type})",
+            workflow_id=context.workflow_id,
+            execution_id=context.execution_id,
+            category='node_execution',
+            details={'node_id': node_id, 'node_type': node_type}
+        )
         
-        started_at = datetime.utcnow()
+        started_at = now_utc()
         
         try:
             # Resolve variables in node parameters
@@ -308,7 +333,7 @@ class WorkflowEngine:
             # Execute the node with resolved parameters
             output_data = executor(resolved_node, context)
             
-            finished_at = datetime.utcnow()
+            finished_at = now_utc()
             duration_ms = int((finished_at - started_at).total_seconds() * 1000)
             
             return NodeResult(
@@ -322,8 +347,14 @@ class WorkflowEngine:
             )
             
         except Exception as e:
-            logger.exception(f"Node {node_id} failed: {e}")
-            finished_at = datetime.utcnow()
+            logger.error(
+                f"Node {node_id} failed: {e}",
+                workflow_id=context.workflow_id,
+                execution_id=context.execution_id,
+                category='node_execution',
+                details={'node_id': node_id, 'node_type': node_type, 'error': str(e)}
+            )
+            finished_at = now_utc()
             duration_ms = int((finished_at - started_at).total_seconds() * 1000)
             
             return NodeResult(
@@ -382,7 +413,7 @@ class WorkflowEngine:
         error_message: str = None
     ) -> Dict:
         """Create the final execution result."""
-        finished_at = datetime.utcnow()
+        finished_at = now_utc()
         duration_ms = int((finished_at - started_at).total_seconds() * 1000)
         
         node_results = {

@@ -10,9 +10,54 @@ import {
   CheckCircle,
   AlertTriangle,
   XCircle,
-  RefreshCw
+  RefreshCw,
+  Bell,
+  Check
 } from 'lucide-react';
 import { fetchApi, formatTimeOnly, formatShortTime, formatDuration } from '../../lib/utils';
+
+function AlertItem({ alert, onAcknowledge }) {
+  const severityColors = {
+    info: 'bg-blue-50 border-blue-200',
+    warning: 'bg-yellow-50 border-yellow-200',
+    critical: 'bg-red-50 border-red-200',
+  };
+  
+  const severityIcons = {
+    info: <Bell className="w-4 h-4 text-blue-500" />,
+    warning: <AlertTriangle className="w-4 h-4 text-yellow-500" />,
+    critical: <XCircle className="w-4 h-4 text-red-500" />,
+  };
+  
+  return (
+    <div className={`p-3 border-l-4 ${severityColors[alert.severity] || severityColors.warning}`}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-start gap-2 min-w-0">
+          {severityIcons[alert.severity] || severityIcons.warning}
+          <div className="min-w-0">
+            <div className="font-medium text-sm text-gray-900 truncate">{alert.title}</div>
+            <div className="text-xs text-gray-600 mt-0.5 line-clamp-2">{alert.message}</div>
+            <div className="text-[10px] text-gray-400 mt-1">
+              {formatShortTime(alert.triggered_at)}
+              {alert.status === 'acknowledged' && (
+                <span className="ml-2 text-green-600">• Acknowledged</span>
+              )}
+            </div>
+          </div>
+        </div>
+        {alert.status === 'active' && onAcknowledge && (
+          <button
+            onClick={() => onAcknowledge(alert.id)}
+            className="flex-shrink-0 p-1 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded"
+            title="Acknowledge"
+          >
+            <Check className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function StatusCard({ title, icon: Icon, status, details, color }) {
   const statusColors = {
@@ -62,7 +107,20 @@ export function SystemOverviewPage() {
   const [systemStatus, setSystemStatus] = useState(null);
   const [queueStatus, setQueueStatus] = useState(null);
   const [recentExecutions, setRecentExecutions] = useState([]);
+  const [alerts, setAlerts] = useState([]);
   const [error, setError] = useState(null);
+
+  const handleAcknowledgeAlert = async (alertId) => {
+    try {
+      await fetchApi(`/api/alerts/${alertId}/acknowledge`, { method: 'POST' });
+      // Refresh alerts
+      const alertsResponse = await fetchApi('/api/alerts');
+      const alertsData = alertsResponse.data || alertsResponse;
+      setAlerts(alertsData.alerts || []);
+    } catch (err) {
+      console.error('Failed to acknowledge alert:', err);
+    }
+  };
 
   const loadStatus = async () => {
     try {
@@ -70,7 +128,8 @@ export function SystemOverviewPage() {
       setError(null);
       
       // Load queue status from existing endpoint
-      const queues = await fetchApi('/api/scheduler/queues');
+      const queuesResponse = await fetchApi('/api/scheduler/queues');
+      const queues = queuesResponse.data || queuesResponse;
       setQueueStatus(queues);
       
       // Build system status from available data
@@ -87,11 +146,23 @@ export function SystemOverviewPage() {
       
       // Load recent executions
       try {
-        const execData = await fetchApi('/api/scheduler/executions/recent?limit=15');
-        setRecentExecutions(execData.executions || []);
+        const execResponse = await fetchApi('/api/scheduler/executions/recent?limit=15');
+        const execData = execResponse.data || execResponse;
+        // API returns data as array directly, not {executions: [...]}
+        setRecentExecutions(Array.isArray(execData) ? execData : (execData.executions || []));
       } catch {
         // Non-critical, just show empty
         setRecentExecutions([]);
+      }
+      
+      // Load alerts
+      try {
+        const alertsResponse = await fetchApi('/api/alerts');
+        const alertsData = alertsResponse.data || alertsResponse;
+        setAlerts(alertsData.alerts || []);
+      } catch {
+        // Non-critical, just show empty
+        setAlerts([]);
       }
     } catch (err) {
       setError(err.message);
@@ -273,7 +344,7 @@ export function SystemOverviewPage() {
                           {formatShortTime(exec.started_at)}
                         </td>
                         <td className="px-3 py-2 text-gray-900 font-medium truncate max-w-[150px]" title={exec.job_name}>
-                          {exec.job_display_name || exec.job_name}
+                          {(exec.job_display_name || exec.job_name || '').replace(/_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, '')}
                         </td>
                         <td className="px-3 py-2 text-gray-600 font-mono">
                           {formatDuration(exec.started_at, exec.finished_at)}
@@ -302,13 +373,29 @@ export function SystemOverviewPage() {
           </div>
 
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-            <div className="px-4 py-3 border-b border-gray-200">
+            <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
                 System Alerts
               </h2>
+              {alerts.length > 0 && (
+                <span className="px-2 py-0.5 text-xs font-medium bg-red-100 text-red-700 rounded-full">
+                  {alerts.length} active
+                </span>
+              )}
             </div>
-            <div className="p-4 text-sm text-gray-500">
-              <p>No active alerts</p>
+            <div className="max-h-64 overflow-y-auto">
+              {alerts.length === 0 ? (
+                <div className="p-4 text-sm text-gray-500 flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                  <span>No active alerts</span>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  {alerts.map((alert) => (
+                    <AlertItem key={alert.id} alert={alert} onAcknowledge={handleAcknowledgeAlert} />
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

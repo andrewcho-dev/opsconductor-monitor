@@ -15,6 +15,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from backend.api import register_blueprints
 from backend.utils.errors import AppError
 from backend.utils.responses import error_response
+from backend.services.logging_service import logging_service, get_logger, LogSource
+from backend.middleware import init_request_logging
+from backend.database import get_db
 
 
 def create_app(config=None):
@@ -34,11 +37,24 @@ def create_app(config=None):
     if config:
         app.config.update(config)
     
+    # Initialize logging service with database connection
+    log_level = os.environ.get('LOG_LEVEL', 'INFO')
+    db = get_db()
+    logging_service.initialize(db_connection=db, log_level=log_level)
+    
+    logger = get_logger(__name__, LogSource.SYSTEM)
+    logger.info("OpsConductor backend starting up", category='startup')
+    
     # Enable CORS
     CORS(app)
     
+    # Initialize request logging middleware
+    init_request_logging(app)
+    
     # Register all blueprints (includes settings, system, legacy)
     register_blueprints(app)
+    
+    logger.info("All blueprints registered", category='startup')
     
     # Global error handlers
     @app.errorhandler(AppError)
