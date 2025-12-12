@@ -42,17 +42,6 @@ const moduleNavigation = {
       }
     ]
   },
-  jobs: {
-    title: 'Jobs',
-    sections: [
-      {
-        title: 'Automation',
-        items: [
-          { id: 'definitions', label: 'Legacy Jobs', icon: FileText, path: '/jobs' },
-        ]
-      }
-    ]
-  },
   workflows: {
     title: 'Workflows',
     sections: [

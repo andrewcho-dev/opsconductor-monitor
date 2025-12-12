@@ -2,7 +2,6 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Server, 
-  Briefcase, 
   Activity, 
   Settings,
   ChevronDown,
@@ -24,13 +23,6 @@ const modules = [
     icon: GitBranch, 
     path: '/workflows',
     description: 'Visual Automation Builder'
-  },
-  { 
-    id: 'jobs', 
-    label: 'Jobs', 
-    icon: Briefcase, 
-    path: '/jobs',
-    description: 'Legacy Job Definitions'
   },
   { 
     id: 'monitor', 

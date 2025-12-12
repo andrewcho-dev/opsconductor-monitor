@@ -3,8 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 // Inventory Module
 import { DevicesPage, DeviceDetailPage, GroupsPage } from "./pages/inventory";
 
-// Jobs Module
-import { DefinitionsPage } from "./pages/jobs";
+// Workflows Module (replaced legacy Jobs)
 import { WorkflowsListPage, WorkflowBuilderPage } from "./pages/workflows";
 
 // Monitor Module
@@ -44,12 +43,7 @@ function App() {
         <Route path="/inventory/devices/:ip" element={<DeviceDetailPage />} />
         <Route path="/inventory/groups" element={<GroupsPage />} />
 
-        {/* JOBS MODULE */}
-        <Route path="/jobs" element={<DefinitionsPage />} />
-        <Route path="/jobs/definitions" element={<Navigate to="/jobs" replace />} />
-        <Route path="/jobs/definitions/:id" element={<DefinitionsPage />} />
-        
-        {/* WORKFLOW BUILDER (New Visual Builder) */}
+        {/* WORKFLOWS MODULE */}
         <Route path="/workflows" element={<WorkflowsListPage />} />
         <Route path="/workflows/new" element={<WorkflowBuilderPage />} />
         <Route path="/workflows/:id" element={<WorkflowBuilderPage />} />
@@ -87,8 +81,10 @@ function App() {
         <Route path="/device/:ip" element={<DeviceDetailPage />} />
         <Route path="/scheduler" element={<Navigate to="/monitor/active-jobs" replace />} />
         <Route path="/jobs/scheduler" element={<Navigate to="/monitor/active-jobs" replace />} />
-        <Route path="/job-definitions" element={<Navigate to="/jobs" replace />} />
-        <Route path="/job-builder" element={<Navigate to="/jobs" replace />} />
+        <Route path="/jobs" element={<Navigate to="/workflows" replace />} />
+        <Route path="/jobs/*" element={<Navigate to="/workflows" replace />} />
+        <Route path="/job-definitions" element={<Navigate to="/workflows" replace />} />
+        <Route path="/job-builder" element={<Navigate to="/workflows" replace />} />
         <Route path="/topology" element={<Navigate to="/monitor/topology" replace />} />
         <Route path="/power-trends" element={<Navigate to="/monitor/power" replace />} />
         <Route path="/settings" element={<Navigate to="/system/settings" replace />} />
