@@ -5,6 +5,7 @@ import { DevicesPage, DeviceDetailPage, GroupsPage } from "./pages/inventory";
 
 // Jobs Module
 import { DefinitionsPage } from "./pages/jobs";
+import { WorkflowsListPage, WorkflowBuilderPage } from "./pages/workflows";
 
 // Monitor Module
 import { DashboardPage, TopologyPage, PowerTrendsPage, AlertsPage, ActiveJobsPage, JobHistoryPage } from "./pages/monitor";
@@ -47,6 +48,11 @@ function App() {
         <Route path="/jobs" element={<DefinitionsPage />} />
         <Route path="/jobs/definitions" element={<Navigate to="/jobs" replace />} />
         <Route path="/jobs/definitions/:id" element={<DefinitionsPage />} />
+        
+        {/* WORKFLOW BUILDER (New Visual Builder) */}
+        <Route path="/workflows" element={<WorkflowsListPage />} />
+        <Route path="/workflows/new" element={<WorkflowBuilderPage />} />
+        <Route path="/workflows/:id" element={<WorkflowBuilderPage />} />
 
         {/* MONITOR MODULE */}
         <Route path="/monitor" element={<Navigate to="/monitor/dashboard" replace />} />

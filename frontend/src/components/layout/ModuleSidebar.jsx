@@ -48,7 +48,25 @@ const moduleNavigation = {
       {
         title: 'Automation',
         items: [
-          { id: 'definitions', label: 'Job Definitions', icon: FileText, path: '/jobs' },
+          { id: 'definitions', label: 'Legacy Jobs', icon: FileText, path: '/jobs' },
+        ]
+      }
+    ]
+  },
+  workflows: {
+    title: 'Workflows',
+    sections: [
+      {
+        title: 'Visual Builder',
+        items: [
+          { id: 'all-workflows', label: 'All Workflows', icon: FileText, path: '/workflows' },
+          { id: 'new-workflow', label: 'New Workflow', icon: Plus, path: '/workflows/new' },
+        ]
+      },
+      {
+        title: 'Organization',
+        items: [
+          { id: 'folders', label: 'Folders', icon: FolderOpen, path: '/workflows?view=folders' },
         ]
       }
     ]

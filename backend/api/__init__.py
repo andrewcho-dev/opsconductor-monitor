@@ -8,6 +8,7 @@ from .scans import scans_bp
 from .settings import settings_bp
 from .system import system_bp
 from .legacy import legacy_bp
+from .workflows import workflows_bp, folders_bp, tags_bp, packages_bp
 
 __all__ = [
     'devices_bp',
@@ -18,6 +19,10 @@ __all__ = [
     'settings_bp',
     'system_bp',
     'legacy_bp',
+    'workflows_bp',
+    'folders_bp',
+    'tags_bp',
+    'packages_bp',
     'register_blueprints',
 ]
 
@@ -35,6 +40,12 @@ def register_blueprints(app):
     app.register_blueprint(jobs_bp)
     app.register_blueprint(scheduler_bp)
     app.register_blueprint(scans_bp)
+    
+    # Workflow builder blueprints
+    app.register_blueprint(workflows_bp)
+    app.register_blueprint(folders_bp)
+    app.register_blueprint(tags_bp)
+    app.register_blueprint(packages_bp)
     
     # Additional blueprints
     app.register_blueprint(settings_bp)

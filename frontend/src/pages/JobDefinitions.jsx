@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Plus, RefreshCw, Trash2, FileText, Clock, Calendar, Zap, Play, Settings } from 'lucide-react';
-import CompleteJobBuilder from '../components/jobBuilder/CompleteJobBuilder';
+import { useSearchParams, useNavigate, Link } from 'react-router-dom';
+import { Plus, RefreshCw, Trash2, FileText, Clock, Calendar, Zap, Play, Settings, ArrowRight } from 'lucide-react';
 import { fetchApi, formatLocalTime } from '../lib/utils';
 import { PageHeader } from '../components/layout';
 
@@ -70,25 +69,15 @@ const JobDefinitions = () => {
   );
 
   const openCreateJob = () => {
-    setBuilderEditingJobId(null);
-    setBuilderInitialJob(null); // CompleteJobBuilder will use its DEFAULT_JOB
-    setBuilderError(null);
-    setBuilderOpen(true);
+    // Redirect to new visual workflow builder
+    navigate('/workflows/new');
   };
 
   const openEditJob = (job) => {
     if (!job) return;
-    const def = job.definition || {};
-    const builderJob = {
-      ...(typeof def === 'object' && def !== null ? def : {}),
-      job_id: def.job_id || job.id,
-      name: def.name || job.name || '',
-      description: def.description || job.description || '',
-    };
-    setBuilderEditingJobId(job.id);
-    setBuilderInitialJob(builderJob);
-    setBuilderError(null);
-    setBuilderOpen(true);
+    // For legacy jobs, show migration prompt or redirect to workflows
+    // For now, just show an alert
+    alert('This is a legacy job. Please use the new Workflows page to create and edit jobs.\n\nYou can migrate this job using the migration tool.');
   };
 
   const handleBuilderSave = async (jobSpec) => {
@@ -553,31 +542,23 @@ const JobDefinitions = () => {
         </div>
       </div>
 
-      {/* Builder full-screen overlay */}
-      {builderOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 overflow-hidden">
-          <div className="h-full w-full overflow-auto bg-gray-100">
-            <CompleteJobBuilder
-              job={builderInitialJob}
-              onBack={() => {
-                if (!builderSaving) {
-                  setBuilderOpen(false);
-                  setBuilderInitialJob(null);
-                  setBuilderEditingJobId(null);
-                  setBuilderError(null);
-                }
-              }}
-              onSave={handleBuilderSave}
-              onTest={handleBuilderTest}
-            />
-            {builderSaving && (
-              <div className="fixed bottom-4 right-4 px-3 py-2 bg-purple-600 text-white text-xs rounded shadow-lg">
-                Saving job definition...
-              </div>
-            )}
+      {/* Migration notice banner */}
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4">
+        <div className="flex items-center">
+          <div className="flex-1">
+            <p className="text-sm text-blue-700">
+              <strong>New Visual Workflow Builder Available!</strong> Create and edit jobs using the new drag-and-drop interface.
+            </p>
           </div>
+          <Link
+            to="/workflows"
+            className="flex items-center gap-1 px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
+          >
+            Go to Workflows
+            <ArrowRight className="w-4 h-4" />
+          </Link>
         </div>
-      )}
+      </div>
 
       {/* Schedule modal */}
       {scheduleOpen && (

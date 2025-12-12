@@ -5,7 +5,8 @@ import {
   Briefcase, 
   Activity, 
   Settings,
-  ChevronDown
+  ChevronDown,
+  GitBranch
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -18,11 +19,18 @@ const modules = [
     description: 'Devices & Groups'
   },
   { 
+    id: 'workflows', 
+    label: 'Workflows', 
+    icon: GitBranch, 
+    path: '/workflows',
+    description: 'Visual Automation Builder'
+  },
+  { 
     id: 'jobs', 
     label: 'Jobs', 
     icon: Briefcase, 
     path: '/jobs',
-    description: 'Automation & Scheduling'
+    description: 'Legacy Job Definitions'
   },
   { 
     id: 'monitor', 
