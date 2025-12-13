@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus,
@@ -22,6 +23,7 @@ import {
   Calendar,
   Tag,
   Folder,
+  FolderInput,
 } from 'lucide-react';
 import * as workflowsApi from '../../api/workflows';
 import { cn } from '../../lib/utils';
@@ -46,6 +48,8 @@ const WorkflowsList = () => {
   // Table state
   const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
   const [contextMenu, setContextMenu] = useState(null);
+  const [contextMenuStyle, setContextMenuStyle] = useState({});
+  const [moveToFolderMenu, setMoveToFolderMenu] = useState(null);
 
   // Load data
   useEffect(() => {
@@ -190,6 +194,17 @@ const WorkflowsList = () => {
       loadData();
     } catch (err) {
       console.error('Failed to delete folder:', err);
+    }
+  };
+
+  const handleMoveToFolder = async (workflowId, folderId) => {
+    try {
+      await workflowsApi.updateWorkflow(workflowId, { folder_id: folderId });
+      loadData();
+      setContextMenu(null);
+      setMoveToFolderMenu(null);
+    } catch (err) {
+      console.error('Failed to move workflow:', err);
     }
   };
 
@@ -435,17 +450,57 @@ const WorkflowsList = () => {
                       <td className="px-4 py-3 text-right">
                         <div className="relative inline-block">
                           <button
-                            onClick={() => setContextMenu(
-                              contextMenu === workflow.id ? null : workflow.id
-                            )}
+                            onClick={(e) => {
+                              if (contextMenu === workflow.id) {
+                                setContextMenu(null);
+                              } else {
+                                // Calculate fixed position for menu
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                const menuHeight = 220;
+                                const menuWidth = 160;
+                                const spaceBelow = window.innerHeight - rect.bottom;
+                                const spaceAbove = rect.top;
+                                
+                                let top, bottom;
+                                if (spaceBelow >= menuHeight) {
+                                  // Open below
+                                  top = rect.bottom + 4;
+                                } else if (spaceAbove >= menuHeight) {
+                                  // Open above
+                                  top = rect.top - menuHeight - 4;
+                                } else {
+                                  // Not enough space either way, position at top of viewport with some padding
+                                  top = Math.max(8, Math.min(rect.top, window.innerHeight - menuHeight - 8));
+                                }
+                                
+                                setContextMenuStyle({
+                                  position: 'fixed',
+                                  top: `${top}px`,
+                                  right: `${window.innerWidth - rect.right}px`,
+                                });
+                                setContextMenu(workflow.id);
+                              }
+                            }}
                             className="p-1 hover:bg-gray-100 rounded"
                           >
                             <MoreVertical className="w-4 h-4 text-gray-500" />
                           </button>
                           {contextMenu === workflow.id && (
                             <>
-                              <div className="fixed inset-0 z-10" onClick={() => setContextMenu(null)} />
-                              <div className="absolute right-0 top-8 w-40 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
+                              <div 
+                                className="fixed inset-0" 
+                                style={{ zIndex: 9998 }}
+                                onClick={() => { setContextMenu(null); setMoveToFolderMenu(null); }} 
+                              />
+                              <div 
+                                style={{ 
+                                  position: 'fixed',
+                                  top: contextMenuStyle.top,
+                                  right: contextMenuStyle.right,
+                                  zIndex: 9999 
+                                }}
+                                className="w-40 bg-white rounded-lg shadow-lg border border-gray-200 py-1"
+                              >
                                 <button
                                   onClick={() => { handleEditWorkflow(workflow.id); setContextMenu(null); }}
                                   className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
@@ -467,6 +522,48 @@ const WorkflowsList = () => {
                                   <Copy className="w-4 h-4" />
                                   Duplicate
                                 </button>
+                                <div className="relative">
+                                  <button
+                                    onClick={() => setMoveToFolderMenu(moveToFolderMenu === workflow.id ? null : workflow.id)}
+                                    className="w-full flex items-center justify-between px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                  >
+                                    <span className="flex items-center gap-2">
+                                      <FolderInput className="w-4 h-4" />
+                                      Move to Folder
+                                    </span>
+                                    <ChevronDown className="w-3 h-3" />
+                                  </button>
+                                  {moveToFolderMenu === workflow.id && (
+                                    <div 
+                                      className="absolute right-full top-0 mr-1 w-40 bg-white rounded-lg shadow-lg border border-gray-200 py-1 max-h-60 overflow-y-auto"
+                                      style={{ zIndex: 10000 }}
+                                    >
+                                      <button
+                                        onClick={() => handleMoveToFolder(workflow.id, null)}
+                                        className={cn(
+                                          "w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100",
+                                          !workflow.folder_id ? "text-blue-600 bg-blue-50" : "text-gray-700"
+                                        )}
+                                      >
+                                        <Folder className="w-4 h-4" />
+                                        Uncategorized
+                                      </button>
+                                      {folders.map(folder => (
+                                        <button
+                                          key={folder.id}
+                                          onClick={() => handleMoveToFolder(workflow.id, folder.id)}
+                                          className={cn(
+                                            "w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100",
+                                            workflow.folder_id === folder.id ? "text-blue-600 bg-blue-50" : "text-gray-700"
+                                          )}
+                                        >
+                                          <Folder className="w-4 h-4" style={{ color: folder.color }} />
+                                          {folder.name}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
                                 <hr className="my-1" />
                                 <button
                                   onClick={() => { handleDeleteWorkflow(workflow.id); setContextMenu(null); }}

@@ -13,6 +13,7 @@ from ..executors import ExecutorRegistry, SSHExecutor, PingExecutor, SNMPExecuto
 from ..parsers.registry import ParserRegistry
 from ..targeting import TargetingRegistry
 from ..config.constants import ACTION_TYPES, JOB_STATUS_SUCCESS, JOB_STATUS_FAILED
+from .credential_service import get_credential_service
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,76 @@ class JobExecutor:
         """Ensure all executors are registered."""
         # Import to trigger registration
         from ..executors import SSHExecutor, PingExecutor, SNMPExecutor
+    
+    def _get_credentials_for_target(self, target: str, credential_type: str, job_config: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Get credentials for a target, checking vault first, then job config, then settings.
+        
+        Args:
+            target: Target IP address or hostname
+            credential_type: Type of credential (ssh, snmp, etc.)
+            job_config: Job configuration that may contain inline credentials
+        
+        Returns:
+            Credential data dictionary
+        """
+        try:
+            cred_service = get_credential_service()
+            
+            # First, check if job config specifies a credential by name
+            credential_name = job_config.get(f'{credential_type}_credential')
+            if credential_name:
+                cred = cred_service.get_credential_by_name(credential_name, include_secret=True)
+                if cred and cred.get('secret_data'):
+                    logger.debug(f"Using named credential '{credential_name}' for {target}")
+                    cred_service.log_usage(
+                        credential_id=cred['id'],
+                        credential_name=cred['name'],
+                        used_by=job_config.get('name', 'job'),
+                        used_for=target,
+                        success=True
+                    )
+                    return cred['secret_data']
+            
+            # Second, check for credentials assigned to this target
+            target_creds = cred_service.get_credentials_for_device(
+                ip_address=target,
+                credential_type=credential_type,
+                include_secret=True
+            )
+            if target_creds:
+                cred = target_creds[0]  # Highest priority
+                logger.debug(f"Using device-assigned credential '{cred['name']}' for {target}")
+                cred_service.log_usage(
+                    credential_id=cred['id'],
+                    credential_name=cred['name'],
+                    used_by=job_config.get('name', 'job'),
+                    used_for=target,
+                    success=True
+                )
+                return cred.get('secret_data', {})
+            
+            # Third, check for a default credential of this type
+            all_creds = cred_service.list_credentials(credential_type=credential_type)
+            if all_creds:
+                # Use the first one as default
+                cred = cred_service.get_credential(all_creds[0]['id'], include_secret=True)
+                if cred and cred.get('secret_data'):
+                    logger.debug(f"Using default credential '{cred['name']}' for {target}")
+                    cred_service.log_usage(
+                        credential_id=cred['id'],
+                        credential_name=cred['name'],
+                        used_by=job_config.get('name', 'job'),
+                        used_for=target,
+                        success=True
+                    )
+                    return cred['secret_data']
+        except Exception as e:
+            logger.warning(f"Error getting credentials from vault: {e}")
+        
+        # Fallback to job config or settings
+        logger.debug(f"No vault credentials found for {target}, using job config/settings")
+        return {}
     
     def _log_audit(self, event_type: str, **kwargs):
         """Log an audit event if audit repository is available."""
@@ -253,14 +324,6 @@ class JobExecutor:
             if command:
                 commands = [{'command': command}]
         
-        # Get SSH credentials from job config or settings
-        ssh_config = {
-            'username': job_config.get('ssh_username') or self._get_setting('ssh_username'),
-            'password': job_config.get('ssh_password') or self._get_setting('ssh_password'),
-            'port': job_config.get('ssh_port') or self._get_setting('ssh_port', 22),
-            'timeout': job_config.get('timeout', 30),
-        }
-        
         results = []
         success_count = 0
         
@@ -272,6 +335,18 @@ class JobExecutor:
             }
             
             try:
+                # Get SSH credentials from vault, then job config, then settings
+                vault_creds = self._get_credentials_for_target(target, 'ssh', job_config)
+                
+                ssh_config = {
+                    'username': vault_creds.get('username') or job_config.get('ssh_username') or self._get_setting('ssh_username'),
+                    'password': vault_creds.get('password') or job_config.get('ssh_password') or self._get_setting('ssh_password'),
+                    'port': vault_creds.get('port') or job_config.get('ssh_port') or self._get_setting('ssh_port', 22),
+                    'timeout': job_config.get('timeout', 30),
+                    'private_key': vault_creds.get('private_key'),
+                    'passphrase': vault_creds.get('passphrase'),
+                }
+                
                 executor = SSHExecutor()
                 
                 for cmd_config in commands:
@@ -375,17 +450,27 @@ class JobExecutor:
         execution = action.get('execution', {})
         oid = execution.get('oid', '1.3.6.1.2.1.1.1.0')
         
-        snmp_config = {
-            'community': job_config.get('snmp_community') or self._get_setting('snmp_community', 'public'),
-            'timeout': execution.get('timeout', 5),
-        }
-        
         results = []
         success_count = 0
         
         executor = SNMPExecutor()
         
         for target in targets:
+            # Get SNMP credentials from vault, then job config, then settings
+            vault_creds = self._get_credentials_for_target(target, 'snmp', job_config)
+            
+            snmp_config = {
+                'community': vault_creds.get('community') or job_config.get('snmp_community') or self._get_setting('snmp_community', 'public'),
+                'version': vault_creds.get('version', '2c'),
+                'timeout': execution.get('timeout', 5),
+                # SNMPv3 fields
+                'security_name': vault_creds.get('security_name'),
+                'auth_protocol': vault_creds.get('auth_protocol'),
+                'auth_password': vault_creds.get('auth_password'),
+                'priv_protocol': vault_creds.get('priv_protocol'),
+                'priv_password': vault_creds.get('priv_password'),
+            }
+            
             result = executor.execute(target, oid, snmp_config)
             
             target_result = {

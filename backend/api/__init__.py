@@ -12,6 +12,7 @@ from .workflows import workflows_bp, folders_bp, tags_bp, packages_bp
 from .logs import logs_bp
 from .alerts import alerts_bp
 from .notifications import notifications_bp
+from .credentials import credentials_bp
 
 __all__ = [
     'devices_bp',
@@ -29,6 +30,7 @@ __all__ = [
     'logs_bp',
     'alerts_bp',
     'notifications_bp',
+    'credentials_bp',
     'register_blueprints',
 ]
 
@@ -60,3 +62,4 @@ def register_blueprints(app):
     app.register_blueprint(logs_bp)
     app.register_blueprint(alerts_bp)
     app.register_blueprint(notifications_bp)
+    app.register_blueprint(credentials_bp)

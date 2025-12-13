@@ -9,7 +9,7 @@ import React, { useState } from 'react';
 import {
   Folder,
   FolderOpen,
-  FolderPlus,
+  Plus,
   ChevronRight,
   ChevronDown,
   MoreVertical,
@@ -114,30 +114,15 @@ export function WorkflowFolderSidebar({
     const isEditing = editingFolder === folder.id;
 
     return (
-      <div key={folder.id}>
+      <React.Fragment key={folder.id}>
         <div
           className={cn(
-            'group flex items-center gap-1 px-2 py-1.5 cursor-pointer rounded-md transition-colors text-sm',
+            'flex items-center gap-2 px-4 py-2 cursor-pointer rounded-md mx-2 transition-colors text-sm group',
             isSelected ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100 text-gray-700',
           )}
-          style={{ paddingLeft: `${8 + depth * 12}px` }}
+          style={depth > 0 ? { marginLeft: `${depth * 12}px` } : undefined}
           onClick={() => !isEditing && onSelectFolder(folder.id)}
         >
-          {hasChildren ? (
-            <button
-              onClick={(e) => { e.stopPropagation(); toggleFolder(folder.id); }}
-              className="p-0.5 hover:bg-gray-200 rounded flex-shrink-0"
-            >
-              {isExpanded ? (
-                <ChevronDown className="w-3 h-3" />
-              ) : (
-                <ChevronRight className="w-3 h-3" />
-              )}
-            </button>
-          ) : (
-            <span className="w-4 flex-shrink-0" />
-          )}
-          
           {isSelected ? (
             <FolderOpen className="w-4 h-4 flex-shrink-0" style={{ color: folder.color || '#6b7280' }} />
           ) : (
@@ -167,16 +152,16 @@ export function WorkflowFolderSidebar({
           ) : (
             <>
               <span className="flex-1 truncate">{folder.name}</span>
-              <span className="text-xs text-gray-400 mr-1">{folder.workflowCount}</span>
+              <span className="text-xs text-gray-400 group-hover:hidden">{folder.workflowCount}</span>
               
-              {/* Context menu button */}
-              <div className="relative">
+              {/* Context menu button - shows on hover, replaces count */}
+              <div className="relative hidden group-hover:block">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     setContextMenu(contextMenu === folder.id ? null : folder.id);
                   }}
-                  className="p-0.5 opacity-0 group-hover:opacity-100 hover:bg-gray-200 rounded transition-opacity"
+                  className="p-0.5 hover:bg-gray-200 rounded"
                 >
                   <MoreVertical className="w-3 h-3 text-gray-500" />
                 </button>
@@ -208,21 +193,28 @@ export function WorkflowFolderSidebar({
         </div>
         
         {hasChildren && isExpanded && (
-          <div>
+          <>
             {folder.children.map(child => renderFolderItem(child, depth + 1))}
-          </div>
+          </>
         )}
-      </div>
+      </React.Fragment>
     );
   };
 
   return (
     <div className="py-2">
       {/* Section header */}
-      <div className="px-4 py-1 mb-1">
+      <div className="flex items-center justify-between px-4 py-1 mb-1">
         <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
           Folders
         </span>
+        <button
+          onClick={() => setShowNewFolderInput(true)}
+          className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+          title="New Folder"
+        >
+          <Plus className="w-3.5 h-3.5" />
+        </button>
       </div>
 
       {/* All Workflows */}
@@ -251,14 +243,12 @@ export function WorkflowFolderSidebar({
         <span className="text-xs text-gray-400">{uncategorizedCount}</span>
       </div>
 
-      {/* Folder tree */}
-      <div className="mx-2 mt-1">
-        {folderTree.map(folder => renderFolderItem(folder))}
-      </div>
+      {/* User-created folders */}
+      {folderTree.map(folder => renderFolderItem(folder, 0))}
 
       {/* New folder input */}
-      {showNewFolderInput ? (
-        <div className="mx-2 mt-2 flex items-center gap-1 px-2">
+      {showNewFolderInput && (
+        <div className="flex items-center gap-2 px-4 py-2 mx-2 text-sm">
           <Folder className="w-4 h-4 text-gray-400 flex-shrink-0" />
           <input
             type="text"
@@ -285,14 +275,6 @@ export function WorkflowFolderSidebar({
             <X className="w-4 h-4" />
           </button>
         </div>
-      ) : (
-        <button
-          onClick={() => setShowNewFolderInput(true)}
-          className="flex items-center gap-2 px-4 py-2 mx-2 mt-2 text-sm text-gray-600 hover:bg-gray-100 rounded-md transition-colors w-[calc(100%-16px)]"
-        >
-          <FolderPlus className="w-4 h-4" />
-          <span>New Folder</span>
-        </button>
       )}
     </div>
   );
