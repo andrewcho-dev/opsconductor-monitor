@@ -241,99 +241,133 @@ const NodeEditor = ({
           </div>
         )}
 
-        {/* Column Mapping (n8n-style) */}
+        {/* Column Mapping (n8n-style) - "Columns to Send" */}
         {param.type === 'column-mapping' && (
-          <div className="space-y-3 border border-gray-200 rounded-md p-3 bg-gray-50">
-            {/* Show available input fields from common nodes */}
-            {inputFields && (
-              <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
-                <div className="font-medium text-blue-700 mb-1">Common input fields (from network:ping):</div>
-                <div className="flex flex-wrap gap-1">
-                  {inputFields['network:ping']?.fields?.map(field => (
-                    <button
-                      key={field.name}
-                      onClick={() => {
-                        const existing = (value || []).find(m => m.source === field.name);
-                        if (!existing) {
-                          updateField(param.id, [...(value || []), { source: field.name, target: field.name }]);
-                        }
-                      }}
-                      className="px-1.5 py-0.5 bg-white border border-blue-300 rounded text-blue-700 hover:bg-blue-100"
-                      title={field.description}
-                    >
-                      + {field.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            {/* Show available DB columns if table is selected */}
-            {formData.table && tableColumns[formData.table] && (
-              <div className="mb-3 p-2 bg-green-50 border border-green-200 rounded text-xs">
-                <div className="font-medium text-green-700 mb-1">Database columns ({formData.table}):</div>
-                <div className="flex flex-wrap gap-1">
-                  {tableColumns[formData.table].map(col => (
-                    <span 
-                      key={col.name}
-                      className="px-1.5 py-0.5 bg-white border border-green-300 rounded text-green-700"
-                      title={`Type: ${col.type}`}
-                    >
-                      {col.name}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="flex gap-2 text-xs font-medium text-gray-500 uppercase">
-              <span className="flex-1">Input Field</span>
-              <span className="flex-1">→ Database Column</span>
-              <span className="w-8"></span>
+          <div className="space-y-3 border border-gray-200 rounded-lg p-4 bg-white">
+            <div className="text-xs text-gray-500 mb-2">
+              Map input data fields to database columns. Each row specifies which database column receives which input value.
             </div>
+            
+            {/* Column mapping rows */}
             {(Array.isArray(value) ? value : []).map((mapping, idx) => (
-              <div key={idx} className="flex gap-2 items-center">
-                <input
-                  type="text"
-                  value={mapping.source || ''}
-                  placeholder="e.g. ip_address"
-                  className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm bg-white"
-                  onChange={(e) => {
-                    const newValue = [...(value || [])];
-                    newValue[idx] = { ...newValue[idx], source: e.target.value };
-                    updateField(param.id, newValue);
-                  }}
-                />
-                <span className="text-gray-400">→</span>
-                <input
-                  type="text"
-                  value={mapping.target || ''}
-                  placeholder="e.g. ip_address"
-                  className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm bg-white"
-                  onChange={(e) => {
-                    const newValue = [...(value || [])];
-                    newValue[idx] = { ...newValue[idx], target: e.target.value };
-                    updateField(param.id, newValue);
-                  }}
-                />
+              <div key={idx} className="flex gap-2 items-start p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Database Column</label>
+                  {formData.table && tableColumns[formData.table] ? (
+                    <select
+                      value={mapping.target || ''}
+                      onChange={(e) => {
+                        const newValue = [...(value || [])];
+                        newValue[idx] = { ...newValue[idx], target: e.target.value };
+                        updateField(param.id, newValue);
+                      }}
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm bg-white"
+                    >
+                      <option value="">Select column...</option>
+                      {tableColumns[formData.table].map(col => (
+                        <option key={col.name} value={col.name}>
+                          {col.name} ({col.type})
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={mapping.target || ''}
+                      placeholder="column_name"
+                      onChange={(e) => {
+                        const newValue = [...(value || [])];
+                        newValue[idx] = { ...newValue[idx], target: e.target.value };
+                        updateField(param.id, newValue);
+                      }}
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+                    />
+                  )}
+                </div>
+                
+                <div className="flex items-center pt-5 text-gray-400">←</div>
+                
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Input Value</label>
+                  {inputFields && inputFields['network:ping'] ? (
+                    <select
+                      value={mapping.source || ''}
+                      onChange={(e) => {
+                        const newValue = [...(value || [])];
+                        newValue[idx] = { ...newValue[idx], source: e.target.value };
+                        updateField(param.id, newValue);
+                      }}
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm bg-white"
+                    >
+                      <option value="">Select field...</option>
+                      {inputFields['network:ping'].fields.map(field => (
+                        <option key={field.name} value={field.name} title={field.description}>
+                          {field.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={mapping.source || ''}
+                      placeholder="input_field"
+                      onChange={(e) => {
+                        const newValue = [...(value || [])];
+                        newValue[idx] = { ...newValue[idx], source: e.target.value };
+                        updateField(param.id, newValue);
+                      }}
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+                    />
+                  )}
+                </div>
+                
                 <button
                   onClick={() => {
                     const newValue = [...(value || [])];
                     newValue.splice(idx, 1);
                     updateField(param.id, newValue);
                   }}
-                  className="w-8 text-center text-red-500 hover:text-red-700 font-bold"
+                  className="mt-5 p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded"
+                  title="Remove mapping"
                 >
-                  ×
+                  <X className="w-4 h-4" />
                 </button>
               </div>
             ))}
+            
+            {/* Add mapping button */}
             <button
               onClick={() => updateField(param.id, [...(value || []), { source: '', target: '' }])}
-              className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+              className="w-full py-2 px-3 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
             >
-              + Add Field Mapping
+              + Add Column Mapping
             </button>
+            
+            {/* Quick add common mappings */}
+            {formData.table && tableColumns[formData.table] && inputFields && (
+              <div className="pt-2 border-t border-gray-200">
+                <div className="text-xs font-medium text-gray-500 mb-2">Quick Add (auto-match by name):</div>
+                <div className="flex flex-wrap gap-1">
+                  {tableColumns[formData.table]
+                    .filter(col => {
+                      const inputField = inputFields['network:ping']?.fields?.find(f => f.name === col.name);
+                      const alreadyMapped = (value || []).some(m => m.target === col.name);
+                      return inputField && !alreadyMapped;
+                    })
+                    .map(col => (
+                      <button
+                        key={col.name}
+                        onClick={() => {
+                          updateField(param.id, [...(value || []), { source: col.name, target: col.name }]);
+                        }}
+                        className="px-2 py-1 text-xs bg-green-50 border border-green-200 rounded text-green-700 hover:bg-green-100"
+                      >
+                        + {col.name}
+                      </button>
+                    ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
