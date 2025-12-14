@@ -37,6 +37,14 @@ export default defineConfig({
       '/poller/run_all': 'http://192.168.10.50:5000',
       '/poller/statistics': 'http://192.168.10.50:5000',
       '/poller/logs/clear': 'http://192.168.10.50:5000',
+      '/api/schema': 'http://192.168.10.50:5000',
+      '/api/workflows': 'http://192.168.10.50:5000',
+      '/api/devices': 'http://192.168.10.50:5000',
+      '/api/groups': 'http://192.168.10.50:5000',
+      '/api/alerts': 'http://192.168.10.50:5000',
+      '/api/credentials': 'http://192.168.10.50:5000',
+      '/api/logs': 'http://192.168.10.50:5000',
+      '/api/system': 'http://192.168.10.50:5000',
     }
   },
   build: {
