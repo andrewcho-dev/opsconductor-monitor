@@ -265,6 +265,15 @@ class WorkflowEngine:
         result = self._execute_single_node(node, context)
         context.node_results[node_id] = result
         
+        # Update context variables with node output for downstream nodes
+        if result.status == NodeStatus.SUCCESS and result.output_data:
+            # Store output under node label or id for reference
+            node_label = node.get('data', {}).get('label', node_id)
+            context.variables[node_label] = result.output_data
+            context.variables[node_id] = result.output_data
+            # Also set as 'results' for simple from_input data sources
+            context.variables['results'] = result.output_data.get('results', result.output_data)
+        
         # Determine which outputs to follow
         outputs_to_follow = self._get_outputs_to_follow(result, node)
         
@@ -335,6 +344,36 @@ class WorkflowEngine:
             
             finished_at = now_utc()
             duration_ms = int((finished_at - started_at).total_seconds() * 1000)
+            
+            # Check if the executor returned a failure indicator
+            node_failed = False
+            error_message = None
+            if isinstance(output_data, dict):
+                if output_data.get('success') is False:
+                    node_failed = True
+                    error_message = output_data.get('error') or '; '.join(output_data.get('errors', []))
+                elif output_data.get('error'):
+                    node_failed = True
+                    error_message = output_data.get('error')
+            
+            if node_failed:
+                logger.error(
+                    f"Node {node_id} returned failure: {error_message}",
+                    workflow_id=context.workflow_id,
+                    execution_id=context.execution_id,
+                    category='node_execution',
+                    details={'node_id': node_id, 'node_type': node_type, 'error': error_message}
+                )
+                return NodeResult(
+                    node_id=node_id,
+                    node_type=node_type,
+                    status=NodeStatus.FAILURE,
+                    output_data=output_data or {},
+                    error_message=error_message,
+                    started_at=started_at,
+                    finished_at=finished_at,
+                    duration_ms=duration_ms,
+                )
             
             return NodeResult(
                 node_id=node_id,

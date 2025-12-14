@@ -256,6 +256,7 @@ def update_workflow_tags(workflow_id):
 def run_workflow(workflow_id):
     """Execute a workflow immediately."""
     from ..services.workflow_engine import WorkflowEngine
+    from database import DatabaseManager
     
     workflow = get_workflow_repo().get_by_id(workflow_id)
     
@@ -265,12 +266,16 @@ def run_workflow(workflow_id):
             'error': 'Workflow not found'
         }), 404
     
-    # Get trigger data from request
-    data = request.get_json() or {}
+    # Get trigger data from request (handle empty body)
+    try:
+        data = request.get_json(silent=True) or {}
+    except Exception:
+        data = {}
     trigger_data = data.get('trigger_data', {})
     
-    # Execute the workflow
-    engine = WorkflowEngine()
+    # Execute the workflow with database access
+    db = DatabaseManager()
+    engine = WorkflowEngine(db_manager=db)
     result = engine.execute(workflow, trigger_data)
     
     # Record execution
@@ -296,8 +301,11 @@ def test_workflow(workflow_id):
             'error': 'Workflow not found'
         }), 404
     
-    # Get trigger data from request
-    data = request.get_json() or {}
+    # Get trigger data from request (handle empty body)
+    try:
+        data = request.get_json(silent=True) or {}
+    except Exception:
+        data = {}
     trigger_data = data.get('trigger_data', {})
     trigger_data['_test_mode'] = True  # Flag for test mode
     

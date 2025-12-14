@@ -76,7 +76,7 @@ class PingExecutor:
             'offline_count': len(offline),
         }
     
-    def _get_targets(self, params: Dict, context: Dict) -> List[str]:
+    def _get_targets(self, params: Dict, context) -> List[str]:
         """Get target IPs based on target_type parameter."""
         target_type = params.get('target_type', 'network_range')
         
@@ -89,6 +89,9 @@ class PingExecutor:
             return [ip.strip() for ip in ip_list.split('\n') if ip.strip()]
         
         elif target_type == 'from_input':
+            # Handle both dict and ExecutionContext
+            if hasattr(context, 'variables'):
+                return context.variables.get('targets', [])
             return context.get('variables', {}).get('targets', [])
         
         elif target_type == 'device_group':
@@ -129,7 +132,9 @@ class PingExecutor:
                 rtt = self._parse_ping_rtt(result.stdout)
                 return {
                     'target': target,
+                    'ip_address': target,  # For scan_results compatibility
                     'status': 'online',
+                    'ping_status': 'online',  # For scan_results compatibility
                     'rtt_ms': rtt,
                     'packets_sent': count,
                     'packets_received': count,
@@ -137,20 +142,26 @@ class PingExecutor:
             else:
                 return {
                     'target': target,
+                    'ip_address': target,  # For scan_results compatibility
                     'status': 'offline',
+                    'ping_status': 'offline',  # For scan_results compatibility
                     'packets_sent': count,
                     'packets_received': 0,
                 }
         except subprocess.TimeoutExpired:
             return {
                 'target': target,
+                'ip_address': target,  # For scan_results compatibility
                 'status': 'timeout',
+                'ping_status': 'offline',  # For scan_results compatibility
                 'error': 'Ping timed out'
             }
         except Exception as e:
             return {
                 'target': target,
+                'ip_address': target,  # For scan_results compatibility
                 'status': 'error',
+                'ping_status': 'offline',  # For scan_results compatibility
                 'error': str(e)
             }
     
