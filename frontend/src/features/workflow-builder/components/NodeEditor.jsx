@@ -180,6 +180,60 @@ const NodeEditor = ({
           </div>
         )}
 
+        {/* Column Mapping (n8n-style) */}
+        {param.type === 'column-mapping' && (
+          <div className="space-y-2 border border-gray-200 rounded-md p-3 bg-gray-50">
+            <div className="flex gap-2 text-xs font-medium text-gray-500 uppercase">
+              <span className="flex-1">Input Field</span>
+              <span className="flex-1">→ Database Column</span>
+              <span className="w-8"></span>
+            </div>
+            {(Array.isArray(value) ? value : []).map((mapping, idx) => (
+              <div key={idx} className="flex gap-2 items-center">
+                <input
+                  type="text"
+                  value={mapping.source || ''}
+                  placeholder="e.g. ip_address"
+                  className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm"
+                  onChange={(e) => {
+                    const newValue = [...(value || [])];
+                    newValue[idx] = { ...newValue[idx], source: e.target.value };
+                    updateField(param.id, newValue);
+                  }}
+                />
+                <span className="text-gray-400">→</span>
+                <input
+                  type="text"
+                  value={mapping.target || ''}
+                  placeholder="e.g. ip_address"
+                  className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm"
+                  onChange={(e) => {
+                    const newValue = [...(value || [])];
+                    newValue[idx] = { ...newValue[idx], target: e.target.value };
+                    updateField(param.id, newValue);
+                  }}
+                />
+                <button
+                  onClick={() => {
+                    const newValue = [...(value || [])];
+                    newValue.splice(idx, 1);
+                    updateField(param.id, newValue);
+                  }}
+                  className="w-8 text-center text-red-500 hover:text-red-700 font-bold"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+            <button
+              onClick={() => updateField(param.id, [...(value || []), { source: '', target: '' }])}
+              className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+            >
+              + Add Field Mapping
+            </button>
+          </div>
+        )}
+
         {/* Device Group Selector (placeholder - would connect to API) */}
         {param.type === 'device-group-selector' && (
           <select {...commonProps}>
@@ -190,14 +244,23 @@ const NodeEditor = ({
           </select>
         )}
 
-        {/* Table Selector (placeholder) */}
+        {/* Table Selector */}
         {param.type === 'table-selector' && (
           <select {...commonProps}>
-            <option value="devices">devices</option>
-            <option value="interfaces">interfaces</option>
-            <option value="optical_power_readings">optical_power_readings</option>
-            <option value="scan_results">scan_results</option>
-            <option value="custom">Custom...</option>
+            {param.options ? (
+              param.options.map(opt => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))
+            ) : (
+              <>
+                <option value="scan_results">Scan Results (Devices)</option>
+                <option value="interfaces">Interfaces</option>
+                <option value="optical_power_readings">Optical Power Readings</option>
+                <option value="custom">Custom...</option>
+              </>
+            )}
           </select>
         )}
 
