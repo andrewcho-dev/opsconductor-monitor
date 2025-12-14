@@ -5,8 +5,8 @@
  * Renders form fields based on node definition.
  */
 
-import React, { useState } from 'react';
-import { X, ChevronDown, ChevronRight, AlertCircle, HelpCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, ChevronDown, ChevronRight, AlertCircle, HelpCircle, Loader2 } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 
 const NodeEditor = ({
@@ -22,6 +22,67 @@ const NodeEditor = ({
   shouldShowParameter,
 }) => {
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [tables, setTables] = useState([]);
+  const [tableColumns, setTableColumns] = useState({});
+  const [loadingTables, setLoadingTables] = useState(false);
+  const [loadingColumns, setLoadingColumns] = useState(false);
+  const [inputFields, setInputFields] = useState(null);
+
+  // Fetch available tables when component mounts
+  useEffect(() => {
+    if (isOpen) {
+      fetchTables();
+      fetchInputFields();
+    }
+  }, [isOpen]);
+
+  // Fetch columns when table selection changes
+  useEffect(() => {
+    const selectedTable = formData.table;
+    if (selectedTable && selectedTable !== 'custom' && !tableColumns[selectedTable]) {
+      fetchTableColumns(selectedTable);
+    }
+  }, [formData.table]);
+
+  const fetchTables = async () => {
+    setLoadingTables(true);
+    try {
+      const response = await fetch('/api/schema/tables');
+      const data = await response.json();
+      if (data.success) {
+        setTables(data.tables);
+      }
+    } catch (error) {
+      console.error('Failed to fetch tables:', error);
+    }
+    setLoadingTables(false);
+  };
+
+  const fetchTableColumns = async (tableName) => {
+    setLoadingColumns(true);
+    try {
+      const response = await fetch(`/api/schema/tables/${tableName}/columns`);
+      const data = await response.json();
+      if (data.success) {
+        setTableColumns(prev => ({ ...prev, [tableName]: data.columns }));
+      }
+    } catch (error) {
+      console.error('Failed to fetch columns:', error);
+    }
+    setLoadingColumns(false);
+  };
+
+  const fetchInputFields = async () => {
+    try {
+      const response = await fetch('/api/schema/input-fields');
+      const data = await response.json();
+      if (data.success) {
+        setInputFields(data.node_outputs);
+      }
+    } catch (error) {
+      console.error('Failed to fetch input fields:', error);
+    }
+  };
 
   if (!isOpen || !node || !nodeDefinition) return null;
 
@@ -182,7 +243,49 @@ const NodeEditor = ({
 
         {/* Column Mapping (n8n-style) */}
         {param.type === 'column-mapping' && (
-          <div className="space-y-2 border border-gray-200 rounded-md p-3 bg-gray-50">
+          <div className="space-y-3 border border-gray-200 rounded-md p-3 bg-gray-50">
+            {/* Show available input fields from common nodes */}
+            {inputFields && (
+              <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
+                <div className="font-medium text-blue-700 mb-1">Common input fields (from network:ping):</div>
+                <div className="flex flex-wrap gap-1">
+                  {inputFields['network:ping']?.fields?.map(field => (
+                    <button
+                      key={field.name}
+                      onClick={() => {
+                        const existing = (value || []).find(m => m.source === field.name);
+                        if (!existing) {
+                          updateField(param.id, [...(value || []), { source: field.name, target: field.name }]);
+                        }
+                      }}
+                      className="px-1.5 py-0.5 bg-white border border-blue-300 rounded text-blue-700 hover:bg-blue-100"
+                      title={field.description}
+                    >
+                      + {field.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Show available DB columns if table is selected */}
+            {formData.table && tableColumns[formData.table] && (
+              <div className="mb-3 p-2 bg-green-50 border border-green-200 rounded text-xs">
+                <div className="font-medium text-green-700 mb-1">Database columns ({formData.table}):</div>
+                <div className="flex flex-wrap gap-1">
+                  {tableColumns[formData.table].map(col => (
+                    <span 
+                      key={col.name}
+                      className="px-1.5 py-0.5 bg-white border border-green-300 rounded text-green-700"
+                      title={`Type: ${col.type}`}
+                    >
+                      {col.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-2 text-xs font-medium text-gray-500 uppercase">
               <span className="flex-1">Input Field</span>
               <span className="flex-1">→ Database Column</span>
@@ -194,7 +297,7 @@ const NodeEditor = ({
                   type="text"
                   value={mapping.source || ''}
                   placeholder="e.g. ip_address"
-                  className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm"
+                  className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm bg-white"
                   onChange={(e) => {
                     const newValue = [...(value || [])];
                     newValue[idx] = { ...newValue[idx], source: e.target.value };
@@ -206,7 +309,7 @@ const NodeEditor = ({
                   type="text"
                   value={mapping.target || ''}
                   placeholder="e.g. ip_address"
-                  className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm"
+                  className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm bg-white"
                   onChange={(e) => {
                     const newValue = [...(value || [])];
                     newValue[idx] = { ...newValue[idx], target: e.target.value };
@@ -244,24 +347,57 @@ const NodeEditor = ({
           </select>
         )}
 
-        {/* Table Selector */}
+        {/* Table Selector - Dynamic from API */}
         {param.type === 'table-selector' && (
-          <select {...commonProps}>
-            {param.options ? (
-              param.options.map(opt => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))
-            ) : (
-              <>
-                <option value="scan_results">Scan Results (Devices)</option>
-                <option value="interfaces">Interfaces</option>
-                <option value="optical_power_readings">Optical Power Readings</option>
-                <option value="custom">Custom...</option>
-              </>
+          <div>
+            <div className="flex items-center gap-2">
+              <select {...commonProps} className={cn(commonProps.className, 'flex-1')}>
+                {loadingTables ? (
+                  <option value="">Loading tables...</option>
+                ) : tables.length > 0 ? (
+                  <>
+                    {tables.map(table => (
+                      <option key={table.name} value={table.name}>
+                        {table.label} ({table.column_count} columns)
+                      </option>
+                    ))}
+                    <option value="custom">Custom Table...</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="scan_results">Scan Results (Devices)</option>
+                    <option value="interfaces">Interfaces</option>
+                    <option value="optical_power_readings">Optical Power Readings</option>
+                    <option value="custom">Custom...</option>
+                  </>
+                )}
+              </select>
+              {loadingTables && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
+            </div>
+            {/* Show available columns for selected table */}
+            {formData.table && tableColumns[formData.table] && (
+              <div className="mt-2 p-2 bg-gray-50 border border-gray-200 rounded text-xs">
+                <div className="font-medium text-gray-600 mb-1">Available columns:</div>
+                <div className="flex flex-wrap gap-1">
+                  {tableColumns[formData.table].map(col => (
+                    <span 
+                      key={col.name} 
+                      className="px-1.5 py-0.5 bg-white border border-gray-300 rounded text-gray-700"
+                      title={`Type: ${col.type}${col.nullable ? ' (nullable)' : ''}`}
+                    >
+                      {col.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
             )}
-          </select>
+            {loadingColumns && (
+              <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Loading columns...
+              </div>
+            )}
+          </div>
         )}
 
         {/* OID Selector (placeholder) */}
