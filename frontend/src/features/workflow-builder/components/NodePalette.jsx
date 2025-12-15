@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { ChevronDown, ChevronRight, Search, X, Folder, FolderOpen } from 'lucide-react';
+import { ChevronDown, ChevronRight, Search, X, Folder, FolderOpen, AlertTriangle, Key, Wifi, Server, Terminal } from 'lucide-react';
 import { getNodesByCategory, getAllPackages, getNodesByPackage } from '../packages';
 import { cn } from '../../../lib/utils';
 
@@ -127,6 +127,34 @@ const NodePalette = ({ enabledPackages, onDragStart }) => {
     return icons[category] || '📦';
   }
 
+  // Get platform badge info
+  function getPlatformBadge(platform) {
+    const badges = {
+      'any': null, // No badge needed for universal nodes
+      'linux': { label: 'Linux', color: 'bg-orange-100 text-orange-700 border-orange-200' },
+      'ciena-saos-8': { label: 'SAOS', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+      'windows': { label: 'Win', color: 'bg-cyan-100 text-cyan-700 border-cyan-200' },
+    };
+    return badges[platform] || (platform && platform !== 'any' ? { label: platform, color: 'bg-gray-100 text-gray-700 border-gray-200' } : null);
+  }
+
+  // Get context icon
+  function getContextIcon(context) {
+    switch (context) {
+      case 'remote_ssh': return <Terminal className="w-3 h-3" />;
+      case 'remote_snmp': return <Wifi className="w-3 h-3" />;
+      case 'remote_api': return <Server className="w-3 h-3" />;
+      case 'local': return <Server className="w-3 h-3" />;
+      default: return null;
+    }
+  }
+
+  // Check if node has credential requirements
+  function hasCredentialRequirements(node) {
+    const requirements = node.execution?.requirements;
+    return requirements?.credentials && requirements.credentials.length > 0;
+  }
+
   const togglePackage = (pkgId) => {
     setExpandedPackages(prev => ({
       ...prev,
@@ -155,33 +183,90 @@ const NodePalette = ({ enabledPackages, onDragStart }) => {
   };
 
   // Render a single node card
-  const renderNodeCard = (node) => (
-    <div
-      key={node.id}
-      draggable
-      onDragStart={(e) => handleDragStart(e, node)}
-      className={cn(
-        'flex items-center gap-2 p-2 rounded-lg cursor-grab',
-        'bg-white border border-gray-200 shadow-sm',
-        'hover:shadow-md hover:border-gray-300 hover:scale-[1.01]',
-        'transition-all duration-150',
-        'active:cursor-grabbing active:scale-100 active:shadow-lg'
-      )}
-      title={node.description}
-    >
-      <div 
-        className="w-8 h-8 flex items-center justify-center rounded-md flex-shrink-0"
-        style={{ backgroundColor: node.color || '#6366F1' }}
+  const renderNodeCard = (node) => {
+    const execution = node.execution || {};
+    const platform = execution.platform;
+    const context = execution.context;
+    const platformBadge = getPlatformBadge(platform);
+    const needsCredentials = hasCredentialRequirements(node);
+    const contextIcon = getContextIcon(context);
+    
+    // Build tooltip with requirements info
+    let tooltip = node.description || '';
+    if (execution.requirements) {
+      const reqs = [];
+      if (execution.requirements.credentials) {
+        reqs.push(`Credentials: ${execution.requirements.credentials.join(', ')}`);
+      }
+      if (execution.requirements.tools) {
+        reqs.push(`Tools: ${execution.requirements.tools.join(', ')}`);
+      }
+      if (execution.requirements.network) {
+        reqs.push('Requires network access');
+      }
+      if (execution.requirements.database) {
+        reqs.push('Requires database connection');
+      }
+      if (reqs.length > 0) {
+        tooltip += `\n\nRequirements:\n• ${reqs.join('\n• ')}`;
+      }
+    }
+    if (platform && platform !== 'any') {
+      tooltip += `\n\nPlatform: ${platform}`;
+    }
+    if (context) {
+      tooltip += `\nContext: ${context}`;
+    }
+    
+    return (
+      <div
+        key={node.id}
+        draggable
+        onDragStart={(e) => handleDragStart(e, node)}
+        className={cn(
+          'flex items-center gap-2 p-2 rounded-lg cursor-grab',
+          'bg-white border border-gray-200 shadow-sm',
+          'hover:shadow-md hover:border-gray-300 hover:scale-[1.01]',
+          'transition-all duration-150',
+          'active:cursor-grabbing active:scale-100 active:shadow-lg'
+        )}
+        title={tooltip}
       >
-        <span className="text-base">{node.icon}</span>
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium text-gray-900 truncate">
-          {node.name}
+        <div 
+          className="w-8 h-8 flex items-center justify-center rounded-md flex-shrink-0"
+          style={{ backgroundColor: node.color || '#6366F1' }}
+        >
+          <span className="text-base">{node.icon}</span>
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-medium text-gray-900 truncate">
+            {node.name}
+          </div>
+          {/* Platform and requirements badges */}
+          <div className="flex items-center gap-1 mt-0.5">
+            {platformBadge && (
+              <span className={cn(
+                'text-[10px] px-1 py-0 rounded border font-medium',
+                platformBadge.color
+              )}>
+                {platformBadge.label}
+              </span>
+            )}
+            {contextIcon && (
+              <span className="text-gray-400" title={`Runs ${context}`}>
+                {contextIcon}
+              </span>
+            )}
+            {needsCredentials && (
+              <span className="text-amber-500" title="Requires credentials">
+                <Key className="w-3 h-3" />
+              </span>
+            )}
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="w-72 bg-gray-50 border-r border-gray-200 flex flex-col h-full">

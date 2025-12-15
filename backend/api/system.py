@@ -67,3 +67,121 @@ def cancel_scan():
 def test_endpoint():
     """Test endpoint."""
     return jsonify(success_response({'message': 'Backend is running'}))
+
+
+@system_bp.route('/check-tool', methods=['GET'])
+def check_tool():
+    """
+    Check if a tool is available on the system.
+    
+    Query params:
+        tool: Name of the tool to check (e.g., 'ping', 'nmap', 'traceroute')
+    
+    Returns:
+        available: bool
+        version: str (if available)
+        path: str (if available)
+    """
+    import subprocess
+    import shutil
+    
+    tool = request.args.get('tool')
+    if not tool:
+        return jsonify(error_response('Tool name required')), 400
+    
+    # Security: only allow specific known tools
+    allowed_tools = {
+        'ping', 'nmap', 'traceroute', 'arp-scan', 'ssh', 'snmpget', 'snmpwalk',
+        'curl', 'wget', 'python3', 'python', 'node', 'npm'
+    }
+    
+    if tool not in allowed_tools:
+        return jsonify(error_response(f'Tool "{tool}" is not in the allowed list')), 400
+    
+    # Check if tool exists
+    tool_path = shutil.which(tool)
+    
+    if not tool_path:
+        return jsonify(success_response({
+            'tool': tool,
+            'available': False,
+        }))
+    
+    # Try to get version
+    version = None
+    try:
+        version_flags = {
+            'ping': ['-V'],
+            'nmap': ['--version'],
+            'traceroute': ['--version'],
+            'arp-scan': ['--version'],
+            'ssh': ['-V'],
+            'snmpget': ['-V'],
+            'snmpwalk': ['-V'],
+            'curl': ['--version'],
+            'wget': ['--version'],
+            'python3': ['--version'],
+            'python': ['--version'],
+            'node': ['--version'],
+            'npm': ['--version'],
+        }
+        
+        flag = version_flags.get(tool, ['--version'])
+        result = subprocess.run(
+            [tool] + flag,
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        version = (result.stdout or result.stderr).strip().split('\n')[0][:100]
+    except Exception:
+        pass
+    
+    return jsonify(success_response({
+        'tool': tool,
+        'available': True,
+        'path': tool_path,
+        'version': version,
+    }))
+
+
+@system_bp.route('/check-network', methods=['GET'])
+def check_network():
+    """Check network connectivity."""
+    import socket
+    
+    # Check basic network
+    network_available = True
+    internet_available = False
+    
+    try:
+        # Try to resolve a common domain
+        socket.gethostbyname('google.com')
+        internet_available = True
+    except socket.gaierror:
+        pass
+    
+    return jsonify(success_response({
+        'available': network_available,
+        'internet': internet_available,
+    }))
+
+
+@system_bp.route('/check-database', methods=['GET'])
+def check_database():
+    """Check database connectivity."""
+    from backend.database import get_db
+    
+    try:
+        db = get_db()
+        with db.cursor() as cursor:
+            cursor.execute('SELECT 1')
+        return jsonify(success_response({
+            'available': True,
+            'type': 'postgresql',
+        }))
+    except Exception as e:
+        return jsonify(success_response({
+            'available': False,
+            'error': str(e),
+        }))
