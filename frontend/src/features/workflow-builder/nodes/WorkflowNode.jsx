@@ -1,8 +1,11 @@
 /**
  * WorkflowNode Component
  * 
- * Generic workflow node that renders based on node definition.
- * Used for all node types in the workflow builder.
+ * n8n/Node-RED style workflow node with:
+ * - Large icon on left side
+ * - Node name prominently displayed
+ * - Color-coded by category
+ * - Clean, modern design
  */
 
 import React, { memo, useMemo } from 'react';
@@ -18,9 +21,14 @@ const WorkflowNode = memo(({ id, data, selected }) => {
 
   if (!nodeDefinition) {
     return (
-      <div className="bg-red-100 border-2 border-red-400 rounded-lg p-3 min-w-[150px]">
-        <div className="text-red-700 text-sm font-medium">Unknown Node</div>
-        <div className="text-red-500 text-xs">{data.nodeType}</div>
+      <div className="flex items-center bg-red-50 border border-red-300 rounded-lg p-2 min-w-[180px] shadow-sm">
+        <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center text-red-500 mr-3">
+          ❓
+        </div>
+        <div>
+          <div className="text-red-700 text-sm font-medium">Unknown</div>
+          <div className="text-red-400 text-xs">{data.nodeType}</div>
+        </div>
       </div>
     );
   }
@@ -28,85 +36,60 @@ const WorkflowNode = memo(({ id, data, selected }) => {
   const { 
     name, 
     icon, 
-    color, 
+    color = '#6366F1', 
     inputs = [], 
     outputs = [],
     category,
   } = nodeDefinition;
 
   const label = data.label || name;
-  const description = data.description || '';
+  const subtitle = data.description || nodeDefinition.description || '';
 
-  // Get category-based styling
-  const getCategoryStyle = () => {
+  // n8n-style category colors
+  const getCategoryColor = () => {
     switch (category) {
       case 'triggers':
-        return 'border-green-500 bg-green-50';
+        return { bg: '#10B981', light: '#D1FAE5' }; // Green
       case 'logic':
-        return 'border-purple-500 bg-purple-50';
+        return { bg: '#8B5CF6', light: '#EDE9FE' }; // Purple
       case 'data':
-        return 'border-orange-500 bg-orange-50';
+        return { bg: '#F59E0B', light: '#FEF3C7' }; // Amber
       case 'notify':
-        return 'border-pink-500 bg-pink-50';
+        return { bg: '#EC4899', light: '#FCE7F3' }; // Pink
+      case 'network':
+        return { bg: '#3B82F6', light: '#DBEAFE' }; // Blue
       default:
-        return 'border-blue-500 bg-blue-50';
+        return { bg: color, light: `${color}20` };
     }
   };
 
-  // Format parameter preview
-  const getParameterPreview = () => {
+  const categoryColor = getCategoryColor();
+
+  // Get a short parameter summary
+  const getParamSummary = () => {
     const params = data.parameters || {};
-    const previews = [];
-
-    // Show key parameters based on node type
-    if (params.target_type) {
-      if (params.target_type === 'network_range' && params.network_range) {
-        previews.push(`Target: ${params.network_range}`);
-      } else if (params.target_type === 'from_input') {
-        previews.push('Target: From previous');
-      } else if (params.target_type === 'device_group' && params.device_group) {
-        previews.push(`Group: ${params.device_group}`);
-      }
-    }
-
-    if (params.schedule_type === 'interval' && params.interval_minutes) {
-      previews.push(`Every ${params.interval_minutes} min`);
-    } else if (params.schedule_type === 'cron' && params.cron_expression) {
-      previews.push(`Cron: ${params.cron_expression}`);
-    }
-
-    if (params.command) {
-      const cmd = params.command.length > 30 
-        ? params.command.substring(0, 30) + '...' 
-        : params.command;
-      previews.push(`Cmd: ${cmd}`);
-    }
-
-    if (params.table) {
-      previews.push(`Table: ${params.table}`);
-    }
-
-    if (params.channel) {
-      previews.push(`Channel: ${params.channel}`);
-    }
-
-    if (params.condition_type && params.condition_type !== 'expression') {
-      previews.push(`Condition: ${params.condition_type}`);
-    }
-
-    return previews.slice(0, 2); // Max 2 preview lines
+    if (params.network_range) return params.network_range;
+    if (params.table) return params.table;
+    if (params.channel) return params.channel;
+    if (params.target_type === 'from_input') return 'From input';
+    return null;
   };
 
-  const parameterPreviews = getParameterPreview();
+  const paramSummary = getParamSummary();
 
   return (
     <div
       className={cn(
-        'relative bg-white rounded-lg shadow-md border-2 min-w-[200px] max-w-[300px]',
-        'transition-all duration-200',
-        selected ? 'shadow-xl ring-2 ring-blue-400 ring-offset-2' : 'hover:shadow-lg',
+        'relative flex items-stretch bg-white rounded-xl shadow-lg min-w-[200px] max-w-[280px]',
+        'transition-all duration-150 cursor-pointer',
+        selected 
+          ? 'shadow-xl ring-2 ring-offset-2' 
+          : 'hover:shadow-xl hover:scale-[1.02]',
       )}
-      style={{ borderColor: color || '#6B7280' }}
+      style={{ 
+        borderColor: selected ? categoryColor.bg : 'transparent',
+        '--tw-ring-color': categoryColor.bg,
+      }}
     >
       {/* Input Handles */}
       {inputs.map((input, index) => (
@@ -115,72 +98,39 @@ const WorkflowNode = memo(({ id, data, selected }) => {
           type="target"
           position={Position.Left}
           id={input.id}
-          className={cn(
-            'w-3 h-3 rounded-full border-2 border-white transition-transform hover:scale-125',
-            input.type === 'trigger' ? 'bg-green-500' : 'bg-blue-500'
-          )}
+          className="!w-3 !h-3 !rounded-full !border-2 !border-white !bg-gray-400 hover:!bg-gray-600 transition-colors"
           style={{
             top: inputs.length === 1 
               ? '50%' 
               : `${((index + 1) / (inputs.length + 1)) * 100}%`,
             transform: 'translateY(-50%)',
+            left: '-6px',
           }}
           title={input.label}
         />
       ))}
 
-      {/* Node Header */}
-      <div
-        className="px-3 py-2 rounded-t-md flex items-center gap-2"
-        style={{ backgroundColor: `${color}20` || '#F3F4F6' }}
+      {/* Icon Section - n8n style large icon on left */}
+      <div 
+        className="flex items-center justify-center w-14 rounded-l-xl flex-shrink-0"
+        style={{ backgroundColor: categoryColor.bg }}
       >
-        <span className="text-base flex-shrink-0">{icon || '⚡'}</span>
-        <div className="flex-1 min-w-0">
-          <div className="font-semibold text-sm text-gray-900 truncate">
-            {label}
-          </div>
-        </div>
+        <span className="text-2xl filter drop-shadow-sm">{icon || '⚡'}</span>
       </div>
 
-      {/* Node Body - Parameter Preview */}
-      {(description || parameterPreviews.length > 0) && (
-        <div className="px-3 py-2 text-xs border-t border-gray-100 space-y-1">
-          {description && (
-            <div className="text-gray-500 italic truncate">{description}</div>
-          )}
-          {parameterPreviews.map((preview, idx) => (
-            <div key={idx} className="text-gray-600 truncate font-mono">
-              {preview}
-            </div>
-          ))}
+      {/* Content Section */}
+      <div className="flex-1 py-3 px-3 min-w-0">
+        <div className="font-semibold text-sm text-gray-900 truncate leading-tight">
+          {label}
         </div>
-      )}
+        {(subtitle || paramSummary) && (
+          <div className="text-xs text-gray-500 truncate mt-0.5">
+            {paramSummary || subtitle.substring(0, 40)}
+          </div>
+        )}
+      </div>
 
-      {/* Output Labels Footer - only show if multiple outputs */}
-      {outputs.length > 1 && (
-        <div className="px-3 py-1.5 border-t border-gray-100 flex flex-col gap-0.5">
-          {outputs.map((output) => (
-            <div 
-              key={output.id}
-              className="flex items-center justify-end gap-1.5 text-xs"
-            >
-              <span className="text-gray-500">{output.label}</span>
-              <span 
-                className={cn(
-                  'w-2 h-2 rounded-full',
-                  output.type === 'trigger'
-                    ? output.id === 'failure' || output.id === 'false'
-                      ? 'bg-red-500'
-                      : 'bg-green-500'
-                    : 'bg-orange-500'
-                )}
-              />
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Output Handles - positioned on main container */}
+      {/* Output Handles */}
       {outputs.map((output, index) => (
         <Handle
           key={output.id}
@@ -188,36 +138,53 @@ const WorkflowNode = memo(({ id, data, selected }) => {
           position={Position.Right}
           id={output.id}
           className={cn(
-            'w-3 h-3 rounded-full border-2 border-white transition-transform hover:scale-125',
-            output.type === 'trigger'
-              ? output.id === 'failure' || output.id === 'false'
-                ? 'bg-red-500'
-                : 'bg-green-500'
-              : 'bg-orange-500'
+            '!w-3 !h-3 !rounded-full !border-2 !border-white transition-colors',
+            output.id === 'failure' || output.id === 'false'
+              ? '!bg-red-400 hover:!bg-red-600'
+              : '!bg-green-400 hover:!bg-green-600'
           )}
           style={{
             top: outputs.length === 1 
               ? '50%' 
               : `${((index + 1) / (outputs.length + 1)) * 100}%`,
             transform: 'translateY(-50%)',
+            right: '-6px',
           }}
           title={output.label}
         />
       ))}
 
-      {/* Execution status indicator (shown during execution) */}
+      {/* Execution status badge */}
       {data.executionStatus && (
         <div className={cn(
-          'absolute -top-2 -right-2 w-5 h-5 rounded-full flex items-center justify-center text-white text-xs font-bold',
+          'absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-md',
           data.executionStatus === 'running' && 'bg-blue-500 animate-pulse',
           data.executionStatus === 'success' && 'bg-green-500',
           data.executionStatus === 'error' && 'bg-red-500',
           data.executionStatus === 'pending' && 'bg-gray-400',
         )}>
-          {data.executionStatus === 'running' && '▶'}
+          {data.executionStatus === 'running' && '⟳'}
           {data.executionStatus === 'success' && '✓'}
           {data.executionStatus === 'error' && '✗'}
           {data.executionStatus === 'pending' && '○'}
+        </div>
+      )}
+
+      {/* Multiple outputs indicator */}
+      {outputs.length > 1 && (
+        <div className="absolute -bottom-1 right-2 flex gap-1">
+          {outputs.map((output) => (
+            <div 
+              key={output.id}
+              className={cn(
+                'w-2 h-2 rounded-full',
+                output.id === 'failure' || output.id === 'false'
+                  ? 'bg-red-400'
+                  : 'bg-green-400'
+              )}
+              title={output.label}
+            />
+          ))}
         </div>
       )}
     </div>

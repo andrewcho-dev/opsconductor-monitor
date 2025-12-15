@@ -478,98 +478,109 @@ const NodeEditor = ({
   const parameters = nodeDefinition.parameters || [];
   const advancedParams = nodeDefinition.advanced || [];
 
+  // n8n-style slide-in panel from right
   return (
-    <div 
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-      onClick={onClose}
-      onKeyDown={handleKeyDown}
-    >
+    <>
+      {/* Backdrop */}
       <div 
-        className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col"
-        onClick={(e) => e.stopPropagation()}
+        className={cn(
+          "fixed inset-0 z-40 bg-black/20 transition-opacity duration-300",
+          isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+        )}
+        onClick={onClose}
+      />
+      
+      {/* Side Panel */}
+      <div 
+        className={cn(
+          "fixed top-0 right-0 z-50 h-full w-[420px] bg-white shadow-2xl flex flex-col",
+          "transform transition-transform duration-300 ease-out",
+          isOpen ? "translate-x-0" : "translate-x-full"
+        )}
+        onKeyDown={handleKeyDown}
       >
-        {/* Header */}
-        <div 
-          className="px-6 py-4 border-b border-gray-200 flex items-center justify-between"
-          style={{ backgroundColor: `${nodeDefinition.color}10` }}
-        >
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">{nodeDefinition.icon}</span>
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">
-                Edit: {nodeDefinition.name}
-              </h2>
-              <p className="text-sm text-gray-500">{nodeDefinition.description}</p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1 text-gray-400 hover:text-gray-600 rounded"
+        {/* Header - n8n style */}
+        <div className="flex-shrink-0 border-b border-gray-200">
+          <div 
+            className="px-4 py-3 flex items-center gap-3"
+            style={{ backgroundColor: nodeDefinition.color || '#6366F1' }}
           >
-            <X className="w-5 h-5" />
-          </button>
+            <span className="text-2xl">{nodeDefinition.icon}</span>
+            <div className="flex-1 min-w-0">
+              <h2 className="text-base font-semibold text-white truncate">
+                {formData.label || nodeDefinition.name}
+              </h2>
+              <p className="text-xs text-white/80 truncate">{nodeDefinition.description}</p>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-1.5 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          
+          {/* Tabs - n8n style */}
+          <div className="flex border-b border-gray-100">
+            <button className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-900 border-b-2 border-blue-500 bg-blue-50/50">
+              Parameters
+            </button>
+            <button className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-50">
+              Settings
+            </button>
+          </div>
         </div>
 
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-4">
-          {/* General Section */}
-          <div className="mb-6">
-            <h3 className="text-sm font-semibold text-gray-900 mb-3 uppercase tracking-wide">
-              General
-            </h3>
-            
-            {/* Node Label */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Node Name
+        {/* Body - Scrollable */}
+        <div className="flex-1 overflow-y-auto">
+          {/* Node Name & Description */}
+          <div className="px-4 py-4 border-b border-gray-100 bg-gray-50/50">
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                Name
               </label>
               <input
                 type="text"
                 value={formData.label || ''}
                 onChange={(e) => updateField('label', e.target.value)}
                 placeholder={nodeDefinition.name}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
-
-            {/* Node Description */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Description
+            <div>
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                Notes
               </label>
               <input
                 type="text"
                 value={formData.description || ''}
                 onChange={(e) => updateField('description', e.target.value)}
-                placeholder="Optional description"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Add a note..."
+                className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
           </div>
 
           {/* Parameters Section */}
           {parameters.length > 0 && (
-            <div className="mb-6">
-              <h3 className="text-sm font-semibold text-gray-900 mb-3 uppercase tracking-wide">
-                Parameters
-              </h3>
+            <div className="px-4 py-4">
               {parameters.map(renderField)}
             </div>
           )}
 
           {/* Advanced Section */}
           {advancedParams.length > 0 && (
-            <div className="mb-6">
+            <div className="px-4 py-4 border-t border-gray-100">
               <button
                 onClick={() => setShowAdvanced(!showAdvanced)}
-                className="flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-gray-900 mb-3"
+                className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 mb-3 w-full"
               >
                 {showAdvanced ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                Advanced Settings
+                <span>Options</span>
               </button>
               
               {showAdvanced && (
-                <div className="pl-4 border-l-2 border-gray-200">
+                <div className="space-y-4">
                   {advancedParams.map(renderField)}
                 </div>
               )}
@@ -577,32 +588,32 @@ const NodeEditor = ({
           )}
         </div>
 
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between bg-gray-50 rounded-b-xl">
+        {/* Footer - n8n style */}
+        <div className="flex-shrink-0 px-4 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
           <button
             onClick={onDelete}
-            className="px-3 py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md"
+            className="px-3 py-1.5 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
           >
-            Delete Node
+            Delete
           </button>
           
           <div className="flex items-center gap-2">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-md"
+              className="px-4 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
             >
               Cancel
             </button>
             <button
               onClick={handleSave}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md"
+              className="px-4 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
             >
-              Save Changes
+              Save
             </button>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 
