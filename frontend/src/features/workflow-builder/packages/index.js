@@ -12,6 +12,13 @@ import sshPackage from './ssh';
 import databasePackage from './database';
 import notificationsPackage from './notifications';
 import cienaSaosPackage from './ciena-saos';
+import dataTransformPackage from './data-transform';
+import flowControlPackage from './flow-control';
+import httpApiPackage from './http-api';
+import fileStoragePackage from './file-storage';
+import schedulingPackage from './scheduling';
+import parserFormatPackage from './parser-format';
+import debugUtilityPackage from './debug-utility';
 
 // All available packages
 export const PACKAGES = {
@@ -22,6 +29,13 @@ export const PACKAGES = {
   'database': databasePackage,
   'notifications': notificationsPackage,
   'ciena-saos': cienaSaosPackage,
+  'data-transform': dataTransformPackage,
+  'flow-control': flowControlPackage,
+  'http-api': httpApiPackage,
+  'file-storage': fileStoragePackage,
+  'scheduling': schedulingPackage,
+  'parser-format': parserFormatPackage,
+  'debug-utility': debugUtilityPackage,
 };
 
 // Default enabled packages
@@ -33,6 +47,13 @@ const DEFAULT_ENABLED = [
   'database',
   'notifications',
   'ciena-saos',
+  'data-transform',
+  'flow-control',
+  'http-api',
+  'file-storage',
+  'scheduling',
+  'parser-format',
+  'debug-utility',
 ];
 
 /**
