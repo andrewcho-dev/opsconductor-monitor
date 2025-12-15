@@ -537,6 +537,205 @@ export default {
       },
     },
 
+    // ============ SHOW PORT & XCVR NODES ============
+
+    'ciena:show-port': {
+      name: 'Show Port',
+      description: 'Display port status, configuration, and statistics',
+      category: 'query',
+      icon: '🔌',
+      color: '#0066CC',
+      
+      inputs: [
+        { id: 'trigger', type: 'trigger', label: 'Trigger', required: true },
+        { id: 'targets', type: 'string[]', label: 'Targets (override)' },
+      ],
+      outputs: [
+        { id: 'success', type: 'trigger', label: 'On Success' },
+        { id: 'failure', type: 'trigger', label: 'On Failure' },
+        { id: 'results', type: 'object[]', label: 'All Results' },
+        { id: 'ports', type: 'object[]', label: 'Port Data' },
+      ],
+      
+      parameters: [
+        {
+          id: 'target_type',
+          type: 'select',
+          label: 'Target Source',
+          default: 'device_group',
+          options: [
+            { value: 'ip_list', label: 'IP List' },
+            { value: 'device_group', label: 'Device Group' },
+            { value: 'from_input', label: 'From Previous Node' },
+          ],
+        },
+        {
+          id: 'ip_list',
+          type: 'textarea',
+          label: 'Target IPs',
+          default: '',
+          showIf: { field: 'target_type', value: 'ip_list' },
+        },
+        {
+          id: 'device_group',
+          type: 'device-group-selector',
+          label: 'Device Group',
+          default: '',
+          showIf: { field: 'target_type', value: 'device_group' },
+        },
+        {
+          id: 'port_filter',
+          type: 'select',
+          label: 'Port Filter',
+          default: 'all',
+          options: [
+            { value: 'all', label: 'All Ports' },
+            { value: 'specific', label: 'Specific Port' },
+          ],
+        },
+        {
+          id: 'port',
+          type: 'text',
+          label: 'Port',
+          default: '1/1',
+          showIf: { field: 'port_filter', value: 'specific' },
+          help: 'Port identifier (e.g., 1/1, 2/24)',
+        },
+        {
+          id: 'show_stats',
+          type: 'checkbox',
+          label: 'Include Statistics',
+          default: false,
+          help: 'Include port statistics (counters)',
+        },
+      ],
+      
+      execution: {
+        type: 'action',
+        executor: 'ciena_ssh',
+        platform: 'ciena-saos-8',
+        command_template: 'port show port {port}',
+      },
+    },
+
+    'ciena:show-xcvr': {
+      name: 'Show XCVR',
+      description: 'Display transceiver (SFP/QSFP) information and diagnostics',
+      category: 'query',
+      icon: '📡',
+      color: '#0066CC',
+      
+      inputs: [
+        { id: 'trigger', type: 'trigger', label: 'Trigger', required: true },
+        { id: 'targets', type: 'string[]', label: 'Targets (override)' },
+      ],
+      outputs: [
+        { id: 'success', type: 'trigger', label: 'On Success' },
+        { id: 'failure', type: 'trigger', label: 'On Failure' },
+        { id: 'results', type: 'object[]', label: 'All Results' },
+        { id: 'xcvr', type: 'object[]', label: 'Transceiver Data' },
+        { id: 'diagnostics', type: 'object[]', label: 'Diagnostics Data' },
+      ],
+      
+      parameters: [
+        {
+          id: 'target_type',
+          type: 'select',
+          label: 'Target Source',
+          default: 'device_group',
+          options: [
+            { value: 'ip_list', label: 'IP List' },
+            { value: 'device_group', label: 'Device Group' },
+            { value: 'from_input', label: 'From Previous Node' },
+          ],
+        },
+        {
+          id: 'ip_list',
+          type: 'textarea',
+          label: 'Target IPs',
+          default: '',
+          showIf: { field: 'target_type', value: 'ip_list' },
+        },
+        {
+          id: 'device_group',
+          type: 'device-group-selector',
+          label: 'Device Group',
+          default: '',
+          showIf: { field: 'target_type', value: 'device_group' },
+        },
+        {
+          id: 'port_filter',
+          type: 'select',
+          label: 'Port Filter',
+          default: 'all',
+          options: [
+            { value: 'all', label: 'All Ports' },
+            { value: 'specific', label: 'Specific Port' },
+          ],
+        },
+        {
+          id: 'port',
+          type: 'text',
+          label: 'Port',
+          default: '1/1',
+          showIf: { field: 'port_filter', value: 'specific' },
+          help: 'Port with transceiver (e.g., 1/1)',
+        },
+        {
+          id: 'detail_level',
+          type: 'select',
+          label: 'Detail Level',
+          default: 'summary',
+          options: [
+            { value: 'summary', label: 'Summary' },
+            { value: 'detail', label: 'Detailed (with vendor info)' },
+            { value: 'diag', label: 'Diagnostics (DOM data)' },
+          ],
+        },
+        {
+          id: 'check_thresholds',
+          type: 'checkbox',
+          label: 'Check Power Thresholds',
+          default: true,
+          help: 'Flag transceivers with power outside normal range',
+        },
+      ],
+      
+      advanced: [
+        {
+          id: 'tx_low_warn',
+          type: 'number',
+          label: 'TX Low Warning (dBm)',
+          default: -8,
+        },
+        {
+          id: 'tx_high_warn',
+          type: 'number',
+          label: 'TX High Warning (dBm)',
+          default: 2,
+        },
+        {
+          id: 'rx_low_warn',
+          type: 'number',
+          label: 'RX Low Warning (dBm)',
+          default: -20,
+        },
+        {
+          id: 'rx_high_warn',
+          type: 'number',
+          label: 'RX High Warning (dBm)',
+          default: 0,
+        },
+      ],
+      
+      execution: {
+        type: 'action',
+        executor: 'ciena_ssh',
+        platform: 'ciena-saos-8',
+        command_template: 'xcvr show port {port}',
+      },
+    },
+
     // ============ PORT CONFIGURATION NODES ============
 
     'ciena:port-enable': {
