@@ -91,24 +91,21 @@ const WorkflowNode = memo(({ id, data, selected }) => {
         '--tw-ring-color': categoryColor.bg,
       }}
     >
-      {/* Input Handles */}
-      {inputs.map((input, index) => (
+      {/* Single Input Handle - Node-RED style */}
+      {inputs.length > 0 && (
         <Handle
-          key={input.id}
           type="target"
           position={Position.Left}
-          id={input.id}
-          className="!w-3 !h-3 !rounded-full !border-2 !border-white !bg-gray-400 hover:!bg-gray-600 transition-colors"
+          id={inputs[0]?.id || 'input'}
+          className="!w-2.5 !h-2.5 !rounded-sm !border-0 !bg-gray-400 hover:!bg-gray-600 transition-colors"
           style={{
-            top: inputs.length === 1 
-              ? '50%' 
-              : `${((index + 1) / (inputs.length + 1)) * 100}%`,
+            top: '50%',
             transform: 'translateY(-50%)',
-            left: '-6px',
+            left: '-5px',
           }}
-          title={input.label}
+          title="Input"
         />
-      ))}
+      )}
 
       {/* Icon Section - n8n style large icon on left */}
       <div 
@@ -130,29 +127,39 @@ const WorkflowNode = memo(({ id, data, selected }) => {
         )}
       </div>
 
-      {/* Output Handles */}
-      {outputs.map((output, index) => (
-        <Handle
-          key={output.id}
-          type="source"
-          position={Position.Right}
-          id={output.id}
-          className={cn(
-            '!w-3 !h-3 !rounded-full !border-2 !border-white transition-colors',
-            output.id === 'failure' || output.id === 'false'
-              ? '!bg-red-400 hover:!bg-red-600'
-              : '!bg-green-400 hover:!bg-green-600'
+      {/* Output Handles - Node-RED style: 1 or 2 outputs max */}
+      {outputs.length > 0 && (
+        <>
+          {/* Primary output (success/main) */}
+          <Handle
+            type="source"
+            position={Position.Right}
+            id={outputs.find(o => o.id !== 'failure' && o.id !== 'false')?.id || outputs[0]?.id || 'output'}
+            className="!w-2.5 !h-2.5 !rounded-sm !border-0 !bg-gray-400 hover:!bg-gray-600 transition-colors"
+            style={{
+              top: outputs.some(o => o.id === 'failure' || o.id === 'false') ? '35%' : '50%',
+              transform: 'translateY(-50%)',
+              right: '-5px',
+            }}
+            title="Output"
+          />
+          {/* Secondary output (failure) - only if node has failure path */}
+          {outputs.some(o => o.id === 'failure' || o.id === 'false') && (
+            <Handle
+              type="source"
+              position={Position.Right}
+              id={outputs.find(o => o.id === 'failure' || o.id === 'false')?.id || 'failure'}
+              className="!w-2.5 !h-2.5 !rounded-sm !border-0 !bg-red-400 hover:!bg-red-600 transition-colors"
+              style={{
+                top: '65%',
+                transform: 'translateY(-50%)',
+                right: '-5px',
+              }}
+              title="On Error"
+            />
           )}
-          style={{
-            top: outputs.length === 1 
-              ? '50%' 
-              : `${((index + 1) / (outputs.length + 1)) * 100}%`,
-            transform: 'translateY(-50%)',
-            right: '-6px',
-          }}
-          title={output.label}
-        />
-      ))}
+        </>
+      )}
 
       {/* Execution status badge */}
       {data.executionStatus && (
@@ -170,23 +177,6 @@ const WorkflowNode = memo(({ id, data, selected }) => {
         </div>
       )}
 
-      {/* Multiple outputs indicator */}
-      {outputs.length > 1 && (
-        <div className="absolute -bottom-1 right-2 flex gap-1">
-          {outputs.map((output) => (
-            <div 
-              key={output.id}
-              className={cn(
-                'w-2 h-2 rounded-full',
-                output.id === 'failure' || output.id === 'false'
-                  ? 'bg-red-400'
-                  : 'bg-green-400'
-              )}
-              title={output.label}
-            />
-          ))}
-        </div>
-      )}
     </div>
   );
 });
