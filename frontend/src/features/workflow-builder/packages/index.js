@@ -40,8 +40,8 @@ export const PACKAGES = {
   'axis-cameras': axisCamerasPackage,
 };
 
-// Default enabled packages
-const DEFAULT_ENABLED = [
+// Default enabled packages - export this so other components can use it
+export const DEFAULT_ENABLED_PACKAGES = [
   'core',
   'network-discovery',
   'snmp',
@@ -64,7 +64,7 @@ const DEFAULT_ENABLED = [
  * @param {string[]} enabledIds - Array of enabled package IDs (from settings)
  * @returns {Object[]} Array of enabled package definitions
  */
-export function getEnabledPackages(enabledIds = DEFAULT_ENABLED) {
+export function getEnabledPackages(enabledIds = DEFAULT_ENABLED_PACKAGES) {
   return enabledIds
     .filter(id => PACKAGES[id])
     .map(id => ({ id, ...PACKAGES[id] }));

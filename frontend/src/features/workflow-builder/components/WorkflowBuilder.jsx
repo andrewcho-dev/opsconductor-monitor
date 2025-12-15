@@ -16,26 +16,8 @@ import WorkflowCanvas from './WorkflowCanvas';
 import NodePalette from './NodePalette';
 import NodeEditor from './NodeEditor';
 import ExecutionDebugView from './ExecutionDebugView';
-import { getNodeDefinition } from '../packages';
+import { getNodeDefinition, DEFAULT_ENABLED_PACKAGES } from '../packages';
 import { autoLayout } from '../utils/layout';
-
-const DEFAULT_ENABLED_PACKAGES = [
-  'core',
-  'network-discovery',
-  'snmp',
-  'ssh',
-  'database',
-  'notifications',
-  'ciena-saos',
-  'axis-cameras',
-  'data-transform',
-  'flow-control',
-  'http-api',
-  'file-storage',
-  'scheduling',
-  'parser-format',
-  'debug-utility',
-];
 
 const WorkflowBuilder = ({
   initialWorkflow,
