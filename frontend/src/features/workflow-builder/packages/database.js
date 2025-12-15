@@ -120,6 +120,12 @@ export default {
       execution: {
         type: 'data',
         executor: 'db_insert',
+        context: 'local',
+        platform: 'any',
+        requirements: {
+          database: true,
+          credentials: ['database_credentials'],
+        },
       },
     },
 
@@ -186,6 +192,12 @@ export default {
       execution: {
         type: 'data',
         executor: 'db_update',
+        context: 'local',
+        platform: 'any',
+        requirements: {
+          database: true,
+          credentials: ['database_credentials'],
+        },
       },
     },
 
@@ -270,6 +282,12 @@ export default {
       execution: {
         type: 'data',
         executor: 'db_upsert',
+        context: 'local',
+        platform: 'any',
+        requirements: {
+          database: true,
+          credentials: ['database_credentials'],
+        },
       },
     },
 
@@ -343,7 +361,13 @@ export default {
       execution: {
         type: 'data',
         executor: 'db_delete',
+        context: 'local',
+        platform: 'any',
         requires_confirmation: true,
+        requirements: {
+          database: true,
+          credentials: ['database_credentials'],
+        },
       },
     },
 
@@ -428,6 +452,12 @@ export default {
       execution: {
         type: 'data',
         executor: 'db_query',
+        context: 'local',
+        platform: 'any',
+        requirements: {
+          database: true,
+          credentials: ['database_credentials'],
+        },
       },
     },
   },

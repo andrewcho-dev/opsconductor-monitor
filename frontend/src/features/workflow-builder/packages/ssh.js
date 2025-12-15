@@ -168,6 +168,12 @@ export default {
       execution: {
         type: 'action',
         executor: 'ssh_command',
+        context: 'remote_ssh',
+        platform: 'any',
+        requirements: {
+          connection: 'ssh',
+          credentials: ['ssh_credentials'],
+        },
       },
     },
 
@@ -252,7 +258,13 @@ export default {
       execution: {
         type: 'action',
         executor: 'ssh_script',
+        context: 'remote_ssh',
+        platform: 'linux',
         requires_confirmation: true,
+        requirements: {
+          connection: 'ssh',
+          credentials: ['ssh_credentials'],
+        },
       },
     },
 
@@ -316,6 +328,12 @@ export default {
       execution: {
         type: 'action',
         executor: 'scp_download',
+        context: 'remote_ssh',
+        platform: 'any',
+        requirements: {
+          connection: 'ssh',
+          credentials: ['ssh_credentials'],
+        },
       },
     },
 
@@ -379,7 +397,13 @@ export default {
       execution: {
         type: 'action',
         executor: 'scp_upload',
+        context: 'remote_ssh',
+        platform: 'any',
         requires_confirmation: true,
+        requirements: {
+          connection: 'ssh',
+          credentials: ['ssh_credentials'],
+        },
       },
     },
   },

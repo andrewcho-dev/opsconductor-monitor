@@ -42,6 +42,9 @@ export default {
       execution: {
         type: 'trigger',
         executor: 'manual_trigger',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -102,6 +105,9 @@ export default {
       execution: {
         type: 'trigger',
         executor: 'schedule_trigger',
+        context: 'local',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -143,6 +149,11 @@ export default {
       execution: {
         type: 'trigger',
         executor: 'webhook_trigger',
+        context: 'local',
+        platform: 'any',
+        requirements: {
+          network: true,
+        },
       },
     },
 
@@ -200,6 +211,9 @@ export default {
       execution: {
         type: 'logic',
         executor: 'if_executor',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -243,6 +257,9 @@ export default {
       execution: {
         type: 'logic',
         executor: 'switch_executor',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -294,6 +311,9 @@ export default {
       execution: {
         type: 'logic',
         executor: 'loop_executor',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -351,6 +371,9 @@ export default {
       execution: {
         type: 'logic',
         executor: 'wait_executor',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -387,6 +410,9 @@ export default {
       execution: {
         type: 'logic',
         executor: 'merge_executor',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -427,6 +453,9 @@ export default {
       execution: {
         type: 'data',
         executor: 'set_variable_executor',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -471,6 +500,9 @@ export default {
       execution: {
         type: 'data',
         executor: 'debug_executor',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -516,6 +548,9 @@ export default {
       execution: {
         type: 'data',
         executor: 'transform_executor',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
   },

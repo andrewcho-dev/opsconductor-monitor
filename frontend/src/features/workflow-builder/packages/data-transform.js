@@ -75,6 +75,9 @@ export default {
       execution: {
         type: 'transform',
         executor: 'set_fields',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -121,6 +124,9 @@ export default {
       execution: {
         type: 'transform',
         executor: 'split_out',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -184,6 +190,9 @@ export default {
       execution: {
         type: 'transform',
         executor: 'merge',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -224,6 +233,9 @@ export default {
       execution: {
         type: 'transform',
         executor: 'aggregate',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -262,6 +274,9 @@ export default {
       execution: {
         type: 'transform',
         executor: 'sort',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -302,6 +317,9 @@ export default {
       execution: {
         type: 'transform',
         executor: 'limit',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -344,6 +362,9 @@ export default {
       execution: {
         type: 'transform',
         executor: 'filter',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -396,6 +417,9 @@ return items.map(item => ({
       execution: {
         type: 'transform',
         executor: 'code',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -439,6 +463,9 @@ return items.map(item => ({
       execution: {
         type: 'transform',
         executor: 'remove_duplicates',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -470,6 +497,9 @@ return items.map(item => ({
       execution: {
         type: 'transform',
         executor: 'rename_keys',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
   },

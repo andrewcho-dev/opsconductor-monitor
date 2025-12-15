@@ -87,6 +87,9 @@ export default {
       execution: {
         type: 'trigger',
         executor: 'cron_trigger',
+        context: 'local',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -133,6 +136,9 @@ export default {
       execution: {
         type: 'trigger',
         executor: 'interval_trigger',
+        context: 'local',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -192,6 +198,9 @@ export default {
       execution: {
         type: 'trigger',
         executor: 'time_trigger',
+        context: 'local',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -244,6 +253,9 @@ export default {
       execution: {
         type: 'trigger',
         executor: 'date_trigger',
+        context: 'local',
+        platform: 'any',
+        requirements: {},
       },
     },
   },

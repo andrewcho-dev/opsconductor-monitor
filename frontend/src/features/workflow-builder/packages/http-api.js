@@ -191,6 +191,11 @@ export default {
       execution: {
         type: 'action',
         executor: 'http_request',
+        context: 'local',
+        platform: 'any',
+        requirements: {
+          network: true,
+        },
       },
     },
 
@@ -284,6 +289,11 @@ export default {
       execution: {
         type: 'trigger',
         executor: 'webhook_trigger',
+        context: 'local',
+        platform: 'any',
+        requirements: {
+          network: true,
+        },
       },
     },
 
@@ -348,6 +358,9 @@ export default {
       execution: {
         type: 'action',
         executor: 'respond_webhook',
+        context: 'local',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -434,6 +447,11 @@ export default {
       execution: {
         type: 'action',
         executor: 'graphql',
+        context: 'local',
+        platform: 'any',
+        requirements: {
+          network: true,
+        },
       },
     },
   },

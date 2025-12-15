@@ -120,6 +120,12 @@ export default {
       execution: {
         type: 'notify',
         executor: 'email',
+        context: 'local',
+        platform: 'any',
+        requirements: {
+          network: true,
+          credentials: ['smtp_credentials'],
+        },
       },
     },
 
@@ -221,6 +227,12 @@ export default {
       execution: {
         type: 'notify',
         executor: 'slack',
+        context: 'local',
+        platform: 'any',
+        requirements: {
+          network: true,
+          credentials: ['slack_credentials'],
+        },
       },
     },
 
@@ -378,6 +390,11 @@ export default {
       execution: {
         type: 'notify',
         executor: 'webhook',
+        context: 'local',
+        platform: 'any',
+        requirements: {
+          network: true,
+        },
       },
     },
 
@@ -434,6 +451,9 @@ export default {
       execution: {
         type: 'notify',
         executor: 'log',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
   },

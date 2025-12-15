@@ -85,6 +85,9 @@ export default {
       execution: {
         type: 'flow',
         executor: 'wait',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -116,6 +119,9 @@ export default {
       execution: {
         type: 'flow',
         executor: 'delay',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -174,6 +180,9 @@ export default {
       execution: {
         type: 'flow',
         executor: 'retry',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -219,6 +228,9 @@ export default {
       execution: {
         type: 'trigger',
         executor: 'error_trigger',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -258,6 +270,9 @@ export default {
       execution: {
         type: 'flow',
         executor: 'stop',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -295,6 +310,9 @@ export default {
       execution: {
         type: 'flow',
         executor: 'noop',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -362,6 +380,9 @@ export default {
       execution: {
         type: 'flow',
         executor: 'switch',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -412,6 +433,9 @@ export default {
       execution: {
         type: 'flow',
         executor: 'loop',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
   },

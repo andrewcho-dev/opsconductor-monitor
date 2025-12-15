@@ -69,6 +69,9 @@ export default {
       execution: {
         type: 'transform',
         executor: 'json_parse',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -144,6 +147,9 @@ export default {
       execution: {
         type: 'transform',
         executor: 'csv_parse',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -212,6 +218,9 @@ export default {
       execution: {
         type: 'transform',
         executor: 'xml_parse',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -279,6 +288,9 @@ export default {
       execution: {
         type: 'transform',
         executor: 'regex_extract',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -327,6 +339,9 @@ export default {
       execution: {
         type: 'transform',
         executor: 'template',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -367,6 +382,9 @@ export default {
       execution: {
         type: 'transform',
         executor: 'html_extract',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -414,6 +432,9 @@ export default {
       execution: {
         type: 'transform',
         executor: 'markdown',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
   },

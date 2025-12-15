@@ -85,6 +85,11 @@ export default {
       execution: {
         type: 'action',
         executor: 'read_file',
+        context: 'local',
+        platform: 'linux',
+        requirements: {
+          filesystem: true,
+        },
       },
     },
 
@@ -178,6 +183,11 @@ export default {
       execution: {
         type: 'action',
         executor: 'write_file',
+        context: 'local',
+        platform: 'linux',
+        requirements: {
+          filesystem: true,
+        },
       },
     },
 
@@ -282,6 +292,12 @@ export default {
       execution: {
         type: 'action',
         executor: 'sftp',
+        context: 'remote_ssh',
+        platform: 'any',
+        requirements: {
+          connection: 'ssh',
+          credentials: ['ssh_credentials'],
+        },
       },
     },
 
@@ -365,6 +381,11 @@ export default {
       execution: {
         type: 'action',
         executor: 'ftp',
+        context: 'remote_api',
+        platform: 'any',
+        requirements: {
+          network: true,
+        },
       },
     },
 
@@ -455,6 +476,12 @@ export default {
       execution: {
         type: 'action',
         executor: 's3',
+        context: 'remote_api',
+        platform: 'any',
+        requirements: {
+          network: true,
+          credentials: ['aws_credentials'],
+        },
       },
     },
   },

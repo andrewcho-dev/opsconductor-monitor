@@ -198,7 +198,12 @@ export default {
       execution: {
         type: 'action',
         executor: 'snmp_get',
-        platform: 'ubuntu-20.04',
+        context: 'remote_snmp',
+        platform: 'any',
+        requirements: {
+          connection: 'snmp',
+          credentials: ['snmp_credentials'],
+        },
       },
     },
 
@@ -299,7 +304,12 @@ export default {
       execution: {
         type: 'action',
         executor: 'snmp_walk',
-        platform: 'ubuntu-20.04',
+        context: 'remote_snmp',
+        platform: 'any',
+        requirements: {
+          connection: 'snmp',
+          credentials: ['snmp_credentials'],
+        },
       },
     },
 
@@ -395,8 +405,13 @@ export default {
       execution: {
         type: 'action',
         executor: 'snmp_set',
-        platform: 'ubuntu-20.04',
+        context: 'remote_snmp',
+        platform: 'any',
         requires_confirmation: true,
+        requirements: {
+          connection: 'snmp',
+          credentials: ['snmp_credentials'],
+        },
       },
     },
   },

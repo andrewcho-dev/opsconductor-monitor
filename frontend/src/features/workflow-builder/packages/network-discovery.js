@@ -141,8 +141,12 @@ export default {
       execution: {
         type: 'action',
         executor: 'ping',
-        platform: 'ubuntu-20.04',
+        context: 'local',
+        platform: 'linux',
         command_template: 'ping -c {count} -W {timeout} {target}',
+        requirements: {
+          tools: ['ping'],
+        },
       },
     },
 
@@ -236,7 +240,11 @@ export default {
       execution: {
         type: 'action',
         executor: 'port_scan',
-        platform: 'ubuntu-20.04',
+        context: 'local',
+        platform: 'linux',
+        requirements: {
+          tools: ['nmap'],
+        },
       },
     },
 
@@ -304,8 +312,12 @@ export default {
       execution: {
         type: 'action',
         executor: 'traceroute',
-        platform: 'ubuntu-20.04',
+        context: 'local',
+        platform: 'linux',
         command_template: 'traceroute -n -w {timeout} -m {max_hops} {target}',
+        requirements: {
+          tools: ['traceroute'],
+        },
       },
     },
 
@@ -346,9 +358,13 @@ export default {
       execution: {
         type: 'action',
         executor: 'arp_scan',
-        platform: 'ubuntu-20.04',
+        context: 'local',
+        platform: 'linux',
         command_template: 'arp-scan -I {interface} {network_range}',
-        requires_root: true,
+        requirements: {
+          tools: ['arp-scan'],
+          root: true,
+        },
       },
     },
   },

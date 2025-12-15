@@ -120,8 +120,13 @@ export default {
       execution: {
         type: 'action',
         executor: 'ciena_ssh',
+        context: 'remote_ssh',
         platform: 'ciena-saos-8',
         command_template: 'show interface {interface}',
+        requirements: {
+          connection: 'ssh',
+          credentials: ['ciena_credentials'],
+        },
       },
     },
 
@@ -234,8 +239,13 @@ export default {
       execution: {
         type: 'action',
         executor: 'ciena_ssh',
+        context: 'remote_ssh',
         platform: 'ciena-saos-8',
         command_template: 'show optics {interface}',
+        requirements: {
+          connection: 'ssh',
+          credentials: ['ciena_credentials'],
+        },
       },
     },
 
@@ -306,8 +316,13 @@ export default {
       execution: {
         type: 'action',
         executor: 'ciena_ssh',
+        context: 'remote_ssh',
         platform: 'ciena-saos-8',
         command_template: 'show lldp neighbors {detail}',
+        requirements: {
+          connection: 'ssh',
+          credentials: ['ciena_credentials'],
+        },
       },
     },
 
@@ -387,8 +402,13 @@ export default {
       execution: {
         type: 'action',
         executor: 'ciena_ssh',
+        context: 'remote_ssh',
         platform: 'ciena-saos-8',
         command_template: 'show alarms {severity}',
+        requirements: {
+          connection: 'ssh',
+          credentials: ['ciena_credentials'],
+        },
       },
     },
 
@@ -448,8 +468,13 @@ export default {
       execution: {
         type: 'action',
         executor: 'ciena_ssh',
+        context: 'remote_ssh',
         platform: 'ciena-saos-8',
         command_template: 'show version',
+        requirements: {
+          connection: 'ssh',
+          credentials: ['ciena_credentials'],
+        },
       },
     },
 
@@ -533,7 +558,12 @@ export default {
       execution: {
         type: 'action',
         executor: 'ciena_ssh',
+        context: 'remote_ssh',
         platform: 'ciena-saos-8',
+        requirements: {
+          connection: 'ssh',
+          credentials: ['ciena_credentials'],
+        },
       },
     },
 
@@ -613,8 +643,13 @@ export default {
       execution: {
         type: 'action',
         executor: 'ciena_ssh',
+        context: 'remote_ssh',
         platform: 'ciena-saos-8',
         command_template: 'port show port {port}',
+        requirements: {
+          connection: 'ssh',
+          credentials: ['ciena_credentials'],
+        },
       },
     },
 
@@ -731,8 +766,13 @@ export default {
       execution: {
         type: 'action',
         executor: 'ciena_ssh',
+        context: 'remote_ssh',
         platform: 'ciena-saos-8',
         command_template: 'xcvr show port {port}',
+        requirements: {
+          connection: 'ssh',
+          credentials: ['ciena_credentials'],
+        },
       },
     },
 
@@ -794,8 +834,13 @@ export default {
       execution: {
         type: 'action',
         executor: 'ciena_ssh',
+        context: 'remote_ssh',
         platform: 'ciena-saos-8',
         command_template: 'port enable port {port}',
+        requirements: {
+          connection: 'ssh',
+          credentials: ['ciena_credentials'],
+        },
       },
     },
 
@@ -855,8 +900,13 @@ export default {
       execution: {
         type: 'action',
         executor: 'ciena_ssh',
+        context: 'remote_ssh',
         platform: 'ciena-saos-8',
         command_template: 'port disable port {port}',
+        requirements: {
+          connection: 'ssh',
+          credentials: ['ciena_credentials'],
+        },
       },
     },
 
@@ -923,8 +973,13 @@ export default {
       execution: {
         type: 'action',
         executor: 'ciena_ssh',
+        context: 'remote_ssh',
         platform: 'ciena-saos-8',
         command_template: 'port set port {port} description "{description}"',
+        requirements: {
+          connection: 'ssh',
+          credentials: ['ciena_credentials'],
+        },
       },
     },
 
@@ -998,8 +1053,13 @@ export default {
       execution: {
         type: 'action',
         executor: 'ciena_ssh',
+        context: 'remote_ssh',
         platform: 'ciena-saos-8',
         command_template: 'show vlan {vlan}',
+        requirements: {
+          connection: 'ssh',
+          credentials: ['ciena_credentials'],
+        },
       },
     },
 
@@ -1067,8 +1127,13 @@ export default {
       execution: {
         type: 'action',
         executor: 'ciena_ssh',
+        context: 'remote_ssh',
         platform: 'ciena-saos-8',
         command_template: 'vlan create vlan {vlan_id} name {vlan_name}',
+        requirements: {
+          connection: 'ssh',
+          credentials: ['ciena_credentials'],
+        },
       },
     },
 
@@ -1146,8 +1211,13 @@ export default {
       execution: {
         type: 'action',
         executor: 'ciena_ssh',
+        context: 'remote_ssh',
         platform: 'ciena-saos-8',
         command_template: 'vlan add vlan {vlan_id} port {port} {tag_mode}',
+        requirements: {
+          connection: 'ssh',
+          credentials: ['ciena_credentials'],
+        },
       },
     },
 
@@ -1221,8 +1291,13 @@ export default {
       execution: {
         type: 'action',
         executor: 'ciena_ssh',
+        context: 'remote_ssh',
         platform: 'ciena-saos-8',
         command_template: 'show service {service_type}',
+        requirements: {
+          connection: 'ssh',
+          credentials: ['ciena_credentials'],
+        },
       },
     },
 
@@ -1282,8 +1357,13 @@ export default {
       execution: {
         type: 'action',
         executor: 'ciena_ssh',
+        context: 'remote_ssh',
         platform: 'ciena-saos-8',
         command_template: 'show virtual-switch {vs_name}',
+        requirements: {
+          connection: 'ssh',
+          credentials: ['ciena_credentials'],
+        },
       },
     },
 
@@ -1338,8 +1418,13 @@ export default {
       execution: {
         type: 'action',
         executor: 'ciena_ssh',
+        context: 'remote_ssh',
         platform: 'ciena-saos-8',
         command_template: 'show chassis',
+        requirements: {
+          connection: 'ssh',
+          credentials: ['ciena_credentials'],
+        },
       },
     },
 
@@ -1398,8 +1483,13 @@ export default {
       execution: {
         type: 'action',
         executor: 'ciena_ssh',
+        context: 'remote_ssh',
         platform: 'ciena-saos-8',
         command_template: 'configuration save {filename}',
+        requirements: {
+          connection: 'ssh',
+          credentials: ['ciena_credentials'],
+        },
       },
     },
 
@@ -1464,8 +1554,13 @@ export default {
       execution: {
         type: 'action',
         executor: 'ciena_ssh',
+        context: 'remote_ssh',
         platform: 'ciena-saos-8',
         command_template: 'show running-config {section}',
+        requirements: {
+          connection: 'ssh',
+          credentials: ['ciena_credentials'],
+        },
       },
     },
 
@@ -1527,8 +1622,13 @@ export default {
       execution: {
         type: 'action',
         executor: 'ciena_ssh',
+        context: 'remote_ssh',
         platform: 'ciena-saos-8',
         command_template: 'show traffic-profile {profile_name}',
+        requirements: {
+          connection: 'ssh',
+          credentials: ['ciena_credentials'],
+        },
       },
     },
 
@@ -1590,8 +1690,13 @@ export default {
       execution: {
         type: 'action',
         executor: 'ciena_ssh',
+        context: 'remote_ssh',
         platform: 'ciena-saos-8',
         command_template: 'show ring-protection {ring_name}',
+        requirements: {
+          connection: 'ssh',
+          credentials: ['ciena_credentials'],
+        },
       },
     },
   },

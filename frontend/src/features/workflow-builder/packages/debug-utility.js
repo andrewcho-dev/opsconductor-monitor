@@ -76,6 +76,9 @@ export default {
       execution: {
         type: 'utility',
         executor: 'debug',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -121,6 +124,9 @@ export default {
       execution: {
         type: 'none',
         executor: null,
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -193,6 +199,9 @@ export default {
       execution: {
         type: 'utility',
         executor: 'set_variable',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -236,6 +245,9 @@ export default {
       execution: {
         type: 'utility',
         executor: 'get_variable',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -280,6 +292,9 @@ export default {
       execution: {
         type: 'utility',
         executor: 'execution_data',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
 
@@ -323,6 +338,9 @@ export default {
       execution: {
         type: 'utility',
         executor: 'assert',
+        context: 'internal',
+        platform: 'any',
+        requirements: {},
       },
     },
   },
