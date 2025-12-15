@@ -26,23 +26,21 @@ const nodeTypes = {
   workflow: WorkflowNode,
 };
 
-// Custom edge options
+// Custom edge options - Node-RED style bezier curves
 const defaultEdgeOptions = {
-  type: 'smoothstep',
+  type: 'default', // bezier curve like Node-RED
   animated: false,
-  style: { strokeWidth: 2, stroke: '#6B7280' },
-  markerEnd: {
-    type: MarkerType.ArrowClosed,
-    width: 15,
-    height: 15,
-    color: '#6B7280',
+  style: { 
+    strokeWidth: 2, 
+    stroke: '#999',
   },
+  // No arrow - Node-RED style
 };
 
-// Connection line style
+// Connection line style (while dragging)
 const connectionLineStyle = {
   strokeWidth: 2,
-  stroke: '#3B82F6',
+  stroke: '#ff7f50',
 };
 
 // Get edge style based on source handle type
@@ -172,20 +170,21 @@ const WorkflowCanvasInner = ({
     [nodes, selectedNodes]
   );
 
-  // Style edges based on source handle type
+  // Style edges - Node-RED style (simple gray lines, selectable)
   const styledEdges = useMemo(() => 
     edges.map(edge => {
       const sourceNode = nodes.find(n => n.id === edge.source);
-      const style = getEdgeStyle(sourceNode, edge.sourceHandle);
+      const isFailurePath = edge.sourceHandle === 'failure' || edge.sourceHandle === 'false';
       return {
         ...edge,
-        style,
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          width: 12,
-          height: 12,
-          color: style.stroke,
+        type: 'default', // bezier curve
+        style: { 
+          strokeWidth: 2, 
+          stroke: isFailurePath ? '#EF4444' : '#999',
         },
+        // Make edges selectable and deletable
+        selectable: true,
+        deletable: true,
       };
     }),
     [edges, nodes]
@@ -226,6 +225,9 @@ const WorkflowCanvasInner = ({
         selectionOnDrag
         panOnDrag={[1, 2]} // Middle and right mouse button
         selectNodesOnDrag={false}
+        edgesUpdatable={true}
+        edgesFocusable={true}
+        elementsSelectable={true}
         minZoom={0.1}
         maxZoom={4}
         attributionPosition="bottom-left"
