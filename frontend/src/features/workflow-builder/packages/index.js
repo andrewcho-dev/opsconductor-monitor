@@ -78,6 +78,23 @@ export function getNodeDefinition(nodeId) {
 }
 
 /**
+ * Get all nodes from a specific package
+ * @param {string} packageId - Package ID
+ * @returns {Object[]} Array of node definitions from that package
+ */
+export function getNodesByPackage(packageId) {
+  const pkg = PACKAGES[packageId];
+  if (!pkg || !pkg.nodes) return [];
+  
+  return Object.entries(pkg.nodes).map(([nodeId, nodeDef]) => ({
+    id: nodeId,
+    ...nodeDef,
+    packageId,
+    packageName: pkg.name,
+  }));
+}
+
+/**
  * Get all nodes from enabled packages, organized by category
  * @param {string[]} enabledIds - Array of enabled package IDs
  * @returns {Object} Nodes organized by category
@@ -122,4 +139,5 @@ export default {
   getAllPackages,
   getNodeDefinition,
   getNodesByCategory,
+  getNodesByPackage,
 };
