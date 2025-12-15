@@ -19,6 +19,7 @@ import fileStoragePackage from './file-storage';
 import schedulingPackage from './scheduling';
 import parserFormatPackage from './parser-format';
 import debugUtilityPackage from './debug-utility';
+import axisCamerasPackage from './axis-cameras';
 
 // All available packages
 export const PACKAGES = {
@@ -36,6 +37,7 @@ export const PACKAGES = {
   'scheduling': schedulingPackage,
   'parser-format': parserFormatPackage,
   'debug-utility': debugUtilityPackage,
+  'axis-cameras': axisCamerasPackage,
 };
 
 // Default enabled packages
@@ -54,6 +56,7 @@ const DEFAULT_ENABLED = [
   'scheduling',
   'parser-format',
   'debug-utility',
+  'axis-cameras',
 ];
 
 /**
