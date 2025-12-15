@@ -34,7 +34,8 @@ const defaultEdgeOptions = {
     strokeWidth: 2, 
     stroke: '#999',
   },
-  // No arrow - Node-RED style
+  focusable: true,
+  interactionWidth: 20, // Wider click area
 };
 
 // Connection line style (while dragging)
@@ -160,6 +161,12 @@ const WorkflowCanvasInner = ({
     }
   }, [onViewportChange]);
 
+  // Handle edge click - select the edge
+  const handleEdgeClick = useCallback((event, edge) => {
+    event.stopPropagation();
+    // Edge selection is handled by React Flow's onEdgesChange
+  }, []);
+
   // Convert nodes to React Flow format
   const flowNodes = useMemo(() => 
     nodes.map(node => ({
@@ -173,21 +180,22 @@ const WorkflowCanvasInner = ({
   // Style edges - Node-RED style (simple gray lines, selectable)
   const styledEdges = useMemo(() => 
     edges.map(edge => {
-      const sourceNode = nodes.find(n => n.id === edge.source);
       const isFailurePath = edge.sourceHandle === 'failure' || edge.sourceHandle === 'false';
+      const isSelected = edge.selected;
       return {
         ...edge,
         type: 'default', // bezier curve
         style: { 
-          strokeWidth: 2, 
-          stroke: isFailurePath ? '#EF4444' : '#999',
+          strokeWidth: isSelected ? 3 : 2, 
+          stroke: isSelected ? '#3B82F6' : (isFailurePath ? '#EF4444' : '#999'),
+          cursor: 'pointer',
         },
-        // Make edges selectable and deletable
-        selectable: true,
-        deletable: true,
+        // Wider click area for easier selection
+        interactionWidth: 20,
+        className: isSelected ? 'selected-edge' : '',
       };
     }),
-    [edges, nodes]
+    [edges]
   );
 
   // MiniMap node color
@@ -209,6 +217,7 @@ const WorkflowCanvasInner = ({
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeDoubleClick={handleNodeDoubleClick}
+        onEdgeClick={handleEdgeClick}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onMoveEnd={handleMoveEnd}
