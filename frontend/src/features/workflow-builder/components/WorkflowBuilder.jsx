@@ -27,6 +27,7 @@ const DEFAULT_ENABLED_PACKAGES = [
   'database',
   'notifications',
   'ciena-saos',
+  'axis-cameras',
   'data-transform',
   'flow-control',
   'http-api',
