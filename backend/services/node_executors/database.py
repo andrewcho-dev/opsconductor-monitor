@@ -99,10 +99,10 @@ class DBUpsertExecutor:
         key_columns = params.get('key_columns', 'ip_address').split(',')
         data_source = params.get('data_source', 'from_input')
         
-        # n8n-style column mapping: [{source: 'input_field', target: 'db_column'}, ...]
+        # n8n-style mapping mode: 'auto' or 'manual'
+        mapping_mode = params.get('mapping_mode', 'auto')
+        # Manual column mapping: [{source: 'input_field', target: 'db_column'}, ...]
         column_mapping = params.get('column_mapping', [])
-        # Or simple column list (uses same name for source and target)
-        columns_param = params.get('columns', '')
         
         if not table:
             return {'error': 'No table specified', 'inserted': 0, 'updated': 0, 'success': False}
@@ -131,29 +131,25 @@ class DBUpsertExecutor:
                 'success': True,
             }
         
-        # Build column mapping
+        # Build column mapping based on mode
         mapping = {}
-        if column_mapping:
-            # Explicit mapping: [{source: 'ip_address', target: 'ip_address'}, ...]
+        
+        if mapping_mode == 'manual' and column_mapping:
+            # Manual mapping: [{source: 'ip_address', target: 'ip_address'}, ...]
             for m in column_mapping:
                 if isinstance(m, dict) and 'source' in m and 'target' in m:
-                    mapping[m['source']] = m['target']
-        elif columns_param:
-            # Simple column list: 'ip_address,ping_status' - same name for source and target
-            for col in columns_param.split(','):
-                col = col.strip()
-                if col:
-                    mapping[col] = col
-        
-        # If no mapping specified, try to auto-detect safe columns
-        # Only use columns that exist in the first row of data
-        if not mapping and data:
-            first_row = data[0] if isinstance(data[0], dict) else {}
-            # Default safe columns for scan_results table
-            safe_columns = ['ip_address', 'ping_status', 'scan_timestamp']
-            for col in safe_columns:
-                if col in first_row:
-                    mapping[col] = col
+                    source = m['source'].strip()
+                    target = m['target'].strip()
+                    if source and target:
+                        mapping[source] = target
+        else:
+            # Auto mode: map all matching field names from input to database columns
+            # Use all fields from the first row of data
+            if data:
+                first_row = data[0] if isinstance(data[0], dict) else {}
+                for field_name in first_row.keys():
+                    # Map field to same-named column (auto-matching)
+                    mapping[field_name] = field_name
         
         if not mapping:
             return {
