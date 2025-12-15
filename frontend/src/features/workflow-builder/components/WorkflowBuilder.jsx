@@ -27,6 +27,13 @@ const DEFAULT_ENABLED_PACKAGES = [
   'database',
   'notifications',
   'ciena-saos',
+  'data-transform',
+  'flow-control',
+  'http-api',
+  'file-storage',
+  'scheduling',
+  'parser-format',
+  'debug-utility',
 ];
 
 const WorkflowBuilder = ({
