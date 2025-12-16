@@ -16,6 +16,7 @@ from .credentials import credentials_bp
 from .schema import schema_bp
 from .winrm import winrm_bp
 from .auth import auth_bp
+from .netbox import netbox_bp
 
 __all__ = [
     'devices_bp',
@@ -37,6 +38,7 @@ __all__ = [
     'schema_bp',
     'winrm_bp',
     'auth_bp',
+    'netbox_bp',
     'register_blueprints',
 ]
 
@@ -72,3 +74,4 @@ def register_blueprints(app):
     app.register_blueprint(schema_bp)
     app.register_blueprint(winrm_bp)
     app.register_blueprint(auth_bp)
+    app.register_blueprint(netbox_bp)

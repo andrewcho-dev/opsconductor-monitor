@@ -170,6 +170,7 @@ const settingsNavigation = [
   { id: 'database', label: 'Database', icon: Database, path: '/system/settings/database' },
   { id: 'security', label: 'Security', icon: Shield, path: '/system/settings/security' },
   { id: 'logging', label: 'Logging', icon: ScrollText, path: '/system/settings/logging' },
+  { id: 'netbox', label: 'NetBox', icon: Server, path: '/system/settings/netbox' },
   { id: 'backup', label: 'Backup', icon: Archive, path: '/system/settings/backup' },
 ];
 

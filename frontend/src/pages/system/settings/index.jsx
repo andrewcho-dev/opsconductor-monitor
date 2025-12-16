@@ -2,6 +2,7 @@ export { GeneralSettings } from './GeneralSettings';
 export { DatabaseSettings } from './DatabaseSettings';
 export { PasswordPolicySettings } from './PasswordPolicySettings';
 export { LoggingSettings } from './LoggingSettings';
+export { NetBoxSettings } from './NetBoxSettings';
 
 // SecuritySettings now uses PasswordPolicySettings
 export { PasswordPolicySettings as SecuritySettings } from './PasswordPolicySettings';

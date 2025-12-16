@@ -33,6 +33,7 @@ import {
   DatabaseSettings,
   SecuritySettings,
   LoggingSettings,
+  NetBoxSettings,
   BackupSettings
 } from "./pages/system/settings";
 
@@ -87,6 +88,7 @@ function App() {
           <Route path="database" element={<DatabaseSettings />} />
           <Route path="security" element={<SecuritySettings />} />
           <Route path="logging" element={<LoggingSettings />} />
+          <Route path="netbox" element={<NetBoxSettings />} />
           <Route path="backup" element={<BackupSettings />} />
         </Route>
         <Route path="/system/notifications" element={<ProtectedRoute permission="system.settings.view"><NotificationsPage /></ProtectedRoute>} />
