@@ -692,6 +692,96 @@ function CredentialModal({ credential, onClose, onSave }) {
             </>
           )}
 
+          {formData.credential_type === 'snmp' && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">SNMP Version</label>
+                <select
+                  value={formData.snmp_version}
+                  onChange={(e) => setFormData(prev => ({ ...prev, snmp_version: e.target.value }))}
+                  className="w-full px-3 py-2 border rounded-lg"
+                >
+                  <option value="2c">v2c</option>
+                  <option value="1">v1</option>
+                  <option value="3">v3</option>
+                </select>
+              </div>
+              {(formData.snmp_version === '1' || formData.snmp_version === '2c') && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Community String</label>
+                  <input
+                    type="password"
+                    value={formData.community}
+                    onChange={(e) => setFormData(prev => ({ ...prev, community: e.target.value }))}
+                    className="w-full px-3 py-2 border rounded-lg"
+                    placeholder={credential ? '(unchanged)' : 'e.g., public'}
+                  />
+                </div>
+              )}
+              {formData.snmp_version === '3' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Security Name (Username)</label>
+                    <input
+                      type="text"
+                      value={formData.security_name}
+                      onChange={(e) => setFormData(prev => ({ ...prev, security_name: e.target.value }))}
+                      className="w-full px-3 py-2 border rounded-lg"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Auth Protocol</label>
+                      <select
+                        value={formData.auth_protocol}
+                        onChange={(e) => setFormData(prev => ({ ...prev, auth_protocol: e.target.value }))}
+                        className="w-full px-3 py-2 border rounded-lg"
+                      >
+                        <option value="">None</option>
+                        <option value="MD5">MD5</option>
+                        <option value="SHA">SHA</option>
+                        <option value="SHA256">SHA-256</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Auth Password</label>
+                      <input
+                        type="password"
+                        value={formData.auth_password}
+                        onChange={(e) => setFormData(prev => ({ ...prev, auth_password: e.target.value }))}
+                        className="w-full px-3 py-2 border rounded-lg"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Privacy Protocol</label>
+                      <select
+                        value={formData.priv_protocol}
+                        onChange={(e) => setFormData(prev => ({ ...prev, priv_protocol: e.target.value }))}
+                        className="w-full px-3 py-2 border rounded-lg"
+                      >
+                        <option value="">None</option>
+                        <option value="DES">DES</option>
+                        <option value="AES">AES</option>
+                        <option value="AES256">AES-256</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Privacy Password</label>
+                      <input
+                        type="password"
+                        value={formData.priv_password}
+                        onChange={(e) => setFormData(prev => ({ ...prev, priv_password: e.target.value }))}
+                        className="w-full px-3 py-2 border rounded-lg"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+
           {formData.credential_type === 'winrm' && (
             <>
               <div className="grid grid-cols-2 gap-4">

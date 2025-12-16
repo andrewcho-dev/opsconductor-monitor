@@ -133,6 +133,7 @@ const moduleNavigation = {
         title: 'By Type',
         items: [
           { id: 'ssh', label: 'SSH Keys', icon: Terminal, path: '/credentials?type=ssh' },
+          { id: 'snmp', label: 'SNMP', icon: Server, path: '/credentials?type=snmp' },
           { id: 'winrm', label: 'WinRM', icon: Shield, path: '/credentials?type=winrm' },
           { id: 'certificates', label: 'Certificates', icon: FileKey, path: '/credentials?type=certificate' },
           { id: 'api-keys', label: 'API Keys', icon: Key, path: '/credentials?type=api_key' },
