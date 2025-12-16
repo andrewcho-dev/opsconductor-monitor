@@ -394,10 +394,10 @@ export function PasswordPolicySettings() {
           </label>
           <input
             type="number"
-            value={policy?.password_history_count || 12}
-            onChange={(e) => handleChange('password_history_count', parseInt(e.target.value))}
-            min={0}
-            max={24}
+            value={policy?.password_history_count ?? 12}
+            onChange={(e) => handleChange('password_history_count', parseInt(e.target.value) || 0)}
+            min="0"
+            max="24"
             disabled={!canEdit}
             className="w-full max-w-xs px-3 py-2 border rounded-lg disabled:bg-gray-50"
           />
