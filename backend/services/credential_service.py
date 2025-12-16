@@ -801,6 +801,257 @@ class CredentialService:
                 'usage': usage
             }
 
+    # =========================================================================
+    # Enterprise Authentication Support
+    # =========================================================================
+    
+    def get_enterprise_auth_config(self, auth_type: str, config_name: str = None) -> Optional[Dict[str, Any]]:
+        """
+        Get enterprise auth server configuration.
+        
+        Args:
+            auth_type: Type of auth (tacacs, radius, ldap, active_directory)
+            config_name: Optional specific config name, otherwise returns default
+        
+        Returns:
+            Auth config with decrypted server credentials
+        """
+        db = get_db()
+        with db.cursor() as cursor:
+            if config_name:
+                cursor.execute("""
+                    SELECT eac.*, c.encrypted_data, c.credential_type
+                    FROM enterprise_auth_configs eac
+                    LEFT JOIN credentials c ON eac.credential_id = c.id
+                    WHERE eac.name = %s AND eac.enabled = TRUE
+                """, (config_name,))
+            else:
+                cursor.execute("""
+                    SELECT eac.*, c.encrypted_data, c.credential_type
+                    FROM enterprise_auth_configs eac
+                    LEFT JOIN credentials c ON eac.credential_id = c.id
+                    WHERE eac.auth_type = %s AND eac.enabled = TRUE
+                    ORDER BY eac.is_default DESC, eac.priority DESC
+                    LIMIT 1
+                """, (auth_type,))
+            
+            row = cursor.fetchone()
+            if not row:
+                return None
+            
+            config = dict(row)
+            if config.get('encrypted_data'):
+                config['server_config'] = self.decrypt(config['encrypted_data'])
+                del config['encrypted_data']
+            
+            return config
+    
+    def get_enterprise_auth_user(self, user_id: int = None, user_name: str = None, 
+                                  include_secret: bool = False) -> Optional[Dict[str, Any]]:
+        """
+        Get enterprise auth user credentials.
+        
+        Args:
+            user_id: User ID
+            user_name: User name (alternative to ID)
+            include_secret: Whether to include decrypted credentials
+        
+        Returns:
+            User record with optional decrypted credentials
+        """
+        db = get_db()
+        with db.cursor() as cursor:
+            if user_id:
+                cursor.execute("""
+                    SELECT eau.*, eac.auth_type, eac.name as config_name
+                    FROM enterprise_auth_users eau
+                    JOIN enterprise_auth_configs eac ON eau.auth_config_id = eac.id
+                    WHERE eau.id = %s AND eau.enabled = TRUE
+                """, (user_id,))
+            else:
+                cursor.execute("""
+                    SELECT eau.*, eac.auth_type, eac.name as config_name
+                    FROM enterprise_auth_users eau
+                    JOIN enterprise_auth_configs eac ON eau.auth_config_id = eac.id
+                    WHERE eau.name = %s AND eau.enabled = TRUE
+                """, (user_name,))
+            
+            row = cursor.fetchone()
+            if not row:
+                return None
+            
+            user = dict(row)
+            if include_secret and user.get('encrypted_credentials'):
+                user['credentials'] = self.decrypt(user['encrypted_credentials'])
+            if 'encrypted_credentials' in user:
+                del user['encrypted_credentials']
+            
+            return user
+    
+    def resolve_device_credentials(self, device_ip: str, credential_type: str = 'ssh',
+                                    include_secret: bool = True) -> Optional[Dict[str, Any]]:
+        """
+        Resolve credentials for a device, supporting both local and enterprise auth.
+        
+        This is the main method jobs should use to get credentials for device access.
+        
+        Args:
+            device_ip: IP address of the device
+            credential_type: Type of credential needed (ssh, snmp, etc.)
+            include_secret: Whether to include decrypted secrets
+        
+        Returns:
+            Dict with auth_method and credentials:
+            - For local: {'auth_method': 'local', 'credentials': {...}}
+            - For enterprise: {'auth_method': 'tacacs', 'credentials': {...}, 'server_config': {...}}
+        """
+        db = get_db()
+        with db.cursor() as cursor:
+            # Check device_credentials for this IP
+            cursor.execute("""
+                SELECT dc.*, c.name as credential_name, c.encrypted_data,
+                       eau.id as enterprise_user_id, eau.encrypted_credentials as enterprise_creds,
+                       eac.auth_type, eac.credential_id as server_credential_id
+                FROM device_credentials dc
+                LEFT JOIN credentials c ON dc.credential_id = c.id
+                LEFT JOIN enterprise_auth_users eau ON dc.enterprise_auth_user_id = eau.id
+                LEFT JOIN enterprise_auth_configs eac ON eau.auth_config_id = eac.id
+                WHERE dc.ip_address = %s 
+                  AND (dc.credential_type = %s OR dc.credential_type IS NULL)
+                ORDER BY dc.priority DESC
+                LIMIT 1
+            """, (device_ip, credential_type))
+            
+            row = cursor.fetchone()
+            if not row:
+                return None
+            
+            device_cred = dict(row)
+            auth_method = device_cred.get('auth_method', 'local')
+            
+            result = {
+                'auth_method': auth_method,
+                'device_ip': device_ip,
+                'credential_type': credential_type,
+            }
+            
+            if auth_method == 'local':
+                # Local credentials - decrypt from credential vault
+                if include_secret and device_cred.get('encrypted_data'):
+                    result['credentials'] = self.decrypt(device_cred['encrypted_data'])
+                result['credential_name'] = device_cred.get('credential_name')
+                result['credential_id'] = device_cred.get('credential_id')
+            else:
+                # Enterprise auth - get user credentials and server config
+                if include_secret and device_cred.get('enterprise_creds'):
+                    result['credentials'] = self.decrypt(device_cred['enterprise_creds'])
+                
+                result['enterprise_user_id'] = device_cred.get('enterprise_user_id')
+                
+                # Get server config
+                if device_cred.get('server_credential_id'):
+                    server_cred = self.get_credential(
+                        device_cred['server_credential_id'], 
+                        include_secret=include_secret
+                    )
+                    if server_cred:
+                        result['server_config'] = server_cred.get('secret_data', {})
+            
+            return result
+    
+    def create_enterprise_auth_config(self, name: str, auth_type: str, 
+                                       credential_id: int, is_default: bool = False,
+                                       priority: int = 0) -> Dict[str, Any]:
+        """Create an enterprise auth server configuration."""
+        db = get_db()
+        with db.cursor() as cursor:
+            # If setting as default, unset other defaults for this type
+            if is_default:
+                cursor.execute("""
+                    UPDATE enterprise_auth_configs 
+                    SET is_default = FALSE 
+                    WHERE auth_type = %s
+                """, (auth_type,))
+            
+            cursor.execute("""
+                INSERT INTO enterprise_auth_configs 
+                (name, auth_type, credential_id, is_default, priority)
+                VALUES (%s, %s, %s, %s, %s)
+                RETURNING id, name, auth_type, credential_id, is_default, priority, enabled, created_at
+            """, (name, auth_type, credential_id, is_default, priority))
+            
+            row = cursor.fetchone()
+            db.get_connection().commit()
+            return dict(row)
+    
+    def create_enterprise_auth_user(self, name: str, auth_config_id: int,
+                                     username: str, password: str,
+                                     description: str = None,
+                                     is_service_account: bool = False) -> Dict[str, Any]:
+        """Create an enterprise auth user credential."""
+        db = get_db()
+        
+        # Encrypt the credentials
+        encrypted = self.encrypt({'username': username, 'password': password})
+        
+        with db.cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO enterprise_auth_users 
+                (name, description, auth_config_id, encrypted_credentials, username, is_service_account)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                RETURNING id, name, description, auth_config_id, username, is_service_account, enabled, created_at
+            """, (name, description, auth_config_id, encrypted, username, is_service_account))
+            
+            row = cursor.fetchone()
+            db.get_connection().commit()
+            return dict(row)
+    
+    def list_enterprise_auth_configs(self, auth_type: str = None) -> List[Dict[str, Any]]:
+        """List enterprise auth configurations."""
+        db = get_db()
+        with db.cursor() as cursor:
+            if auth_type:
+                cursor.execute("""
+                    SELECT eac.*, c.name as credential_name
+                    FROM enterprise_auth_configs eac
+                    LEFT JOIN credentials c ON eac.credential_id = c.id
+                    WHERE eac.auth_type = %s
+                    ORDER BY eac.is_default DESC, eac.priority DESC
+                """, (auth_type,))
+            else:
+                cursor.execute("""
+                    SELECT eac.*, c.name as credential_name
+                    FROM enterprise_auth_configs eac
+                    LEFT JOIN credentials c ON eac.credential_id = c.id
+                    ORDER BY eac.auth_type, eac.is_default DESC, eac.priority DESC
+                """)
+            return [dict(row) for row in cursor.fetchall()]
+    
+    def list_enterprise_auth_users(self, auth_config_id: int = None) -> List[Dict[str, Any]]:
+        """List enterprise auth users."""
+        db = get_db()
+        with db.cursor() as cursor:
+            if auth_config_id:
+                cursor.execute("""
+                    SELECT eau.id, eau.name, eau.description, eau.username, 
+                           eau.is_service_account, eau.enabled, eau.created_at, eau.last_used_at,
+                           eac.name as config_name, eac.auth_type
+                    FROM enterprise_auth_users eau
+                    JOIN enterprise_auth_configs eac ON eau.auth_config_id = eac.id
+                    WHERE eau.auth_config_id = %s
+                    ORDER BY eau.name
+                """, (auth_config_id,))
+            else:
+                cursor.execute("""
+                    SELECT eau.id, eau.name, eau.description, eau.username, 
+                           eau.is_service_account, eau.enabled, eau.created_at, eau.last_used_at,
+                           eac.name as config_name, eac.auth_type
+                    FROM enterprise_auth_users eau
+                    JOIN enterprise_auth_configs eac ON eau.auth_config_id = eac.id
+                    ORDER BY eac.auth_type, eau.name
+                """)
+            return [dict(row) for row in cursor.fetchall()]
+
 
 # Singleton instance
 _credential_service = None

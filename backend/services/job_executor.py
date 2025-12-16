@@ -54,7 +54,13 @@ class JobExecutor:
     
     def _get_credentials_for_target(self, target: str, credential_type: str, job_config: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Get credentials for a target, checking vault first, then job config, then settings.
+        Get credentials for a target, supporting both local vault credentials and enterprise auth.
+        
+        Resolution order:
+        1. Job config specifies a credential by name
+        2. Device has assigned credentials (local or enterprise auth)
+        3. Default credential of the type from vault
+        4. Fallback to job config or settings
         
         Args:
             target: Target IP address or hostname
@@ -62,7 +68,8 @@ class JobExecutor:
             job_config: Job configuration that may contain inline credentials
         
         Returns:
-            Credential data dictionary
+            Credential data dictionary with keys like username, password, etc.
+            For enterprise auth, also includes auth_method and server_config.
         """
         try:
             cred_service = get_credential_service()
@@ -82,7 +89,39 @@ class JobExecutor:
                     )
                     return cred['secret_data']
             
-            # Second, check for credentials assigned to this target
+            # Second, try resolve_device_credentials which handles both local and enterprise auth
+            resolved = cred_service.resolve_device_credentials(
+                device_ip=target,
+                credential_type=credential_type,
+                include_secret=True
+            )
+            if resolved:
+                auth_method = resolved.get('auth_method', 'local')
+                credentials = resolved.get('credentials', {})
+                
+                if auth_method != 'local':
+                    # Enterprise auth - log and return with auth context
+                    logger.info(f"Using {auth_method} enterprise auth for {target}")
+                    # For enterprise auth, the credentials contain username/password
+                    # that will be validated by the enterprise server when used
+                    credentials['_auth_method'] = auth_method
+                    credentials['_server_config'] = resolved.get('server_config', {})
+                else:
+                    logger.debug(f"Using device-assigned credential for {target}")
+                
+                # Log usage
+                if resolved.get('credential_id'):
+                    cred_service.log_usage(
+                        credential_id=resolved['credential_id'],
+                        credential_name=resolved.get('credential_name', 'unknown'),
+                        used_by=job_config.get('name', 'job'),
+                        used_for=target,
+                        success=True
+                    )
+                
+                return credentials
+            
+            # Third, fallback to legacy method - check for credentials assigned to this target
             target_creds = cred_service.get_credentials_for_device(
                 ip_address=target,
                 credential_type=credential_type,
