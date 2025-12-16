@@ -4,13 +4,35 @@ import { PageLayout, PageHeader } from "../../components/layout";
 import { DeviceTable } from "../../components/DeviceTable";
 import { GroupModal } from "../../components/GroupModal";
 import { useDevices, useGroups } from "../../hooks/useDevices";
+import { useNetBoxDevices, useNetBoxStatus } from "../../hooks/useNetBox";
 import { fetchApi } from "../../lib/utils";
-import { Server, RefreshCw } from "lucide-react";
+import { Server, RefreshCw, Database, ExternalLink } from "lucide-react";
 
 export function DevicesPage() {
   const navigate = useNavigate();
-  const { devices, loading: devicesLoading, refetch: refetchDevices } = useDevices();
+  
+  // Check NetBox status
+  const netboxStatus = useNetBoxStatus();
+  const [useNetBox, setUseNetBox] = useState(false);
+  
+  // Local devices (scan_results)
+  const { devices: localDevices, loading: localLoading, refetch: refetchLocal } = useDevices();
   const { groups, createGroup, updateGroup, refetch: refetchGroups } = useGroups();
+  
+  // NetBox devices
+  const { devices: netboxDevices, loading: netboxLoading, refetch: refetchNetBox } = useNetBoxDevices();
+  
+  // Use appropriate data source
+  const devices = useNetBox ? netboxDevices : localDevices;
+  const devicesLoading = useNetBox ? netboxLoading : localLoading;
+  const refetchDevices = useNetBox ? refetchNetBox : refetchLocal;
+  
+  // Auto-switch to NetBox if configured and connected
+  useEffect(() => {
+    if (netboxStatus.connected && !netboxStatus.loading) {
+      setUseNetBox(true);
+    }
+  }, [netboxStatus.connected, netboxStatus.loading]);
 
   // Filter state
   const [currentFilter, setCurrentFilter] = useState({ type: "all", label: "All Devices" });
@@ -136,14 +158,34 @@ export function DevicesPage() {
         description={`${filteredDevices.length} of ${devices.length} devices`}
         icon={Server}
         actions={
-          <button
-            onClick={() => { refetchDevices(); refetchGroups(); }}
-            disabled={devicesLoading}
-            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-          >
-            <RefreshCw className={`w-4 h-4 ${devicesLoading ? 'animate-spin' : ''}`} />
-            Refresh
-          </button>
+          <div className="flex items-center gap-3">
+            {/* Data source indicator */}
+            {netboxStatus.connected && (
+              <div className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 border border-gray-200">
+                <span className="text-gray-500">Source:</span>
+                <button
+                  onClick={() => setUseNetBox(false)}
+                  className={`px-2 py-0.5 rounded ${!useNetBox ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-200'}`}
+                >
+                  <Database className="w-3 h-3 inline mr-1" />Local
+                </button>
+                <button
+                  onClick={() => setUseNetBox(true)}
+                  className={`px-2 py-0.5 rounded ${useNetBox ? 'bg-green-600 text-white' : 'text-gray-600 hover:bg-gray-200'}`}
+                >
+                  <ExternalLink className="w-3 h-3 inline mr-1" />NetBox
+                </button>
+              </div>
+            )}
+            <button
+              onClick={() => { refetchDevices(); refetchGroups(); }}
+              disabled={devicesLoading}
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${devicesLoading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+          </div>
         }
       />
 
