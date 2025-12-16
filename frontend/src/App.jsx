@@ -30,10 +30,7 @@ import {
 import { CredentialVaultPage } from "./pages/credentials";
 import {
   GeneralSettings,
-  NetworkSettings,
-  SSHSettings,
   DatabaseSettings,
-  APISettings,
   SecuritySettings,
   LoggingSettings,
   BackupSettings
@@ -87,10 +84,7 @@ function App() {
         <Route path="/system/settings" element={<ProtectedRoute permission="system.settings.view"><SystemSettingsPage /></ProtectedRoute>}>
           <Route index element={<Navigate to="general" replace />} />
           <Route path="general" element={<GeneralSettings />} />
-          <Route path="network" element={<NetworkSettings />} />
-          <Route path="ssh" element={<SSHSettings />} />
           <Route path="database" element={<DatabaseSettings />} />
-          <Route path="api" element={<APISettings />} />
           <Route path="security" element={<SecuritySettings />} />
           <Route path="logging" element={<LoggingSettings />} />
           <Route path="backup" element={<BackupSettings />} />
