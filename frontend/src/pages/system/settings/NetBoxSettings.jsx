@@ -11,14 +11,6 @@ export function NetBoxSettings() {
     url: '',
     token: '',
     verify_ssl: true,
-    default_site_id: '',
-    default_role_id: '',
-    default_device_type_id: '',
-  });
-  const [lookups, setLookups] = useState({
-    sites: [],
-    roles: [],
-    deviceTypes: [],
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -41,38 +33,12 @@ export function NetBoxSettings() {
           url: res.data.url || '',
           token: res.data.token || '',
           verify_ssl: res.data.verify_ssl !== 'false',
-          default_site_id: res.data.default_site_id || '',
-          default_role_id: res.data.default_role_id || '',
-          default_device_type_id: res.data.default_device_type_id || '',
         }));
-        
-        // If configured, load lookups
-        if (res.data.url && res.data.token_configured) {
-          loadLookups();
-        }
       }
     } catch (err) {
       console.error('Failed to load NetBox settings:', err);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadLookups = async () => {
-    try {
-      const [sitesRes, rolesRes, typesRes] = await Promise.all([
-        fetchApi('/api/netbox/sites', { headers: getAuthHeader() }).catch(() => ({ data: [] })),
-        fetchApi('/api/netbox/device-roles', { headers: getAuthHeader() }).catch(() => ({ data: [] })),
-        fetchApi('/api/netbox/device-types', { headers: getAuthHeader() }).catch(() => ({ data: [] })),
-      ]);
-      
-      setLookups({
-        sites: sitesRes.data || [],
-        roles: rolesRes.data || [],
-        deviceTypes: typesRes.data || [],
-      });
-    } catch (err) {
-      console.error('Failed to load NetBox lookups:', err);
     }
   };
 
@@ -94,7 +60,6 @@ export function NetBoxSettings() {
       if (res.success) {
         setHasChanges(false);
         setMessage({ type: 'success', text: 'Settings saved' });
-        loadLookups();
       } else {
         setMessage({ type: 'error', text: res.error?.message || 'Failed to save' });
       }
@@ -251,63 +216,13 @@ export function NetBoxSettings() {
           )}
         </div>
 
-        {/* Discovery Defaults */}
-        <div className="col-span-2 border rounded-lg p-4">
-          <span className="text-xs font-semibold text-gray-900 mb-3 block">Discovery Defaults</span>
-          <p className="text-xs text-gray-500 mb-3">
-            Default values used when discovery jobs create new devices in NetBox.
+        {/* Info */}
+        <div className="col-span-2 border rounded-lg p-4 bg-blue-50 border-blue-200">
+          <p className="text-xs text-blue-700">
+            <strong>Note:</strong> Discovery jobs will find active devices on your network. 
+            Discovered device information (IP, hostname, SNMP data) will be stored locally. 
+            You can then manually add devices to NetBox with the correct site, role, and device type.
           </p>
-          
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">Default Site</label>
-              <select
-                value={settings.default_site_id}
-                onChange={(e) => handleChange('default_site_id', e.target.value)}
-                disabled={!canEdit || lookups.sites.length === 0}
-                className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500 disabled:bg-gray-50"
-              >
-                <option value="">Select site...</option>
-                {lookups.sites.map(site => (
-                  <option key={site.id} value={site.id}>{site.name}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">Default Role</label>
-              <select
-                value={settings.default_role_id}
-                onChange={(e) => handleChange('default_role_id', e.target.value)}
-                disabled={!canEdit || lookups.roles.length === 0}
-                className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500 disabled:bg-gray-50"
-              >
-                <option value="">Select role...</option>
-                {lookups.roles.map(role => (
-                  <option key={role.id} value={role.id}>{role.name}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">Default Device Type</label>
-              <select
-                value={settings.default_device_type_id}
-                onChange={(e) => handleChange('default_device_type_id', e.target.value)}
-                disabled={!canEdit || lookups.deviceTypes.length === 0}
-                className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500 disabled:bg-gray-50"
-              >
-                <option value="">Select type...</option>
-                {lookups.deviceTypes.map(type => (
-                  <option key={type.id} value={type.id}>{type.manufacturer?.name} - {type.model}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          
-          {lookups.sites.length === 0 && settings.url && (
-            <p className="mt-3 text-xs text-amber-600">
-              Connect to NetBox to load available sites, roles, and device types.
-            </p>
-          )}
         </div>
       </div>
     </div>
