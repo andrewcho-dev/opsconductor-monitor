@@ -10,14 +10,14 @@ from typing import Dict, Any, List
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .base import BaseExecutor
-from .registry import ExecutorRegistry
+from .registry import register_executor
 from .ping_executor import PingExecutor
 from .snmp_executor import SNMPExecutor
 
 logger = logging.getLogger(__name__)
 
 
-@ExecutorRegistry.register('discovery')
+@register_executor
 class DiscoveryExecutor(BaseExecutor):
     """
     Executor for network discovery operations.
