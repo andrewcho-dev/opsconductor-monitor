@@ -114,7 +114,8 @@ const moduleNavigation = {
       {
         title: 'Access Control',
         items: [
-          { id: 'users', label: 'Users & Roles', icon: Users, path: '/system/users' },
+          { id: 'users', label: 'Users', icon: Users, path: '/system/users' },
+          { id: 'roles', label: 'Roles & Permissions', icon: Shield, path: '/system/roles' },
         ]
       },
       {

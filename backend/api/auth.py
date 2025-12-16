@@ -816,6 +816,124 @@ def get_role(role_id):
         }), 500
 
 
+@auth_bp.route('/roles', methods=['POST'])
+@permission_required('system.roles.manage')
+def create_role():
+    """Create a new role."""
+    try:
+        data = request.get_json()
+        
+        if not data.get('name') or not data.get('display_name'):
+            return jsonify({
+                'success': False,
+                'error': {'code': 'VALIDATION_ERROR', 'message': 'name and display_name are required'}
+            }), 400
+        
+        auth_service = get_auth_service()
+        role = auth_service.create_role(
+            name=data['name'],
+            display_name=data['display_name'],
+            description=data.get('description', ''),
+            permissions=data.get('permissions', [])
+        )
+        
+        return jsonify({
+            'success': True,
+            'data': {'role': role}
+        }), 201
+        
+    except ValueError as e:
+        return jsonify({
+            'success': False,
+            'error': {'code': 'VALIDATION_ERROR', 'message': str(e)}
+        }), 400
+    except Exception as e:
+        logger.error(f"Create role error: {e}")
+        return jsonify({
+            'success': False,
+            'error': {'code': 'SERVER_ERROR', 'message': 'Failed to create role'}
+        }), 500
+
+
+@auth_bp.route('/roles/<int:role_id>', methods=['PUT'])
+@permission_required('system.roles.manage')
+def update_role(role_id):
+    """Update a role."""
+    try:
+        data = request.get_json()
+        
+        auth_service = get_auth_service()
+        
+        # Check if role exists and is not a system role
+        role = auth_service.get_role(role_id)
+        if not role:
+            return jsonify({
+                'success': False,
+                'error': {'code': 'NOT_FOUND', 'message': 'Role not found'}
+            }), 404
+        
+        if role.get('is_system'):
+            return jsonify({
+                'success': False,
+                'error': {'code': 'FORBIDDEN', 'message': 'Cannot modify system roles'}
+            }), 403
+        
+        updated_role = auth_service.update_role(
+            role_id=role_id,
+            display_name=data.get('display_name'),
+            description=data.get('description'),
+            permissions=data.get('permissions')
+        )
+        
+        return jsonify({
+            'success': True,
+            'data': {'role': updated_role}
+        })
+        
+    except Exception as e:
+        logger.error(f"Update role error: {e}")
+        return jsonify({
+            'success': False,
+            'error': {'code': 'SERVER_ERROR', 'message': 'Failed to update role'}
+        }), 500
+
+
+@auth_bp.route('/roles/<int:role_id>', methods=['DELETE'])
+@permission_required('system.roles.manage')
+def delete_role(role_id):
+    """Delete a role."""
+    try:
+        auth_service = get_auth_service()
+        
+        # Check if role exists and is not a system role
+        role = auth_service.get_role(role_id)
+        if not role:
+            return jsonify({
+                'success': False,
+                'error': {'code': 'NOT_FOUND', 'message': 'Role not found'}
+            }), 404
+        
+        if role.get('is_system'):
+            return jsonify({
+                'success': False,
+                'error': {'code': 'FORBIDDEN', 'message': 'Cannot delete system roles'}
+            }), 403
+        
+        auth_service.delete_role(role_id)
+        
+        return jsonify({
+            'success': True,
+            'data': {'message': 'Role deleted'}
+        })
+        
+    except Exception as e:
+        logger.error(f"Delete role error: {e}")
+        return jsonify({
+            'success': False,
+            'error': {'code': 'SERVER_ERROR', 'message': 'Failed to delete role'}
+        }), 500
+
+
 @auth_bp.route('/permissions', methods=['GET'])
 @login_required
 def list_permissions():

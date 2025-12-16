@@ -6,3 +6,4 @@ export { NotificationsPage } from './NotificationsPage';
 export { LogsPage } from './LogsPage';
 export { AboutPage } from './AboutPage';
 export { UsersPage } from './UsersPage';
+export { RolesPage } from './RolesPage';

@@ -22,7 +22,8 @@ import {
   NotificationsPage,
   LogsPage,
   AboutPage,
-  UsersPage
+  UsersPage,
+  RolesPage
 } from "./pages/system";
 
 // Credentials Module
@@ -99,6 +100,7 @@ function App() {
         <Route path="/system/logs" element={<ProtectedRoute permission="system.audit.view"><LogsPage /></ProtectedRoute>} />
         <Route path="/system/about" element={<ProtectedRoute><AboutPage /></ProtectedRoute>} />
         <Route path="/system/users" element={<ProtectedRoute permission="system.users.view"><UsersPage /></ProtectedRoute>} />
+        <Route path="/system/roles" element={<ProtectedRoute permission="system.roles.manage"><RolesPage /></ProtectedRoute>} />
 
         {/* LEGACY REDIRECTS */}
         <Route path="/device/:ip" element={<DeviceDetailPage />} />

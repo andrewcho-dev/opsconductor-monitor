@@ -801,15 +801,27 @@ class AuthService:
     # =========================================================================
     
     def list_roles(self) -> List[Dict[str, Any]]:
-        """List all roles."""
+        """List all roles with their permissions."""
         with self.db.cursor() as cursor:
             cursor.execute("""
                 SELECT r.*, 
-                       (SELECT COUNT(*) FROM user_roles ur WHERE ur.role_id = r.id) as user_count
+                       (SELECT COUNT(*) FROM user_roles ur WHERE ur.role_id = r.id) as user_count,
+                       (SELECT COUNT(*) FROM role_permissions rp WHERE rp.role_id = r.id) as permission_count
                 FROM roles r
                 ORDER BY r.priority DESC
             """)
-            return [dict(row) for row in cursor.fetchall()]
+            roles = [dict(row) for row in cursor.fetchall()]
+            
+            # Get permissions for each role
+            for role in roles:
+                cursor.execute("""
+                    SELECT p.code FROM permissions p
+                    JOIN role_permissions rp ON p.id = rp.permission_id
+                    WHERE rp.role_id = %s
+                """, (role['id'],))
+                role['permissions'] = [row['code'] for row in cursor.fetchall()]
+            
+            return roles
     
     def get_role(self, role_id: int) -> Optional[Dict[str, Any]]:
         """Get role by ID with its permissions."""
@@ -858,6 +870,115 @@ class AuthService:
             return True
         except Exception as e:
             logger.error(f"Error removing role: {e}")
+            return False
+    
+    def create_role(
+        self,
+        name: str,
+        display_name: str,
+        description: str = '',
+        permissions: List[str] = None
+    ) -> Dict[str, Any]:
+        """Create a new custom role."""
+        try:
+            with self.db.cursor() as cursor:
+                # Check if role name exists
+                cursor.execute("SELECT id FROM roles WHERE name = %s", (name,))
+                if cursor.fetchone():
+                    raise ValueError(f"Role '{name}' already exists")
+                
+                # Create role
+                cursor.execute("""
+                    INSERT INTO roles (name, display_name, description, is_system, priority)
+                    VALUES (%s, %s, %s, FALSE, 50)
+                    RETURNING *
+                """, (name, display_name, description))
+                role = dict(cursor.fetchone())
+                
+                # Assign permissions
+                if permissions:
+                    for perm_code in permissions:
+                        cursor.execute("""
+                            INSERT INTO role_permissions (role_id, permission_id)
+                            SELECT %s, id FROM permissions WHERE code = %s
+                        """, (role['id'], perm_code))
+                
+                self.db.get_connection().commit()
+                
+                # Get permissions list
+                role['permissions'] = permissions or []
+                return role
+                
+        except ValueError:
+            raise
+        except Exception as e:
+            self.db.get_connection().rollback()
+            logger.error(f"Error creating role: {e}")
+            raise
+    
+    def update_role(
+        self,
+        role_id: int,
+        display_name: str = None,
+        description: str = None,
+        permissions: List[str] = None
+    ) -> Dict[str, Any]:
+        """Update a role's properties and permissions."""
+        try:
+            with self.db.cursor() as cursor:
+                # Update role properties
+                updates = []
+                params = []
+                if display_name is not None:
+                    updates.append("display_name = %s")
+                    params.append(display_name)
+                if description is not None:
+                    updates.append("description = %s")
+                    params.append(description)
+                
+                if updates:
+                    params.append(role_id)
+                    cursor.execute(f"""
+                        UPDATE roles SET {', '.join(updates)}, updated_at = NOW()
+                        WHERE id = %s
+                    """, params)
+                
+                # Update permissions if provided
+                if permissions is not None:
+                    # Remove existing permissions
+                    cursor.execute("DELETE FROM role_permissions WHERE role_id = %s", (role_id,))
+                    
+                    # Add new permissions
+                    for perm_code in permissions:
+                        cursor.execute("""
+                            INSERT INTO role_permissions (role_id, permission_id)
+                            SELECT %s, id FROM permissions WHERE code = %s
+                        """, (role_id, perm_code))
+                
+                self.db.get_connection().commit()
+                
+                return self.get_role(role_id)
+                
+        except Exception as e:
+            self.db.get_connection().rollback()
+            logger.error(f"Error updating role: {e}")
+            raise
+    
+    def delete_role(self, role_id: int) -> bool:
+        """Delete a custom role."""
+        try:
+            with self.db.cursor() as cursor:
+                # Remove role assignments first
+                cursor.execute("DELETE FROM user_roles WHERE role_id = %s", (role_id,))
+                # Remove role permissions
+                cursor.execute("DELETE FROM role_permissions WHERE role_id = %s", (role_id,))
+                # Delete role
+                cursor.execute("DELETE FROM roles WHERE id = %s AND is_system = FALSE", (role_id,))
+                self.db.get_connection().commit()
+            return True
+        except Exception as e:
+            self.db.get_connection().rollback()
+            logger.error(f"Error deleting role: {e}")
             return False
     
     # =========================================================================
