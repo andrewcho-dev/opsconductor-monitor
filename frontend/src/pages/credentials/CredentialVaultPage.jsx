@@ -57,6 +57,14 @@ export function CredentialVaultPage() {
     setActiveView(getActiveView());
   }, [location.pathname]);
 
+  // Update typeFilter when URL search params change
+  useEffect(() => {
+    const urlType = searchParams.get('type') || '';
+    if (urlType !== typeFilter) {
+      setTypeFilter(urlType);
+    }
+  }, [searchParams]);
+
   useEffect(() => {
     loadData();
   }, [activeView, typeFilter, statusFilter]);
