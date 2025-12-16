@@ -30,7 +30,7 @@ def test_connection():
     
     target = data.get('target')
     if not target:
-        return jsonify(error_response('Target is required')), 400
+        return jsonify(error_response('MISSING_TARGET', 'Target is required')), 400
     
     config = {
         'username': data.get('username', ''),
@@ -46,7 +46,7 @@ def test_connection():
     if result['success']:
         return jsonify(success_response(result))
     else:
-        return jsonify(error_response(result.get('message', 'Connection failed'))), 400
+        return jsonify(error_response('CONNECTION_FAILED', result.get('message', 'Connection failed'))), 400
 
 
 @winrm_bp.route('/execute/cmd', methods=['POST'])
@@ -65,9 +65,9 @@ def execute_cmd():
     command = data.get('command')
     
     if not target:
-        return jsonify(error_response('Target is required')), 400
+        return jsonify(error_response('MISSING_TARGET', 'Target is required')), 400
     if not command:
-        return jsonify(error_response('Command is required')), 400
+        return jsonify(error_response('MISSING_COMMAND', 'Command is required')), 400
     
     config = {
         'username': data.get('username', ''),
@@ -98,9 +98,9 @@ def execute_powershell():
     script = data.get('script')
     
     if not target:
-        return jsonify(error_response('Target is required')), 400
+        return jsonify(error_response('MISSING_TARGET', 'Target is required')), 400
     if not script:
-        return jsonify(error_response('Script is required')), 400
+        return jsonify(error_response('MISSING_SCRIPT', 'Script is required')), 400
     
     config = {
         'username': data.get('username', ''),
@@ -122,7 +122,7 @@ def get_system_info():
     
     target = data.get('target')
     if not target:
-        return jsonify(error_response('Target is required')), 400
+        return jsonify(error_response('MISSING_TARGET', 'Target is required')), 400
     
     config = {
         'username': data.get('username', ''),
@@ -143,7 +143,7 @@ def get_services():
     
     target = data.get('target')
     if not target:
-        return jsonify(error_response('Target is required')), 400
+        return jsonify(error_response('MISSING_TARGET', 'Target is required')), 400
     
     config = {
         'username': data.get('username', ''),
@@ -172,11 +172,11 @@ def manage_service():
     action = data.get('action')
     
     if not target:
-        return jsonify(error_response('Target is required')), 400
+        return jsonify(error_response('MISSING_TARGET', 'Target is required')), 400
     if not service_name:
-        return jsonify(error_response('Service name is required')), 400
+        return jsonify(error_response('MISSING_SERVICE', 'Service name is required')), 400
     if not action:
-        return jsonify(error_response('Action is required')), 400
+        return jsonify(error_response('MISSING_ACTION', 'Action is required')), 400
     
     config = {
         'username': data.get('username', ''),
@@ -197,7 +197,7 @@ def get_processes():
     
     target = data.get('target')
     if not target:
-        return jsonify(error_response('Target is required')), 400
+        return jsonify(error_response('MISSING_TARGET', 'Target is required')), 400
     
     config = {
         'username': data.get('username', ''),
@@ -222,7 +222,7 @@ def get_event_log():
     
     target = data.get('target')
     if not target:
-        return jsonify(error_response('Target is required')), 400
+        return jsonify(error_response('MISSING_TARGET', 'Target is required')), 400
     
     config = {
         'username': data.get('username', ''),
@@ -249,7 +249,7 @@ def get_disk_space():
     
     target = data.get('target')
     if not target:
-        return jsonify(error_response('Target is required')), 400
+        return jsonify(error_response('MISSING_TARGET', 'Target is required')), 400
     
     config = {
         'username': data.get('username', ''),
@@ -270,7 +270,7 @@ def get_network_config():
     
     target = data.get('target')
     if not target:
-        return jsonify(error_response('Target is required')), 400
+        return jsonify(error_response('MISSING_TARGET', 'Target is required')), 400
     
     config = {
         'username': data.get('username', ''),
@@ -291,11 +291,11 @@ def reboot_system():
     
     target = data.get('target')
     if not target:
-        return jsonify(error_response('Target is required')), 400
+        return jsonify(error_response('MISSING_TARGET', 'Target is required')), 400
     
     # Require confirmation
     if not data.get('confirm'):
-        return jsonify(error_response('Confirmation required')), 400
+        return jsonify(error_response('CONFIRMATION_REQUIRED', 'Confirmation required')), 400
     
     config = {
         'username': data.get('username', ''),
@@ -321,11 +321,11 @@ def shutdown_system():
     
     target = data.get('target')
     if not target:
-        return jsonify(error_response('Target is required')), 400
+        return jsonify(error_response('MISSING_TARGET', 'Target is required')), 400
     
     # Require confirmation
     if not data.get('confirm'):
-        return jsonify(error_response('Confirmation required')), 400
+        return jsonify(error_response('CONFIRMATION_REQUIRED', 'Confirmation required')), 400
     
     config = {
         'username': data.get('username', ''),
