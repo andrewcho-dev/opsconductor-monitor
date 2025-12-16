@@ -9,7 +9,7 @@ import logging
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 
-from ..executors import ExecutorRegistry, SSHExecutor, PingExecutor, SNMPExecutor
+from ..executors import ExecutorRegistry, SSHExecutor, PingExecutor, SNMPExecutor, DiscoveryExecutor
 from ..parsers.registry import ParserRegistry
 from ..targeting import TargetingRegistry
 from ..config.constants import ACTION_TYPES, JOB_STATUS_SUCCESS, JOB_STATUS_FAILED
@@ -316,6 +316,8 @@ class JobExecutor:
             return self._execute_ping_action(targets, action, job_config, action_name)
         elif action_type == 'snmp':
             return self._execute_snmp_action(targets, action, job_config, action_name)
+        elif action_type == 'discovery':
+            return self._execute_discovery_action(targets, action, job_config, action_name)
         elif action_type == 'database':
             return self._execute_database_action(targets, action, job_config, action_name)
         else:
@@ -530,6 +532,70 @@ class JobExecutor:
             'success_count': success_count,
             'results': results,
         }
+    
+    def _execute_discovery_action(
+        self, 
+        targets: List[str], 
+        action: Dict[str, Any], 
+        job_config: Dict[str, Any],
+        action_name: str = None
+    ) -> Dict[str, Any]:
+        """Execute network discovery action with NetBox sync."""
+        execution = action.get('execution', {})
+        
+        # Build discovery config
+        discovery_config = {
+            'ping_timeout': execution.get('ping_timeout', 2),
+            'snmp_community': execution.get('snmp_community') or job_config.get('snmp_community', 'public'),
+            'snmp_timeout': execution.get('snmp_timeout', 3),
+            'sync_to_netbox': execution.get('sync_to_netbox', True),
+            'netbox_site_id': execution.get('netbox_site_id'),
+            'netbox_role_id': execution.get('netbox_role_id'),
+            'netbox_device_type_id': execution.get('netbox_device_type_id'),
+            'max_workers': execution.get('max_workers', 20),
+        }
+        
+        executor = DiscoveryExecutor()
+        
+        # Check if targets is a network range or list of IPs
+        if len(targets) == 1 and '/' in targets[0]:
+            # Single network range - use execute_range
+            result = executor.execute_range(targets[0], discovery_config)
+            return {
+                'success': result.get('success', False),
+                'network': targets[0],
+                'total_ips': result.get('total_ips', 0),
+                'online_count': result.get('online_count', 0),
+                'snmp_responding_count': result.get('snmp_responding_count', 0),
+                'netbox_synced_count': result.get('netbox_synced_count', 0),
+                'devices': result.get('devices', []),
+            }
+        else:
+            # List of individual IPs
+            results = []
+            online_count = 0
+            snmp_count = 0
+            netbox_count = 0
+            
+            for target in targets:
+                device_result = executor.execute(target, discovery_config)
+                results.append(device_result)
+                
+                if device_result.get('ping_status') == 'online':
+                    online_count += 1
+                if device_result.get('snmp_status') == 'responding':
+                    snmp_count += 1
+                if device_result.get('netbox_synced'):
+                    netbox_count += 1
+            
+            return {
+                'success': True,
+                'targets_count': len(targets),
+                'online_count': online_count,
+                'snmp_responding_count': snmp_count,
+                'netbox_synced_count': netbox_count,
+                'devices': results,
+            }
     
     def _execute_database_action(
         self, 

@@ -5,6 +5,7 @@ from .registry import ExecutorRegistry
 from .ssh_executor import SSHExecutor
 from .ping_executor import PingExecutor
 from .snmp_executor import SNMPExecutor
+from .discovery_executor import DiscoveryExecutor
 
 __all__ = [
     'BaseExecutor',
@@ -12,4 +13,5 @@ __all__ = [
     'SSHExecutor',
     'PingExecutor',
     'SNMPExecutor',
+    'DiscoveryExecutor',
 ]
