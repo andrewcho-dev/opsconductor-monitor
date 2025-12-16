@@ -8,8 +8,7 @@ import {
   FolderOpen, Calendar, User, Server, Activity
 } from 'lucide-react';
 import { PageLayout } from '../../components/layout/PageLayout';
-import { fetchApi } from '../../lib/api';
-import { cn } from '../../lib/utils';
+import { fetchApi, cn } from '../../lib/utils';
 
 const CREDENTIAL_TYPES = {
   ssh: { label: 'SSH', icon: Terminal, color: 'bg-blue-100 text-blue-700 border-blue-200' },
