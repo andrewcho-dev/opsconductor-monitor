@@ -2,6 +2,14 @@
 Device service for business logic related to network devices.
 
 Handles device operations, filtering, and coordination with groups.
+
+DEPRECATION NOTICE:
+This service uses the local scan_results table for device inventory.
+For new deployments, use NetBox as the source of truth for device inventory.
+See backend/services/netbox_service.py for the NetBox integration.
+
+The local scan_results table will be maintained for backwards compatibility
+but new features should use the NetBox integration.
 """
 
 from typing import Dict, List, Optional, Any
