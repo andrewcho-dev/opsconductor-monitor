@@ -13,6 +13,7 @@ const CREDENTIAL_TYPE_MAP = {
   'ssh_credentials': 'ssh',
   'ciena_credentials': 'ssh',
   'axis_credentials': 'password',
+  'winrm_credentials': 'winrm',
   'snmp_credentials': 'snmp',
   'database_credentials': 'password',
   'smtp_credentials': 'password',

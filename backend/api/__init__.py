@@ -14,6 +14,7 @@ from .alerts import alerts_bp
 from .notifications import notifications_bp
 from .credentials import credentials_bp
 from .schema import schema_bp
+from .winrm import winrm_bp
 
 __all__ = [
     'devices_bp',
@@ -33,6 +34,7 @@ __all__ = [
     'notifications_bp',
     'credentials_bp',
     'schema_bp',
+    'winrm_bp',
     'register_blueprints',
 ]
 
@@ -66,3 +68,4 @@ def register_blueprints(app):
     app.register_blueprint(notifications_bp)
     app.register_blueprint(credentials_bp)
     app.register_blueprint(schema_bp)
+    app.register_blueprint(winrm_bp)

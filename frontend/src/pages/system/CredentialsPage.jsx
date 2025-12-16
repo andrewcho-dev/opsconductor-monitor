@@ -17,6 +17,7 @@ export function CredentialsPage() {
     'snmp': 'bg-green-100 text-green-700 border-green-200',
     'api_key': 'bg-purple-100 text-purple-700 border-purple-200',
     'password': 'bg-orange-100 text-orange-700 border-orange-200',
+    'winrm': 'bg-cyan-100 text-cyan-700 border-cyan-200',
   };
 
   const typeLabels = {
@@ -24,6 +25,7 @@ export function CredentialsPage() {
     'snmp': 'SNMP',
     'api_key': 'API Key',
     'password': 'Password',
+    'winrm': 'WinRM',
   };
 
   useEffect(() => {
@@ -295,6 +297,10 @@ function CredentialModal({ credential, onClose, onSave }) {
     api_key: '',
     api_secret: '',
     token: '',
+    // WinRM fields
+    domain: '',
+    winrm_transport: 'ntlm',
+    winrm_port: 5985,
   });
   const [saving, setSaving] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -356,6 +362,7 @@ function CredentialModal({ credential, onClose, onSave }) {
             >
               <option value="ssh">SSH</option>
               <option value="snmp">SNMP</option>
+              <option value="winrm">WinRM (Windows)</option>
               <option value="api_key">API Key</option>
               <option value="password">Password</option>
             </select>
@@ -423,6 +430,83 @@ function CredentialModal({ credential, onClose, onSave }) {
                   className="w-full px-3 py-2 border rounded-lg font-mono text-sm h-24"
                   placeholder="-----BEGIN RSA PRIVATE KEY-----"
                 />
+              </div>
+            </>
+          )}
+
+          {/* WinRM Fields */}
+          {formData.credential_type === 'winrm' && (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                  <input
+                    type="text"
+                    value={formData.username}
+                    onChange={(e) => setFormData(prev => ({ ...prev, username: e.target.value }))}
+                    className="w-full px-3 py-2 border rounded-lg"
+                    placeholder="Administrator"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Domain</label>
+                  <input
+                    type="text"
+                    value={formData.domain}
+                    onChange={(e) => setFormData(prev => ({ ...prev, domain: e.target.value }))}
+                    className="w-full px-3 py-2 border rounded-lg"
+                    placeholder="DOMAIN (optional)"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={formData.password}
+                    onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                    className="w-full px-3 py-2 border rounded-lg pr-10"
+                    placeholder={credential ? '(unchanged)' : 'Enter password'}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Transport</label>
+                  <select
+                    value={formData.winrm_transport}
+                    onChange={(e) => setFormData(prev => ({ ...prev, winrm_transport: e.target.value }))}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  >
+                    <option value="ntlm">NTLM</option>
+                    <option value="kerberos">Kerberos</option>
+                    <option value="basic">Basic</option>
+                    <option value="credssp">CredSSP</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Port</label>
+                  <select
+                    value={formData.winrm_port}
+                    onChange={(e) => setFormData(prev => ({ ...prev, winrm_port: parseInt(e.target.value) }))}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  >
+                    <option value="5985">5985 (HTTP)</option>
+                    <option value="5986">5986 (HTTPS)</option>
+                  </select>
+                </div>
+              </div>
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+                <strong>Note:</strong> WinRM must be enabled on the target Windows machine. 
+                Run <code className="bg-amber-100 px-1 rounded">winrm quickconfig</code> on the target to enable it.
               </div>
             </>
           )}
