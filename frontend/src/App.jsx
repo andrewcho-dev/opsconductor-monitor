@@ -1,4 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider } from "./contexts/AuthContext";
+import { ProtectedRoute } from "./components/auth/ProtectedRoute";
+import { LoginPage } from "./pages/auth/LoginPage";
 
 // Inventory Module
 import { DevicesPage, DeviceDetailPage, GroupsPage } from "./pages/inventory";
@@ -36,44 +39,48 @@ import {
 function App() {
   return (
     <Router>
-      <Routes>
-        {/* Root redirect to dashboard */}
-        <Route path="/" element={<Navigate to="/monitor/dashboard" replace />} />
+      <AuthProvider>
+        <Routes>
+          {/* Auth routes */}
+          <Route path="/login" element={<LoginPage />} />
+          
+          {/* Root redirect to dashboard */}
+          <Route path="/" element={<ProtectedRoute><Navigate to="/monitor/dashboard" replace /></ProtectedRoute>} />
 
         {/* INVENTORY MODULE */}
-        <Route path="/inventory" element={<Navigate to="/inventory/devices" replace />} />
-        <Route path="/inventory/devices" element={<DevicesPage />} />
-        <Route path="/inventory/devices/:ip" element={<DeviceDetailPage />} />
-        <Route path="/inventory/groups" element={<GroupsPage />} />
+        <Route path="/inventory" element={<ProtectedRoute><Navigate to="/inventory/devices" replace /></ProtectedRoute>} />
+        <Route path="/inventory/devices" element={<ProtectedRoute permission="devices.device.view"><DevicesPage /></ProtectedRoute>} />
+        <Route path="/inventory/devices/:ip" element={<ProtectedRoute permission="devices.device.view"><DeviceDetailPage /></ProtectedRoute>} />
+        <Route path="/inventory/groups" element={<ProtectedRoute permission="devices.group.manage"><GroupsPage /></ProtectedRoute>} />
 
         {/* WORKFLOWS MODULE */}
-        <Route path="/workflows" element={<WorkflowsListPage />} />
-        <Route path="/workflows/new" element={<WorkflowBuilderPage />} />
-        <Route path="/workflows/:id" element={<WorkflowBuilderPage />} />
+        <Route path="/workflows" element={<ProtectedRoute permission="jobs.job.view"><WorkflowsListPage /></ProtectedRoute>} />
+        <Route path="/workflows/new" element={<ProtectedRoute permission="jobs.job.create"><WorkflowBuilderPage /></ProtectedRoute>} />
+        <Route path="/workflows/:id" element={<ProtectedRoute permission="jobs.job.view"><WorkflowBuilderPage /></ProtectedRoute>} />
 
         {/* MONITOR MODULE */}
-        <Route path="/monitor" element={<Navigate to="/monitor/dashboard" replace />} />
-        <Route path="/monitor/dashboard" element={<DashboardPage />} />
-        <Route path="/monitor/topology" element={<TopologyPage />} />
-        <Route path="/monitor/power" element={<PowerTrendsPage />} />
-        <Route path="/monitor/alerts" element={<AlertsPage />} />
-        <Route path="/monitor/active-jobs" element={<ActiveJobsPage />} />
-        <Route path="/monitor/job-history" element={<JobHistoryPage />} />
+        <Route path="/monitor" element={<ProtectedRoute><Navigate to="/monitor/dashboard" replace /></ProtectedRoute>} />
+        <Route path="/monitor/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+        <Route path="/monitor/topology" element={<ProtectedRoute><TopologyPage /></ProtectedRoute>} />
+        <Route path="/monitor/power" element={<ProtectedRoute><PowerTrendsPage /></ProtectedRoute>} />
+        <Route path="/monitor/alerts" element={<ProtectedRoute><AlertsPage /></ProtectedRoute>} />
+        <Route path="/monitor/active-jobs" element={<ProtectedRoute permission="jobs.job.view"><ActiveJobsPage /></ProtectedRoute>} />
+        <Route path="/monitor/job-history" element={<ProtectedRoute permission="jobs.job.view"><JobHistoryPage /></ProtectedRoute>} />
 
         {/* CREDENTIALS MODULE */}
-        <Route path="/credentials" element={<CredentialVaultPage />} />
-        <Route path="/credentials/groups" element={<CredentialVaultPage />} />
-        <Route path="/credentials/expiring" element={<CredentialVaultPage />} />
-        <Route path="/credentials/audit" element={<CredentialVaultPage />} />
-        <Route path="/credentials/enterprise" element={<CredentialVaultPage />} />
-        <Route path="/credentials/enterprise/users" element={<CredentialVaultPage />} />
+        <Route path="/credentials" element={<ProtectedRoute permission="credentials.credential.view"><CredentialVaultPage /></ProtectedRoute>} />
+        <Route path="/credentials/groups" element={<ProtectedRoute permission="credentials.group.manage"><CredentialVaultPage /></ProtectedRoute>} />
+        <Route path="/credentials/expiring" element={<ProtectedRoute permission="credentials.credential.view"><CredentialVaultPage /></ProtectedRoute>} />
+        <Route path="/credentials/audit" element={<ProtectedRoute permission="system.audit.view"><CredentialVaultPage /></ProtectedRoute>} />
+        <Route path="/credentials/enterprise" element={<ProtectedRoute permission="credentials.enterprise.manage"><CredentialVaultPage /></ProtectedRoute>} />
+        <Route path="/credentials/enterprise/users" element={<ProtectedRoute permission="credentials.enterprise.manage"><CredentialVaultPage /></ProtectedRoute>} />
 
         {/* SYSTEM MODULE */}
-        <Route path="/system" element={<Navigate to="/system/overview" replace />} />
-        <Route path="/system/overview" element={<SystemOverviewPage />} />
-        <Route path="/system/workers" element={<WorkersPage />} />
-        <Route path="/system/alerts" element={<SystemAlertsPage />} />
-        <Route path="/system/settings" element={<SystemSettingsPage />}>
+        <Route path="/system" element={<ProtectedRoute><Navigate to="/system/overview" replace /></ProtectedRoute>} />
+        <Route path="/system/overview" element={<ProtectedRoute permission="system.settings.view"><SystemOverviewPage /></ProtectedRoute>} />
+        <Route path="/system/workers" element={<ProtectedRoute permission="system.settings.view"><WorkersPage /></ProtectedRoute>} />
+        <Route path="/system/alerts" element={<ProtectedRoute><SystemAlertsPage /></ProtectedRoute>} />
+        <Route path="/system/settings" element={<ProtectedRoute permission="system.settings.view"><SystemSettingsPage /></ProtectedRoute>}>
           <Route index element={<Navigate to="general" replace />} />
           <Route path="general" element={<GeneralSettings />} />
           <Route path="network" element={<NetworkSettings />} />
@@ -84,10 +91,10 @@ function App() {
           <Route path="logging" element={<LoggingSettings />} />
           <Route path="backup" element={<BackupSettings />} />
         </Route>
-        <Route path="/system/notifications" element={<NotificationsPage />} />
-        <Route path="/system/credentials" element={<Navigate to="/credentials" replace />} />
-        <Route path="/system/logs" element={<LogsPage />} />
-        <Route path="/system/about" element={<AboutPage />} />
+        <Route path="/system/notifications" element={<ProtectedRoute permission="system.settings.view"><NotificationsPage /></ProtectedRoute>} />
+        <Route path="/system/credentials" element={<ProtectedRoute><Navigate to="/credentials" replace /></ProtectedRoute>} />
+        <Route path="/system/logs" element={<ProtectedRoute permission="system.audit.view"><LogsPage /></ProtectedRoute>} />
+        <Route path="/system/about" element={<ProtectedRoute><AboutPage /></ProtectedRoute>} />
 
         {/* LEGACY REDIRECTS */}
         <Route path="/device/:ip" element={<DeviceDetailPage />} />
@@ -104,7 +111,8 @@ function App() {
 
         {/* Catch all */}
         <Route path="*" element={<Navigate to="/monitor/dashboard" replace />} />
-      </Routes>
+        </Routes>
+      </AuthProvider>
     </Router>
   );
 }
