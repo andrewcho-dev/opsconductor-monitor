@@ -112,6 +112,12 @@ const moduleNavigation = {
         ]
       },
       {
+        title: 'Access Control',
+        items: [
+          { id: 'users', label: 'Users & Roles', icon: Users, path: '/system/users' },
+        ]
+      },
+      {
         title: 'Maintenance',
         items: [
           { id: 'logs', label: 'System Logs', icon: ScrollText, path: '/system/logs' },
