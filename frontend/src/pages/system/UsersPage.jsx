@@ -3,7 +3,7 @@ import {
   Users, Plus, Search, Shield, Mail, Clock, MoreVertical,
   Check, X, Pencil, Trash2, Key, UserCog, Loader2, AlertTriangle
 } from 'lucide-react';
-import { PageLayout } from '../../components/layout/PageLayout';
+import { PageLayout, PageHeader } from '../../components/layout';
 import { fetchApi, cn } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -126,12 +126,12 @@ export function UsersPage() {
   const canManageUsers = hasPermission('system.users.create');
 
   return (
-    <PageLayout
-      title="User Management"
-      subtitle="Manage user accounts and access control"
-      icon={Users}
-    >
-      <div className="space-y-6">
+    <PageLayout module="system">
+      <PageHeader
+        title="Users & Roles"
+        description="Manage user accounts and access control"
+      />
+      <div className="p-6 space-y-6">
         {/* Header Actions */}
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 flex-1">

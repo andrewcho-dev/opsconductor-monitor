@@ -3,7 +3,7 @@ import {
   User, Mail, Shield, Key, Lock, Eye, EyeOff, Smartphone,
   Check, X, Copy, Loader2, AlertTriangle, LogOut, Monitor
 } from 'lucide-react';
-import { PageLayout } from '../../components/layout/PageLayout';
+import { PageLayout, PageHeader } from '../../components/layout';
 import { fetchApi, cn } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -41,7 +41,7 @@ export function ProfilePage() {
 
   if (loading) {
     return (
-      <PageLayout title="Profile" icon={User}>
+      <PageLayout module="system">
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
         </div>
@@ -50,12 +50,12 @@ export function ProfilePage() {
   }
 
   return (
-    <PageLayout
-      title="My Profile"
-      subtitle="Manage your account settings and security"
-      icon={User}
-    >
-      <div className="max-w-4xl mx-auto space-y-6">
+    <PageLayout module="system">
+      <PageHeader
+        title="My Profile"
+        description="Manage your account settings and security"
+      />
+      <div className="p-6 max-w-4xl mx-auto space-y-6">
         {/* Profile Header */}
         <div className="bg-white rounded-xl border p-6">
           <div className="flex items-center gap-6">
