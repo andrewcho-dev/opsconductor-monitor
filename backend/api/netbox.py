@@ -155,7 +155,7 @@ def test_connection():
 
 @netbox_bp.route('/devices', methods=['GET'])
 def list_devices():
-    """List devices from NetBox."""
+    """List devices from NetBox (includes VMs by default)."""
     service = get_netbox_service()
     
     params = {
@@ -173,11 +173,51 @@ def list_devices():
     params = {k: v for k, v in params.items() if v is not None}
     
     result = service.get_devices(**params)
+    devices = result.get('results', [])
+    
+    # Also include virtual machines unless explicitly excluded
+    include_vms = request.args.get('include_vms', 'true').lower() != 'false'
+    vms = []
+    vm_count = 0
+    
+    if include_vms:
+        vm_params = {
+            'status': params.get('status'),
+            'tag': params.get('tag'),
+            'limit': params.get('limit', 100),
+            'offset': params.get('offset', 0),
+        }
+        if request.args.get('site'):
+            vm_params['site'] = request.args.get('site')
+        if request.args.get('q') or request.args.get('search'):
+            vm_params['q'] = request.args.get('q') or request.args.get('search')
+        
+        vm_params = {k: v for k, v in vm_params.items() if v is not None}
+        
+        try:
+            vm_result = service._request('GET', 'virtualization/virtual-machines/', params=vm_params)
+            vms = vm_result.get('results', [])
+            vm_count = vm_result.get('count', 0)
+            
+            # Add a type field to distinguish devices from VMs
+            for device in devices:
+                device['_type'] = 'device'
+            for vm in vms:
+                vm['_type'] = 'virtual_machine'
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Failed to fetch VMs: {e}")
+    
+    # Combine devices and VMs
+    all_items = devices + vms
+    total_count = result.get('count', 0) + vm_count
     
     return jsonify({
         'success': True,
-        'data': result.get('results', []),
-        'count': result.get('count', 0),
+        'data': all_items,
+        'count': total_count,
+        'device_count': result.get('count', 0),
+        'vm_count': vm_count,
         'next': result.get('next'),
         'previous': result.get('previous'),
     })
