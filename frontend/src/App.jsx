@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { LoginPage } from "./pages/auth/LoginPage";
+import { ProfilePage } from "./pages/auth/ProfilePage";
 
 // Inventory Module
 import { DevicesPage, DeviceDetailPage, GroupsPage } from "./pages/inventory";
@@ -44,6 +45,7 @@ function App() {
         <Routes>
           {/* Auth routes */}
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
           
           {/* Root redirect to dashboard */}
           <Route path="/" element={<ProtectedRoute><Navigate to="/monitor/dashboard" replace /></ProtectedRoute>} />
