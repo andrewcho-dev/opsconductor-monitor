@@ -185,3 +185,62 @@ def check_database():
             'available': False,
             'error': str(e),
         }))
+
+
+@system_bp.route('/api/system/logging/settings', methods=['GET'])
+@system_bp.route('/logging/settings', methods=['GET'])
+def get_logging_settings():
+    """Get logging settings."""
+    from database import DatabaseManager
+    
+    db = DatabaseManager()
+    settings = {
+        'log_level': 'INFO',
+        'file_logging_enabled': True,
+        'database_logging_enabled': True,
+        'json_logging_enabled': True,
+        'max_file_size_mb': 10,
+        'backup_count': 10,
+        'retention_days': 30,
+        'console_logging_enabled': True,
+    }
+    
+    try:
+        with db.cursor() as cursor:
+            cursor.execute("""
+                SELECT key, value FROM system_settings 
+                WHERE key LIKE 'logging_%'
+            """)
+            rows = cursor.fetchall()
+        
+        for row in rows:
+            key = row['key'].replace('logging_', '')
+            settings[key] = row['value']
+    except Exception as e:
+        pass  # Return defaults if table doesn't exist
+    
+    return jsonify(success_response(settings))
+
+
+@system_bp.route('/api/system/logging/settings', methods=['PUT'])
+@system_bp.route('/logging/settings', methods=['PUT'])
+def update_logging_settings():
+    """Update logging settings."""
+    from database import DatabaseManager
+    
+    db = DatabaseManager()
+    data = request.get_json() or {}
+    
+    try:
+        with db.cursor() as cursor:
+            for key, value in data.items():
+                cursor.execute("""
+                    INSERT INTO system_settings (key, value, updated_at)
+                    VALUES (%s, %s, NOW())
+                    ON CONFLICT (key) DO UPDATE SET value = %s, updated_at = NOW()
+                """, (f'logging_{key}', str(value), str(value)))
+            db.get_connection().commit()
+        
+        return jsonify(success_response(message='Logging settings saved'))
+    except Exception as e:
+        return jsonify(error_response('SAVE_ERROR', str(e))), 500
