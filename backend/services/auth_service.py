@@ -68,6 +68,266 @@ class AuthService:
         return hashlib.sha256(token.encode('utf-8')).hexdigest()
     
     # =========================================================================
+    # PASSWORD POLICY
+    # =========================================================================
+    
+    def get_password_policy(self) -> Dict[str, Any]:
+        """Get the current password policy settings."""
+        with self.db.cursor() as cursor:
+            cursor.execute("SELECT * FROM password_policy ORDER BY id LIMIT 1")
+            row = cursor.fetchone()
+            if row:
+                return dict(row)
+            # Return defaults if no policy exists
+            return {
+                'min_length': 8,
+                'max_length': 128,
+                'require_uppercase': True,
+                'require_lowercase': True,
+                'require_numbers': True,
+                'require_special_chars': True,
+                'special_chars_allowed': '!@#$%^&*()_+-=[]{}|;:,.<>?',
+                'min_uppercase': 1,
+                'min_lowercase': 1,
+                'min_numbers': 1,
+                'min_special': 1,
+                'password_expires': True,
+                'expiration_days': 90,
+                'expiration_warning_days': 14,
+                'password_history_count': 12,
+                'min_password_age_hours': 24,
+                'max_failed_attempts': 5,
+                'lockout_duration_minutes': 30,
+                'prevent_username_in_password': True,
+                'prevent_email_in_password': True,
+                'prevent_common_passwords': True,
+                'require_password_change_on_first_login': True
+            }
+    
+    def update_password_policy(self, updates: Dict[str, Any], updated_by: int = None) -> Dict[str, Any]:
+        """Update password policy settings."""
+        allowed_fields = [
+            'min_length', 'max_length', 'require_uppercase', 'require_lowercase',
+            'require_numbers', 'require_special_chars', 'special_chars_allowed',
+            'min_uppercase', 'min_lowercase', 'min_numbers', 'min_special',
+            'password_expires', 'expiration_days', 'expiration_warning_days',
+            'password_history_count', 'min_password_age_hours',
+            'max_failed_attempts', 'lockout_duration_minutes', 'reset_failed_count_minutes',
+            'prevent_username_in_password', 'prevent_email_in_password', 'prevent_common_passwords',
+            'require_password_change_on_first_login', 'allow_password_reset'
+        ]
+        
+        set_clauses = []
+        params = []
+        for field in allowed_fields:
+            if field in updates:
+                set_clauses.append(f"{field} = %s")
+                params.append(updates[field])
+        
+        if not set_clauses:
+            return self.get_password_policy()
+        
+        set_clauses.append("updated_at = NOW()")
+        if updated_by:
+            set_clauses.append("updated_by = %s")
+            params.append(updated_by)
+        
+        with self.db.cursor() as cursor:
+            cursor.execute(f"""
+                UPDATE password_policy SET {', '.join(set_clauses)}
+                WHERE id = (SELECT id FROM password_policy ORDER BY id LIMIT 1)
+                RETURNING *
+            """, params)
+            row = cursor.fetchone()
+            self.db.get_connection().commit()
+            return dict(row) if row else self.get_password_policy()
+    
+    def validate_password(
+        self, 
+        password: str, 
+        username: str = None, 
+        email: str = None,
+        user_id: int = None
+    ) -> Tuple[bool, List[str]]:
+        """
+        Validate a password against the password policy.
+        
+        Returns:
+            (is_valid, list_of_errors)
+        """
+        policy = self.get_password_policy()
+        errors = []
+        
+        # Length checks
+        if len(password) < policy['min_length']:
+            errors.append(f"Password must be at least {policy['min_length']} characters")
+        if len(password) > policy['max_length']:
+            errors.append(f"Password must be no more than {policy['max_length']} characters")
+        
+        # Complexity checks
+        if policy['require_uppercase']:
+            uppercase_count = sum(1 for c in password if c.isupper())
+            if uppercase_count < policy.get('min_uppercase', 1):
+                errors.append(f"Password must contain at least {policy.get('min_uppercase', 1)} uppercase letter(s)")
+        
+        if policy['require_lowercase']:
+            lowercase_count = sum(1 for c in password if c.islower())
+            if lowercase_count < policy.get('min_lowercase', 1):
+                errors.append(f"Password must contain at least {policy.get('min_lowercase', 1)} lowercase letter(s)")
+        
+        if policy['require_numbers']:
+            number_count = sum(1 for c in password if c.isdigit())
+            if number_count < policy.get('min_numbers', 1):
+                errors.append(f"Password must contain at least {policy.get('min_numbers', 1)} number(s)")
+        
+        if policy['require_special_chars']:
+            special_chars = policy.get('special_chars_allowed', '!@#$%^&*()_+-=[]{}|;:,.<>?')
+            special_count = sum(1 for c in password if c in special_chars)
+            if special_count < policy.get('min_special', 1):
+                errors.append(f"Password must contain at least {policy.get('min_special', 1)} special character(s)")
+        
+        # Username/email in password check
+        if policy['prevent_username_in_password'] and username:
+            if username.lower() in password.lower():
+                errors.append("Password cannot contain your username")
+        
+        if policy['prevent_email_in_password'] and email:
+            email_local = email.split('@')[0].lower()
+            if email_local in password.lower():
+                errors.append("Password cannot contain your email address")
+        
+        # Common password check
+        if policy['prevent_common_passwords']:
+            password_hash = hashlib.sha256(password.lower().encode()).hexdigest()
+            with self.db.cursor() as cursor:
+                cursor.execute(
+                    "SELECT 1 FROM common_passwords WHERE password_hash = %s",
+                    (password_hash,)
+                )
+                if cursor.fetchone():
+                    errors.append("This password is too common. Please choose a more unique password")
+        
+        # Password history check
+        if user_id and policy['password_history_count'] > 0:
+            if self._is_password_in_history(user_id, password, policy['password_history_count']):
+                errors.append(f"Cannot reuse any of your last {policy['password_history_count']} passwords")
+        
+        # Minimum password age check
+        if user_id and policy.get('min_password_age_hours', 0) > 0:
+            with self.db.cursor() as cursor:
+                cursor.execute(
+                    "SELECT password_changed_at FROM users WHERE id = %s",
+                    (user_id,)
+                )
+                row = cursor.fetchone()
+                if row and row['password_changed_at']:
+                    min_age = timedelta(hours=policy['min_password_age_hours'])
+                    if datetime.utcnow() - row['password_changed_at'].replace(tzinfo=None) < min_age:
+                        errors.append(f"Password can only be changed once every {policy['min_password_age_hours']} hours")
+        
+        return len(errors) == 0, errors
+    
+    def _is_password_in_history(self, user_id: int, password: str, history_count: int) -> bool:
+        """Check if password was used recently."""
+        with self.db.cursor() as cursor:
+            cursor.execute("""
+                SELECT password_hash FROM password_history
+                WHERE user_id = %s
+                ORDER BY created_at DESC
+                LIMIT %s
+            """, (user_id, history_count))
+            
+            for row in cursor.fetchall():
+                if self.verify_password(password, row['password_hash']):
+                    return True
+        return False
+    
+    def _add_password_to_history(self, user_id: int, password_hash: str):
+        """Add a password hash to the user's history."""
+        policy = self.get_password_policy()
+        
+        with self.db.cursor() as cursor:
+            # Add new password to history
+            cursor.execute("""
+                INSERT INTO password_history (user_id, password_hash)
+                VALUES (%s, %s)
+                ON CONFLICT (user_id, password_hash) DO UPDATE SET created_at = NOW()
+            """, (user_id, password_hash))
+            
+            # Clean up old history entries beyond the limit
+            cursor.execute("""
+                DELETE FROM password_history
+                WHERE user_id = %s AND id NOT IN (
+                    SELECT id FROM password_history
+                    WHERE user_id = %s
+                    ORDER BY created_at DESC
+                    LIMIT %s
+                )
+            """, (user_id, user_id, policy['password_history_count']))
+            
+            self.db.get_connection().commit()
+    
+    def check_password_expiration(self, user_id: int) -> Dict[str, Any]:
+        """Check if user's password is expired or expiring soon."""
+        policy = self.get_password_policy()
+        
+        if not policy['password_expires']:
+            return {'expired': False, 'expiring_soon': False, 'days_until_expiry': None}
+        
+        with self.db.cursor() as cursor:
+            cursor.execute("""
+                SELECT password_changed_at, password_never_expires, must_change_password
+                FROM users WHERE id = %s
+            """, (user_id,))
+            row = cursor.fetchone()
+            
+            if not row:
+                return {'expired': False, 'expiring_soon': False, 'days_until_expiry': None}
+            
+            if row['password_never_expires']:
+                return {'expired': False, 'expiring_soon': False, 'days_until_expiry': None}
+            
+            if row['must_change_password']:
+                return {'expired': True, 'expiring_soon': True, 'days_until_expiry': 0, 'must_change': True}
+            
+            if not row['password_changed_at']:
+                return {'expired': True, 'expiring_soon': True, 'days_until_expiry': 0}
+            
+            password_age = datetime.utcnow() - row['password_changed_at'].replace(tzinfo=None)
+            days_until_expiry = policy['expiration_days'] - password_age.days
+            
+            return {
+                'expired': days_until_expiry <= 0,
+                'expiring_soon': days_until_expiry <= policy['expiration_warning_days'],
+                'days_until_expiry': max(0, days_until_expiry)
+            }
+    
+    def get_password_requirements_text(self) -> List[str]:
+        """Get human-readable password requirements for display."""
+        policy = self.get_password_policy()
+        requirements = []
+        
+        requirements.append(f"At least {policy['min_length']} characters")
+        
+        if policy['require_uppercase']:
+            requirements.append(f"At least {policy.get('min_uppercase', 1)} uppercase letter(s)")
+        if policy['require_lowercase']:
+            requirements.append(f"At least {policy.get('min_lowercase', 1)} lowercase letter(s)")
+        if policy['require_numbers']:
+            requirements.append(f"At least {policy.get('min_numbers', 1)} number(s)")
+        if policy['require_special_chars']:
+            requirements.append(f"At least {policy.get('min_special', 1)} special character(s)")
+        
+        if policy['prevent_username_in_password']:
+            requirements.append("Cannot contain your username")
+        if policy['prevent_common_passwords']:
+            requirements.append("Cannot be a commonly used password")
+        if policy['password_history_count'] > 0:
+            requirements.append(f"Cannot reuse last {policy['password_history_count']} passwords")
+        
+        return requirements
+    
+    # =========================================================================
     # ENCRYPTION
     # =========================================================================
     
@@ -251,13 +511,26 @@ class AuthService:
             return False
         
         new_hash = self.hash_password(new_password)
+        policy = self.get_password_policy()
         
         with self.db.cursor() as cursor:
+            # Calculate expiration date
+            expiration_days = policy.get('expiration_days', 90) if policy.get('password_expires') else None
+            
             cursor.execute("""
-                UPDATE users SET password_hash = %s, password_changed_at = NOW(), updated_at = NOW()
+                UPDATE users SET 
+                    password_hash = %s, 
+                    password_changed_at = NOW(),
+                    password_expires_at = CASE WHEN %s IS NOT NULL THEN NOW() + INTERVAL '%s days' ELSE NULL END,
+                    must_change_password = FALSE,
+                    updated_at = NOW()
                 WHERE id = %s
-            """, (new_hash, user_id))
+            """, (new_hash, expiration_days, expiration_days or 0, user_id))
             self.db.get_connection().commit()
+        
+        # Add old password to history
+        if user.get('password_hash'):
+            self._add_password_to_history(user_id, user['password_hash'])
         
         self._log_auth_event(
             user_id=user_id,

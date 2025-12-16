@@ -436,6 +436,88 @@ def update_current_user():
         }), 500
 
 
+@auth_bp.route('/password-policy', methods=['GET'])
+def get_password_policy():
+    """Get password policy settings and requirements."""
+    try:
+        auth_service = get_auth_service()
+        policy = auth_service.get_password_policy()
+        requirements = auth_service.get_password_requirements_text()
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'policy': policy,
+                'requirements': requirements
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Get password policy error: {e}")
+        return jsonify({
+            'success': False,
+            'error': {'code': 'SERVER_ERROR', 'message': 'Failed to get password policy'}
+        }), 500
+
+
+@auth_bp.route('/password-policy', methods=['PUT'])
+@permission_required('system.settings.edit')
+def update_password_policy():
+    """Update password policy settings (admin only)."""
+    try:
+        data = request.get_json()
+        auth_service = get_auth_service()
+        
+        policy = auth_service.update_password_policy(
+            updates=data,
+            updated_by=g.current_user['user_id']
+        )
+        
+        return jsonify({
+            'success': True,
+            'data': {'policy': policy}
+        })
+        
+    except Exception as e:
+        logger.error(f"Update password policy error: {e}")
+        return jsonify({
+            'success': False,
+            'error': {'code': 'SERVER_ERROR', 'message': 'Failed to update password policy'}
+        }), 500
+
+
+@auth_bp.route('/validate-password', methods=['POST'])
+def validate_password():
+    """Validate a password against the policy (for real-time feedback)."""
+    try:
+        data = request.get_json()
+        password = data.get('password', '')
+        username = data.get('username')
+        email = data.get('email')
+        
+        auth_service = get_auth_service()
+        is_valid, errors = auth_service.validate_password(
+            password=password,
+            username=username,
+            email=email
+        )
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'valid': is_valid,
+                'errors': errors
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Validate password error: {e}")
+        return jsonify({
+            'success': False,
+            'error': {'code': 'SERVER_ERROR', 'message': 'Failed to validate password'}
+        }), 500
+
+
 @auth_bp.route('/me/password', methods=['PUT'])
 @login_required
 def change_password():
@@ -451,13 +533,25 @@ def change_password():
                 'error': {'code': 'VALIDATION_ERROR', 'message': 'Current and new password required'}
             }), 400
         
-        if len(new_password) < 8:
+        auth_service = get_auth_service()
+        
+        # Get user info for validation
+        user = auth_service.get_user(g.current_user['user_id'])
+        
+        # Validate against password policy
+        is_valid, errors = auth_service.validate_password(
+            password=new_password,
+            username=user.get('username'),
+            email=user.get('email'),
+            user_id=g.current_user['user_id']
+        )
+        
+        if not is_valid:
             return jsonify({
                 'success': False,
-                'error': {'code': 'VALIDATION_ERROR', 'message': 'Password must be at least 8 characters'}
+                'error': {'code': 'VALIDATION_ERROR', 'message': errors[0] if errors else 'Password does not meet requirements', 'details': errors}
             }), 400
         
-        auth_service = get_auth_service()
         success = auth_service.change_password(
             g.current_user['user_id'],
             current_password,
