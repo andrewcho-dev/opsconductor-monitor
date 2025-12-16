@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Shield, Lock, Clock, History, AlertTriangle, Check, 
-  Loader2, Save, RotateCcw, Info
+  Loader2, Save, RotateCcw
 } from 'lucide-react';
 import { fetchApi, cn } from '../../../lib/utils';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -11,29 +11,24 @@ export function PasswordPolicySettings() {
   const [policy, setPolicy] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [message, setMessage] = useState(null);
   const [hasChanges, setHasChanges] = useState(false);
   const [originalPolicy, setOriginalPolicy] = useState(null);
 
   const canEdit = hasPermission('system.settings.edit');
 
-  useEffect(() => {
-    loadPolicy();
-  }, []);
+  useEffect(() => { loadPolicy(); }, []);
 
   const loadPolicy = async () => {
     setLoading(true);
     try {
-      const res = await fetchApi('/api/auth/password-policy', {
-        headers: getAuthHeader()
-      });
+      const res = await fetchApi('/api/auth/password-policy', { headers: getAuthHeader() });
       if (res.success) {
         setPolicy(res.data.policy);
         setOriginalPolicy(res.data.policy);
       }
     } catch (err) {
-      setError('Failed to load password policy');
+      setMessage({ type: 'error', text: 'Failed to load password policy' });
     } finally {
       setLoading(false);
     }
@@ -42,31 +37,28 @@ export function PasswordPolicySettings() {
   const handleChange = (field, value) => {
     setPolicy(prev => ({ ...prev, [field]: value }));
     setHasChanges(true);
-    setSuccess('');
+    setMessage(null);
   };
 
   const handleSave = async () => {
-    setError('');
-    setSuccess('');
+    setMessage(null);
     setSaving(true);
-
     try {
       const res = await fetchApi('/api/auth/password-policy', {
         method: 'PUT',
         headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
         body: JSON.stringify(policy)
       });
-
       if (res.success) {
         setOriginalPolicy(res.data.policy);
         setPolicy(res.data.policy);
         setHasChanges(false);
-        setSuccess('Password policy updated successfully');
+        setMessage({ type: 'success', text: 'Password policy updated' });
       } else {
-        setError(res.error?.message || 'Failed to save policy');
+        setMessage({ type: 'error', text: res.error?.message || 'Failed to save' });
       }
     } catch (err) {
-      setError(err.message || 'Failed to save policy');
+      setMessage({ type: 'error', text: err.message || 'Failed to save' });
     } finally {
       setSaving(false);
     }
@@ -75,449 +67,156 @@ export function PasswordPolicySettings() {
   const handleReset = () => {
     setPolicy(originalPolicy);
     setHasChanges(false);
-    setError('');
-    setSuccess('');
+    setMessage(null);
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
-      </div>
-    );
+    return <div className="flex items-center justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-gray-400" /></div>;
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+      <div className="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">Password Policy</h2>
-          <p className="text-sm text-gray-500">Configure password requirements and security controls</p>
+          <h2 className="text-base font-semibold text-gray-900">Security Settings</h2>
+          <p className="text-xs text-gray-500">Password policy and account lockout</p>
         </div>
-        {canEdit && hasChanges && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleReset}
-              className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg flex items-center gap-1"
-            >
-              <RotateCcw className="w-4 h-4" />
-              Reset
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="px-4 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1"
-            >
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              Save Changes
-            </button>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {message && (
+            <span className={cn("text-xs px-2 py-1 rounded", message.type === 'success' ? "bg-green-50 text-green-600" : "bg-red-50 text-red-600")}>
+              {message.text}
+            </span>
+          )}
+          {canEdit && hasChanges && (
+            <>
+              <button onClick={handleReset} className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+                <RotateCcw className="w-3.5 h-3.5" />Reset
+              </button>
+              <button onClick={handleSave} disabled={saving} className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}Save
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
-      {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 text-red-500" />
-          <p className="text-sm text-red-600">{error}</p>
-        </div>
-      )}
-
-      {success && (
-        <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
-          <Check className="w-4 h-4 text-green-500" />
-          <p className="text-sm text-green-600">{success}</p>
-        </div>
-      )}
-
-      {/* Complexity Requirements */}
-      <div className="bg-white rounded-xl border p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 bg-blue-100 rounded-lg">
-            <Lock className="w-5 h-5 text-blue-600" />
+      <div className="p-5 grid grid-cols-2 gap-5">
+        {/* Complexity */}
+        <div className="border rounded-lg p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Lock className="w-4 h-4 text-blue-600" />
+            <span className="text-xs font-semibold text-gray-900">Password Complexity</span>
           </div>
-          <div>
-            <h3 className="font-semibold text-gray-900">Complexity Requirements</h3>
-            <p className="text-sm text-gray-500">Define password strength requirements</p>
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">Min Length</label>
+              <input type="number" value={policy?.min_length || 8} onChange={(e) => handleChange('min_length', parseInt(e.target.value))} min={6} max={128} disabled={!canEdit} className="w-full px-2 py-1 text-sm border rounded disabled:bg-gray-50" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">Max Length</label>
+              <input type="number" value={policy?.max_length || 128} onChange={(e) => handleChange('max_length', parseInt(e.target.value))} min={16} max={256} disabled={!canEdit} className="w-full px-2 py-1 text-sm border rounded disabled:bg-gray-50" />
+            </div>
           </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Minimum Length
+          <div className="space-y-1.5">
+            <label className="flex items-center gap-2 text-xs text-gray-700">
+              <input type="checkbox" checked={policy?.require_uppercase || false} onChange={(e) => handleChange('require_uppercase', e.target.checked)} disabled={!canEdit} className="rounded w-3.5 h-3.5" />
+              Uppercase
             </label>
-            <input
-              type="number"
-              value={policy?.min_length || 8}
-              onChange={(e) => handleChange('min_length', parseInt(e.target.value))}
-              min={6}
-              max={128}
-              disabled={!canEdit}
-              className="w-full px-3 py-2 border rounded-lg disabled:bg-gray-50"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Maximum Length
+            <label className="flex items-center gap-2 text-xs text-gray-700">
+              <input type="checkbox" checked={policy?.require_lowercase || false} onChange={(e) => handleChange('require_lowercase', e.target.checked)} disabled={!canEdit} className="rounded w-3.5 h-3.5" />
+              Lowercase
             </label>
-            <input
-              type="number"
-              value={policy?.max_length || 128}
-              onChange={(e) => handleChange('max_length', parseInt(e.target.value))}
-              min={16}
-              max={256}
-              disabled={!canEdit}
-              className="w-full px-3 py-2 border rounded-lg disabled:bg-gray-50"
-            />
-          </div>
-        </div>
-
-        <div className="mt-4 space-y-3">
-          <label className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                checked={policy?.require_uppercase || false}
-                onChange={(e) => handleChange('require_uppercase', e.target.checked)}
-                disabled={!canEdit}
-                className="rounded"
-              />
-              <span className="text-sm text-gray-700">Require uppercase letters</span>
-            </div>
-            {policy?.require_uppercase && (
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500">Minimum:</span>
-                <input
-                  type="number"
-                  value={policy?.min_uppercase || 1}
-                  onChange={(e) => handleChange('min_uppercase', parseInt(e.target.value))}
-                  min={1}
-                  max={10}
-                  disabled={!canEdit}
-                  className="w-16 px-2 py-1 text-sm border rounded"
-                />
-              </div>
-            )}
-          </label>
-
-          <label className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                checked={policy?.require_lowercase || false}
-                onChange={(e) => handleChange('require_lowercase', e.target.checked)}
-                disabled={!canEdit}
-                className="rounded"
-              />
-              <span className="text-sm text-gray-700">Require lowercase letters</span>
-            </div>
-            {policy?.require_lowercase && (
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500">Minimum:</span>
-                <input
-                  type="number"
-                  value={policy?.min_lowercase || 1}
-                  onChange={(e) => handleChange('min_lowercase', parseInt(e.target.value))}
-                  min={1}
-                  max={10}
-                  disabled={!canEdit}
-                  className="w-16 px-2 py-1 text-sm border rounded"
-                />
-              </div>
-            )}
-          </label>
-
-          <label className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                checked={policy?.require_numbers || false}
-                onChange={(e) => handleChange('require_numbers', e.target.checked)}
-                disabled={!canEdit}
-                className="rounded"
-              />
-              <span className="text-sm text-gray-700">Require numbers</span>
-            </div>
-            {policy?.require_numbers && (
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500">Minimum:</span>
-                <input
-                  type="number"
-                  value={policy?.min_numbers || 1}
-                  onChange={(e) => handleChange('min_numbers', parseInt(e.target.value))}
-                  min={1}
-                  max={10}
-                  disabled={!canEdit}
-                  className="w-16 px-2 py-1 text-sm border rounded"
-                />
-              </div>
-            )}
-          </label>
-
-          <label className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                checked={policy?.require_special_chars || false}
-                onChange={(e) => handleChange('require_special_chars', e.target.checked)}
-                disabled={!canEdit}
-                className="rounded"
-              />
-              <span className="text-sm text-gray-700">Require special characters</span>
-            </div>
-            {policy?.require_special_chars && (
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500">Minimum:</span>
-                <input
-                  type="number"
-                  value={policy?.min_special || 1}
-                  onChange={(e) => handleChange('min_special', parseInt(e.target.value))}
-                  min={1}
-                  max={10}
-                  disabled={!canEdit}
-                  className="w-16 px-2 py-1 text-sm border rounded"
-                />
-              </div>
-            )}
-          </label>
-        </div>
-
-        {policy?.require_special_chars && (
-          <div className="mt-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Allowed Special Characters
+            <label className="flex items-center gap-2 text-xs text-gray-700">
+              <input type="checkbox" checked={policy?.require_numbers || false} onChange={(e) => handleChange('require_numbers', e.target.checked)} disabled={!canEdit} className="rounded w-3.5 h-3.5" />
+              Numbers
             </label>
-            <input
-              type="text"
-              value={policy?.special_chars_allowed || '!@#$%^&*()_+-=[]{}|;:,.<>?'}
-              onChange={(e) => handleChange('special_chars_allowed', e.target.value)}
-              disabled={!canEdit}
-              className="w-full px-3 py-2 border rounded-lg font-mono text-sm disabled:bg-gray-50"
-            />
-          </div>
-        )}
-      </div>
-
-      {/* Expiration Settings */}
-      <div className="bg-white rounded-xl border p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 bg-amber-100 rounded-lg">
-            <Clock className="w-5 h-5 text-amber-600" />
-          </div>
-          <div>
-            <h3 className="font-semibold text-gray-900">Password Expiration</h3>
-            <p className="text-sm text-gray-500">Configure password aging and expiration</p>
+            <label className="flex items-center gap-2 text-xs text-gray-700">
+              <input type="checkbox" checked={policy?.require_special_chars || false} onChange={(e) => handleChange('require_special_chars', e.target.checked)} disabled={!canEdit} className="rounded w-3.5 h-3.5" />
+              Special chars
+            </label>
           </div>
         </div>
 
-        <div className="space-y-4">
-          <label className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              checked={policy?.password_expires || false}
-              onChange={(e) => handleChange('password_expires', e.target.checked)}
-              disabled={!canEdit}
-              className="rounded"
-            />
-            <span className="text-sm text-gray-700">Enable password expiration</span>
+        {/* Expiration */}
+        <div className="border rounded-lg p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Clock className="w-4 h-4 text-amber-600" />
+            <span className="text-xs font-semibold text-gray-900">Expiration</span>
+          </div>
+          <label className="flex items-center gap-2 text-xs text-gray-700 mb-3">
+            <input type="checkbox" checked={policy?.password_expires || false} onChange={(e) => handleChange('password_expires', e.target.checked)} disabled={!canEdit} className="rounded w-3.5 h-3.5" />
+            Enable expiration
           </label>
-
           {policy?.password_expires && (
-            <div className="grid grid-cols-2 gap-6 pl-6">
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Password expires after (days)
-                </label>
-                <input
-                  type="number"
-                  value={policy?.expiration_days || 90}
-                  onChange={(e) => handleChange('expiration_days', parseInt(e.target.value))}
-                  min={1}
-                  max={365}
-                  disabled={!canEdit}
-                  className="w-full px-3 py-2 border rounded-lg disabled:bg-gray-50"
-                />
+                <label className="block text-xs text-gray-600 mb-1">Expires (days)</label>
+                <input type="number" value={policy?.expiration_days || 90} onChange={(e) => handleChange('expiration_days', parseInt(e.target.value))} min={1} max={365} disabled={!canEdit} className="w-full px-2 py-1 text-sm border rounded disabled:bg-gray-50" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Warning before expiration (days)
-                </label>
-                <input
-                  type="number"
-                  value={policy?.expiration_warning_days || 14}
-                  onChange={(e) => handleChange('expiration_warning_days', parseInt(e.target.value))}
-                  min={1}
-                  max={30}
-                  disabled={!canEdit}
-                  className="w-full px-3 py-2 border rounded-lg disabled:bg-gray-50"
-                />
+                <label className="block text-xs text-gray-600 mb-1">Warning (days)</label>
+                <input type="number" value={policy?.expiration_warning_days || 14} onChange={(e) => handleChange('expiration_warning_days', parseInt(e.target.value))} min={1} max={30} disabled={!canEdit} className="w-full px-2 py-1 text-sm border rounded disabled:bg-gray-50" />
               </div>
             </div>
           )}
+        </div>
 
+        {/* History */}
+        <div className="border rounded-lg p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <History className="w-4 h-4 text-purple-600" />
+            <span className="text-xs font-semibold text-gray-900">Password History</span>
+          </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Minimum password age (hours)
+            <label className="block text-xs text-gray-600 mb-1">Remember last N passwords</label>
+            <input type="number" value={policy?.password_history_count ?? 12} onChange={(e) => handleChange('password_history_count', parseInt(e.target.value) || 0)} min="0" max="24" disabled={!canEdit} className="w-full px-2 py-1 text-sm border rounded disabled:bg-gray-50" />
+            <p className="text-xs text-gray-400 mt-1">0 = disabled</p>
+          </div>
+        </div>
+
+        {/* Lockout */}
+        <div className="border rounded-lg p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Shield className="w-4 h-4 text-red-600" />
+            <span className="text-xs font-semibold text-gray-900">Account Lockout</span>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">Max attempts</label>
+              <input type="number" value={policy?.max_failed_attempts || 5} onChange={(e) => handleChange('max_failed_attempts', parseInt(e.target.value))} min={3} max={20} disabled={!canEdit} className="w-full px-2 py-1 text-sm border rounded disabled:bg-gray-50" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">Lockout (min)</label>
+              <input type="number" value={policy?.lockout_duration_minutes || 30} onChange={(e) => handleChange('lockout_duration_minutes', parseInt(e.target.value))} min={5} max={1440} disabled={!canEdit} className="w-full px-2 py-1 text-sm border rounded disabled:bg-gray-50" />
+            </div>
+          </div>
+        </div>
+
+        {/* Additional Controls */}
+        <div className="col-span-2 border rounded-lg p-4">
+          <span className="text-xs font-semibold text-gray-900 mb-2 block">Additional Controls</span>
+          <div className="flex flex-wrap gap-x-6 gap-y-1.5">
+            <label className="flex items-center gap-2 text-xs text-gray-700">
+              <input type="checkbox" checked={policy?.prevent_username_in_password || false} onChange={(e) => handleChange('prevent_username_in_password', e.target.checked)} disabled={!canEdit} className="rounded w-3.5 h-3.5" />
+              No username in password
             </label>
-            <input
-              type="number"
-              value={policy?.min_password_age_hours || 0}
-              onChange={(e) => handleChange('min_password_age_hours', parseInt(e.target.value))}
-              min={0}
-              max={168}
-              disabled={!canEdit}
-              className="w-full max-w-xs px-3 py-2 border rounded-lg disabled:bg-gray-50"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Prevents users from changing passwords too frequently. Set to 0 to disable.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* History and Reuse */}
-      <div className="bg-white rounded-xl border p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 bg-purple-100 rounded-lg">
-            <History className="w-5 h-5 text-purple-600" />
-          </div>
-          <div>
-            <h3 className="font-semibold text-gray-900">Password History</h3>
-            <p className="text-sm text-gray-500">Prevent password reuse</p>
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Remember last N passwords
-          </label>
-          <input
-            type="number"
-            value={policy?.password_history_count ?? 12}
-            onChange={(e) => handleChange('password_history_count', parseInt(e.target.value) || 0)}
-            min="0"
-            max="24"
-            disabled={!canEdit}
-            className="w-full max-w-xs px-3 py-2 border rounded-lg disabled:bg-gray-50"
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            Users cannot reuse any of their last N passwords. Set to 0 to disable.
-          </p>
-        </div>
-      </div>
-
-      {/* Lockout Settings */}
-      <div className="bg-white rounded-xl border p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 bg-red-100 rounded-lg">
-            <Shield className="w-5 h-5 text-red-600" />
-          </div>
-          <div>
-            <h3 className="font-semibold text-gray-900">Account Lockout</h3>
-            <p className="text-sm text-gray-500">Protect against brute force attacks</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Max failed login attempts
+            <label className="flex items-center gap-2 text-xs text-gray-700">
+              <input type="checkbox" checked={policy?.prevent_email_in_password || false} onChange={(e) => handleChange('prevent_email_in_password', e.target.checked)} disabled={!canEdit} className="rounded w-3.5 h-3.5" />
+              No email in password
             </label>
-            <input
-              type="number"
-              value={policy?.max_failed_attempts || 5}
-              onChange={(e) => handleChange('max_failed_attempts', parseInt(e.target.value))}
-              min={3}
-              max={20}
-              disabled={!canEdit}
-              className="w-full px-3 py-2 border rounded-lg disabled:bg-gray-50"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Lockout duration (minutes)
+            <label className="flex items-center gap-2 text-xs text-gray-700">
+              <input type="checkbox" checked={policy?.prevent_common_passwords || false} onChange={(e) => handleChange('prevent_common_passwords', e.target.checked)} disabled={!canEdit} className="rounded w-3.5 h-3.5" />
+              Block common passwords
             </label>
-            <input
-              type="number"
-              value={policy?.lockout_duration_minutes || 30}
-              onChange={(e) => handleChange('lockout_duration_minutes', parseInt(e.target.value))}
-              min={5}
-              max={1440}
-              disabled={!canEdit}
-              className="w-full px-3 py-2 border rounded-lg disabled:bg-gray-50"
-            />
+            <label className="flex items-center gap-2 text-xs text-gray-700">
+              <input type="checkbox" checked={policy?.require_password_change_on_first_login || false} onChange={(e) => handleChange('require_password_change_on_first_login', e.target.checked)} disabled={!canEdit} className="rounded w-3.5 h-3.5" />
+              Change on first login
+            </label>
+            <label className="flex items-center gap-2 text-xs text-gray-700">
+              <input type="checkbox" checked={policy?.allow_password_reset || true} onChange={(e) => handleChange('allow_password_reset', e.target.checked)} disabled={!canEdit} className="rounded w-3.5 h-3.5" />
+              Allow self-service reset
+            </label>
           </div>
-        </div>
-      </div>
-
-      {/* Additional Controls */}
-      <div className="bg-white rounded-xl border p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 bg-green-100 rounded-lg">
-            <Info className="w-5 h-5 text-green-600" />
-          </div>
-          <div>
-            <h3 className="font-semibold text-gray-900">Additional Controls</h3>
-            <p className="text-sm text-gray-500">Extra security measures</p>
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          <label className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              checked={policy?.prevent_username_in_password || false}
-              onChange={(e) => handleChange('prevent_username_in_password', e.target.checked)}
-              disabled={!canEdit}
-              className="rounded"
-            />
-            <span className="text-sm text-gray-700">Prevent username in password</span>
-          </label>
-
-          <label className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              checked={policy?.prevent_email_in_password || false}
-              onChange={(e) => handleChange('prevent_email_in_password', e.target.checked)}
-              disabled={!canEdit}
-              className="rounded"
-            />
-            <span className="text-sm text-gray-700">Prevent email address in password</span>
-          </label>
-
-          <label className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              checked={policy?.prevent_common_passwords || false}
-              onChange={(e) => handleChange('prevent_common_passwords', e.target.checked)}
-              disabled={!canEdit}
-              className="rounded"
-            />
-            <span className="text-sm text-gray-700">Block common/weak passwords</span>
-          </label>
-
-          <label className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              checked={policy?.require_password_change_on_first_login || false}
-              onChange={(e) => handleChange('require_password_change_on_first_login', e.target.checked)}
-              disabled={!canEdit}
-              className="rounded"
-            />
-            <span className="text-sm text-gray-700">Require password change on first login</span>
-          </label>
-
-          <label className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              checked={policy?.allow_password_reset || true}
-              onChange={(e) => handleChange('allow_password_reset', e.target.checked)}
-              disabled={!canEdit}
-              className="rounded"
-            />
-            <span className="text-sm text-gray-700">Allow self-service password reset</span>
-          </label>
         </div>
       </div>
     </div>
