@@ -161,6 +161,104 @@ def login():
         }), 500
 
 
+@auth_bp.route('/login/enterprise', methods=['POST'])
+def login_enterprise():
+    """
+    Authenticate user with enterprise auth (LDAP/AD).
+    
+    Request body:
+        username: string
+        password: string
+        config_id: int (enterprise auth config ID)
+    """
+    try:
+        data = request.get_json()
+        username = data.get('username')
+        password = data.get('password')
+        config_id = data.get('config_id')
+        
+        if not username or not password or not config_id:
+            return jsonify({
+                'success': False,
+                'error': {'code': 'VALIDATION_ERROR', 'message': 'Username, password, and config_id required'}
+            }), 400
+        
+        auth_service = get_auth_service()
+        
+        success, result, error = auth_service.authenticate_ldap(
+            username=username,
+            password=password,
+            config_id=config_id,
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent')
+        )
+        
+        if not success:
+            return jsonify({
+                'success': False,
+                'error': {'code': 'AUTH_FAILED', 'message': error}
+            }), 401
+        
+        # Check if 2FA is required
+        if result.get('requires_2fa'):
+            return jsonify({
+                'success': True,
+                'data': {
+                    'requires_2fa': True,
+                    'user_id': result['user_id'],
+                    'two_factor_method': result['two_factor_method']
+                }
+            })
+        
+        # Get user roles and permissions
+        roles = auth_service.get_user_roles(result['user_id'])
+        permissions = auth_service.get_user_permissions(result['user_id'])
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'user': {
+                    'id': result['user_id'],
+                    'username': result['username'],
+                    'email': result['email'],
+                    'display_name': result['display_name'],
+                    'roles': [r['name'] for r in roles],
+                    'permissions': permissions
+                },
+                'session_token': result['session_token'],
+                'refresh_token': result['refresh_token'],
+                'expires_at': result['expires_at']
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Enterprise login error: {e}")
+        return jsonify({
+            'success': False,
+            'error': {'code': 'SERVER_ERROR', 'message': 'Login failed'}
+        }), 500
+
+
+@auth_bp.route('/enterprise-configs', methods=['GET'])
+def get_enterprise_configs():
+    """Get available enterprise auth configurations for login page."""
+    try:
+        auth_service = get_auth_service()
+        configs = auth_service.get_enterprise_auth_configs_for_login()
+        
+        return jsonify({
+            'success': True,
+            'data': {'configs': configs}
+        })
+        
+    except Exception as e:
+        logger.error(f"Get enterprise configs error: {e}")
+        return jsonify({
+            'success': False,
+            'error': {'code': 'SERVER_ERROR', 'message': 'Failed to get configs'}
+        }), 500
+
+
 @auth_bp.route('/login/2fa', methods=['POST'])
 def login_2fa():
     """

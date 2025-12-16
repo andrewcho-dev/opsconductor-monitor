@@ -996,6 +996,280 @@ class AuthService:
                 LIMIT %s
             """, params + [limit])
             return [dict(row) for row in cursor.fetchall()]
+    
+    # =========================================================================
+    # ENTERPRISE AUTHENTICATION (LDAP/AD)
+    # =========================================================================
+    
+    def authenticate_ldap(
+        self,
+        username: str,
+        password: str,
+        config_id: int,
+        ip_address: Optional[str] = None,
+        user_agent: Optional[str] = None
+    ) -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
+        """
+        Authenticate user against LDAP/Active Directory.
+        
+        Args:
+            username: Username to authenticate
+            password: Password to verify
+            config_id: ID of the enterprise auth config to use
+            ip_address: Client IP address
+            user_agent: Client user agent
+            
+        Returns:
+            (success, user_data, error_message)
+        """
+        try:
+            # Get LDAP config
+            config = self._get_enterprise_auth_config(config_id)
+            if not config:
+                return False, None, "LDAP configuration not found"
+            
+            if config['auth_type'] not in ('ldap', 'active_directory'):
+                return False, None, "Invalid auth type for LDAP authentication"
+            
+            # Try LDAP bind
+            ldap_result = self._ldap_bind(config, username, password)
+            
+            if not ldap_result['success']:
+                self._log_auth_event(
+                    username=username,
+                    event_type='login_failed',
+                    event_status='failure',
+                    ip_address=ip_address,
+                    details={'reason': 'ldap_auth_failed', 'config_id': config_id}
+                )
+                return False, None, ldap_result.get('error', 'LDAP authentication failed')
+            
+            # Get or create local user
+            user = self._get_or_create_ldap_user(username, ldap_result.get('user_info', {}), config)
+            
+            if not user:
+                return False, None, "Failed to create local user account"
+            
+            # Check if 2FA is required for enterprise users
+            if user.get('two_factor_enabled'):
+                return True, {
+                    'user_id': user['id'],
+                    'username': user['username'],
+                    'requires_2fa': True,
+                    'two_factor_method': user.get('two_factor_method')
+                }, None
+            
+            # Create session
+            session = self._create_session(user['id'], ip_address, user_agent)
+            
+            # Update last login
+            self._update_last_login(user['id'], ip_address)
+            
+            self._log_auth_event(
+                user_id=user['id'],
+                username=username,
+                event_type='login',
+                event_status='success',
+                ip_address=ip_address,
+                details={'auth_method': 'ldap', 'config_id': config_id}
+            )
+            
+            return True, {
+                'user_id': user['id'],
+                'username': user['username'],
+                'email': user.get('email'),
+                'display_name': user.get('display_name'),
+                'session_token': session['session_token'],
+                'refresh_token': session['refresh_token'],
+                'expires_at': session['expires_at'].isoformat()
+            }, None
+            
+        except Exception as e:
+            logger.error(f"LDAP authentication error: {e}")
+            return False, None, "Authentication service error"
+    
+    def _get_enterprise_auth_config(self, config_id: int) -> Optional[Dict[str, Any]]:
+        """Get enterprise auth configuration by ID."""
+        with self.db.cursor() as cursor:
+            cursor.execute("""
+                SELECT * FROM enterprise_auth_configs
+                WHERE id = %s AND is_active = TRUE
+            """, (config_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+    
+    def get_enterprise_auth_configs_for_login(self) -> List[Dict[str, Any]]:
+        """Get active enterprise auth configs available for login."""
+        with self.db.cursor() as cursor:
+            cursor.execute("""
+                SELECT id, name, auth_type, description
+                FROM enterprise_auth_configs
+                WHERE is_active = TRUE
+                ORDER BY name
+            """)
+            return [dict(row) for row in cursor.fetchall()]
+    
+    def _ldap_bind(self, config: Dict[str, Any], username: str, password: str) -> Dict[str, Any]:
+        """
+        Attempt LDAP bind with provided credentials.
+        
+        Returns dict with 'success' boolean and optionally 'user_info' or 'error'.
+        """
+        try:
+            import ldap3
+            from ldap3 import Server, Connection, ALL, SUBTREE
+            
+            # Build server connection
+            server = Server(
+                config['host'],
+                port=config.get('port', 389),
+                use_ssl=config.get('use_ssl', False),
+                get_info=ALL
+            )
+            
+            # Build user DN
+            bind_dn_template = config.get('bind_dn_template', 'cn={username}')
+            base_dn = config.get('base_dn', '')
+            
+            if '{username}' in bind_dn_template:
+                user_dn = bind_dn_template.replace('{username}', username)
+            else:
+                user_dn = f"{bind_dn_template}={username},{base_dn}"
+            
+            # For Active Directory, use UPN format
+            if config['auth_type'] == 'active_directory':
+                domain = config.get('domain', '')
+                if domain and '@' not in username:
+                    user_dn = f"{username}@{domain}"
+            
+            # Attempt bind
+            conn = Connection(
+                server,
+                user=user_dn,
+                password=password,
+                auto_bind=True,
+                raise_exceptions=True
+            )
+            
+            # Search for user attributes
+            user_info = {}
+            search_filter = config.get('user_search_filter', '(sAMAccountName={username})')
+            search_filter = search_filter.replace('{username}', username)
+            
+            if conn.search(
+                search_base=base_dn,
+                search_filter=search_filter,
+                search_scope=SUBTREE,
+                attributes=['cn', 'mail', 'displayName', 'givenName', 'sn', 'memberOf']
+            ):
+                if conn.entries:
+                    entry = conn.entries[0]
+                    user_info = {
+                        'cn': str(entry.cn) if hasattr(entry, 'cn') else username,
+                        'email': str(entry.mail) if hasattr(entry, 'mail') else None,
+                        'display_name': str(entry.displayName) if hasattr(entry, 'displayName') else None,
+                        'first_name': str(entry.givenName) if hasattr(entry, 'givenName') else None,
+                        'last_name': str(entry.sn) if hasattr(entry, 'sn') else None,
+                        'groups': [str(g) for g in entry.memberOf] if hasattr(entry, 'memberOf') else []
+                    }
+            
+            conn.unbind()
+            
+            return {'success': True, 'user_info': user_info}
+            
+        except ImportError:
+            logger.warning("ldap3 library not installed - LDAP auth unavailable")
+            return {'success': False, 'error': 'LDAP support not available'}
+        except Exception as e:
+            logger.error(f"LDAP bind error: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    def _get_or_create_ldap_user(
+        self,
+        username: str,
+        ldap_info: Dict[str, Any],
+        config: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """Get existing user or create new one from LDAP info."""
+        # Check if user exists
+        user = self.get_user_by_username(username)
+        
+        if user:
+            # Update user info from LDAP if needed
+            if user['auth_method'] in ('ldap', 'active_directory'):
+                updates = {}
+                if ldap_info.get('email') and ldap_info['email'] != user.get('email'):
+                    updates['email'] = ldap_info['email']
+                if ldap_info.get('display_name') and ldap_info['display_name'] != user.get('display_name'):
+                    updates['display_name'] = ldap_info['display_name']
+                
+                if updates:
+                    self.update_user(user['id'], updates)
+                    user.update(updates)
+            
+            return user
+        
+        # Create new user from LDAP
+        try:
+            email = ldap_info.get('email') or f"{username}@{config.get('domain', 'local')}"
+            
+            user = self.create_user(
+                username=username,
+                email=email,
+                password=None,  # No local password for LDAP users
+                first_name=ldap_info.get('first_name'),
+                last_name=ldap_info.get('last_name'),
+                auth_method=config['auth_type'],
+                role_names=config.get('default_roles', ['viewer'])
+            )
+            
+            return user
+            
+        except Exception as e:
+            logger.error(f"Error creating LDAP user: {e}")
+            return None
+    
+    def test_ldap_connection(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        """Test LDAP connection with provided configuration."""
+        try:
+            import ldap3
+            from ldap3 import Server, Connection, ALL
+            
+            server = Server(
+                config['host'],
+                port=config.get('port', 389),
+                use_ssl=config.get('use_ssl', False),
+                get_info=ALL,
+                connect_timeout=10
+            )
+            
+            # Try anonymous bind or service account bind
+            bind_dn = config.get('service_account_dn')
+            bind_password = config.get('service_account_password')
+            
+            if bind_dn and bind_password:
+                conn = Connection(server, user=bind_dn, password=bind_password, auto_bind=True)
+            else:
+                conn = Connection(server, auto_bind=True)
+            
+            server_info = {
+                'vendor': str(server.info.vendor_name) if server.info else 'Unknown',
+                'version': str(server.info.vendor_version) if server.info else 'Unknown',
+                'naming_contexts': [str(nc) for nc in server.info.naming_contexts] if server.info else []
+            }
+            
+            conn.unbind()
+            
+            return {
+                'success': True,
+                'message': 'Connection successful',
+                'server_info': server_info
+            }
+            
+        except ImportError:
+            return {'success': False, 'error': 'ldap3 library not installed'}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
 
 
 # Singleton instance
