@@ -3,6 +3,7 @@ import {
   User, Mail, Shield, Key, Lock, Eye, EyeOff, Smartphone,
   Check, X, Copy, Loader2, AlertTriangle, LogOut, Monitor
 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { PageLayout, PageHeader } from '../../components/layout';
 import { fetchApi, cn } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
@@ -544,14 +545,18 @@ function Setup2FA({ onComplete, onCancel, getAuthHeader }) {
           
           <div className="flex justify-center py-4">
             <div className="p-4 bg-white border-2 rounded-lg">
-              {/* QR Code placeholder - in production use a QR library */}
-              <div className="w-48 h-48 bg-gray-100 flex items-center justify-center">
-                <div className="text-center">
-                  <Smartphone className="w-8 h-8 mx-auto text-gray-400 mb-2" />
-                  <p className="text-xs text-gray-500">Scan with authenticator app</p>
-                  <p className="text-xs text-gray-400 mt-1">or enter secret manually</p>
+              {setupData?.provisioning_uri ? (
+                <QRCodeSVG 
+                  value={setupData.provisioning_uri} 
+                  size={192}
+                  level="M"
+                  includeMargin={true}
+                />
+              ) : (
+                <div className="w-48 h-48 bg-gray-100 flex items-center justify-center">
+                  <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
                 </div>
-              </div>
+              )}
             </div>
           </div>
 
