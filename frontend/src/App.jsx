@@ -65,6 +65,8 @@ function App() {
         <Route path="/credentials/groups" element={<CredentialVaultPage />} />
         <Route path="/credentials/expiring" element={<CredentialVaultPage />} />
         <Route path="/credentials/audit" element={<CredentialVaultPage />} />
+        <Route path="/credentials/enterprise" element={<CredentialVaultPage />} />
+        <Route path="/credentials/enterprise/users" element={<CredentialVaultPage />} />
 
         {/* SYSTEM MODULE */}
         <Route path="/system" element={<Navigate to="/system/overview" replace />} />

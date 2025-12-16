@@ -38,6 +38,8 @@ export function CredentialVaultPage() {
   
   // Determine active view from path
   const getActiveView = () => {
+    if (location.pathname.includes('/enterprise/users')) return 'enterprise-users';
+    if (location.pathname.includes('/enterprise')) return 'enterprise';
     if (location.pathname.includes('/groups')) return 'groups';
     if (location.pathname.includes('/expiring')) return 'expiring';
     if (location.pathname.includes('/audit')) return 'audit';
@@ -48,6 +50,8 @@ export function CredentialVaultPage() {
   const [credentials, setCredentials] = useState([]);
   const [groups, setGroups] = useState([]);
   const [auditLog, setAuditLog] = useState([]);
+  const [enterpriseConfigs, setEnterpriseConfigs] = useState([]);
+  const [enterpriseUsers, setEnterpriseUsers] = useState([]);
   const [statistics, setStatistics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -106,6 +110,30 @@ export function CredentialVaultPage() {
         const res = await fetchApi('/api/credentials/audit?limit=100');
         if (res.success) {
           setAuditLog(res.data.entries);
+        }
+      } else if (activeView === 'enterprise') {
+        // Load both configs and credentials (for the dropdown)
+        const [configsRes, credsRes] = await Promise.all([
+          fetchApi('/api/credentials/enterprise/configs'),
+          fetchApi('/api/credentials')
+        ]);
+        if (configsRes.success) {
+          setEnterpriseConfigs(configsRes.data.configs || []);
+        }
+        if (credsRes.success) {
+          setCredentials(credsRes.data.credentials || []);
+        }
+      } else if (activeView === 'enterprise-users') {
+        // Load both users and configs (for the dropdown)
+        const [usersRes, configsRes] = await Promise.all([
+          fetchApi('/api/credentials/enterprise/users'),
+          fetchApi('/api/credentials/enterprise/configs')
+        ]);
+        if (usersRes.success) {
+          setEnterpriseUsers(usersRes.data.users || []);
+        }
+        if (configsRes.success) {
+          setEnterpriseConfigs(configsRes.data.configs || []);
         }
       }
     } catch (err) {
@@ -262,6 +290,10 @@ export function CredentialVaultPage() {
           <GroupsList groups={groups} onRefresh={loadData} />
         ) : activeView === 'audit' ? (
           <AuditLogView entries={auditLog} />
+        ) : activeView === 'enterprise' ? (
+          <EnterpriseAuthConfigsList configs={enterpriseConfigs} credentials={credentials} onRefresh={loadData} />
+        ) : activeView === 'enterprise-users' ? (
+          <EnterpriseAuthUsersList users={enterpriseUsers} configs={enterpriseConfigs} onRefresh={loadData} />
         ) : null}
       </div>
 
@@ -1355,6 +1387,419 @@ function CredentialHistoryModal({ credential, onClose }) {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// ENTERPRISE AUTH COMPONENTS
+// =============================================================================
+
+const AUTH_TYPE_LABELS = {
+  tacacs: { label: 'TACACS+', color: 'bg-emerald-100 text-emerald-700' },
+  radius: { label: 'RADIUS', color: 'bg-teal-100 text-teal-700' },
+  ldap: { label: 'LDAP', color: 'bg-indigo-100 text-indigo-700' },
+  active_directory: { label: 'Active Directory', color: 'bg-sky-100 text-sky-700' },
+};
+
+function EnterpriseAuthConfigsList({ configs, credentials, onRefresh }) {
+  const [showModal, setShowModal] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    auth_type: 'tacacs',
+    credential_id: '',
+    is_default: false,
+    priority: 0,
+  });
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await fetchApi('/api/credentials/enterprise/configs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+      setShowModal(false);
+      setFormData({ name: '', auth_type: 'tacacs', credential_id: '', is_default: false, priority: 0 });
+      onRefresh();
+    } catch (err) {
+      alert('Error creating config: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!confirm('Delete this auth server configuration?')) return;
+    try {
+      await fetchApi(`/api/credentials/enterprise/configs/${id}`, { method: 'DELETE' });
+      onRefresh();
+    } catch (err) {
+      alert('Error deleting config: ' + err.message);
+    }
+  };
+
+  // Filter credentials to only show directory service types
+  const directoryCredentials = credentials.filter(c => 
+    ['tacacs', 'radius', 'ldap', 'active_directory'].includes(c.credential_type)
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold">Enterprise Auth Servers</h2>
+          <p className="text-sm text-gray-500">Configure TACACS+, RADIUS, LDAP, and Active Directory servers</p>
+        </div>
+        <button
+          onClick={() => setShowModal(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+        >
+          <Plus className="w-4 h-4" />
+          Add Auth Server
+        </button>
+      </div>
+
+      {configs.length === 0 ? (
+        <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed">
+          <Server className="w-12 h-12 mx-auto text-gray-400 mb-3" />
+          <p className="text-gray-600 font-medium">No auth servers configured</p>
+          <p className="text-sm text-gray-500 mt-1">Add a TACACS+, RADIUS, LDAP, or AD server to enable enterprise authentication</p>
+        </div>
+      ) : (
+        <div className="grid gap-4">
+          {configs.map((config) => {
+            const typeInfo = AUTH_TYPE_LABELS[config.auth_type] || { label: config.auth_type, color: 'bg-gray-100 text-gray-700' };
+            return (
+              <div key={config.id} className="bg-white border rounded-lg p-4 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="p-2 bg-gray-100 rounded-lg">
+                    <Server className="w-5 h-5 text-gray-600" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{config.name}</span>
+                      <span className={cn("px-2 py-0.5 text-xs rounded-full", typeInfo.color)}>
+                        {typeInfo.label}
+                      </span>
+                      {config.is_default && (
+                        <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full">Default</span>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Credential: {config.credential_name || 'Not set'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleDelete(config.id)}
+                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                    title="Delete"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Add Config Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4">
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <h2 className="text-lg font-semibold">Add Auth Server</h2>
+              <button onClick={() => setShowModal(false)} className="p-1 hover:bg-gray-100 rounded">
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full px-3 py-2 border rounded-lg"
+                  placeholder="e.g., Primary TACACS Server"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Auth Type *</label>
+                <select
+                  value={formData.auth_type}
+                  onChange={(e) => setFormData(prev => ({ ...prev, auth_type: e.target.value }))}
+                  className="w-full px-3 py-2 border rounded-lg"
+                >
+                  <option value="tacacs">TACACS+</option>
+                  <option value="radius">RADIUS</option>
+                  <option value="ldap">LDAP</option>
+                  <option value="active_directory">Active Directory</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Server Credential *</label>
+                <select
+                  value={formData.credential_id}
+                  onChange={(e) => setFormData(prev => ({ ...prev, credential_id: parseInt(e.target.value) }))}
+                  className="w-full px-3 py-2 border rounded-lg"
+                  required
+                >
+                  <option value="">Select a credential...</option>
+                  {directoryCredentials.map(cred => (
+                    <option key={cred.id} value={cred.id}>
+                      {cred.name} ({CREDENTIAL_TYPES[cred.credential_type]?.label || cred.credential_type})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Select a credential containing the server connection details
+                </p>
+              </div>
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={formData.is_default}
+                    onChange={(e) => setFormData(prev => ({ ...prev, is_default: e.target.checked }))}
+                    className="rounded"
+                  />
+                  <span className="text-sm text-gray-700">Set as default for this auth type</span>
+                </label>
+              </div>
+              <div className="flex justify-end gap-3 pt-4 border-t">
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {saving ? 'Creating...' : 'Create'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EnterpriseAuthUsersList({ users, configs, onRefresh }) {
+  const [showModal, setShowModal] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    auth_config_id: '',
+    username: '',
+    password: '',
+    description: '',
+    is_service_account: true,
+  });
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await fetchApi('/api/credentials/enterprise/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+      setShowModal(false);
+      setFormData({ name: '', auth_config_id: '', username: '', password: '', description: '', is_service_account: true });
+      onRefresh();
+    } catch (err) {
+      alert('Error creating user: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!confirm('Delete this service account?')) return;
+    try {
+      await fetchApi(`/api/credentials/enterprise/users/${id}`, { method: 'DELETE' });
+      onRefresh();
+    } catch (err) {
+      alert('Error deleting user: ' + err.message);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold">Service Accounts</h2>
+          <p className="text-sm text-gray-500">User credentials validated against enterprise auth servers</p>
+        </div>
+        <button
+          onClick={() => setShowModal(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          disabled={configs.length === 0}
+        >
+          <Plus className="w-4 h-4" />
+          Add Service Account
+        </button>
+      </div>
+
+      {configs.length === 0 ? (
+        <div className="text-center py-12 bg-amber-50 rounded-lg border border-amber-200">
+          <AlertTriangle className="w-12 h-12 mx-auto text-amber-500 mb-3" />
+          <p className="text-amber-800 font-medium">No auth servers configured</p>
+          <p className="text-sm text-amber-600 mt-1">Add an auth server first before creating service accounts</p>
+        </div>
+      ) : users.length === 0 ? (
+        <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed">
+          <User className="w-12 h-12 mx-auto text-gray-400 mb-3" />
+          <p className="text-gray-600 font-medium">No service accounts</p>
+          <p className="text-sm text-gray-500 mt-1">Add service accounts to use for job authentication</p>
+        </div>
+      ) : (
+        <div className="grid gap-4">
+          {users.map((user) => {
+            const typeInfo = AUTH_TYPE_LABELS[user.auth_type] || { label: user.auth_type, color: 'bg-gray-100 text-gray-700' };
+            return (
+              <div key={user.id} className="bg-white border rounded-lg p-4 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="p-2 bg-gray-100 rounded-lg">
+                    <User className="w-5 h-5 text-gray-600" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{user.name}</span>
+                      <span className={cn("px-2 py-0.5 text-xs rounded-full", typeInfo.color)}>
+                        {typeInfo.label}
+                      </span>
+                      {user.is_service_account && (
+                        <span className="px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full">Service Account</span>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Username: {user.username} • Server: {user.config_name}
+                    </p>
+                    {user.description && (
+                      <p className="text-xs text-gray-400 mt-1">{user.description}</p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleDelete(user.id)}
+                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                    title="Delete"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Add User Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4">
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <h2 className="text-lg font-semibold">Add Service Account</h2>
+              <button onClick={() => setShowModal(false)} className="p-1 hover:bg-gray-100 rounded">
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full px-3 py-2 border rounded-lg"
+                  placeholder="e.g., Network Automation Account"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Auth Server *</label>
+                <select
+                  value={formData.auth_config_id}
+                  onChange={(e) => setFormData(prev => ({ ...prev, auth_config_id: parseInt(e.target.value) }))}
+                  className="w-full px-3 py-2 border rounded-lg"
+                  required
+                >
+                  <option value="">Select an auth server...</option>
+                  {configs.map(config => (
+                    <option key={config.id} value={config.id}>
+                      {config.name} ({AUTH_TYPE_LABELS[config.auth_type]?.label || config.auth_type})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Username *</label>
+                <input
+                  type="text"
+                  value={formData.username}
+                  onChange={(e) => setFormData(prev => ({ ...prev, username: e.target.value }))}
+                  className="w-full px-3 py-2 border rounded-lg"
+                  placeholder="service_account"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Password *</label>
+                <input
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                  className="w-full px-3 py-2 border rounded-lg"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <input
+                  type="text"
+                  value={formData.description}
+                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                  className="w-full px-3 py-2 border rounded-lg"
+                  placeholder="Optional description"
+                />
+              </div>
+              <div className="flex justify-end gap-3 pt-4 border-t">
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {saving ? 'Creating...' : 'Create'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

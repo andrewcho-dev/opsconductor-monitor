@@ -576,3 +576,208 @@ def check_expirations():
     except Exception as e:
         logger.error(f"Error checking expirations: {e}")
         return jsonify(error_response('EXPIRATION_CHECK_ERROR', str(e))), 500
+
+
+# =============================================================================
+# ENTERPRISE AUTHENTICATION
+# =============================================================================
+
+@credentials_bp.route('/enterprise/configs', methods=['GET'])
+def list_enterprise_auth_configs():
+    """List all enterprise auth server configurations."""
+    auth_type = request.args.get('type')
+    
+    try:
+        service = get_credential_service()
+        configs = service.list_enterprise_auth_configs(auth_type=auth_type)
+        return jsonify(success_response(data={'configs': configs}))
+    except Exception as e:
+        logger.error(f"Error listing enterprise auth configs: {e}")
+        return jsonify(error_response('LIST_CONFIGS_ERROR', str(e))), 500
+
+
+@credentials_bp.route('/enterprise/configs', methods=['POST'])
+def create_enterprise_auth_config():
+    """Create a new enterprise auth server configuration."""
+    data = request.get_json()
+    
+    name = data.get('name')
+    auth_type = data.get('auth_type')
+    credential_id = data.get('credential_id')
+    
+    if not name or not auth_type or not credential_id:
+        return jsonify(error_response('MISSING_FIELDS', 'name, auth_type, and credential_id are required')), 400
+    
+    if auth_type not in ('tacacs', 'radius', 'ldap', 'active_directory'):
+        return jsonify(error_response('INVALID_AUTH_TYPE', 'auth_type must be tacacs, radius, ldap, or active_directory')), 400
+    
+    try:
+        service = get_credential_service()
+        config = service.create_enterprise_auth_config(
+            name=name,
+            auth_type=auth_type,
+            credential_id=credential_id,
+            is_default=data.get('is_default', False),
+            priority=data.get('priority', 0)
+        )
+        return jsonify(success_response(data={'config': config}, message='Enterprise auth config created')), 201
+    except Exception as e:
+        logger.error(f"Error creating enterprise auth config: {e}")
+        return jsonify(error_response('CREATE_CONFIG_ERROR', str(e))), 500
+
+
+@credentials_bp.route('/enterprise/configs/<int:config_id>', methods=['GET'])
+def get_enterprise_auth_config(config_id):
+    """Get a specific enterprise auth configuration."""
+    try:
+        service = get_credential_service()
+        # Use list and filter since we don't have a get by ID method
+        configs = service.list_enterprise_auth_configs()
+        config = next((c for c in configs if c['id'] == config_id), None)
+        
+        if not config:
+            return jsonify(error_response('NOT_FOUND', 'Enterprise auth config not found')), 404
+        
+        return jsonify(success_response(data={'config': config}))
+    except Exception as e:
+        logger.error(f"Error getting enterprise auth config: {e}")
+        return jsonify(error_response('GET_CONFIG_ERROR', str(e))), 500
+
+
+@credentials_bp.route('/enterprise/configs/<int:config_id>', methods=['DELETE'])
+def delete_enterprise_auth_config(config_id):
+    """Delete an enterprise auth configuration."""
+    try:
+        from backend.database import get_db
+        db = get_db()
+        with db.cursor() as cursor:
+            cursor.execute("DELETE FROM enterprise_auth_configs WHERE id = %s RETURNING id", (config_id,))
+            deleted = cursor.fetchone()
+            db.get_connection().commit()
+            
+            if not deleted:
+                return jsonify(error_response('NOT_FOUND', 'Enterprise auth config not found')), 404
+        
+        return jsonify(success_response(message='Enterprise auth config deleted'))
+    except Exception as e:
+        logger.error(f"Error deleting enterprise auth config: {e}")
+        return jsonify(error_response('DELETE_CONFIG_ERROR', str(e))), 500
+
+
+@credentials_bp.route('/enterprise/users', methods=['GET'])
+def list_enterprise_auth_users():
+    """List all enterprise auth users."""
+    config_id = request.args.get('config_id', type=int)
+    
+    try:
+        service = get_credential_service()
+        users = service.list_enterprise_auth_users(auth_config_id=config_id)
+        return jsonify(success_response(data={'users': users}))
+    except Exception as e:
+        logger.error(f"Error listing enterprise auth users: {e}")
+        return jsonify(error_response('LIST_USERS_ERROR', str(e))), 500
+
+
+@credentials_bp.route('/enterprise/users', methods=['POST'])
+def create_enterprise_auth_user():
+    """Create a new enterprise auth user (service account)."""
+    data = request.get_json()
+    
+    name = data.get('name')
+    auth_config_id = data.get('auth_config_id')
+    username = data.get('username')
+    password = data.get('password')
+    
+    if not name or not auth_config_id or not username or not password:
+        return jsonify(error_response('MISSING_FIELDS', 'name, auth_config_id, username, and password are required')), 400
+    
+    try:
+        service = get_credential_service()
+        user = service.create_enterprise_auth_user(
+            name=name,
+            auth_config_id=auth_config_id,
+            username=username,
+            password=password,
+            description=data.get('description'),
+            is_service_account=data.get('is_service_account', True)
+        )
+        return jsonify(success_response(data={'user': user}, message='Enterprise auth user created')), 201
+    except Exception as e:
+        logger.error(f"Error creating enterprise auth user: {e}")
+        return jsonify(error_response('CREATE_USER_ERROR', str(e))), 500
+
+
+@credentials_bp.route('/enterprise/users/<int:user_id>', methods=['GET'])
+def get_enterprise_auth_user(user_id):
+    """Get a specific enterprise auth user."""
+    try:
+        service = get_credential_service()
+        user = service.get_enterprise_auth_user(user_id=user_id, include_secret=False)
+        
+        if not user:
+            return jsonify(error_response('NOT_FOUND', 'Enterprise auth user not found')), 404
+        
+        return jsonify(success_response(data={'user': user}))
+    except Exception as e:
+        logger.error(f"Error getting enterprise auth user: {e}")
+        return jsonify(error_response('GET_USER_ERROR', str(e))), 500
+
+
+@credentials_bp.route('/enterprise/users/<int:user_id>', methods=['DELETE'])
+def delete_enterprise_auth_user(user_id):
+    """Delete an enterprise auth user."""
+    try:
+        from backend.database import get_db
+        db = get_db()
+        with db.cursor() as cursor:
+            cursor.execute("DELETE FROM enterprise_auth_users WHERE id = %s RETURNING id", (user_id,))
+            deleted = cursor.fetchone()
+            db.get_connection().commit()
+            
+            if not deleted:
+                return jsonify(error_response('NOT_FOUND', 'Enterprise auth user not found')), 404
+        
+        return jsonify(success_response(message='Enterprise auth user deleted'))
+    except Exception as e:
+        logger.error(f"Error deleting enterprise auth user: {e}")
+        return jsonify(error_response('DELETE_USER_ERROR', str(e))), 500
+
+
+@credentials_bp.route('/enterprise/test-connection', methods=['POST'])
+def test_enterprise_connection():
+    """Test connection to an enterprise auth server."""
+    data = request.get_json()
+    
+    config_id = data.get('config_id')
+    if not config_id:
+        return jsonify(error_response('MISSING_CONFIG_ID', 'config_id is required')), 400
+    
+    try:
+        service = get_credential_service()
+        configs = service.list_enterprise_auth_configs()
+        config = next((c for c in configs if c['id'] == config_id), None)
+        
+        if not config:
+            return jsonify(error_response('NOT_FOUND', 'Enterprise auth config not found')), 404
+        
+        # Get the full credential with server details
+        cred = service.get_credential(config['credential_id'], include_secret=True)
+        if not cred:
+            return jsonify(error_response('CREDENTIAL_NOT_FOUND', 'Server credential not found')), 404
+        
+        auth_type = config['auth_type']
+        server_config = cred.get('secret_data', {})
+        
+        # TODO: Implement actual connection tests for each auth type
+        # For now, return a placeholder response
+        return jsonify(success_response(
+            data={
+                'auth_type': auth_type,
+                'server': server_config.get('server') or server_config.get('domain_controller'),
+                'status': 'connection_test_not_implemented',
+                'message': f'Connection test for {auth_type} is not yet implemented'
+            }
+        ))
+    except Exception as e:
+        logger.error(f"Error testing enterprise connection: {e}")
+        return jsonify(error_response('TEST_CONNECTION_ERROR', str(e))), 500
