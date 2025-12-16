@@ -326,26 +326,6 @@ export function UsersPage() {
           )}
         </div>
 
-        {/* Roles Section */}
-        <div className="bg-white rounded-xl border p-6">
-          <h3 className="text-lg font-semibold mb-4">Available Roles</h3>
-          <div className="grid grid-cols-2 gap-4">
-            {roles.map((role) => (
-              <div key={role.id} className="border rounded-lg p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className={cn(
-                    "px-2 py-1 text-sm rounded-full font-medium",
-                    ROLE_COLORS[role.name] || 'bg-gray-100 text-gray-600'
-                  )}>
-                    {role.display_name}
-                  </span>
-                  <span className="text-sm text-gray-500">{role.user_count || 0} users</span>
-                </div>
-                <p className="text-sm text-gray-600">{role.description}</p>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
 
       {/* Create User Modal */}
