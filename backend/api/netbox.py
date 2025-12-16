@@ -122,7 +122,7 @@ def update_settings():
 @netbox_bp.route('/test', methods=['POST'])
 def test_connection():
     """Test connection to NetBox."""
-    data = request.get_json() or {}
+    data = request.get_json(silent=True) or {}
     
     # Use provided credentials or saved ones
     url = data.get('url')

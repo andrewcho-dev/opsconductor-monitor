@@ -46,6 +46,7 @@ export default {
             { value: 'network_range', label: 'Network Range (CIDR)' },
             { value: 'ip_list', label: 'IP List' },
             { value: 'device_group', label: 'Device Group' },
+            { value: 'netbox_devices', label: 'NetBox Devices' },
             { value: 'from_input', label: 'From Previous Node' },
             { value: 'database_query', label: 'Database Query' },
           ],
@@ -74,6 +75,14 @@ export default {
           label: 'Device Group',
           default: '',
           showIf: { field: 'target_type', value: 'device_group' },
+        },
+        {
+          id: 'netbox_filter',
+          type: 'netbox-device-selector',
+          label: 'NetBox Device Filter',
+          default: { site: '', role: '', status: 'active' },
+          showIf: { field: 'target_type', value: 'netbox_devices' },
+          help: 'Select devices from NetBox by site, role, or status',
         },
         {
           id: 'input_expression',

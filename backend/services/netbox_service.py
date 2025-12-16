@@ -518,30 +518,58 @@ class NetBoxService:
                 status=status,
                 serial=serial,
                 description=description,
-                tags=tags or ['discovered'],
+                tags=None,  # Don't use tags - they must exist in NetBox first
                 custom_fields=custom_fields,
             )
         
-        # Handle IP address
+        # Handle IP address - need to create interface first, then assign IP to it
         ip_with_prefix = ip_address if '/' in ip_address else f"{ip_address}/32"
+        
+        # Create a management interface if device is new
+        interface = None
+        if device and not existing:
+            try:
+                interface = self.create_interface(
+                    device_id=device['id'],
+                    name='mgmt0',
+                    type='virtual',
+                )
+            except Exception as e:
+                logger.warning(f"Could not create interface for {device_name}: {e}")
+        
+        # Get or create IP address
         existing_ip = self.get_ip_address_by_address(ip_address)
         
         if existing_ip:
-            # Update IP if needed
             ip_record = existing_ip
+            # Assign to interface if we have one and IP isn't assigned
+            if interface and not existing_ip.get('assigned_object'):
+                try:
+                    self.update_ip_address(
+                        existing_ip['id'],
+                        assigned_object_type='dcim.interface',
+                        assigned_object_id=interface['id']
+                    )
+                except Exception as e:
+                    logger.warning(f"Could not assign IP to interface: {e}")
         else:
-            # Create IP address
+            # Create IP address assigned to interface
             ip_record = self.create_ip_address(
                 address=ip_with_prefix,
                 status='active',
                 dns_name=hostname,
-                tags=tags or ['discovered'],
+                assigned_object_type='dcim.interface' if interface else None,
+                assigned_object_id=interface['id'] if interface else None,
+                tags=None,
             )
         
-        # Set as primary IP if device doesn't have one
-        if device and not device.get('primary_ip4'):
-            self.update_device(device['id'], primary_ip4=ip_record['id'])
-            device['primary_ip4'] = ip_record
+        # Set as primary IP if device doesn't have one and IP is assigned to device
+        if device and not device.get('primary_ip4') and interface:
+            try:
+                self.update_device(device['id'], primary_ip4=ip_record['id'])
+                device['primary_ip4'] = ip_record
+            except Exception as e:
+                logger.warning(f"Could not set primary IP: {e}")
         
         return {
             'device': device,

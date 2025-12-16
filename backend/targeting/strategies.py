@@ -242,6 +242,119 @@ class NetworkRangeTargeting(BaseTargeting):
 
 
 @register_targeting
+class NetBoxTargeting(BaseTargeting):
+    """Targeting strategy for NetBox devices."""
+    
+    @property
+    def targeting_type(self) -> str:
+        return 'netbox'
+    
+    def get_required_fields(self) -> List[str]:
+        return []  # All filters are optional
+    
+    def resolve(self, config: Dict) -> List[str]:
+        """
+        Resolve targets from NetBox devices.
+        
+        Config:
+            site: NetBox site slug or ID (optional)
+            role: NetBox device role slug or ID (optional)
+            status: Device status filter (optional, default: 'active')
+            tag: Tag to filter by (optional)
+            query: Search query (optional)
+        
+        Returns:
+            List of IP addresses from NetBox devices
+        """
+        try:
+            from ..services.netbox_service import NetBoxService
+            from ..api.netbox import get_netbox_settings
+            
+            # Get NetBox settings
+            settings = get_netbox_settings()
+            
+            if not settings.get('url') or not settings.get('token'):
+                return []
+            
+            service = NetBoxService(
+                url=settings.get('url'),
+                token=settings.get('token'),
+                verify_ssl=settings.get('verify_ssl', 'true').lower() == 'true'
+            )
+            
+            # Build filter params
+            params = {}
+            if config.get('site'):
+                params['site'] = config['site']
+            if config.get('role'):
+                params['role'] = config['role']
+            if config.get('status'):
+                params['status'] = config['status']
+            if config.get('tag'):
+                params['tag'] = config['tag']
+            if config.get('query'):
+                params['q'] = config['query']
+            
+            # Fetch devices from NetBox
+            result = service.get_devices(**params)
+            devices = result.get('results', [])
+            
+            # Extract primary IPs from devices
+            targets = []
+            for device in devices:
+                primary_ip = device.get('primary_ip4') or device.get('primary_ip')
+                if primary_ip:
+                    # primary_ip is an object with 'address' field like '192.168.1.1/24'
+                    if isinstance(primary_ip, dict):
+                        address = primary_ip.get('address', '')
+                    else:
+                        address = str(primary_ip)
+                    
+                    # Strip CIDR notation if present
+                    ip = address.split('/')[0] if '/' in address else address
+                    if ip:
+                        targets.append(ip)
+            
+            # Also fetch virtual machines if include_vms is True (default)
+            if config.get('include_vms', True):
+                vm_params = {}
+                if config.get('site'):
+                    vm_params['site'] = config['site']
+                if config.get('status'):
+                    vm_params['status'] = config['status']
+                if config.get('tag'):
+                    vm_params['tag'] = config['tag']
+                if config.get('cluster'):
+                    vm_params['cluster'] = config['cluster']
+                
+                try:
+                    vm_result = service._request('GET', 'virtualization/virtual-machines/', params={**vm_params, 'limit': 100})
+                    vms = vm_result.get('results', [])
+                    
+                    for vm in vms:
+                        primary_ip = vm.get('primary_ip4') or vm.get('primary_ip')
+                        if primary_ip:
+                            if isinstance(primary_ip, dict):
+                                address = primary_ip.get('address', '')
+                            else:
+                                address = str(primary_ip)
+                            
+                            ip = address.split('/')[0] if '/' in address else address
+                            if ip and ip not in targets:
+                                targets.append(ip)
+                except Exception as e:
+                    import logging
+                    logging.getLogger(__name__).warning(f"Failed to fetch VMs from NetBox: {e}")
+            
+            return targets
+            
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"NetBox targeting failed: {e}")
+            return []
+
+
+@register_targeting
 class PreviousResultTargeting(BaseTargeting):
     """Targeting strategy that uses results from a previous action."""
     

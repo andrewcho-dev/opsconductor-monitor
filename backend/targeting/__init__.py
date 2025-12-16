@@ -7,6 +7,7 @@ from .strategies import (
     DatabaseQueryTargeting,
     GroupTargeting,
     NetworkRangeTargeting,
+    NetBoxTargeting,
     PreviousResultTargeting,
 )
 
@@ -17,5 +18,6 @@ __all__ = [
     'DatabaseQueryTargeting',
     'GroupTargeting',
     'NetworkRangeTargeting',
+    'NetBoxTargeting',
     'PreviousResultTargeting',
 ]

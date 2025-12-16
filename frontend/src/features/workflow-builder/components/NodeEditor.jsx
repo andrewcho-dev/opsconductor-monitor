@@ -8,6 +8,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, ChevronDown, ChevronRight, AlertCircle, HelpCircle, Loader2 } from 'lucide-react';
 import { cn } from '../../../lib/utils';
+import NetBoxDeviceSelector from './NetBoxDeviceSelector';
 
 const NodeEditor = ({
   isOpen,
@@ -354,6 +355,14 @@ const NodeEditor = ({
             <option value="switches">Switches</option>
             <option value="routers">Routers</option>
           </select>
+        )}
+
+        {/* NetBox Device Selector */}
+        {param.type === 'netbox-device-selector' && (
+          <NetBoxDeviceSelector
+            value={value || param.default || {}}
+            onChange={(newValue) => updateField(param.id, newValue)}
+          />
         )}
 
         {/* Table Selector - Dynamic from API */}
