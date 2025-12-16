@@ -107,6 +107,46 @@ def create_credential():
             'passphrase': data.get('passphrase', ''),
             'ca_certificate': data.get('ca_certificate', ''),
         }
+    elif credential_type == 'ldap':
+        credential_data = {
+            'server': data.get('ldap_server', ''),
+            'port': data.get('ldap_port', 389),
+            'use_ssl': data.get('ldap_use_ssl', False),
+            'bind_dn': data.get('bind_dn', ''),
+            'bind_password': data.get('bind_password', ''),
+            'base_dn': data.get('base_dn', ''),
+            'user_search_filter': data.get('user_search_filter', '(uid={username})'),
+            'group_search_filter': data.get('group_search_filter', ''),
+        }
+    elif credential_type == 'active_directory':
+        credential_data = {
+            'domain_controller': data.get('domain_controller', ''),
+            'domain': data.get('ad_domain', ''),
+            'port': data.get('ad_port', 389),
+            'use_ssl': data.get('ad_use_ssl', False),
+            'username': data.get('username', ''),
+            'password': data.get('password', ''),
+            'base_dn': data.get('base_dn', ''),
+            'user_search_filter': data.get('user_search_filter', '(sAMAccountName={username})'),
+        }
+    elif credential_type == 'tacacs':
+        credential_data = {
+            'server': data.get('tacacs_server', ''),
+            'port': data.get('tacacs_port', 49),
+            'secret_key': data.get('tacacs_secret', ''),
+            'timeout': data.get('tacacs_timeout', 5),
+            'authentication_type': data.get('tacacs_auth_type', 'ascii'),  # ascii, pap, chap
+        }
+    elif credential_type == 'radius':
+        credential_data = {
+            'server': data.get('radius_server', ''),
+            'auth_port': data.get('radius_auth_port', 1812),
+            'acct_port': data.get('radius_acct_port', 1813),
+            'secret_key': data.get('radius_secret', ''),
+            'timeout': data.get('radius_timeout', 5),
+            'retries': data.get('radius_retries', 3),
+            'nas_identifier': data.get('nas_identifier', ''),
+        }
     else:
         # Generic - store whatever is provided
         credential_data = {k: v for k, v in data.items() 

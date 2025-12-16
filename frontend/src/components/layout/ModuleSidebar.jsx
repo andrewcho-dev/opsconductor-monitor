@@ -140,6 +140,15 @@ const moduleNavigation = {
         ]
       },
       {
+        title: 'Directory Services',
+        items: [
+          { id: 'ldap', label: 'LDAP', icon: Server, path: '/credentials?type=ldap' },
+          { id: 'active-directory', label: 'Active Directory', icon: Shield, path: '/credentials?type=active_directory' },
+          { id: 'tacacs', label: 'TACACS+', icon: Shield, path: '/credentials?type=tacacs' },
+          { id: 'radius', label: 'RADIUS', icon: Server, path: '/credentials?type=radius' },
+        ]
+      },
+      {
         title: 'Monitoring',
         items: [
           { id: 'expiring', label: 'Expiring Soon', icon: AlertTriangle, path: '/credentials/expiring' },

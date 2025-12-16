@@ -18,6 +18,10 @@ const CREDENTIAL_TYPES = {
   password: { label: 'Password', icon: KeyRound, color: 'bg-orange-100 text-orange-700 border-orange-200' },
   certificate: { label: 'Certificate', icon: FileKey, color: 'bg-pink-100 text-pink-700 border-pink-200' },
   pki: { label: 'PKI', icon: FileKey, color: 'bg-rose-100 text-rose-700 border-rose-200' },
+  ldap: { label: 'LDAP', icon: Server, color: 'bg-indigo-100 text-indigo-700 border-indigo-200' },
+  active_directory: { label: 'Active Directory', icon: Shield, color: 'bg-sky-100 text-sky-700 border-sky-200' },
+  tacacs: { label: 'TACACS+', icon: Shield, color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+  radius: { label: 'RADIUS', icon: Server, color: 'bg-teal-100 text-teal-700 border-teal-200' },
 };
 
 const STATUS_COLORS = {
@@ -542,6 +546,34 @@ function CredentialModal({ credential, onClose, onSave }) {
     winrm_port: 5985,
     certificate: '',
     ca_certificate: '',
+    // LDAP fields
+    ldap_server: '',
+    ldap_port: 389,
+    ldap_use_ssl: false,
+    bind_dn: '',
+    bind_password: '',
+    base_dn: '',
+    user_search_filter: '(uid={username})',
+    // Active Directory fields
+    domain_controller: '',
+    ad_domain: '',
+    ad_port: 389,
+    ad_use_ssl: false,
+    // TACACS+ fields
+    tacacs_server: '',
+    tacacs_port: 49,
+    tacacs_secret: '',
+    tacacs_timeout: 5,
+    tacacs_auth_type: 'ascii',
+    // RADIUS fields
+    radius_server: '',
+    radius_auth_port: 1812,
+    radius_acct_port: 1813,
+    radius_secret: '',
+    radius_timeout: 5,
+    radius_retries: 3,
+    nas_identifier: '',
+    // Metadata
     valid_until: credential?.valid_until ? credential.valid_until.split('T')[0] : '',
     category: credential?.category || '',
     environment: credential?.environment || '',
@@ -893,6 +925,294 @@ function CredentialModal({ credential, onClose, onSave }) {
                   value={formData.api_secret}
                   onChange={(e) => setFormData(prev => ({ ...prev, api_secret: e.target.value }))}
                   className="w-full px-3 py-2 border rounded-lg"
+                />
+              </div>
+            </div>
+          )}
+
+          {formData.credential_type === 'ldap' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">LDAP Server</label>
+                  <input
+                    type="text"
+                    value={formData.ldap_server}
+                    onChange={(e) => setFormData(prev => ({ ...prev, ldap_server: e.target.value }))}
+                    className="w-full px-3 py-2 border rounded-lg"
+                    placeholder="ldap.example.com"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Port</label>
+                  <input
+                    type="number"
+                    value={formData.ldap_port}
+                    onChange={(e) => setFormData(prev => ({ ...prev, ldap_port: parseInt(e.target.value) }))}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="ldap_use_ssl"
+                  checked={formData.ldap_use_ssl}
+                  onChange={(e) => setFormData(prev => ({ ...prev, ldap_use_ssl: e.target.checked }))}
+                  className="rounded"
+                />
+                <label htmlFor="ldap_use_ssl" className="text-sm text-gray-700">Use SSL/TLS (LDAPS)</label>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Bind DN</label>
+                <input
+                  type="text"
+                  value={formData.bind_dn}
+                  onChange={(e) => setFormData(prev => ({ ...prev, bind_dn: e.target.value }))}
+                  className="w-full px-3 py-2 border rounded-lg"
+                  placeholder="cn=admin,dc=example,dc=com"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Bind Password</label>
+                <input
+                  type="password"
+                  value={formData.bind_password}
+                  onChange={(e) => setFormData(prev => ({ ...prev, bind_password: e.target.value }))}
+                  className="w-full px-3 py-2 border rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Base DN</label>
+                <input
+                  type="text"
+                  value={formData.base_dn}
+                  onChange={(e) => setFormData(prev => ({ ...prev, base_dn: e.target.value }))}
+                  className="w-full px-3 py-2 border rounded-lg"
+                  placeholder="dc=example,dc=com"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">User Search Filter</label>
+                <input
+                  type="text"
+                  value={formData.user_search_filter}
+                  onChange={(e) => setFormData(prev => ({ ...prev, user_search_filter: e.target.value }))}
+                  className="w-full px-3 py-2 border rounded-lg font-mono text-sm"
+                  placeholder="(uid={username})"
+                />
+              </div>
+            </div>
+          )}
+
+          {formData.credential_type === 'active_directory' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Domain Controller</label>
+                  <input
+                    type="text"
+                    value={formData.domain_controller}
+                    onChange={(e) => setFormData(prev => ({ ...prev, domain_controller: e.target.value }))}
+                    className="w-full px-3 py-2 border rounded-lg"
+                    placeholder="dc01.example.com"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Domain</label>
+                  <input
+                    type="text"
+                    value={formData.ad_domain}
+                    onChange={(e) => setFormData(prev => ({ ...prev, ad_domain: e.target.value }))}
+                    className="w-full px-3 py-2 border rounded-lg"
+                    placeholder="EXAMPLE.COM"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Port</label>
+                  <input
+                    type="number"
+                    value={formData.ad_port}
+                    onChange={(e) => setFormData(prev => ({ ...prev, ad_port: parseInt(e.target.value) }))}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                </div>
+                <div className="flex items-center gap-2 pt-6">
+                  <input
+                    type="checkbox"
+                    id="ad_use_ssl"
+                    checked={formData.ad_use_ssl}
+                    onChange={(e) => setFormData(prev => ({ ...prev, ad_use_ssl: e.target.checked }))}
+                    className="rounded"
+                  />
+                  <label htmlFor="ad_use_ssl" className="text-sm text-gray-700">Use SSL/TLS</label>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                  <input
+                    type="text"
+                    value={formData.username}
+                    onChange={(e) => setFormData(prev => ({ ...prev, username: e.target.value }))}
+                    className="w-full px-3 py-2 border rounded-lg"
+                    placeholder="admin@example.com"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                  <input
+                    type="password"
+                    value={formData.password}
+                    onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Base DN</label>
+                <input
+                  type="text"
+                  value={formData.base_dn}
+                  onChange={(e) => setFormData(prev => ({ ...prev, base_dn: e.target.value }))}
+                  className="w-full px-3 py-2 border rounded-lg"
+                  placeholder="DC=example,DC=com"
+                />
+              </div>
+            </div>
+          )}
+
+          {formData.credential_type === 'tacacs' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">TACACS+ Server</label>
+                  <input
+                    type="text"
+                    value={formData.tacacs_server}
+                    onChange={(e) => setFormData(prev => ({ ...prev, tacacs_server: e.target.value }))}
+                    className="w-full px-3 py-2 border rounded-lg"
+                    placeholder="tacacs.example.com"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Port</label>
+                  <input
+                    type="number"
+                    value={formData.tacacs_port}
+                    onChange={(e) => setFormData(prev => ({ ...prev, tacacs_port: parseInt(e.target.value) }))}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Secret Key</label>
+                <input
+                  type="password"
+                  value={formData.tacacs_secret}
+                  onChange={(e) => setFormData(prev => ({ ...prev, tacacs_secret: e.target.value }))}
+                  className="w-full px-3 py-2 border rounded-lg"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Authentication Type</label>
+                  <select
+                    value={formData.tacacs_auth_type}
+                    onChange={(e) => setFormData(prev => ({ ...prev, tacacs_auth_type: e.target.value }))}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  >
+                    <option value="ascii">ASCII</option>
+                    <option value="pap">PAP</option>
+                    <option value="chap">CHAP</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Timeout (seconds)</label>
+                  <input
+                    type="number"
+                    value={formData.tacacs_timeout}
+                    onChange={(e) => setFormData(prev => ({ ...prev, tacacs_timeout: parseInt(e.target.value) }))}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {formData.credential_type === 'radius' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">RADIUS Server</label>
+                  <input
+                    type="text"
+                    value={formData.radius_server}
+                    onChange={(e) => setFormData(prev => ({ ...prev, radius_server: e.target.value }))}
+                    className="w-full px-3 py-2 border rounded-lg"
+                    placeholder="radius.example.com"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Secret Key</label>
+                  <input
+                    type="password"
+                    value={formData.radius_secret}
+                    onChange={(e) => setFormData(prev => ({ ...prev, radius_secret: e.target.value }))}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Auth Port</label>
+                  <input
+                    type="number"
+                    value={formData.radius_auth_port}
+                    onChange={(e) => setFormData(prev => ({ ...prev, radius_auth_port: parseInt(e.target.value) }))}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Accounting Port</label>
+                  <input
+                    type="number"
+                    value={formData.radius_acct_port}
+                    onChange={(e) => setFormData(prev => ({ ...prev, radius_acct_port: parseInt(e.target.value) }))}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Timeout (seconds)</label>
+                  <input
+                    type="number"
+                    value={formData.radius_timeout}
+                    onChange={(e) => setFormData(prev => ({ ...prev, radius_timeout: parseInt(e.target.value) }))}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Retries</label>
+                  <input
+                    type="number"
+                    value={formData.radius_retries}
+                    onChange={(e) => setFormData(prev => ({ ...prev, radius_retries: parseInt(e.target.value) }))}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">NAS Identifier (optional)</label>
+                <input
+                  type="text"
+                  value={formData.nas_identifier}
+                  onChange={(e) => setFormData(prev => ({ ...prev, nas_identifier: e.target.value }))}
+                  className="w-full px-3 py-2 border rounded-lg"
+                  placeholder="opsconductor"
                 />
               </div>
             </div>
