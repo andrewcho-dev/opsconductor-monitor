@@ -105,18 +105,27 @@ export function useNetBoxDevices(options = {}) {
       const transformedDevices = (response.data || []).map(device => ({
         id: device.id,
         ip_address: device.primary_ip4?.address?.split("/")[0] || device.name,
+        ip_with_prefix: device.primary_ip4?.address,
         hostname: device.name,
+        name: device.name,
         description: device.description || device.device_type?.display,
         vendor: device.device_type?.manufacturer?.name,
         model: device.device_type?.model,
         serial: device.serial,
         status: device.status?.value || "active",
+        status_label: device.status?.label || "Active",
         site: device.site?.name,
-        role: device.role?.name,
+        site_slug: device.site?.slug,
+        role: device.role?.name || device.device_role?.name,
+        role_slug: device.role?.slug || device.device_role?.slug,
+        platform: device.platform?.name,
+        platform_slug: device.platform?.slug,
+        device_type: device._type || "device",  // 'device' or 'virtual_machine'
+        cluster: device.cluster?.name,  // For VMs
         // For compatibility with existing UI
         ping_status: device.status?.value === "active" ? "online" : "unknown",
         snmp_status: "unknown",
-        network_range: null,
+        network_range: null,  // Will be computed from IP ranges
         // Keep original NetBox data
         _netbox: device,
       }));
@@ -249,9 +258,93 @@ export function useNetBoxLookups() {
   return { lookups, loading, refetch: fetchLookups };
 }
 
+/**
+ * Hook to fetch tags from NetBox
+ */
+export function useNetBoxTags() {
+  const [tags, setTags] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const fetchTags = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await fetchApi("/api/netbox/tags");
+      
+      const transformedTags = (extractData(response) || []).map(tag => ({
+        id: tag.id,
+        name: tag.name,
+        slug: tag.slug,
+        color: tag.color,
+        description: tag.description,
+        _netbox: tag,
+      }));
+      
+      setTags(transformedTags);
+      setError(null);
+    } catch (err) {
+      setError(err.message);
+      setTags([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchTags();
+  }, [fetchTags]);
+
+  return { tags, loading, error, refetch: fetchTags };
+}
+
+/**
+ * Hook to fetch IP ranges from NetBox IPAM
+ */
+export function useNetBoxIPRanges() {
+  const [ranges, setRanges] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const fetchRanges = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await fetchApi("/api/netbox/ip-ranges");
+      
+      const transformedRanges = (response.data || []).map(range => ({
+        id: range.id,
+        start_address: range.start_address?.split("/")[0],
+        end_address: range.end_address?.split("/")[0],
+        display: range.display,
+        description: range.description,
+        status: range.status?.value,
+        role: range.role?.name,
+        vrf: range.vrf?.name,
+        tenant: range.tenant?.name,
+        _netbox: range,
+      }));
+      
+      setRanges(transformedRanges);
+      setError(null);
+    } catch (err) {
+      setError(err.message);
+      setRanges([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchRanges();
+  }, [fetchRanges]);
+
+  return { ranges, loading, error, refetch: fetchRanges };
+}
+
 export default {
   useNetBoxStatus,
   useNetBoxDevices,
   useNetBoxDevice,
   useNetBoxLookups,
+  useNetBoxTags,
+  useNetBoxIPRanges,
 };

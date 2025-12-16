@@ -300,6 +300,27 @@ def list_ip_addresses():
     })
 
 
+# ==================== IP RANGES ====================
+
+@netbox_bp.route('/ip-ranges', methods=['GET'])
+def list_ip_ranges():
+    """List IP ranges from NetBox IPAM."""
+    service = get_netbox_service()
+    
+    params = {
+        'limit': int(request.args.get('limit', 100)),
+        'offset': int(request.args.get('offset', 0)),
+    }
+    
+    result = service._request('GET', 'ipam/ip-ranges/', params=params)
+    
+    return jsonify({
+        'success': True,
+        'data': result.get('results', []),
+        'count': result.get('count', 0),
+    })
+
+
 # ==================== LOOKUP DATA ====================
 
 @netbox_bp.route('/sites', methods=['GET'])
@@ -332,6 +353,14 @@ def list_manufacturers():
     """List manufacturers from NetBox."""
     service = get_netbox_service()
     result = service.get_manufacturers(limit=500)
+    return jsonify(list_response(result.get('results', [])))
+
+
+@netbox_bp.route('/tags', methods=['GET'])
+def list_tags():
+    """List tags from NetBox."""
+    service = get_netbox_service()
+    result = service._request('GET', 'extras/tags/', params={'limit': 500})
     return jsonify(list_response(result.get('results', [])))
 
 

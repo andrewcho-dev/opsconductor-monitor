@@ -44,7 +44,6 @@ const moduleNavigation = {
         title: 'Devices',
         items: [
           { id: 'devices', label: 'All Devices', icon: Server, path: '/inventory/devices' },
-          { id: 'groups', label: 'Device Groups', icon: FolderOpen, path: '/inventory/groups' },
         ]
       }
     ]
