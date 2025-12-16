@@ -141,19 +141,9 @@ const moduleNavigation = {
         ]
       },
       {
-        title: 'Directory Services',
-        items: [
-          { id: 'ldap', label: 'LDAP', icon: Server, path: '/credentials?type=ldap' },
-          { id: 'active-directory', label: 'Active Directory', icon: Shield, path: '/credentials?type=active_directory' },
-          { id: 'tacacs', label: 'TACACS+', icon: Shield, path: '/credentials?type=tacacs' },
-          { id: 'radius', label: 'RADIUS', icon: Server, path: '/credentials?type=radius' },
-        ]
-      },
-      {
         title: 'Enterprise Auth',
         items: [
-          { id: 'auth-servers', label: 'Auth Servers', icon: Server, path: '/credentials/enterprise' },
-          { id: 'service-accounts', label: 'Service Accounts', icon: User, path: '/credentials/enterprise/users' },
+          { id: 'enterprise-auth', label: 'Auth Servers', icon: Server, path: '/credentials/enterprise' },
         ]
       },
       {

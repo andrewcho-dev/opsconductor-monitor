@@ -1392,70 +1392,166 @@ function CredentialHistoryModal({ credential, onClose }) {
 }
 
 // =============================================================================
-// ENTERPRISE AUTH COMPONENTS
+// ENTERPRISE AUTH - UNIFIED VIEW
 // =============================================================================
 
 const AUTH_TYPE_LABELS = {
-  tacacs: { label: 'TACACS+', color: 'bg-emerald-100 text-emerald-700' },
-  radius: { label: 'RADIUS', color: 'bg-teal-100 text-teal-700' },
-  ldap: { label: 'LDAP', color: 'bg-indigo-100 text-indigo-700' },
-  active_directory: { label: 'Active Directory', color: 'bg-sky-100 text-sky-700' },
+  tacacs: { label: 'TACACS+', color: 'bg-emerald-100 text-emerald-700', icon: Shield },
+  radius: { label: 'RADIUS', color: 'bg-teal-100 text-teal-700', icon: Server },
+  ldap: { label: 'LDAP', color: 'bg-indigo-100 text-indigo-700', icon: Server },
+  active_directory: { label: 'Active Directory', color: 'bg-sky-100 text-sky-700', icon: Shield },
 };
 
 function EnterpriseAuthConfigsList({ configs, credentials, onRefresh }) {
-  const [showModal, setShowModal] = useState(false);
-  const [formData, setFormData] = useState({
+  const [showServerModal, setShowServerModal] = useState(false);
+  const [showAccountModal, setShowAccountModal] = useState(false);
+  const [selectedServer, setSelectedServer] = useState(null);
+  const [users, setUsers] = useState([]);
+  const [serverForm, setServerForm] = useState({
     name: '',
     auth_type: 'tacacs',
-    credential_id: '',
+    server: '',
+    port: '',
+    secret_key: '',
     is_default: false,
-    priority: 0,
+  });
+  const [accountForm, setAccountForm] = useState({
+    name: '',
+    auth_config_id: '',
+    username: '',
+    password: '',
+    description: '',
   });
   const [saving, setSaving] = useState(false);
 
-  const handleSubmit = async (e) => {
+  // Load service accounts
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  const loadUsers = async () => {
+    try {
+      const res = await fetchApi('/api/credentials/enterprise/users');
+      if (res.success) {
+        setUsers(res.data.users || []);
+      }
+    } catch (err) {
+      console.error('Error loading users:', err);
+    }
+  };
+
+  const handleCreateServer = async (e) => {
     e.preventDefault();
     setSaving(true);
     try {
+      // First create the credential with server details
+      const credRes = await fetchApi('/api/credentials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: `${serverForm.name} - Server Config`,
+          credential_type: serverForm.auth_type,
+          description: `Server configuration for ${serverForm.name}`,
+          [`${serverForm.auth_type}_server`]: serverForm.server,
+          [`${serverForm.auth_type}_port`]: parseInt(serverForm.port) || getDefaultPort(serverForm.auth_type),
+          secret_key: serverForm.secret_key,
+        }),
+      });
+
+      if (!credRes.success) {
+        throw new Error(credRes.error?.message || 'Failed to create credential');
+      }
+
+      // Then create the auth config
       await fetchApi('/api/credentials/enterprise/configs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          name: serverForm.name,
+          auth_type: serverForm.auth_type,
+          credential_id: credRes.data.credential.id,
+          is_default: serverForm.is_default,
+        }),
       });
-      setShowModal(false);
-      setFormData({ name: '', auth_type: 'tacacs', credential_id: '', is_default: false, priority: 0 });
+
+      setShowServerModal(false);
+      setServerForm({ name: '', auth_type: 'tacacs', server: '', port: '', secret_key: '', is_default: false });
       onRefresh();
     } catch (err) {
-      alert('Error creating config: ' + err.message);
+      alert('Error creating server: ' + err.message);
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm('Delete this auth server configuration?')) return;
+  const handleCreateAccount = async (e) => {
+    e.preventDefault();
+    setSaving(true);
     try {
-      await fetchApi(`/api/credentials/enterprise/configs/${id}`, { method: 'DELETE' });
-      onRefresh();
+      await fetchApi('/api/credentials/enterprise/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...accountForm,
+          is_service_account: true,
+        }),
+      });
+      setShowAccountModal(false);
+      setAccountForm({ name: '', auth_config_id: '', username: '', password: '', description: '' });
+      loadUsers();
     } catch (err) {
-      alert('Error deleting config: ' + err.message);
+      alert('Error creating account: ' + err.message);
+    } finally {
+      setSaving(false);
     }
   };
 
-  // Filter credentials to only show directory service types
-  const directoryCredentials = credentials.filter(c => 
-    ['tacacs', 'radius', 'ldap', 'active_directory'].includes(c.credential_type)
-  );
+  const handleDeleteServer = async (id) => {
+    if (!confirm('Delete this auth server and all associated accounts?')) return;
+    try {
+      await fetchApi(`/api/credentials/enterprise/configs/${id}`, { method: 'DELETE' });
+      onRefresh();
+      loadUsers();
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  };
+
+  const handleDeleteAccount = async (id) => {
+    if (!confirm('Delete this service account?')) return;
+    try {
+      await fetchApi(`/api/credentials/enterprise/users/${id}`, { method: 'DELETE' });
+      loadUsers();
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  };
+
+  const getDefaultPort = (authType) => {
+    switch (authType) {
+      case 'tacacs': return 49;
+      case 'radius': return 1812;
+      case 'ldap': return 389;
+      case 'active_directory': return 389;
+      default: return 0;
+    }
+  };
+
+  // Group users by config
+  const getUsersForConfig = (configId) => users.filter(u => u.auth_config_id === configId);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold">Enterprise Auth Servers</h2>
-          <p className="text-sm text-gray-500">Configure TACACS+, RADIUS, LDAP, and Active Directory servers</p>
+          <h2 className="text-lg font-semibold">Enterprise Authentication</h2>
+          <p className="text-sm text-gray-500">
+            Configure TACACS+, RADIUS, LDAP, or Active Directory for device authentication
+          </p>
         </div>
         <button
-          onClick={() => setShowModal(true)}
+          onClick={() => setShowServerModal(true)}
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
           <Plus className="w-4 h-4" />
@@ -1463,45 +1559,102 @@ function EnterpriseAuthConfigsList({ configs, credentials, onRefresh }) {
         </button>
       </div>
 
+      {/* Empty State */}
       {configs.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed">
-          <Server className="w-12 h-12 mx-auto text-gray-400 mb-3" />
-          <p className="text-gray-600 font-medium">No auth servers configured</p>
-          <p className="text-sm text-gray-500 mt-1">Add a TACACS+, RADIUS, LDAP, or AD server to enable enterprise authentication</p>
+        <div className="text-center py-16 bg-gray-50 rounded-xl border-2 border-dashed">
+          <Server className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+          <h3 className="text-lg font-medium text-gray-700">No Auth Servers Configured</h3>
+          <p className="text-gray-500 mt-2 max-w-md mx-auto">
+            Add a TACACS+, RADIUS, LDAP, or Active Directory server to enable 
+            enterprise authentication for your scheduled jobs.
+          </p>
+          <button
+            onClick={() => setShowServerModal(true)}
+            className="mt-6 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Add Your First Auth Server
+          </button>
         </div>
       ) : (
-        <div className="grid gap-4">
+        <div className="space-y-4">
           {configs.map((config) => {
-            const typeInfo = AUTH_TYPE_LABELS[config.auth_type] || { label: config.auth_type, color: 'bg-gray-100 text-gray-700' };
+            const typeInfo = AUTH_TYPE_LABELS[config.auth_type] || { label: config.auth_type, color: 'bg-gray-100 text-gray-700', icon: Server };
+            const TypeIcon = typeInfo.icon;
+            const configUsers = getUsersForConfig(config.id);
+
             return (
-              <div key={config.id} className="bg-white border rounded-lg p-4 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="p-2 bg-gray-100 rounded-lg">
-                    <Server className="w-5 h-5 text-gray-600" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{config.name}</span>
-                      <span className={cn("px-2 py-0.5 text-xs rounded-full", typeInfo.color)}>
-                        {typeInfo.label}
-                      </span>
-                      {config.is_default && (
-                        <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full">Default</span>
-                      )}
+              <div key={config.id} className="bg-white border rounded-xl overflow-hidden">
+                {/* Server Header */}
+                <div className="p-4 bg-gray-50 border-b flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={cn("p-2 rounded-lg", typeInfo.color)}>
+                      <TypeIcon className="w-5 h-5" />
                     </div>
-                    <p className="text-sm text-gray-500 mt-1">
-                      Credential: {config.credential_name || 'Not set'}
-                    </p>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold">{config.name}</span>
+                        <span className={cn("px-2 py-0.5 text-xs rounded-full", typeInfo.color)}>
+                          {typeInfo.label}
+                        </span>
+                        {config.is_default && (
+                          <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full">Default</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => { setSelectedServer(config); setAccountForm(prev => ({ ...prev, auth_config_id: config.id })); setShowAccountModal(true); }}
+                      className="flex items-center gap-1 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-lg"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add Account
+                    </button>
+                    <button
+                      onClick={() => handleDeleteServer(config.id)}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                      title="Delete Server"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleDelete(config.id)}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                    title="Delete"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+
+                {/* Service Accounts */}
+                <div className="p-4">
+                  {configUsers.length === 0 ? (
+                    <div className="text-center py-6 text-gray-500">
+                      <User className="w-8 h-8 mx-auto text-gray-300 mb-2" />
+                      <p className="text-sm">No service accounts configured</p>
+                      <button
+                        onClick={() => { setSelectedServer(config); setAccountForm(prev => ({ ...prev, auth_config_id: config.id })); setShowAccountModal(true); }}
+                        className="text-blue-600 text-sm mt-1 hover:underline"
+                      >
+                        Add a service account
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Service Accounts</p>
+                      {configUsers.map(user => (
+                        <div key={user.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <User className="w-4 h-4 text-gray-400" />
+                            <div>
+                              <span className="font-medium text-sm">{user.name}</span>
+                              <span className="text-gray-500 text-sm ml-2">({user.username})</span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleDeleteAccount(user.id)}
+                            className="p-1.5 text-red-500 hover:bg-red-100 rounded"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -1509,23 +1662,23 @@ function EnterpriseAuthConfigsList({ configs, credentials, onRefresh }) {
         </div>
       )}
 
-      {/* Add Config Modal */}
-      {showModal && (
+      {/* Add Server Modal */}
+      {showServerModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4">
             <div className="flex items-center justify-between px-6 py-4 border-b">
               <h2 className="text-lg font-semibold">Add Auth Server</h2>
-              <button onClick={() => setShowModal(false)} className="p-1 hover:bg-gray-100 rounded">
+              <button onClick={() => setShowServerModal(false)} className="p-1 hover:bg-gray-100 rounded">
                 <XCircle className="w-5 h-5" />
               </button>
             </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleCreateServer} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Server Name *</label>
                 <input
                   type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  value={serverForm.name}
+                  onChange={(e) => setServerForm(prev => ({ ...prev, name: e.target.value }))}
                   className="w-full px-3 py-2 border rounded-lg"
                   placeholder="e.g., Primary TACACS Server"
                   required
@@ -1534,8 +1687,8 @@ function EnterpriseAuthConfigsList({ configs, credentials, onRefresh }) {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Auth Type *</label>
                 <select
-                  value={formData.auth_type}
-                  onChange={(e) => setFormData(prev => ({ ...prev, auth_type: e.target.value }))}
+                  value={serverForm.auth_type}
+                  onChange={(e) => setServerForm(prev => ({ ...prev, auth_type: e.target.value, port: '' }))}
                   className="w-full px-3 py-2 border rounded-lg"
                 >
                   <option value="tacacs">TACACS+</option>
@@ -1544,50 +1697,137 @@ function EnterpriseAuthConfigsList({ configs, credentials, onRefresh }) {
                   <option value="active_directory">Active Directory</option>
                 </select>
               </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Server Address *</label>
+                  <input
+                    type="text"
+                    value={serverForm.server}
+                    onChange={(e) => setServerForm(prev => ({ ...prev, server: e.target.value }))}
+                    className="w-full px-3 py-2 border rounded-lg"
+                    placeholder="192.168.1.100 or hostname"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Port</label>
+                  <input
+                    type="number"
+                    value={serverForm.port}
+                    onChange={(e) => setServerForm(prev => ({ ...prev, port: e.target.value }))}
+                    className="w-full px-3 py-2 border rounded-lg"
+                    placeholder={String(getDefaultPort(serverForm.auth_type))}
+                  />
+                </div>
+              </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Server Credential *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {serverForm.auth_type === 'ldap' || serverForm.auth_type === 'active_directory' ? 'Bind Password' : 'Shared Secret'} *
+                </label>
+                <input
+                  type="password"
+                  value={serverForm.secret_key}
+                  onChange={(e) => setServerForm(prev => ({ ...prev, secret_key: e.target.value }))}
+                  className="w-full px-3 py-2 border rounded-lg"
+                  required
+                />
+              </div>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={serverForm.is_default}
+                  onChange={(e) => setServerForm(prev => ({ ...prev, is_default: e.target.checked }))}
+                  className="rounded"
+                />
+                <span className="text-sm text-gray-700">Set as default for this auth type</span>
+              </label>
+              <div className="flex justify-end gap-3 pt-4 border-t">
+                <button type="button" onClick={() => setShowServerModal(false)} className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg">
+                  Cancel
+                </button>
+                <button type="submit" disabled={saving} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                  {saving ? 'Creating...' : 'Create Server'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Account Modal */}
+      {showAccountModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4">
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <h2 className="text-lg font-semibold">Add Service Account</h2>
+              <button onClick={() => setShowAccountModal(false)} className="p-1 hover:bg-gray-100 rounded">
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleCreateAccount} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Account Name *</label>
+                <input
+                  type="text"
+                  value={accountForm.name}
+                  onChange={(e) => setAccountForm(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full px-3 py-2 border rounded-lg"
+                  placeholder="e.g., Network Automation"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Auth Server *</label>
                 <select
-                  value={formData.credential_id}
-                  onChange={(e) => setFormData(prev => ({ ...prev, credential_id: parseInt(e.target.value) }))}
+                  value={accountForm.auth_config_id}
+                  onChange={(e) => setAccountForm(prev => ({ ...prev, auth_config_id: parseInt(e.target.value) }))}
                   className="w-full px-3 py-2 border rounded-lg"
                   required
                 >
-                  <option value="">Select a credential...</option>
-                  {directoryCredentials.map(cred => (
-                    <option key={cred.id} value={cred.id}>
-                      {cred.name} ({CREDENTIAL_TYPES[cred.credential_type]?.label || cred.credential_type})
+                  <option value="">Select server...</option>
+                  {configs.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} ({AUTH_TYPE_LABELS[c.auth_type]?.label})
                     </option>
                   ))}
                 </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  Select a credential containing the server connection details
-                </p>
               </div>
-              <div className="flex items-center gap-4">
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={formData.is_default}
-                    onChange={(e) => setFormData(prev => ({ ...prev, is_default: e.target.checked }))}
-                    className="rounded"
-                  />
-                  <span className="text-sm text-gray-700">Set as default for this auth type</span>
-                </label>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Username *</label>
+                <input
+                  type="text"
+                  value={accountForm.username}
+                  onChange={(e) => setAccountForm(prev => ({ ...prev, username: e.target.value }))}
+                  className="w-full px-3 py-2 border rounded-lg"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Password *</label>
+                <input
+                  type="password"
+                  value={accountForm.password}
+                  onChange={(e) => setAccountForm(prev => ({ ...prev, password: e.target.value }))}
+                  className="w-full px-3 py-2 border rounded-lg"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <input
+                  type="text"
+                  value={accountForm.description}
+                  onChange={(e) => setAccountForm(prev => ({ ...prev, description: e.target.value }))}
+                  className="w-full px-3 py-2 border rounded-lg"
+                  placeholder="Optional"
+                />
               </div>
               <div className="flex justify-end gap-3 pt-4 border-t">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
-                >
+                <button type="button" onClick={() => setShowAccountModal(false)} className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg">
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {saving ? 'Creating...' : 'Create'}
+                <button type="submit" disabled={saving} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                  {saving ? 'Creating...' : 'Create Account'}
                 </button>
               </div>
             </form>
@@ -1599,209 +1839,8 @@ function EnterpriseAuthConfigsList({ configs, credentials, onRefresh }) {
 }
 
 function EnterpriseAuthUsersList({ users, configs, onRefresh }) {
-  const [showModal, setShowModal] = useState(false);
-  const [formData, setFormData] = useState({
-    name: '',
-    auth_config_id: '',
-    username: '',
-    password: '',
-    description: '',
-    is_service_account: true,
-  });
-  const [saving, setSaving] = useState(false);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      await fetchApi('/api/credentials/enterprise/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
-      setShowModal(false);
-      setFormData({ name: '', auth_config_id: '', username: '', password: '', description: '', is_service_account: true });
-      onRefresh();
-    } catch (err) {
-      alert('Error creating user: ' + err.message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDelete = async (id) => {
-    if (!confirm('Delete this service account?')) return;
-    try {
-      await fetchApi(`/api/credentials/enterprise/users/${id}`, { method: 'DELETE' });
-      onRefresh();
-    } catch (err) {
-      alert('Error deleting user: ' + err.message);
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold">Service Accounts</h2>
-          <p className="text-sm text-gray-500">User credentials validated against enterprise auth servers</p>
-        </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          disabled={configs.length === 0}
-        >
-          <Plus className="w-4 h-4" />
-          Add Service Account
-        </button>
-      </div>
-
-      {configs.length === 0 ? (
-        <div className="text-center py-12 bg-amber-50 rounded-lg border border-amber-200">
-          <AlertTriangle className="w-12 h-12 mx-auto text-amber-500 mb-3" />
-          <p className="text-amber-800 font-medium">No auth servers configured</p>
-          <p className="text-sm text-amber-600 mt-1">Add an auth server first before creating service accounts</p>
-        </div>
-      ) : users.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed">
-          <User className="w-12 h-12 mx-auto text-gray-400 mb-3" />
-          <p className="text-gray-600 font-medium">No service accounts</p>
-          <p className="text-sm text-gray-500 mt-1">Add service accounts to use for job authentication</p>
-        </div>
-      ) : (
-        <div className="grid gap-4">
-          {users.map((user) => {
-            const typeInfo = AUTH_TYPE_LABELS[user.auth_type] || { label: user.auth_type, color: 'bg-gray-100 text-gray-700' };
-            return (
-              <div key={user.id} className="bg-white border rounded-lg p-4 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="p-2 bg-gray-100 rounded-lg">
-                    <User className="w-5 h-5 text-gray-600" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{user.name}</span>
-                      <span className={cn("px-2 py-0.5 text-xs rounded-full", typeInfo.color)}>
-                        {typeInfo.label}
-                      </span>
-                      {user.is_service_account && (
-                        <span className="px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full">Service Account</span>
-                      )}
-                    </div>
-                    <p className="text-sm text-gray-500 mt-1">
-                      Username: {user.username} • Server: {user.config_name}
-                    </p>
-                    {user.description && (
-                      <p className="text-xs text-gray-400 mt-1">{user.description}</p>
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleDelete(user.id)}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                    title="Delete"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Add User Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4">
-            <div className="flex items-center justify-between px-6 py-4 border-b">
-              <h2 className="text-lg font-semibold">Add Service Account</h2>
-              <button onClick={() => setShowModal(false)} className="p-1 hover:bg-gray-100 rounded">
-                <XCircle className="w-5 h-5" />
-              </button>
-            </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                  className="w-full px-3 py-2 border rounded-lg"
-                  placeholder="e.g., Network Automation Account"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Auth Server *</label>
-                <select
-                  value={formData.auth_config_id}
-                  onChange={(e) => setFormData(prev => ({ ...prev, auth_config_id: parseInt(e.target.value) }))}
-                  className="w-full px-3 py-2 border rounded-lg"
-                  required
-                >
-                  <option value="">Select an auth server...</option>
-                  {configs.map(config => (
-                    <option key={config.id} value={config.id}>
-                      {config.name} ({AUTH_TYPE_LABELS[config.auth_type]?.label || config.auth_type})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Username *</label>
-                <input
-                  type="text"
-                  value={formData.username}
-                  onChange={(e) => setFormData(prev => ({ ...prev, username: e.target.value }))}
-                  className="w-full px-3 py-2 border rounded-lg"
-                  placeholder="service_account"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Password *</label>
-                <input
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                  className="w-full px-3 py-2 border rounded-lg"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                <input
-                  type="text"
-                  value={formData.description}
-                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  className="w-full px-3 py-2 border rounded-lg"
-                  placeholder="Optional description"
-                />
-              </div>
-              <div className="flex justify-end gap-3 pt-4 border-t">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {saving ? 'Creating...' : 'Create'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  // Redirect to main enterprise page - this view is now unified
+  return <EnterpriseAuthConfigsList configs={configs} credentials={[]} onRefresh={onRefresh} />;
 }
 
 export default CredentialVaultPage;
