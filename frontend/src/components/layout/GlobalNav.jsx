@@ -5,7 +5,8 @@ import {
   Activity, 
   Settings,
   ChevronDown,
-  GitBranch
+  GitBranch,
+  KeyRound
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -23,6 +24,13 @@ const modules = [
     icon: GitBranch, 
     path: '/workflows',
     description: 'Visual Automation Builder'
+  },
+  { 
+    id: 'credentials', 
+    label: 'Credentials', 
+    icon: KeyRound, 
+    path: '/credentials',
+    description: 'Credential Vault'
   },
   { 
     id: 'monitor', 

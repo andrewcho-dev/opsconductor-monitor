@@ -1,0 +1,1 @@
+export { CredentialVaultPage } from './CredentialVaultPage';

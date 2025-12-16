@@ -16,10 +16,12 @@ import {
   AlertsPage as SystemAlertsPage,
   SettingsPage as SystemSettingsPage,
   NotificationsPage,
-  CredentialsPage,
   LogsPage,
   AboutPage 
 } from "./pages/system";
+
+// Credentials Module
+import { CredentialVaultPage } from "./pages/credentials";
 import {
   GeneralSettings,
   NetworkSettings,
@@ -58,6 +60,12 @@ function App() {
         <Route path="/monitor/active-jobs" element={<ActiveJobsPage />} />
         <Route path="/monitor/job-history" element={<JobHistoryPage />} />
 
+        {/* CREDENTIALS MODULE */}
+        <Route path="/credentials" element={<CredentialVaultPage />} />
+        <Route path="/credentials/groups" element={<CredentialVaultPage />} />
+        <Route path="/credentials/expiring" element={<CredentialVaultPage />} />
+        <Route path="/credentials/audit" element={<CredentialVaultPage />} />
+
         {/* SYSTEM MODULE */}
         <Route path="/system" element={<Navigate to="/system/overview" replace />} />
         <Route path="/system/overview" element={<SystemOverviewPage />} />
@@ -75,7 +83,7 @@ function App() {
           <Route path="backup" element={<BackupSettings />} />
         </Route>
         <Route path="/system/notifications" element={<NotificationsPage />} />
-        <Route path="/system/credentials" element={<CredentialsPage />} />
+        <Route path="/system/credentials" element={<Navigate to="/credentials" replace />} />
         <Route path="/system/logs" element={<LogsPage />} />
         <Route path="/system/about" element={<AboutPage />} />
 

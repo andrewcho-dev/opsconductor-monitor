@@ -24,7 +24,13 @@ import {
   Terminal,
   Archive,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  KeyRound,
+  Clock,
+  History,
+  ShieldCheck,
+  AlertTriangle,
+  FileKey
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -102,7 +108,6 @@ const moduleNavigation = {
         items: [
           { id: 'settings', label: 'Settings', icon: Settings, path: '/system/settings' },
           { id: 'notifications', label: 'Notifications', icon: Bell, path: '/system/notifications' },
-          { id: 'credentials', label: 'Credentials', icon: Key, path: '/system/credentials' },
         ]
       },
       {
@@ -110,6 +115,34 @@ const moduleNavigation = {
         items: [
           { id: 'logs', label: 'System Logs', icon: ScrollText, path: '/system/logs' },
           { id: 'about', label: 'About', icon: Info, path: '/system/about' },
+        ]
+      }
+    ]
+  },
+  credentials: {
+    title: 'Credential Vault',
+    sections: [
+      {
+        title: 'Management',
+        items: [
+          { id: 'all', label: 'All Credentials', icon: KeyRound, path: '/credentials' },
+          { id: 'groups', label: 'Credential Groups', icon: FolderOpen, path: '/credentials/groups' },
+        ]
+      },
+      {
+        title: 'By Type',
+        items: [
+          { id: 'ssh', label: 'SSH Keys', icon: Terminal, path: '/credentials?type=ssh' },
+          { id: 'winrm', label: 'WinRM', icon: Shield, path: '/credentials?type=winrm' },
+          { id: 'certificates', label: 'Certificates', icon: FileKey, path: '/credentials?type=certificate' },
+          { id: 'api-keys', label: 'API Keys', icon: Key, path: '/credentials?type=api_key' },
+        ]
+      },
+      {
+        title: 'Monitoring',
+        items: [
+          { id: 'expiring', label: 'Expiring Soon', icon: AlertTriangle, path: '/credentials/expiring' },
+          { id: 'audit', label: 'Audit Log', icon: History, path: '/credentials/audit' },
         ]
       }
     ]

@@ -17,6 +17,7 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 from backend.database import get_db
 from backend.utils.time import now_utc
+from backend.services.credential_audit_service import get_audit_service
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +69,56 @@ class CredentialService:
         encrypted = self._fernet.encrypt(json_data.encode())
         return base64.b64encode(encrypted).decode()
     
+    def _extract_certificate_info(self, credential_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        Extract certificate information from PEM-encoded certificate data.
+        
+        Returns certificate metadata like fingerprint, issuer, subject, validity dates.
+        """
+        try:
+            from cryptography import x509
+            from cryptography.hazmat.backends import default_backend
+            
+            cert_pem = credential_data.get('certificate') or credential_data.get('cert')
+            if not cert_pem:
+                return None
+            
+            # Parse the certificate
+            cert = x509.load_pem_x509_certificate(cert_pem.encode(), default_backend())
+            
+            # Extract info
+            info = {
+                'fingerprint': cert.fingerprint(hashes.SHA256()).hex(),
+                'serial': str(cert.serial_number),
+                'issuer': cert.issuer.rfc4514_string(),
+                'subject': cert.subject.rfc4514_string(),
+                'not_before': cert.not_valid_before_utc,
+                'not_after': cert.not_valid_after_utc,
+            }
+            
+            # Try to get key info
+            try:
+                public_key = cert.public_key()
+                key_type = type(public_key).__name__
+                if 'RSA' in key_type:
+                    info['key_algorithm'] = 'RSA'
+                    info['key_size'] = public_key.key_size
+                elif 'EC' in key_type:
+                    info['key_algorithm'] = 'ECDSA'
+                    info['key_size'] = public_key.key_size
+                elif 'Ed25519' in key_type:
+                    info['key_algorithm'] = 'Ed25519'
+                    info['key_size'] = 256
+                else:
+                    info['key_algorithm'] = key_type
+            except Exception:
+                pass
+            
+            return info
+        except Exception as e:
+            logger.warning(f"Failed to extract certificate info: {e}")
+            return None
+    
     def decrypt(self, encrypted_data: str) -> Dict[str, Any]:
         """Decrypt credential data."""
         try:
@@ -89,46 +140,102 @@ class CredentialService:
         credential_data: Dict[str, Any],
         description: str = None,
         username: str = None,
-        created_by: str = None
+        created_by: str = None,
+        valid_from: datetime = None,
+        valid_until: datetime = None,
+        category: str = None,
+        environment: str = None,
+        owner: str = None,
+        tags: List[str] = None,
+        notes: str = None,
     ) -> Dict[str, Any]:
         """
         Create a new credential.
         
         Args:
             name: Unique name for the credential
-            credential_type: Type (ssh, snmp, api_key, password)
+            credential_type: Type (ssh, snmp, api_key, password, winrm, certificate, pki)
             credential_data: Sensitive data to encrypt (password, private_key, etc.)
             description: Optional description
             username: Optional username for display
             created_by: Who created this credential
+            valid_from: When the credential becomes valid
+            valid_until: When the credential expires
+            category: Category (network, server, cloud, database)
+            environment: Environment (production, staging, development)
+            owner: Who owns/manages this credential
+            tags: List of tags for filtering
+            notes: Additional notes
         
         Returns:
             Created credential (without sensitive data)
         """
         encrypted_data = self.encrypt(credential_data)
         
+        # Extract certificate info if it's a certificate type
+        cert_fingerprint = None
+        cert_issuer = None
+        cert_subject = None
+        cert_serial = None
+        key_algorithm = None
+        key_size = None
+        
+        if credential_type in ('certificate', 'pki'):
+            cert_info = self._extract_certificate_info(credential_data)
+            if cert_info:
+                cert_fingerprint = cert_info.get('fingerprint')
+                cert_issuer = cert_info.get('issuer')
+                cert_subject = cert_info.get('subject')
+                cert_serial = cert_info.get('serial')
+                key_algorithm = cert_info.get('key_algorithm')
+                key_size = cert_info.get('key_size')
+                # Auto-set validity dates from certificate if not provided
+                if not valid_from and cert_info.get('not_before'):
+                    valid_from = cert_info['not_before']
+                if not valid_until and cert_info.get('not_after'):
+                    valid_until = cert_info['not_after']
+        
         db = get_db()
         with db.cursor() as cursor:
             cursor.execute("""
                 INSERT INTO credentials 
-                (name, description, credential_type, encrypted_data, username, created_by)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                (name, description, credential_type, encrypted_data, username, created_by,
+                 valid_from, valid_until, category, environment, owner, tags, notes,
+                 certificate_fingerprint, certificate_issuer, certificate_subject,
+                 certificate_serial, key_algorithm, key_size, status)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id, name, description, credential_type, username, 
-                          used_by_count, last_used_at, created_at, updated_at
-            """, (name, description, credential_type, encrypted_data, username, created_by))
+                          used_by_count, last_used_at, created_at, updated_at,
+                          valid_from, valid_until, category, environment, owner, tags, notes, status
+            """, (name, description, credential_type, encrypted_data, username, created_by,
+                  valid_from, valid_until, category, environment, owner, tags, notes,
+                  cert_fingerprint, cert_issuer, cert_subject, cert_serial, key_algorithm, key_size, 'active'))
             
             row = cursor.fetchone()
             db.get_connection().commit()
             
-            return dict(row)
+            result = dict(row)
+            
+            # Log the creation
+            audit = get_audit_service()
+            audit.log_created(
+                credential_id=result['id'],
+                credential_name=name,
+                credential_type=credential_type,
+                performed_by=created_by
+            )
+            
+            return result
     
-    def get_credential(self, credential_id: int, include_secret: bool = False) -> Optional[Dict[str, Any]]:
+    def get_credential(self, credential_id: int, include_secret: bool = False, accessed_by: str = None, access_reason: str = None) -> Optional[Dict[str, Any]]:
         """
         Get a credential by ID.
         
         Args:
             credential_id: Credential ID
             include_secret: If True, decrypt and include sensitive data
+            accessed_by: Who is accessing (for audit logging when include_secret=True)
+            access_reason: Why the secret is being accessed
         
         Returns:
             Credential data or None
@@ -138,14 +245,22 @@ class CredentialService:
             if include_secret:
                 cursor.execute("""
                     SELECT id, name, description, credential_type, encrypted_data,
-                           username, used_by_count, last_used_at, created_at, updated_at
+                           username, used_by_count, last_used_at, created_at, updated_at,
+                           valid_from, valid_until, is_expired, category, environment,
+                           owner, tags, notes, status,
+                           certificate_fingerprint, certificate_issuer, certificate_subject,
+                           certificate_serial, key_algorithm, key_size
                     FROM credentials
                     WHERE id = %s AND is_deleted = FALSE
                 """, (credential_id,))
             else:
                 cursor.execute("""
                     SELECT id, name, description, credential_type, 
-                           username, used_by_count, last_used_at, created_at, updated_at
+                           username, used_by_count, last_used_at, created_at, updated_at,
+                           valid_from, valid_until, is_expired, category, environment,
+                           owner, tags, notes, status,
+                           certificate_fingerprint, certificate_issuer, certificate_subject,
+                           certificate_serial, key_algorithm, key_size
                     FROM credentials
                     WHERE id = %s AND is_deleted = FALSE
                 """, (credential_id,))
@@ -158,6 +273,16 @@ class CredentialService:
             
             if include_secret and 'encrypted_data' in result:
                 result['secret_data'] = self.decrypt(result.pop('encrypted_data'))
+                
+                # Log the access
+                audit = get_audit_service()
+                audit.log_accessed(
+                    credential_id=credential_id,
+                    credential_name=result['name'],
+                    credential_type=result['credential_type'],
+                    performed_by=accessed_by,
+                    access_reason=access_reason
+                )
             
             return result
     
@@ -173,34 +298,82 @@ class CredentialService:
                 return None
             return self.get_credential(row['id'], include_secret)
     
-    def list_credentials(self, credential_type: str = None) -> List[Dict[str, Any]]:
+    def list_credentials(
+        self,
+        credential_type: str = None,
+        category: str = None,
+        environment: str = None,
+        status: str = None,
+        tags: List[str] = None,
+        include_expired: bool = True
+    ) -> List[Dict[str, Any]]:
         """
         List all credentials (without sensitive data).
         
         Args:
             credential_type: Optional filter by type
+            category: Optional filter by category
+            environment: Optional filter by environment
+            status: Optional filter by status
+            tags: Optional filter by tags (any match)
+            include_expired: Whether to include expired credentials
         
         Returns:
             List of credentials
         """
         db = get_db()
+        
+        conditions = ["is_deleted = FALSE"]
+        params = []
+        
+        if credential_type:
+            conditions.append("credential_type = %s")
+            params.append(credential_type)
+        
+        if category:
+            conditions.append("category = %s")
+            params.append(category)
+        
+        if environment:
+            conditions.append("environment = %s")
+            params.append(environment)
+        
+        if status:
+            conditions.append("status = %s")
+            params.append(status)
+        
+        if tags:
+            conditions.append("tags && %s")
+            params.append(tags)
+        
+        if not include_expired:
+            conditions.append("(is_expired = FALSE OR is_expired IS NULL)")
+        
+        where_clause = " AND ".join(conditions)
+        
         with db.cursor() as cursor:
-            if credential_type:
-                cursor.execute("""
-                    SELECT id, name, description, credential_type, 
-                           username, used_by_count, last_used_at, created_at, updated_at
-                    FROM credentials
-                    WHERE is_deleted = FALSE AND credential_type = %s
-                    ORDER BY name
-                """, (credential_type,))
-            else:
-                cursor.execute("""
-                    SELECT id, name, description, credential_type, 
-                           username, used_by_count, last_used_at, created_at, updated_at
-                    FROM credentials
-                    WHERE is_deleted = FALSE
-                    ORDER BY name
-                """)
+            cursor.execute(f"""
+                SELECT id, name, description, credential_type, 
+                       username, used_by_count, last_used_at, created_at, updated_at,
+                       valid_from, valid_until, is_expired, category, environment,
+                       owner, tags, notes, status,
+                       certificate_fingerprint, certificate_issuer, certificate_subject,
+                       key_algorithm, key_size,
+                       CASE 
+                           WHEN valid_until IS NULL THEN NULL
+                           WHEN valid_until < CURRENT_TIMESTAMP THEN 'expired'
+                           WHEN valid_until < CURRENT_TIMESTAMP + INTERVAL '30 days' THEN 'expiring_soon'
+                           ELSE 'valid'
+                       END as expiration_status,
+                       CASE 
+                           WHEN valid_until IS NOT NULL THEN 
+                               EXTRACT(DAY FROM (valid_until - CURRENT_TIMESTAMP))::INTEGER
+                           ELSE NULL
+                       END as days_until_expiration
+                FROM credentials
+                WHERE {where_clause}
+                ORDER BY name
+            """, params)
             
             return [dict(row) for row in cursor.fetchall()]
     
@@ -268,17 +441,33 @@ class CredentialService:
             
             return dict(row) if row else None
     
-    def delete_credential(self, credential_id: int) -> bool:
+    def delete_credential(self, credential_id: int, deleted_by: str = None) -> bool:
         """Soft delete a credential."""
+        # Get credential info for audit log before deletion
+        cred = self.get_credential(credential_id)
+        if not cred:
+            return False
+        
         db = get_db()
         with db.cursor() as cursor:
             cursor.execute("""
                 UPDATE credentials
-                SET is_deleted = TRUE, updated_at = %s
+                SET is_deleted = TRUE, updated_at = %s, status = 'deleted'
                 WHERE id = %s AND is_deleted = FALSE
             """, (now_utc(), credential_id))
             db.get_connection().commit()
-            return cursor.rowcount > 0
+            
+            if cursor.rowcount > 0:
+                # Log the deletion
+                audit = get_audit_service()
+                audit.log_deleted(
+                    credential_id=credential_id,
+                    credential_name=cred['name'],
+                    credential_type=cred['credential_type'],
+                    performed_by=deleted_by
+                )
+                return True
+            return False
     
     # =========================================================================
     # Credential Groups
@@ -492,6 +681,125 @@ class CredentialService:
                 """, (limit,))
             
             return [dict(row) for row in cursor.fetchall()]
+    
+    # =========================================================================
+    # Expiration Tracking
+    # =========================================================================
+    
+    def get_expiring_credentials(self, days_ahead: int = 30) -> List[Dict[str, Any]]:
+        """Get credentials that will expire within the specified number of days."""
+        db = get_db()
+        with db.cursor() as cursor:
+            cursor.execute("""
+                SELECT id, name, credential_type, valid_until, owner, category, environment,
+                       EXTRACT(DAY FROM (valid_until - CURRENT_TIMESTAMP))::INTEGER as days_remaining
+                FROM credentials
+                WHERE is_deleted = FALSE
+                  AND valid_until IS NOT NULL
+                  AND valid_until > CURRENT_TIMESTAMP
+                  AND valid_until < CURRENT_TIMESTAMP + (%s || ' days')::INTERVAL
+                ORDER BY valid_until ASC
+            """, (days_ahead,))
+            return [dict(row) for row in cursor.fetchall()]
+    
+    def get_expired_credentials(self) -> List[Dict[str, Any]]:
+        """Get all expired credentials."""
+        db = get_db()
+        with db.cursor() as cursor:
+            cursor.execute("""
+                SELECT id, name, credential_type, valid_until, owner, category, environment
+                FROM credentials
+                WHERE is_deleted = FALSE
+                  AND valid_until IS NOT NULL
+                  AND valid_until < CURRENT_TIMESTAMP
+                ORDER BY valid_until DESC
+            """)
+            return [dict(row) for row in cursor.fetchall()]
+    
+    def update_expiration_status(self) -> int:
+        """Update is_expired flag for all credentials. Returns count of newly expired."""
+        db = get_db()
+        with db.cursor() as cursor:
+            cursor.execute("""
+                UPDATE credentials
+                SET is_expired = TRUE, status = 'expired'
+                WHERE valid_until IS NOT NULL 
+                  AND valid_until < CURRENT_TIMESTAMP 
+                  AND is_expired = FALSE
+                  AND is_deleted = FALSE
+                RETURNING id, name, credential_type
+            """)
+            
+            expired = cursor.fetchall()
+            db.get_connection().commit()
+            
+            # Log expiration events
+            if expired:
+                audit = get_audit_service()
+                for row in expired:
+                    audit.log_expired(
+                        credential_id=row['id'],
+                        credential_name=row['name'],
+                        credential_type=row['credential_type']
+                    )
+            
+            return len(expired)
+    
+    def get_credential_statistics(self) -> Dict[str, Any]:
+        """Get statistics about credentials in the vault."""
+        db = get_db()
+        with db.cursor() as cursor:
+            # Total counts by type
+            cursor.execute("""
+                SELECT credential_type, COUNT(*) as count
+                FROM credentials
+                WHERE is_deleted = FALSE
+                GROUP BY credential_type
+                ORDER BY count DESC
+            """)
+            by_type = {row['credential_type']: row['count'] for row in cursor.fetchall()}
+            
+            # Total counts by status
+            cursor.execute("""
+                SELECT status, COUNT(*) as count
+                FROM credentials
+                WHERE is_deleted = FALSE
+                GROUP BY status
+            """)
+            by_status = {row['status'] or 'active': row['count'] for row in cursor.fetchall()}
+            
+            # Expiration stats
+            cursor.execute("""
+                SELECT 
+                    COUNT(*) FILTER (WHERE valid_until IS NULL) as no_expiration,
+                    COUNT(*) FILTER (WHERE valid_until < CURRENT_TIMESTAMP) as expired,
+                    COUNT(*) FILTER (WHERE valid_until BETWEEN CURRENT_TIMESTAMP AND CURRENT_TIMESTAMP + INTERVAL '7 days') as expiring_7_days,
+                    COUNT(*) FILTER (WHERE valid_until BETWEEN CURRENT_TIMESTAMP AND CURRENT_TIMESTAMP + INTERVAL '30 days') as expiring_30_days,
+                    COUNT(*) FILTER (WHERE valid_until > CURRENT_TIMESTAMP + INTERVAL '30 days') as valid
+                FROM credentials
+                WHERE is_deleted = FALSE
+            """)
+            expiration = dict(cursor.fetchone())
+            
+            # Usage stats
+            cursor.execute("""
+                SELECT 
+                    COUNT(*) as total,
+                    COUNT(*) FILTER (WHERE used_by_count > 0) as used_at_least_once,
+                    COUNT(*) FILTER (WHERE last_used_at > CURRENT_TIMESTAMP - INTERVAL '30 days') as used_last_30_days,
+                    COUNT(*) FILTER (WHERE last_used_at IS NULL OR last_used_at < CURRENT_TIMESTAMP - INTERVAL '90 days') as unused_90_days
+                FROM credentials
+                WHERE is_deleted = FALSE
+            """)
+            usage = dict(cursor.fetchone())
+            
+            return {
+                'total': usage['total'],
+                'by_type': by_type,
+                'by_status': by_status,
+                'expiration': expiration,
+                'usage': usage
+            }
 
 
 # Singleton instance
