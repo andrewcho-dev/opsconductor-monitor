@@ -123,8 +123,12 @@ export function LoginPage() {
       <div className="w-full max-w-md">
         {/* Logo/Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl mb-4">
-            <Shield className="w-8 h-8 text-white" />
+          <div className="inline-flex items-center justify-center bg-slate-600 mb-4 p-0.5">
+            <img 
+              src="/badge-light.svg" 
+              alt="OpsConductor" 
+              className="w-16 h-16"
+            />
           </div>
           <h1 className="text-2xl font-bold text-white">OpsConductor</h1>
           <p className="text-slate-400 mt-1">Network Automation Platform</p>
