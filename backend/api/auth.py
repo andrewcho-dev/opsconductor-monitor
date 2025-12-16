@@ -635,10 +635,11 @@ def verify_2fa_setup():
         })
         
     except Exception as e:
-        logger.error(f"2FA verify error: {e}")
+        import traceback
+        logger.error(f"2FA verify error: {e}\n{traceback.format_exc()}")
         return jsonify({
             'success': False,
-            'error': {'code': 'SERVER_ERROR', 'message': 'Failed to verify 2FA'}
+            'error': {'code': 'SERVER_ERROR', 'message': f'Failed to verify 2FA: {str(e)}'}
         }), 500
 
 

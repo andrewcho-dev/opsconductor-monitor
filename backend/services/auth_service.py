@@ -861,33 +861,38 @@ class AuthService:
     
     def verify_totp_setup(self, user_id: int, code: str) -> bool:
         """Verify TOTP code to complete 2FA setup."""
-        user = self.get_user_by_username_internal(user_id)
-        if not user or not user.get('totp_secret_encrypted'):
-            return False
-        
-        secret = self.decrypt(user['totp_secret_encrypted'])
-        totp = pyotp.TOTP(secret)
-        
-        if totp.verify(code, valid_window=1):
-            with self.db.cursor() as cursor:
-                cursor.execute("""
-                    UPDATE users SET 
-                        two_factor_enabled = TRUE,
-                        two_factor_method = 'totp'
-                    WHERE id = %s
-                """, (user_id,))
-                self.db.get_connection().commit()
+        try:
+            user = self.get_user_by_username_internal(user_id)
+            if not user or not user.get('totp_secret_encrypted'):
+                logger.warning(f"2FA verify: user not found or no totp_secret for user_id={user_id}")
+                return False
             
-            self._log_auth_event(
-                user_id=user_id,
-                username=user['username'],
-                event_type='2fa_enabled',
-                event_status='success',
-                details={'method': 'totp'}
-            )
-            return True
-        
-        return False
+            secret = self.decrypt(user['totp_secret_encrypted'])
+            totp = pyotp.TOTP(secret)
+            
+            if totp.verify(code, valid_window=1):
+                with self.db.cursor() as cursor:
+                    cursor.execute("""
+                        UPDATE users SET 
+                            two_factor_enabled = TRUE,
+                            two_factor_method = 'totp'
+                        WHERE id = %s
+                    """, (user_id,))
+                    self.db.get_connection().commit()
+                
+                self._log_auth_event(
+                    user_id=user_id,
+                    username=user.get('username'),
+                    event_type='2fa_enabled',
+                    event_status='success',
+                    details={'method': 'totp'}
+                )
+                return True
+            
+            return False
+        except Exception as e:
+            logger.error(f"verify_totp_setup error: {e}")
+            raise
     
     def verify_totp(self, user_id: int, code: str) -> bool:
         """Verify a TOTP code during login."""
