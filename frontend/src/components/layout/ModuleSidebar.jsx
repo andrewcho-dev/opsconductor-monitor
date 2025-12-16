@@ -167,10 +167,7 @@ const moduleNavigation = {
 // Settings sub-navigation
 const settingsNavigation = [
   { id: 'general', label: 'General', icon: Settings, path: '/system/settings/general' },
-  { id: 'network', label: 'Network', icon: Wifi, path: '/system/settings/network' },
-  { id: 'ssh', label: 'SSH', icon: Terminal, path: '/system/settings/ssh' },
   { id: 'database', label: 'Database', icon: Database, path: '/system/settings/database' },
-  { id: 'api', label: 'API', icon: Network, path: '/system/settings/api' },
   { id: 'security', label: 'Security', icon: Shield, path: '/system/settings/security' },
   { id: 'logging', label: 'Logging', icon: ScrollText, path: '/system/settings/logging' },
   { id: 'backup', label: 'Backup', icon: Archive, path: '/system/settings/backup' },
