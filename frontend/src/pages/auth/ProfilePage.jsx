@@ -459,28 +459,36 @@ function Setup2FA({ onComplete, onCancel, getAuthHeader }) {
   const [copiedSecret, setCopiedSecret] = useState(false);
 
   useEffect(() => {
-    initSetup();
-  }, []);
+    let cancelled = false;
+    
+    const initSetup = async () => {
+      setLoading(true);
+      try {
+        const res = await fetchApi('/api/auth/2fa/setup', {
+          method: 'POST',
+          headers: getAuthHeader()
+        });
 
-  const initSetup = async () => {
-    setLoading(true);
-    try {
-      const res = await fetchApi('/api/auth/2fa/setup', {
-        method: 'POST',
-        headers: getAuthHeader()
-      });
-
-      if (res.success) {
-        setSetupData(res.data);
-      } else {
-        setError(res.error?.message || 'Failed to initialize 2FA setup');
+        if (!cancelled && res.success) {
+          setSetupData(res.data);
+        } else if (!cancelled) {
+          setError(res.error?.message || 'Failed to initialize 2FA setup');
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err.message || 'Failed to initialize 2FA setup');
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
-    } catch (err) {
-      setError(err.message || 'Failed to initialize 2FA setup');
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+    
+    initSetup();
+    
+    return () => { cancelled = true; };
+  }, []);
 
   const handleVerify = async () => {
     setError('');

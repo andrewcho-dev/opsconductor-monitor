@@ -844,14 +844,20 @@ class AuthService:
         encrypted_secret = self.encrypt(secret)
         encrypted_backup = self.encrypt(json.dumps(backup_codes))
         
-        with self.db.cursor() as cursor:
-            cursor.execute("""
-                UPDATE users SET 
-                    totp_secret_encrypted = %s,
-                    totp_backup_codes_encrypted = %s
-                WHERE id = %s
-            """, (encrypted_secret, encrypted_backup, user_id))
-            self.db.get_connection().commit()
+        try:
+            with self.db.cursor() as cursor:
+                cursor.execute("""
+                    UPDATE users SET 
+                        totp_secret_encrypted = %s,
+                        totp_backup_codes_encrypted = %s
+                    WHERE id = %s
+                """, (encrypted_secret, encrypted_backup, user_id))
+                self.db.get_connection().commit()
+                logger.info(f"TOTP secret saved for user_id={user_id}")
+        except Exception as e:
+            logger.error(f"Failed to save TOTP secret: {e}")
+            self.db.get_connection().rollback()
+            raise
         
         return {
             'secret': secret,
