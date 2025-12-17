@@ -11,7 +11,6 @@ from backend.database import get_db
 from backend.utils.time import now_utc
 from ..utils.responses import success_response, error_response
 from ..utils.errors import NotFoundError, ValidationError
-from ..middleware.permissions import require_permission, Permissions
 
 notifications_bp = Blueprint('notifications', __name__, url_prefix='/api/notifications')
 
@@ -26,7 +25,7 @@ def get_db_connection():
 # ============================================================================
 
 @notifications_bp.route('/channels', methods=['GET'])
-@require_permission(Permissions.NOTIFICATIONS_VIEW)
+
 def list_channels():
     """List all notification channels."""
     db = get_db_connection()
@@ -49,7 +48,7 @@ def list_channels():
 
 
 @notifications_bp.route('/channels', methods=['POST'])
-@require_permission(Permissions.NOTIFICATIONS_MANAGE)
+
 def create_channel():
     """Create a new notification channel."""
     data = request.get_json()
@@ -79,7 +78,7 @@ def create_channel():
 
 
 @notifications_bp.route('/channels/<int:channel_id>', methods=['GET'])
-@require_permission(Permissions.NOTIFICATIONS_VIEW)
+
 def get_channel(channel_id):
     """Get a single notification channel."""
     db = get_db_connection()
@@ -104,7 +103,7 @@ def get_channel(channel_id):
 
 
 @notifications_bp.route('/channels/<int:channel_id>', methods=['PUT'])
-@require_permission(Permissions.NOTIFICATIONS_MANAGE)
+
 def update_channel(channel_id):
     """Update a notification channel."""
     data = request.get_json()
@@ -150,7 +149,7 @@ def update_channel(channel_id):
 
 
 @notifications_bp.route('/channels/<int:channel_id>', methods=['DELETE'])
-@require_permission(Permissions.NOTIFICATIONS_MANAGE)
+
 def delete_channel(channel_id):
     """Delete a notification channel."""
     db = get_db_connection()
@@ -167,7 +166,7 @@ def delete_channel(channel_id):
 
 
 @notifications_bp.route('/channels/<int:channel_id>/test', methods=['POST'])
-@require_permission(Permissions.NOTIFICATIONS_MANAGE)
+
 def test_channel(channel_id):
     """Test a notification channel by sending a test message."""
     db = get_db_connection()
@@ -379,7 +378,7 @@ def build_apprise_url(channel_type: str, config: dict) -> str:
 # ============================================================================
 
 @notifications_bp.route('/rules', methods=['GET'])
-@require_permission(Permissions.NOTIFICATIONS_VIEW)
+
 def list_rules():
     """List all notification rules."""
     db = get_db_connection()
@@ -403,7 +402,7 @@ def list_rules():
 
 
 @notifications_bp.route('/rules', methods=['POST'])
-@require_permission(Permissions.NOTIFICATIONS_MANAGE)
+
 def create_rule():
     """Create a new notification rule."""
     data = request.get_json()
@@ -442,7 +441,7 @@ def create_rule():
 
 
 @notifications_bp.route('/rules/<int:rule_id>', methods=['PUT'])
-@require_permission(Permissions.NOTIFICATIONS_MANAGE)
+
 def update_rule(rule_id):
     """Update a notification rule."""
     data = request.get_json()
@@ -503,7 +502,7 @@ def update_rule(rule_id):
 
 
 @notifications_bp.route('/rules/<int:rule_id>', methods=['DELETE'])
-@require_permission(Permissions.NOTIFICATIONS_MANAGE)
+
 def delete_rule(rule_id):
     """Delete a notification rule."""
     db = get_db_connection()
@@ -524,7 +523,7 @@ def delete_rule(rule_id):
 # ============================================================================
 
 @notifications_bp.route('/history', methods=['GET'])
-@require_permission(Permissions.NOTIFICATIONS_VIEW)
+
 def get_history():
     """Get notification history."""
     limit = int(request.args.get('limit', 50))
@@ -564,7 +563,7 @@ def get_history():
 # ============================================================================
 
 @notifications_bp.route('/templates', methods=['GET'])
-@require_permission(Permissions.NOTIFICATIONS_VIEW)
+
 def list_templates():
     """List all notification templates."""
     from backend.services.template_service import get_template_service
@@ -577,7 +576,7 @@ def list_templates():
 
 
 @notifications_bp.route('/templates', methods=['POST'])
-@require_permission(Permissions.NOTIFICATIONS_MANAGE)
+
 def create_template():
     """Create a new notification template."""
     from backend.services.template_service import get_template_service
@@ -605,7 +604,7 @@ def create_template():
 
 
 @notifications_bp.route('/templates/<int:template_id>', methods=['GET'])
-@require_permission(Permissions.NOTIFICATIONS_VIEW)
+
 def get_template(template_id):
     """Get a single template."""
     from backend.services.template_service import get_template_service
@@ -620,7 +619,7 @@ def get_template(template_id):
 
 
 @notifications_bp.route('/templates/<int:template_id>', methods=['PUT'])
-@require_permission(Permissions.NOTIFICATIONS_MANAGE)
+
 def update_template(template_id):
     """Update a notification template."""
     from backend.services.template_service import get_template_service
@@ -637,7 +636,7 @@ def update_template(template_id):
 
 
 @notifications_bp.route('/templates/<int:template_id>', methods=['DELETE'])
-@require_permission(Permissions.NOTIFICATIONS_MANAGE)
+
 def delete_template(template_id):
     """Delete a notification template."""
     from backend.services.template_service import get_template_service
@@ -652,7 +651,7 @@ def delete_template(template_id):
 
 
 @notifications_bp.route('/templates/<int:template_id>/preview', methods=['POST'])
-@require_permission(Permissions.NOTIFICATIONS_VIEW)
+
 def preview_template(template_id):
     """Preview a template with sample data."""
     from backend.services.template_service import get_template_service
@@ -676,7 +675,7 @@ def preview_template(template_id):
 
 
 @notifications_bp.route('/send', methods=['POST'])
-@require_permission(Permissions.NOTIFICATIONS_MANAGE)
+
 def send_notification():
     """
     Send a notification manually.

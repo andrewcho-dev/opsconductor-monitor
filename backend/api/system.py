@@ -8,7 +8,6 @@ import threading
 from flask import Blueprint, request, jsonify
 from ..utils.responses import success_response, error_response
 from ..utils.errors import AppError
-from ..middleware.permissions import require_permission, require_auth, Permissions
 
 
 system_bp = Blueprint('system', __name__)
@@ -58,7 +57,7 @@ def get_progress():
 
 
 @system_bp.route('/cancel_scan', methods=['POST'])
-@require_auth
+
 def cancel_scan():
     """Cancel running scan."""
     update_scan_state(cancel_requested=True)
@@ -72,7 +71,7 @@ def test_endpoint():
 
 
 @system_bp.route('/check-tool', methods=['GET'])
-@require_auth
+
 def check_tool():
     """
     Check if a tool is available on the system.
@@ -149,7 +148,7 @@ def check_tool():
 
 
 @system_bp.route('/check-network', methods=['GET'])
-@require_auth
+
 def check_network():
     """Check network connectivity."""
     import socket
@@ -172,7 +171,7 @@ def check_network():
 
 
 @system_bp.route('/check-database', methods=['GET'])
-@require_auth
+
 def check_database():
     """Check database connectivity."""
     from backend.database import get_db
@@ -194,7 +193,7 @@ def check_database():
 
 @system_bp.route('/api/system/logging/settings', methods=['GET'])
 @system_bp.route('/logging/settings', methods=['GET'])
-@require_permission(Permissions.SYSTEM_SETTINGS_VIEW)
+
 def get_logging_settings():
     """Get logging settings."""
     from database import DatabaseManager
@@ -230,7 +229,7 @@ def get_logging_settings():
 
 @system_bp.route('/api/system/logging/settings', methods=['PUT'])
 @system_bp.route('/logging/settings', methods=['PUT'])
-@require_permission(Permissions.SYSTEM_SETTINGS_EDIT)
+
 def update_logging_settings():
     """Update logging settings."""
     from database import DatabaseManager

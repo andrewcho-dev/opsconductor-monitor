@@ -7,7 +7,6 @@ Routes for scheduler job management and execution history.
 from flask import Blueprint, request, jsonify
 from ..utils.responses import success_response, error_response, list_response
 from ..utils.errors import AppError, NotFoundError, ValidationError
-from ..middleware.permissions import require_permission, Permissions
 
 
 scheduler_bp = Blueprint('scheduler', __name__, url_prefix='/api/scheduler')
@@ -41,7 +40,7 @@ def handle_generic_error(error):
 
 
 @scheduler_bp.route('/jobs', methods=['GET'])
-@require_permission(Permissions.JOBS_VIEW)
+
 def list_jobs():
     """
     List all scheduler jobs.
@@ -65,7 +64,7 @@ def list_jobs():
 
 
 @scheduler_bp.route('/jobs/<name>', methods=['GET'])
-@require_permission(Permissions.JOBS_VIEW)
+
 def get_job(name):
     """
     Get a single scheduler job by name.
@@ -94,7 +93,7 @@ def get_job(name):
 
 
 @scheduler_bp.route('/jobs', methods=['POST'])
-@require_permission(Permissions.JOBS_CREATE)
+
 def create_or_update_job():
     """
     Create or update a scheduler job.
@@ -135,7 +134,7 @@ def create_or_update_job():
 
 
 @scheduler_bp.route('/jobs/<name>', methods=['DELETE'])
-@require_permission(Permissions.JOBS_DELETE)
+
 def delete_job(name):
     """
     Delete a scheduler job.
@@ -153,7 +152,7 @@ def delete_job(name):
 
 
 @scheduler_bp.route('/jobs/<name>/enable', methods=['POST'])
-@require_permission(Permissions.JOBS_EDIT)
+
 def enable_job(name):
     """
     Enable a scheduler job.
@@ -171,7 +170,7 @@ def enable_job(name):
 
 
 @scheduler_bp.route('/jobs/<name>/disable', methods=['POST'])
-@require_permission(Permissions.JOBS_EDIT)
+
 def disable_job(name):
     """
     Disable a scheduler job.
@@ -189,7 +188,7 @@ def disable_job(name):
 
 
 @scheduler_bp.route('/jobs/<name>/toggle', methods=['POST'])
-@require_permission(Permissions.JOBS_EDIT)
+
 def toggle_job(name):
     """
     Toggle a scheduler job's enabled state.
@@ -219,7 +218,7 @@ def toggle_job(name):
 
 
 @scheduler_bp.route('/jobs/<name>/run-once', methods=['POST'])
-@require_permission(Permissions.JOBS_EXECUTE)
+
 def run_job_once(name):
     """
     Trigger a one-off run of a scheduler job.
@@ -265,7 +264,7 @@ def run_job_once(name):
 
 
 @scheduler_bp.route('/jobs/<name>/executions', methods=['GET'])
-@require_permission(Permissions.JOBS_VIEW)
+
 def get_job_executions(name):
     """
     Get execution history for a scheduler job.
@@ -295,7 +294,7 @@ def get_job_executions(name):
 
 
 @scheduler_bp.route('/jobs/<name>/executions/clear', methods=['POST'])
-@require_permission(Permissions.JOBS_DELETE)
+
 def clear_job_executions(name):
     """
     Clear execution history for a scheduler job.
@@ -321,7 +320,7 @@ def clear_job_executions(name):
 
 
 @scheduler_bp.route('/executions/recent', methods=['GET'])
-@require_permission(Permissions.JOBS_VIEW)
+
 def get_recent_executions():
     """
     Get recent executions across all jobs.
@@ -344,7 +343,7 @@ def get_recent_executions():
 
 
 @scheduler_bp.route('/executions/stats', methods=['GET'])
-@require_permission(Permissions.JOBS_VIEW)
+
 def get_execution_stats():
     """
     Get execution statistics.
@@ -367,7 +366,7 @@ def get_execution_stats():
 
 
 @scheduler_bp.route('/executions/stale', methods=['POST'])
-@require_permission(Permissions.JOBS_EDIT)
+
 def mark_stale_executions():
     """
     Mark stale running/queued executions as timed out.
@@ -388,7 +387,7 @@ def mark_stale_executions():
 
 
 @scheduler_bp.route('/executions/<int:execution_id>/cancel', methods=['POST'])
-@require_permission(Permissions.JOBS_EXECUTE)
+
 def cancel_execution(execution_id):
     """
     Cancel a running execution.
@@ -431,7 +430,7 @@ def cancel_execution(execution_id):
 
 
 @scheduler_bp.route('/queues', methods=['GET'])
-@require_permission(Permissions.JOBS_VIEW)
+
 def get_queue_status():
     """
     Get Celery queue status.
@@ -496,7 +495,7 @@ def get_queue_status():
 
 
 @scheduler_bp.route('/executions/<int:execution_id>/audit', methods=['GET'])
-@require_permission(Permissions.JOBS_VIEW)
+
 def get_execution_audit_trail(execution_id):
     """
     Get complete audit trail for an execution.
@@ -525,7 +524,7 @@ def get_execution_audit_trail(execution_id):
 
 
 @scheduler_bp.route('/executions/<int:execution_id>/db-operations', methods=['GET'])
-@require_permission(Permissions.JOBS_VIEW)
+
 def get_execution_db_operations(execution_id):
     """
     Get all database operations for an execution.

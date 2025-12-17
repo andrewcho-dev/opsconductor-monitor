@@ -121,6 +121,7 @@ export function useNetBoxDevices(options = {}) {
         platform: device.platform?.name,
         platform_slug: device.platform?.slug,
         device_type: device._type || "device",  // 'device' or 'virtual_machine'
+        _type: device._type || "device",  // Preserve _type for unique keys
         cluster: device.cluster?.name,  // For VMs
         // For compatibility with existing UI
         ping_status: device.status?.value === "active" ? "online" : "unknown",

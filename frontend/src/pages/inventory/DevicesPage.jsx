@@ -606,9 +606,9 @@ export function DevicesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {sortDevices(filteredDevices).map(device => (
+                {sortDevices(filteredDevices).map((device, index) => (
                   <tr 
-                    key={device.id || device.ip_address}
+                    key={`${device._type}-${device.id}-${index}`}
                     className="hover:bg-gray-50"
                   >
                     <td className="px-4 py-3">

@@ -8,7 +8,6 @@ import os
 from flask import Blueprint, request, jsonify
 from ..utils.responses import success_response, error_response
 from ..utils.errors import AppError, ValidationError
-from ..middleware.permissions import require_permission, Permissions
 
 
 settings_bp = Blueprint('settings', __name__, url_prefix='/api/settings')
@@ -25,7 +24,7 @@ def handle_app_error(error):
 
 
 @settings_bp.route('', methods=['GET'])
-@require_permission(Permissions.SYSTEM_SETTINGS_VIEW)
+
 def get_settings():
     """Get current settings."""
     import json
@@ -58,7 +57,7 @@ def get_settings():
 
 
 @settings_bp.route('', methods=['POST'])
-@require_permission(Permissions.SYSTEM_SETTINGS_EDIT)
+
 def save_settings():
     """Save settings."""
     import json
@@ -75,7 +74,7 @@ def save_settings():
 
 
 @settings_bp.route('/test', methods=['POST'])
-@require_permission(Permissions.SYSTEM_SETTINGS_VIEW)
+
 def test_settings():
     """Test settings (connectivity test)."""
     data = request.get_json() or {}

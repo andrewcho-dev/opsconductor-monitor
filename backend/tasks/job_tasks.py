@@ -210,14 +210,23 @@ def run_workflow(workflow_id, trigger_data=None):
     
     workflow_name = workflow.get('name', f'workflow_{workflow_id}')
     
-    # Create execution record
+    # Extract triggered_by from trigger_data
+    triggered_by = None
+    if trigger_data:
+        triggered_by = trigger_data.pop('_triggered_by', None)
+        logger.info(f"Extracted triggered_by from trigger_data: {triggered_by}")
+    else:
+        logger.warning(f"trigger_data is empty or None: {trigger_data}")
+    
+    # Create execution record with user attribution
     execution_repo.create_execution(
         job_name=workflow_name,
         task_name='opsconductor.workflow.run',
         task_id=task_id,
         status='running',
         config={'workflow_id': workflow_id, 'trigger_data': trigger_data},
-        worker=worker
+        worker=worker,
+        triggered_by=triggered_by
     )
     
     # Update to running status with start time

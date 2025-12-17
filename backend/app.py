@@ -17,6 +17,7 @@ from backend.utils.errors import AppError
 from backend.utils.responses import error_response
 from backend.services.logging_service import logging_service, get_logger, LogSource
 from backend.middleware import init_request_logging
+from backend.middleware.user_audit import init_audit_middleware
 from backend.database import get_db
 
 
@@ -50,6 +51,9 @@ def create_app(config=None):
     
     # Initialize request logging middleware
     init_request_logging(app)
+    
+    # Initialize user action audit middleware (logs all user-initiated actions)
+    init_audit_middleware(app)
     
     # Register all blueprints (includes settings, system, legacy)
     register_blueprints(app)

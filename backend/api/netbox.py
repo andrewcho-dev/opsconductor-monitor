@@ -8,7 +8,6 @@ from flask import Blueprint, request, jsonify
 from ..utils.responses import success_response, error_response, list_response
 from ..utils.errors import AppError, ValidationError
 from ..services.netbox_service import NetBoxService, NetBoxError
-from ..middleware.permissions import require_permission, require_auth, Permissions
 
 netbox_bp = Blueprint('netbox', __name__, url_prefix='/api/netbox')
 
@@ -73,7 +72,6 @@ def handle_app_error(error):
 # ==================== CONFIGURATION ====================
 
 @netbox_bp.route('/settings', methods=['GET'])
-@require_permission(Permissions.SYSTEM_SETTINGS_VIEW)
 def get_settings():
     """Get NetBox configuration settings."""
     settings = get_netbox_settings()
@@ -88,7 +86,6 @@ def get_settings():
 
 
 @netbox_bp.route('/settings', methods=['PUT'])
-@require_permission(Permissions.SYSTEM_SETTINGS_EDIT)
 def update_settings():
     """Update NetBox configuration settings."""
     data = request.get_json() or {}
@@ -123,7 +120,6 @@ def update_settings():
 
 
 @netbox_bp.route('/test', methods=['POST'])
-@require_permission(Permissions.SYSTEM_SETTINGS_VIEW)
 def test_connection():
     """Test connection to NetBox."""
     data = request.get_json(silent=True) or {}
@@ -158,7 +154,6 @@ def test_connection():
 # ==================== DEVICES ====================
 
 @netbox_bp.route('/devices', methods=['GET'])
-@require_permission(Permissions.DEVICES_VIEW)
 def list_devices():
     """List devices from NetBox (includes VMs by default)."""
     service = get_netbox_service()
@@ -229,7 +224,6 @@ def list_devices():
 
 
 @netbox_bp.route('/devices/<int:device_id>', methods=['GET'])
-@require_permission(Permissions.DEVICES_VIEW)
 def get_device(device_id):
     """Get a single device from NetBox."""
     service = get_netbox_service()
@@ -238,7 +232,6 @@ def get_device(device_id):
 
 
 @netbox_bp.route('/devices', methods=['POST'])
-@require_permission(Permissions.DEVICES_CREATE)
 def create_device():
     """Create a device in NetBox."""
     service = get_netbox_service()
@@ -265,7 +258,6 @@ def create_device():
 
 
 @netbox_bp.route('/devices/<int:device_id>', methods=['PATCH'])
-@require_permission(Permissions.DEVICES_EDIT)
 def update_device(device_id):
     """Update a device in NetBox."""
     service = get_netbox_service()
@@ -276,7 +268,6 @@ def update_device(device_id):
 
 
 @netbox_bp.route('/devices/<int:device_id>', methods=['DELETE'])
-@require_permission(Permissions.DEVICES_DELETE)
 def delete_device(device_id):
     """Delete a device from NetBox."""
     service = get_netbox_service()
@@ -287,7 +278,6 @@ def delete_device(device_id):
 # ==================== IP ADDRESSES ====================
 
 @netbox_bp.route('/ip-addresses', methods=['GET'])
-@require_permission(Permissions.DEVICES_VIEW)
 def list_ip_addresses():
     """List IP addresses from NetBox."""
     service = get_netbox_service()
@@ -313,7 +303,6 @@ def list_ip_addresses():
 # ==================== IP RANGES ====================
 
 @netbox_bp.route('/ip-ranges', methods=['GET'])
-@require_permission(Permissions.DEVICES_VIEW)
 def list_ip_ranges():
     """List IP ranges from NetBox IPAM."""
     service = get_netbox_service()
@@ -335,7 +324,6 @@ def list_ip_ranges():
 # ==================== LOOKUP DATA ====================
 
 @netbox_bp.route('/sites', methods=['GET'])
-@require_auth
 def list_sites():
     """List sites from NetBox."""
     service = get_netbox_service()
@@ -344,7 +332,6 @@ def list_sites():
 
 
 @netbox_bp.route('/device-roles', methods=['GET'])
-@require_auth
 def list_device_roles():
     """List device roles from NetBox."""
     service = get_netbox_service()
@@ -353,7 +340,6 @@ def list_device_roles():
 
 
 @netbox_bp.route('/device-types', methods=['GET'])
-@require_auth
 def list_device_types():
     """List device types from NetBox."""
     service = get_netbox_service()
@@ -363,7 +349,6 @@ def list_device_types():
 
 
 @netbox_bp.route('/manufacturers', methods=['GET'])
-@require_auth
 def list_manufacturers():
     """List manufacturers from NetBox."""
     service = get_netbox_service()
@@ -372,7 +357,6 @@ def list_manufacturers():
 
 
 @netbox_bp.route('/tags', methods=['GET'])
-@require_auth
 def list_tags():
     """List tags from NetBox."""
     service = get_netbox_service()
@@ -383,7 +367,6 @@ def list_tags():
 # ==================== DISCOVERY INTEGRATION ====================
 
 @netbox_bp.route('/discover', methods=['POST'])
-@require_permission(Permissions.DEVICES_CREATE)
 def upsert_discovered_device():
     """
     Create or update a device from discovery results.

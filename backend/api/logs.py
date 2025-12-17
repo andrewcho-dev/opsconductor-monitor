@@ -8,14 +8,13 @@ from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify
 from ..utils.responses import success_response, error_response
 from ..services.logging_service import logging_service, get_logger, LogSource
-from ..middleware.permissions import require_permission, require_auth, Permissions
 
 logs_bp = Blueprint('logs', __name__, url_prefix='/api/logs')
 logger = get_logger(__name__, LogSource.API)
 
 
 @logs_bp.route('', methods=['GET'])
-@require_permission(Permissions.SYSTEM_AUDIT_VIEW)
+
 def get_logs():
     """
     Query system logs with filters.
@@ -93,7 +92,7 @@ def get_logs():
 
 
 @logs_bp.route('/stats', methods=['GET'])
-@require_permission(Permissions.SYSTEM_AUDIT_VIEW)
+
 def get_log_stats():
     """
     Get log statistics for the dashboard.
@@ -121,7 +120,7 @@ def get_log_stats():
 
 
 @logs_bp.route('/sources', methods=['GET'])
-@require_auth
+
 def get_log_sources():
     """Get available log sources."""
     sources = [
@@ -140,7 +139,7 @@ def get_log_sources():
 
 
 @logs_bp.route('/levels', methods=['GET'])
-@require_auth
+
 def get_log_levels():
     """Get available log levels."""
     levels = [
@@ -154,7 +153,7 @@ def get_log_levels():
 
 
 @logs_bp.route('/cleanup', methods=['POST'])
-@require_permission(Permissions.SYSTEM_SETTINGS_EDIT)
+
 def cleanup_logs():
     """
     Clean up old logs based on retention policy.

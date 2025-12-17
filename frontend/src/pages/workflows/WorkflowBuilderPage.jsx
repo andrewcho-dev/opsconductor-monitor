@@ -73,7 +73,7 @@ const WorkflowBuilderPage = () => {
     }
   }, [navigate]);
 
-  // Handle run
+  // Handle run - submit to queue and return task info
   const handleRun = useCallback(async (workflowData) => {
     if (!workflowData.id) {
       alert('Please save the workflow before running');
@@ -83,8 +83,14 @@ const WorkflowBuilderPage = () => {
     try {
       setRunning(true);
       const response = await workflowsApi.runWorkflow(workflowData.id);
-      // Return the execution result for the debug view
-      return response.data || response;
+      const data = response.data || response;
+      
+      // Return task info for confirmation modal
+      return {
+        execution_id: data.task_id,
+        workflow_name: data.workflow_name,
+        status: data.status || 'queued',
+      };
     } catch (err) {
       console.error('Failed to run workflow:', err);
       throw err;
@@ -93,7 +99,7 @@ const WorkflowBuilderPage = () => {
     }
   }, []);
 
-  // Handle test
+  // Handle test - submit to queue and return task info
   const handleTest = useCallback(async (workflowData) => {
     if (!workflowData.id) {
       alert('Please save the workflow before testing');
@@ -102,8 +108,15 @@ const WorkflowBuilderPage = () => {
 
     try {
       const response = await workflowsApi.testWorkflow(workflowData.id);
-      // Return the test result for the debug view
-      return response.data || response;
+      const data = response.data || response;
+      
+      // Return task info for confirmation modal
+      return {
+        execution_id: data.task_id,
+        workflow_name: data.workflow_name,
+        status: data.status || 'queued',
+        test_mode: true,
+      };
     } catch (err) {
       console.error('Failed to test workflow:', err);
       throw err;

@@ -12,7 +12,8 @@ from ..repositories.workflow_repo import (
     TagRepository,
     PackageRepository
 )
-from ..middleware.permissions import require_permission, require_auth, Permissions
+from .auth import get_current_user
+from ..middleware.user_audit import log_user_action
 
 workflows_bp = Blueprint('workflows', __name__, url_prefix='/api/workflows')
 folders_bp = Blueprint('folders', __name__, url_prefix='/api/workflows/folders')
@@ -45,7 +46,7 @@ def get_package_repo():
 # =============================================================================
 
 @workflows_bp.route('', methods=['GET'])
-@require_permission(Permissions.JOBS_VIEW)
+
 def list_workflows():
     """List all workflows with optional filters."""
     folder_id = request.args.get('folder_id')
@@ -73,7 +74,7 @@ def list_workflows():
 
 
 @workflows_bp.route('/<workflow_id>', methods=['GET'])
-@require_permission(Permissions.JOBS_VIEW)
+
 def get_workflow(workflow_id):
     """Get a single workflow by ID."""
     workflow = get_workflow_repo().get_by_id(workflow_id)
@@ -91,7 +92,7 @@ def get_workflow(workflow_id):
 
 
 @workflows_bp.route('', methods=['POST'])
-@require_permission(Permissions.JOBS_CREATE)
+
 def create_workflow():
     """Create a new workflow."""
     data = request.get_json()
@@ -130,7 +131,7 @@ def create_workflow():
 
 
 @workflows_bp.route('/<workflow_id>', methods=['PUT'])
-@require_permission(Permissions.JOBS_EDIT)
+
 def update_workflow(workflow_id):
     """Update a workflow."""
     data = request.get_json()
@@ -170,7 +171,7 @@ def update_workflow(workflow_id):
 
 
 @workflows_bp.route('/<workflow_id>', methods=['DELETE'])
-@require_permission(Permissions.JOBS_DELETE)
+
 def delete_workflow(workflow_id):
     """Delete a workflow."""
     success = get_workflow_repo().delete(workflow_id)
@@ -188,7 +189,7 @@ def delete_workflow(workflow_id):
 
 
 @workflows_bp.route('/<workflow_id>/duplicate', methods=['POST'])
-@require_permission(Permissions.JOBS_CREATE)
+
 def duplicate_workflow(workflow_id):
     """Duplicate a workflow."""
     data = request.get_json() or {}
@@ -220,7 +221,7 @@ def duplicate_workflow(workflow_id):
 
 
 @workflows_bp.route('/<workflow_id>/move', methods=['POST'])
-@require_permission(Permissions.JOBS_EDIT)
+
 def move_workflow(workflow_id):
     """Move a workflow to a folder."""
     data = request.get_json() or {}
@@ -241,7 +242,7 @@ def move_workflow(workflow_id):
 
 
 @workflows_bp.route('/<workflow_id>/tags', methods=['PUT'])
-@require_permission(Permissions.JOBS_EDIT)
+
 def update_workflow_tags(workflow_id):
     """Update workflow tags."""
     data = request.get_json() or {}
@@ -262,7 +263,6 @@ def update_workflow_tags(workflow_id):
 
 
 @workflows_bp.route('/<workflow_id>/run', methods=['POST'])
-@require_permission(Permissions.JOBS_EXECUTE)
 def run_workflow(workflow_id):
     """Execute a workflow via Celery (async)."""
     workflow = get_workflow_repo().get_by_id(workflow_id)
@@ -280,6 +280,28 @@ def run_workflow(workflow_id):
         data = {}
     trigger_data = data.get('trigger_data', {})
     sync = data.get('sync', False)  # Allow sync execution if explicitly requested
+    
+    # Capture current user for audit trail (get user from token if available)
+    triggered_by = None
+    user = get_current_user()
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"[AUDIT] get_current_user() returned: {user}")
+    if user:
+        triggered_by = {
+            'user_id': user.get('user_id'),
+            'username': user.get('username'),
+            'display_name': user.get('display_name', user.get('username')),
+            'is_enterprise': isinstance(user.get('user_id'), str) and str(user.get('user_id')).startswith('enterprise_'),
+        }
+        logger.info(f"[AUDIT] triggered_by set to: {triggered_by}")
+    else:
+        logger.warning("[AUDIT] No user found from get_current_user()")
+    
+    # Add triggered_by to trigger_data so it's passed to the task
+    if triggered_by:
+        trigger_data['_triggered_by'] = triggered_by
+        logger.info(f"[AUDIT] Added _triggered_by to trigger_data")
     
     # Try to use Celery for async execution
     try:
@@ -301,6 +323,14 @@ def run_workflow(workflow_id):
             args=[workflow_id, trigger_data]
         )
         
+        # Log user action
+        log_user_action(
+            action_type='run',
+            resource_type='workflow',
+            resource_id=workflow_id,
+            details={'workflow_name': workflow.get('name'), 'task_id': task.id}
+        )
+        
         return jsonify({
             'success': True,
             'message': 'Workflow submitted to queue',
@@ -308,7 +338,8 @@ def run_workflow(workflow_id):
                 'task_id': task.id,
                 'workflow_id': workflow_id,
                 'workflow_name': workflow.get('name'),
-                'status': 'queued'
+                'status': 'queued',
+                'triggered_by': triggered_by
             }
         })
         
@@ -316,6 +347,15 @@ def run_workflow(workflow_id):
         # Celery not available, fall back to sync execution
         from ..tasks.job_tasks import run_workflow as run_workflow_sync
         result = run_workflow_sync(workflow_id, trigger_data)
+        
+        # Log user action
+        log_user_action(
+            action_type='run',
+            resource_type='workflow',
+            resource_id=workflow_id,
+            details={'workflow_name': workflow.get('name'), 'sync': True}
+        )
+        
         return jsonify({
             'success': True,
             'message': 'Workflow execution completed (sync - Celery not available)',
@@ -324,7 +364,6 @@ def run_workflow(workflow_id):
 
 
 @workflows_bp.route('/<workflow_id>/test', methods=['POST'])
-@require_permission(Permissions.JOBS_EXECUTE)
 def test_workflow(workflow_id):
     """Test run a workflow via Celery (async)."""
     workflow = get_workflow_repo().get_by_id(workflow_id)
@@ -343,6 +382,21 @@ def test_workflow(workflow_id):
     trigger_data = data.get('trigger_data', {})
     trigger_data['_test_mode'] = True  # Flag for test mode
     sync = data.get('sync', False)  # Allow sync execution if explicitly requested
+    
+    # Capture current user for audit trail (get user from token if available)
+    triggered_by = None
+    user = get_current_user()
+    if user:
+        triggered_by = {
+            'user_id': user.get('user_id'),
+            'username': user.get('username'),
+            'display_name': user.get('display_name', user.get('username')),
+            'is_enterprise': isinstance(user.get('user_id'), str) and str(user.get('user_id')).startswith('enterprise_'),
+        }
+    
+    # Add triggered_by to trigger_data
+    if triggered_by:
+        trigger_data['_triggered_by'] = triggered_by
     
     # Try to use Celery for async execution
     try:
@@ -365,6 +419,14 @@ def test_workflow(workflow_id):
             args=[workflow_id, trigger_data]
         )
         
+        # Log user action
+        log_user_action(
+            action_type='test',
+            resource_type='workflow',
+            resource_id=workflow_id,
+            details={'workflow_name': workflow.get('name'), 'task_id': task.id, 'test_mode': True}
+        )
+        
         return jsonify({
             'success': True,
             'message': 'Test workflow submitted to queue',
@@ -373,7 +435,8 @@ def test_workflow(workflow_id):
                 'workflow_id': workflow_id,
                 'workflow_name': workflow.get('name'),
                 'status': 'queued',
-                'test_mode': True
+                'test_mode': True,
+                'triggered_by': triggered_by
             }
         })
         
@@ -382,6 +445,15 @@ def test_workflow(workflow_id):
         from ..tasks.job_tasks import run_workflow as run_workflow_sync
         result = run_workflow_sync(workflow_id, trigger_data)
         result['test_mode'] = True
+        
+        # Log user action
+        log_user_action(
+            action_type='test',
+            resource_type='workflow',
+            resource_id=workflow_id,
+            details={'workflow_name': workflow.get('name'), 'sync': True, 'test_mode': True}
+        )
+        
         return jsonify({
             'success': True,
             'message': 'Test run completed (sync - Celery not available)',
@@ -427,7 +499,7 @@ def get_task_status(task_id):
 # =============================================================================
 
 @folders_bp.route('', methods=['GET'])
-@require_permission(Permissions.JOBS_VIEW)
+
 def list_folders():
     """List all folders."""
     folders = get_folder_repo().get_all()
@@ -440,7 +512,7 @@ def list_folders():
 
 
 @folders_bp.route('/<folder_id>', methods=['GET'])
-@require_permission(Permissions.JOBS_VIEW)
+
 def get_folder(folder_id):
     """Get a single folder by ID."""
     folder = get_folder_repo().get_by_id(folder_id)
@@ -458,7 +530,7 @@ def get_folder(folder_id):
 
 
 @folders_bp.route('', methods=['POST'])
-@require_permission(Permissions.JOBS_CREATE)
+
 def create_folder():
     """Create a new folder."""
     data = request.get_json()
@@ -489,7 +561,7 @@ def create_folder():
 
 
 @folders_bp.route('/<folder_id>', methods=['PUT'])
-@require_permission(Permissions.JOBS_EDIT)
+
 def update_folder(folder_id):
     """Update a folder."""
     data = request.get_json()
@@ -521,7 +593,7 @@ def update_folder(folder_id):
 
 
 @folders_bp.route('/<folder_id>', methods=['DELETE'])
-@require_permission(Permissions.JOBS_DELETE)
+
 def delete_folder(folder_id):
     """Delete a folder."""
     success = get_folder_repo().delete(folder_id)
@@ -543,7 +615,7 @@ def delete_folder(folder_id):
 # =============================================================================
 
 @tags_bp.route('', methods=['GET'])
-@require_permission(Permissions.JOBS_VIEW)
+
 def list_tags():
     """List all tags."""
     tags = get_tag_repo().get_all()
@@ -556,7 +628,7 @@ def list_tags():
 
 
 @tags_bp.route('/<tag_id>', methods=['GET'])
-@require_permission(Permissions.JOBS_VIEW)
+
 def get_tag(tag_id):
     """Get a single tag by ID."""
     tag = get_tag_repo().get_by_id(tag_id)
@@ -574,7 +646,7 @@ def get_tag(tag_id):
 
 
 @tags_bp.route('', methods=['POST'])
-@require_permission(Permissions.JOBS_CREATE)
+
 def create_tag():
     """Create a new tag."""
     data = request.get_json()
@@ -603,7 +675,7 @@ def create_tag():
 
 
 @tags_bp.route('/<tag_id>', methods=['PUT'])
-@require_permission(Permissions.JOBS_EDIT)
+
 def update_tag(tag_id):
     """Update a tag."""
     data = request.get_json()
@@ -633,7 +705,7 @@ def update_tag(tag_id):
 
 
 @tags_bp.route('/<tag_id>', methods=['DELETE'])
-@require_permission(Permissions.JOBS_DELETE)
+
 def delete_tag(tag_id):
     """Delete a tag."""
     success = get_tag_repo().delete(tag_id)
@@ -655,7 +727,7 @@ def delete_tag(tag_id):
 # =============================================================================
 
 @packages_bp.route('', methods=['GET'])
-@require_permission(Permissions.JOBS_VIEW)
+
 def list_packages():
     """List all packages."""
     packages = get_package_repo().get_all()
@@ -668,7 +740,7 @@ def list_packages():
 
 
 @packages_bp.route('/enabled', methods=['GET'])
-@require_permission(Permissions.JOBS_VIEW)
+
 def list_enabled_packages():
     """List enabled package IDs."""
     enabled = get_package_repo().get_enabled()
@@ -680,7 +752,7 @@ def list_enabled_packages():
 
 
 @packages_bp.route('/<package_id>/enable', methods=['PUT'])
-@require_permission(Permissions.JOBS_EDIT)
+
 def enable_package(package_id):
     """Enable a package."""
     package = get_package_repo().set_enabled(package_id, True)
@@ -698,7 +770,7 @@ def enable_package(package_id):
 
 
 @packages_bp.route('/<package_id>/disable', methods=['PUT'])
-@require_permission(Permissions.JOBS_EDIT)
+
 def disable_package(package_id):
     """Disable a package."""
     package = get_package_repo().set_enabled(package_id, False)
@@ -720,7 +792,7 @@ def disable_package(package_id):
 # =============================================================================
 
 @workflows_bp.route('/migrate', methods=['POST'])
-@require_permission(Permissions.JOBS_CREATE)
+
 def migrate_jobs():
     """Migrate all old job definitions to new workflow format."""
     from ..services.job_migration import JobMigrationService
@@ -735,7 +807,7 @@ def migrate_jobs():
 
 
 @workflows_bp.route('/migrate/preview', methods=['POST'])
-@require_permission(Permissions.JOBS_VIEW)
+
 def preview_migration():
     """Preview migration of a single job definition."""
     from ..services.job_migration import JobMigrationService

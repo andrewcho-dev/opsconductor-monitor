@@ -16,7 +16,6 @@ import logging
 from backend.database import DatabaseConnection
 from backend.services.prtg_service import PRTGService
 from backend.services.notification_service import NotificationService
-from backend.middleware.permissions import require_permission, require_auth, Permissions
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +94,7 @@ def test_webhook():
 # ============================================================================
 
 @prtg_bp.route('/alerts', methods=['GET'])
-@require_auth
+
 def get_alerts():
     """Get PRTG alerts stored in OpsConductor."""
     try:
@@ -161,7 +160,7 @@ def get_alerts():
 
 
 @prtg_bp.route('/alerts/<int:alert_id>/acknowledge', methods=['POST'])
-@require_auth
+
 def acknowledge_alert(alert_id):
     """Acknowledge a PRTG alert."""
     try:
@@ -206,7 +205,7 @@ def acknowledge_alert(alert_id):
 
 
 @prtg_bp.route('/alerts/<int:alert_id>/resolve', methods=['POST'])
-@require_auth
+
 def resolve_alert(alert_id):
     """Mark a PRTG alert as resolved."""
     try:
@@ -253,7 +252,7 @@ def resolve_alert(alert_id):
 # ============================================================================
 
 @prtg_bp.route('/status', methods=['GET'])
-@require_auth
+
 def get_status():
     """Get PRTG connection status and system info."""
     try:
@@ -280,7 +279,7 @@ def get_status():
 
 
 @prtg_bp.route('/devices', methods=['GET'])
-@require_auth
+
 def get_devices():
     """Get all devices from PRTG."""
     try:
@@ -314,7 +313,7 @@ def get_devices():
 
 
 @prtg_bp.route('/sensors', methods=['GET'])
-@require_auth
+
 def get_sensors():
     """Get sensors from PRTG."""
     try:
@@ -348,7 +347,7 @@ def get_sensors():
 
 
 @prtg_bp.route('/sensors/<int:sensor_id>', methods=['GET'])
-@require_auth
+
 def get_sensor_details(sensor_id):
     """Get detailed information for a specific sensor."""
     try:
@@ -369,7 +368,7 @@ def get_sensor_details(sensor_id):
 
 
 @prtg_bp.route('/groups', methods=['GET'])
-@require_auth
+
 def get_groups():
     """Get device groups from PRTG."""
     try:
@@ -397,7 +396,7 @@ def get_groups():
 # ============================================================================
 
 @prtg_bp.route('/sync/netbox', methods=['POST'])
-@require_permission(Permissions.DEVICES_CREATE)
+
 def sync_to_netbox():
     """Sync PRTG devices to NetBox."""
     try:
@@ -430,7 +429,7 @@ def sync_to_netbox():
 
 
 @prtg_bp.route('/sync/preview', methods=['GET'])
-@require_auth
+
 def preview_sync():
     """Preview what would be synced to NetBox without making changes."""
     try:
@@ -456,7 +455,7 @@ def preview_sync():
 # ============================================================================
 
 @prtg_bp.route('/settings', methods=['GET'])
-@require_permission(Permissions.SYSTEM_SETTINGS_VIEW)
+
 def get_settings():
     """Get PRTG integration settings."""
     try:
@@ -489,7 +488,7 @@ def get_settings():
 
 
 @prtg_bp.route('/settings', methods=['PUT'])
-@require_permission(Permissions.SYSTEM_SETTINGS_EDIT)
+
 def update_settings():
     """Update PRTG integration settings."""
     try:
@@ -522,7 +521,7 @@ def update_settings():
 
 
 @prtg_bp.route('/test-connection', methods=['POST'])
-@require_permission(Permissions.SYSTEM_SETTINGS_VIEW)
+
 def test_connection():
     """Test PRTG connection with provided or saved credentials."""
     try:

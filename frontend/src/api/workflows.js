@@ -117,6 +117,15 @@ export async function testWorkflow(id) {
 }
 
 /**
+ * Get Celery task status
+ * @param {string} taskId - Celery task ID
+ * @returns {Promise<Object>} Task status
+ */
+export async function getTaskStatus(taskId) {
+  return fetchApi(`${BASE_URL}/tasks/${taskId}`);
+}
+
+/**
  * Get workflow execution history
  * @param {string} id - Workflow ID
  * @param {Object} options - Pagination options

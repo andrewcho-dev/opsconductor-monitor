@@ -155,56 +155,47 @@ const WorkflowBuilder = ({
     }
   }, [workflow, onSave, markClean]);
 
-  // Handle run
+  // Handle run - just submit and show confirmation
   const handleRun = useCallback(async () => {
     if (onRun) {
       setIsTestMode(false);
       setExecutionResult(null);
       setIsExecuting(true);
-      setDebugViewOpen(true);
       
       try {
         const result = await onRun(workflow);
-        setExecutionResult(result);
+        if (result) {
+          setExecutionResult(result);
+          setDebugViewOpen(true);
+        }
       } catch (error) {
         console.error('Execution failed:', error);
-        setExecutionResult({
-          status: 'failure',
-          error_message: error.message,
-          node_results: {},
-          variables: {},
-        });
+        alert(`Failed to submit workflow: ${error.message}`);
       } finally {
         setIsExecuting(false);
       }
     }
   }, [workflow, onRun]);
 
-  // Handle test
+  // Handle test - just submit and show confirmation
   const handleTest = useCallback(async () => {
     if (onTest) {
       setIsTestMode(true);
       setExecutionResult(null);
       setIsExecuting(true);
-      setDebugViewOpen(true);
       
       try {
         const result = await onTest(workflow);
         // Handle case where workflow wasn't saved (returns null)
         if (result === null) {
-          setDebugViewOpen(false);
           setIsExecuting(false);
           return;
         }
         setExecutionResult(result);
+        setDebugViewOpen(true);
       } catch (error) {
         console.error('Test run failed:', error);
-        setExecutionResult({
-          status: 'failure',
-          error_message: error.message,
-          node_results: {},
-          variables: {},
-        });
+        alert(`Failed to submit test: ${error.message}`);
       } finally {
         setIsExecuting(false);
       }

@@ -1664,6 +1664,7 @@ export default {
             { value: 'snmp', label: 'SNMP Discovery' },
             { value: 'ports', label: 'Port Scan' },
             { value: 'ssh', label: 'SSH (Linux/Unix)' },
+            { value: 'winrm', label: 'WinRM (Windows)' },
             { value: 'dns', label: 'DNS Lookup' },
           ],
           help: 'Methods to use for discovering device information',
@@ -1722,6 +1723,30 @@ export default {
           credentialType: 'ssh',
         },
         
+        // ==================== WINRM SETTINGS (Windows) ====================
+        {
+          id: 'winrm_enabled',
+          type: 'checkbox',
+          label: 'Enable WinRM Discovery',
+          default: false,
+          help: 'Try WinRM for Windows hosts (requires credentials). Detects Windows version, hostname, domain membership.',
+        },
+        {
+          id: 'winrm_credential',
+          type: 'credential-selector',
+          label: 'WinRM Credential',
+          showIf: { field: 'winrm_enabled', value: true },
+          credentialType: 'winrm',
+        },
+        {
+          id: 'winrm_use_ssl',
+          type: 'checkbox',
+          label: 'Use HTTPS (Port 5986)',
+          default: true,
+          showIf: { field: 'winrm_enabled', value: true },
+          help: 'Use WinRM over HTTPS (port 5986) instead of HTTP (port 5985)',
+        },
+        
         // ==================== PORT SCAN SETTINGS ====================
         {
           id: 'port_scan_enabled',
@@ -1734,9 +1759,9 @@ export default {
           id: 'ports_to_scan',
           type: 'text',
           label: 'Ports to Scan',
-          default: '22,23,80,161,443,3389,8080,8443',
+          default: '22,23,80,135,139,161,443,445,3389,5985,5986,8080,8443',
           showIf: { field: 'port_scan_enabled', value: true },
-          help: 'Comma-separated ports or ranges (e.g., 22,80,443,1000-2000)',
+          help: 'Comma-separated ports. Includes SSH(22), Telnet(23), HTTP(80,8080), HTTPS(443,8443), SNMP(161), RDP(3389), WinRM(5985,5986), SMB(445), RPC(135), NetBIOS(139)',
         },
         
         // ==================== NETBOX DEFAULTS ====================

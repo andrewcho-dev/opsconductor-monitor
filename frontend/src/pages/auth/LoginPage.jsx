@@ -147,37 +147,54 @@ export function LoginPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Sign in with
                     </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setAuthMethod('local')}
-                        className={cn(
-                          "flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-colors",
-                          authMethod === 'local'
-                            ? "border-blue-600 bg-blue-50 text-blue-700"
-                            : "border-gray-300 text-gray-600 hover:bg-gray-50"
-                        )}
-                      >
-                        <User className="w-4 h-4" />
-                        Local Account
-                      </button>
-                      {enterpriseConfigs.map((config) => (
+                    {enterpriseConfigs.length <= 2 ? (
+                      // Button layout for 1-2 enterprise configs
+                      <div className="grid grid-cols-2 gap-2">
                         <button
-                          key={config.id}
                           type="button"
-                          onClick={() => setAuthMethod(String(config.id))}
+                          onClick={() => setAuthMethod('local')}
                           className={cn(
                             "flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-colors",
-                            authMethod === String(config.id)
+                            authMethod === 'local'
                               ? "border-blue-600 bg-blue-50 text-blue-700"
                               : "border-gray-300 text-gray-600 hover:bg-gray-50"
                           )}
                         >
-                          <Building2 className="w-4 h-4" />
-                          {config.name}
+                          <User className="w-4 h-4" />
+                          Local Account
                         </button>
-                      ))}
-                    </div>
+                        {enterpriseConfigs.map((config) => (
+                          <button
+                            key={config.id}
+                            type="button"
+                            onClick={() => setAuthMethod(String(config.id))}
+                            className={cn(
+                              "flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-colors",
+                              authMethod === String(config.id)
+                                ? "border-blue-600 bg-blue-50 text-blue-700"
+                                : "border-gray-300 text-gray-600 hover:bg-gray-50"
+                            )}
+                          >
+                            <Building2 className="w-4 h-4" />
+                            {config.name}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      // Dropdown layout for 3+ enterprise configs
+                      <select
+                        value={authMethod}
+                        onChange={(e) => setAuthMethod(e.target.value)}
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                      >
+                        <option value="local">Local Account</option>
+                        {enterpriseConfigs.map((config) => (
+                          <option key={config.id} value={String(config.id)}>
+                            {config.name} ({config.auth_type === 'active_directory' ? 'AD' : config.auth_type?.toUpperCase()})
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                 )}
 

@@ -360,11 +360,16 @@ PORT_SERVICE_MAP = {
     162: ('SNMP Trap', None),
     3389: ('RDP', 'server'),
     5900: ('VNC', 'server'),
+    5985: ('WinRM-HTTP', 'server'),
+    5986: ('WinRM-HTTPS', 'server'),
     8080: ('HTTP-Alt', None),
     8443: ('HTTPS-Alt', None),
     179: ('BGP', 'network'),
     389: ('LDAP', 'server'),
     636: ('LDAPS', 'server'),
+    445: ('SMB', 'server'),
+    135: ('RPC', 'server'),
+    139: ('NetBIOS', 'server'),
     1433: ('MSSQL', 'server'),
     3306: ('MySQL', 'server'),
     5432: ('PostgreSQL', 'server'),
@@ -758,7 +763,7 @@ class NetBoxAutodiscoveryExecutor(BaseExecutor):
             
             # Port scan
             if config.get('port_scan_enabled', True):
-                ports_str = config.get('ports_to_scan', '22,23,80,161,443,3389,8080,8443')
+                ports_str = config.get('ports_to_scan', '22,23,80,135,139,161,443,445,3389,5985,5986,8080,8443')
                 ports = self._parse_ports(ports_str)
                 device['open_ports'] = self._port_scan(ip, ports, config)
                 device['services'] = [PORT_SERVICE_MAP.get(p, (f'port-{p}', None))[0] 
@@ -792,6 +797,13 @@ class NetBoxAutodiscoveryExecutor(BaseExecutor):
             # MAC OUI lookup if no vendor identified
             if not device['vendor'] and device['mac_address'] and config.get('use_mac_oui', True):
                 device['vendor'] = self._identify_vendor_from_mac(device['mac_address'])
+            
+            # Identify Windows servers from port signature
+            if not device['vendor'] and device['open_ports']:
+                windows_ports = {135, 139, 445, 3389, 5985, 5986}
+                if len(set(device['open_ports']) & windows_ports) >= 2:
+                    device['vendor'] = 'Microsoft'
+                    device['description'] = device.get('description') or 'Windows Server (detected via ports)'
             
             # Infer role from open ports if not set
             if not device['device_role'] and device['open_ports']:

@@ -219,6 +219,7 @@ export function JobHistory() {
                 <tr>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase w-40">Timestamp</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase w-56">Job Name</th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase w-32">Triggered By</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase w-24">Duration</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase w-24">Status</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase w-20">Details</th>
@@ -227,7 +228,7 @@ export function JobHistory() {
               <tbody>
                 {loading && filteredExecutions.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
+                    <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
                       <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
                       Loading execution history...
                     </td>
@@ -235,12 +236,17 @@ export function JobHistory() {
                 )}
                 {!loading && filteredExecutions.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
+                    <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
                       {executions.length === 0 ? "No execution history yet." : "No executions match your filters."}
                     </td>
                   </tr>
                 )}
-                {filteredExecutions.map((exec) => (
+                {filteredExecutions.map((exec) => {
+                  // Parse triggered_by if it's a string
+                  const triggeredBy = typeof exec.triggered_by === 'string' 
+                    ? JSON.parse(exec.triggered_by) 
+                    : exec.triggered_by;
+                  return (
                   <tr
                     key={exec.id}
                     className="border-t border-gray-100 hover:bg-gray-50 cursor-pointer text-xs"
@@ -251,6 +257,21 @@ export function JobHistory() {
                     </td>
                     <td className="px-4 py-2 w-56">
                       <div className="text-gray-900 truncate" title={exec.job_name}>{cleanJobName(exec.job_name)}</div>
+                    </td>
+                    <td className="px-4 py-2 text-gray-600">
+                      {triggeredBy ? (
+                        <span className={cn(
+                          "inline-flex items-center gap-1",
+                          triggeredBy.is_enterprise && "text-purple-600"
+                        )}>
+                          {triggeredBy.display_name || triggeredBy.username || '—'}
+                          {triggeredBy.is_enterprise && (
+                            <span className="text-[9px] bg-purple-100 text-purple-700 px-1 rounded">AD</span>
+                          )}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-2 text-gray-600">
                       {formatDuration(exec.started_at, exec.finished_at)}
@@ -268,7 +289,8 @@ export function JobHistory() {
                       View
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -301,7 +323,7 @@ export function JobHistory() {
               </button>
             </div>
             <div className="p-4 space-y-4 overflow-y-auto text-sm">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 <div>
                   <div className="text-xs text-gray-500">Status</div>
                   <div className={cn(
@@ -311,6 +333,27 @@ export function JobHistory() {
                   )}>
                     {selectedExecution.status}
                   </div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500">Triggered By</div>
+                  {(() => {
+                    const triggeredBy = typeof selectedExecution.triggered_by === 'string' 
+                      ? JSON.parse(selectedExecution.triggered_by) 
+                      : selectedExecution.triggered_by;
+                    return triggeredBy ? (
+                      <div className={cn(
+                        "font-medium flex items-center gap-1",
+                        triggeredBy.is_enterprise && "text-purple-600"
+                      )}>
+                        {triggeredBy.display_name || triggeredBy.username}
+                        {triggeredBy.is_enterprise && (
+                          <span className="text-[9px] bg-purple-100 text-purple-700 px-1 rounded">AD</span>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-gray-400">—</div>
+                    );
+                  })()}
                 </div>
                 <div>
                   <div className="text-xs text-gray-500">Started</div>

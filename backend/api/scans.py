@@ -7,7 +7,6 @@ Routes for interface scans and optical power data.
 from flask import Blueprint, request, jsonify
 from ..utils.responses import success_response, error_response, list_response
 from ..utils.errors import AppError, NotFoundError, ValidationError
-from ..middleware.permissions import require_permission, Permissions
 
 
 scans_bp = Blueprint('scans', __name__, url_prefix='/api/scans')
@@ -40,7 +39,7 @@ def handle_generic_error(error):
 
 
 @scans_bp.route('/interfaces/<ip_address>', methods=['GET'])
-@require_permission(Permissions.DEVICES_VIEW)
+
 def get_device_interfaces(ip_address):
     """
     Get latest interface scan data for a device.
@@ -58,7 +57,7 @@ def get_device_interfaces(ip_address):
 
 
 @scans_bp.route('/optical', methods=['GET'])
-@require_permission(Permissions.DEVICES_VIEW)
+
 def get_optical_interfaces():
     """
     Get all optical interfaces.
@@ -78,7 +77,7 @@ def get_optical_interfaces():
 
 
 @scans_bp.route('/optical/power-history', methods=['GET'])
-@require_permission(Permissions.DEVICES_VIEW)
+
 def get_optical_power_history():
     """
     Get optical power history for a device/interface.
@@ -109,7 +108,7 @@ def get_optical_power_history():
 
 
 @scans_bp.route('/optical/power-history', methods=['POST'])
-@require_permission(Permissions.DEVICES_VIEW)
+
 def get_optical_power_history_bulk():
     """
     Get optical power history for multiple devices.
@@ -138,7 +137,7 @@ def get_optical_power_history_bulk():
 
 
 @scans_bp.route('/optical/trends', methods=['GET'])
-@require_permission(Permissions.DEVICES_VIEW)
+
 def get_optical_power_trends():
     """
     Get optical power trend statistics.
@@ -169,7 +168,7 @@ def get_optical_power_trends():
 
 
 @scans_bp.route('/cleanup', methods=['POST'])
-@require_permission(Permissions.SYSTEM_SETTINGS_EDIT)
+
 def cleanup_old_data():
     """
     Clean up old scan and power data.

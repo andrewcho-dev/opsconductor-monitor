@@ -23,17 +23,23 @@ def get_current_user():
     """Get current user from request headers."""
     auth_header = request.headers.get('Authorization', '')
     
+    logger.debug(f"[AUTH] Authorization header: {auth_header[:50] if auth_header else 'NONE'}...")
+    
     if not auth_header.startswith('Bearer '):
+        logger.debug("[AUTH] No Bearer token found")
         return None
     
     token = auth_header[7:]  # Remove 'Bearer ' prefix
+    logger.debug(f"[AUTH] Token extracted, length: {len(token)}")
     
     auth_service = get_auth_service()
     session = auth_service.validate_session(token)
     
     if not session:
+        logger.debug("[AUTH] Session validation failed")
         return None
     
+    logger.debug(f"[AUTH] Session valid, user: {session.get('username')}")
     return session
 
 
@@ -409,10 +415,32 @@ def refresh_token():
 def get_current_user_info():
     """Get current user information."""
     try:
+        user_id = g.current_user['user_id']
+        
+        # Handle enterprise users (string IDs like 'enterprise_2')
+        if isinstance(user_id, str) and user_id.startswith('enterprise_'):
+            # For enterprise users, return the session data directly
+            permissions = get_auth_service().get_user_permissions(user_id)
+            return jsonify({
+                'success': True,
+                'data': {
+                    'user': {
+                        'id': user_id,
+                        'username': g.current_user.get('username'),
+                        'email': g.current_user.get('email', ''),
+                        'display_name': g.current_user.get('display_name', g.current_user.get('username')),
+                        'roles': g.current_user.get('roles', []),
+                        'permissions': permissions,
+                        'is_enterprise': True
+                    }
+                }
+            })
+        
+        # Local users - fetch from database
         auth_service = get_auth_service()
-        user = auth_service.get_user(g.current_user['user_id'])
-        roles = auth_service.get_user_roles(g.current_user['user_id'])
-        permissions = auth_service.get_user_permissions(g.current_user['user_id'])
+        user = auth_service.get_user(user_id)
+        roles = auth_service.get_user_roles(user_id)
+        permissions = auth_service.get_user_permissions(user_id)
         
         return jsonify({
             'success': True,

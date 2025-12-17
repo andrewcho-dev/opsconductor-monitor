@@ -176,12 +176,26 @@ export function formatRelativeTime(value) {
 }
 
 export async function fetchApi(endpoint, options = {}) {
+  // Get auth token from localStorage (matches AuthContext.jsx TOKEN_KEY)
+  const token = localStorage.getItem('opsconductor_session_token');
+  
+  // Build headers - start with defaults, add options, then add auth
+  const headers = {
+    "Content-Type": "application/json",
+    ...options.headers,
+  };
+  
+  // Add Authorization header if token exists (after options.headers to ensure it's not overwritten)
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  // Destructure options to separate headers from other options
+  const { headers: _ignoredHeaders, ...restOptions } = options;
+  
   const response = await fetch(`${API_BASE}${endpoint}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-    ...options,
+    ...restOptions,
+    headers,  // Use our merged headers, not options.headers
   });
   if (!response.ok) {
     throw new Error(`API error: ${response.statusText}`);

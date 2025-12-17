@@ -253,20 +253,21 @@ export function LogsPage() {
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Level</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Source</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Category</th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">User</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Message</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 font-mono text-xs">
                 {loading && logs.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
                       <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2" />
                       Loading logs...
                     </td>
                   </tr>
                 ) : logs.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
                       No logs found matching your filters
                     </td>
                   </tr>
@@ -283,6 +284,9 @@ export function LogsPage() {
                       </td>
                       <td className="px-4 py-2 text-gray-600">{log.source}</td>
                       <td className="px-4 py-2 text-gray-500">{log.category || '-'}</td>
+                      <td className="px-4 py-2 text-gray-600">
+                        {log.details?.user?.username || log.details?.user?.display_name || '-'}
+                      </td>
                       <td className="px-4 py-2 text-gray-800 max-w-xl truncate" title={log.message}>
                         {log.message}
                       </td>

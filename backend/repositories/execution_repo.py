@@ -23,7 +23,8 @@ class ExecutionRepository(BaseRepository):
         task_id: str,
         status: str = 'queued',
         config: Dict = None,
-        worker: str = None
+        worker: str = None,
+        triggered_by: Dict = None
     ) -> Optional[Dict]:
         """
         Create a new execution record.
@@ -35,6 +36,7 @@ class ExecutionRepository(BaseRepository):
             status: Initial status (queued, running, success, failed)
             config: Job configuration
             worker: Worker hostname
+            triggered_by: User info dict {user_id, username, display_name, is_enterprise}
         
         Returns:
             Created execution record
@@ -52,6 +54,9 @@ class ExecutionRepository(BaseRepository):
         
         if worker:
             data['worker'] = worker
+        
+        if triggered_by:
+            data['triggered_by'] = json.dumps(triggered_by)
         
         return self.create(data)
     

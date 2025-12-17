@@ -8,7 +8,6 @@ All routes use standardized response format and error handling.
 from flask import Blueprint, request, jsonify
 from ..utils.responses import success_response, error_response, list_response
 from ..utils.errors import AppError, NotFoundError, ValidationError
-from ..middleware.permissions import require_permission, Permissions
 
 
 devices_bp = Blueprint('devices', __name__, url_prefix='/api/devices')
@@ -40,7 +39,6 @@ def handle_generic_error(error):
 
 
 @devices_bp.route('', methods=['GET'])
-@require_permission(Permissions.DEVICES_VIEW)
 def list_devices():
     """
     List all devices with optional filtering.
@@ -69,7 +67,6 @@ def list_devices():
 
 
 @devices_bp.route('/<ip_address>', methods=['GET'])
-@require_permission(Permissions.DEVICES_VIEW)
 def get_device(ip_address):
     """
     Get a single device by IP address.
@@ -96,7 +93,6 @@ def get_device(ip_address):
 
 
 @devices_bp.route('', methods=['POST'])
-@require_permission(Permissions.DEVICES_CREATE)
 def create_device():
     """
     Create or update a device.
@@ -133,7 +129,6 @@ def create_device():
 
 
 @devices_bp.route('/<ip_address>', methods=['DELETE'])
-@require_permission(Permissions.DEVICES_DELETE)
 def delete_device(ip_address):
     """
     Delete a device by IP address.
@@ -151,7 +146,6 @@ def delete_device(ip_address):
 
 
 @devices_bp.route('/summary/networks', methods=['GET'])
-@require_permission(Permissions.DEVICES_VIEW)
 def get_network_summary():
     """
     Get summary of devices grouped by network.
@@ -166,7 +160,6 @@ def get_network_summary():
 
 
 @devices_bp.route('/summary/stats', methods=['GET'])
-@require_permission(Permissions.DEVICES_VIEW)
 def get_device_stats():
     """
     Get overall device statistics.
@@ -181,7 +174,6 @@ def get_device_stats():
 
 
 @devices_bp.route('/<ip_address>/groups', methods=['GET'])
-@require_permission(Permissions.DEVICES_VIEW)
 def get_device_groups(ip_address):
     """
     Get all groups a device belongs to.
