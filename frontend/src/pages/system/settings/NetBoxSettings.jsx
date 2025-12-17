@@ -89,7 +89,6 @@ export function NetBoxSettings() {
           connected: true,
           version: res.data.netbox_version,
         });
-        loadLookups();
       } else {
         setConnectionStatus({
           connected: false,

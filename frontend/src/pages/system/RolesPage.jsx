@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Shield, Plus, Search, Check, X, Pencil, Trash2, 
-  ChevronDown, ChevronRight, Loader2, Users, Lock, Eye
+  Shield, Plus, Check, X, Pencil, 
+  ChevronDown, ChevronRight, Loader2, Users,
+  UserPlus, UserMinus
 } from 'lucide-react';
 import { PageLayout, PageHeader } from '../../components/layout';
 import { fetchApi, cn } from '../../lib/utils';
@@ -77,29 +78,19 @@ const PERMISSION_MODULES = {
 export function RolesPage() {
   const { hasPermission, getAuthHeader } = useAuth();
   const [roles, setRoles] = useState([]);
-  const [permissions, setPermissions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedRole, setSelectedRole] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-
-  useEffect(() => {
-    loadData();
-  }, []);
+  const [members, setMembers] = useState([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const [rolesRes, permsRes] = await Promise.all([
-        fetchApi('/api/auth/roles', { headers: getAuthHeader() }),
-        fetchApi('/api/auth/permissions', { headers: getAuthHeader() })
-      ]);
-
+      const rolesRes = await fetchApi('/api/auth/roles', { headers: getAuthHeader() });
       if (rolesRes.success) {
         setRoles(rolesRes.data.roles || []);
-      }
-      if (permsRes.success) {
-        setPermissions(permsRes.data.permissions || []);
       }
     } catch (err) {
       console.error('Error loading data:', err);
@@ -108,64 +99,171 @@ export function RolesPage() {
     }
   };
 
+  useEffect(() => {
+    loadData();
+  }, []);
+
   const canManageRoles = hasPermission('system.roles.manage');
+
+  const loadMembers = async (roleId) => {
+    setLoadingMembers(true);
+    try {
+      const res = await fetchApi(`/api/auth/roles/${roleId}/members`, { headers: getAuthHeader() });
+      if (res.success) {
+        setMembers(res.data.members || []);
+      }
+    } catch (err) {
+      console.error('Error loading members:', err);
+    } finally {
+      setLoadingMembers(false);
+    }
+  };
+
+  const handleSelectRole = (role) => {
+    setSelectedRole(role);
+    loadMembers(role.id);
+  };
+
+  // Auto-select first role on load
+  useEffect(() => {
+    if (roles.length > 0 && !selectedRole) {
+      handleSelectRole(roles[0]);
+    }
+  }, [roles]);
 
   return (
     <PageLayout module="system">
       <PageHeader
         title="Roles & Permissions"
-        description="Define roles with granular permission assignments"
+        description="Manage role-based access control"
       />
-      <div className="p-6 space-y-6">
-        {/* Header Actions */}
-        <div className="flex items-center justify-between">
-          <div className="text-sm text-gray-500">
-            {roles.length} roles defined
-          </div>
-          {canManageRoles && (
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              <Plus className="w-4 h-4" />
-              Create Role
-            </button>
-          )}
-        </div>
-
-        {/* Roles List */}
-        <div className="grid gap-4">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+      <div className="p-4">
+        <div className="flex gap-4 h-[calc(100vh-180px)]">
+          {/* Left Panel - Roles List */}
+          <div className="w-72 flex-shrink-0 bg-white rounded-lg border overflow-hidden flex flex-col">
+            <div className="p-3 border-b bg-gray-50 flex items-center justify-between">
+              <span className="text-sm font-medium text-gray-700">Roles ({roles.length})</span>
+              {canManageRoles && (
+                <button
+                  onClick={() => setShowCreateModal(true)}
+                  className="p-1.5 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  title="Create Role"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              )}
             </div>
-          ) : roles.length === 0 ? (
-            <div className="text-center py-12 bg-white rounded-xl border">
-              <Shield className="w-12 h-12 mx-auto text-gray-300 mb-3" />
-              <p className="text-gray-500">No roles defined</p>
+            <div className="flex-1 overflow-y-auto">
+              {loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {roles.map((role) => (
+                    <button
+                      key={role.id}
+                      onClick={() => handleSelectRole(role)}
+                      className={cn(
+                        "w-full text-left px-3 py-2.5 hover:bg-gray-50 transition-colors",
+                        selectedRole?.id === role.id && "bg-blue-50 border-l-2 border-blue-600"
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Shield className={cn(
+                          "w-4 h-4",
+                          role.is_system ? "text-purple-600" : "text-blue-600"
+                        )} />
+                        <span className="font-medium text-sm text-gray-900">{role.display_name}</span>
+                        {role.is_system && (
+                          <span className="px-1.5 py-0.5 text-[10px] bg-purple-100 text-purple-700 rounded">
+                            System
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 ml-6">
+                        <span>{role.user_count || 0} users</span>
+                        <span>{role.permission_count || 0} perms</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-          ) : (
-            roles.map((role) => (
-              <RoleCard
-                key={role.id}
-                role={role}
-                onEdit={() => { setSelectedRole(role); setShowEditModal(true); }}
-                canManage={canManageRoles}
-              />
-            ))
-          )}
-        </div>
-
-        {/* Permission Reference */}
-        <div className="bg-white rounded-xl border">
-          <div className="px-6 py-4 border-b">
-            <h3 className="text-lg font-semibold">Permission Reference</h3>
-            <p className="text-sm text-gray-500">All available permissions organized by module</p>
           </div>
-          <div className="divide-y">
-            {Object.entries(PERMISSION_MODULES).map(([key, module]) => (
-              <PermissionModuleSection key={key} moduleKey={key} module={module} />
-            ))}
+
+          {/* Right Panel - Role Details */}
+          <div className="flex-1 bg-white rounded-lg border overflow-hidden flex flex-col">
+            {selectedRole ? (
+              <>
+                {/* Role Header */}
+                <div className="p-4 border-b bg-gray-50 flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold text-gray-900">{selectedRole.display_name}</h3>
+                    <p className="text-sm text-gray-500">{selectedRole.description}</p>
+                  </div>
+                  {canManageRoles && !selectedRole.is_system && (
+                    <button
+                      onClick={() => setShowEditModal(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-100"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                      Edit
+                    </button>
+                  )}
+                </div>
+
+                {/* Two Column Layout */}
+                <div className="flex-1 overflow-hidden flex">
+                  {/* Members Column */}
+                  <div className="w-1/2 border-r flex flex-col">
+                    <div className="px-4 py-2 border-b bg-gray-50">
+                      <span className="text-sm font-medium text-gray-700">Members ({members.length})</span>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-3">
+                      <RoleMembersPanel
+                        roleId={selectedRole.id}
+                        members={members}
+                        loading={loadingMembers}
+                        canManage={canManageRoles}
+                        getAuthHeader={getAuthHeader}
+                        onRefresh={() => { loadMembers(selectedRole.id); loadData(); }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Permissions Column */}
+                  <div className="w-1/2 flex flex-col">
+                    <div className="px-4 py-2 border-b bg-gray-50">
+                      <span className="text-sm font-medium text-gray-700">Permissions ({selectedRole.permission_count || 0})</span>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-3">
+                      {selectedRole.permissions && selectedRole.permissions.length > 0 ? (
+                        <div className="flex flex-wrap gap-1.5">
+                          {selectedRole.permissions.map((perm, idx) => (
+                            <span
+                              key={idx}
+                              className="px-2 py-1 text-xs bg-gray-100 rounded text-gray-600"
+                            >
+                              {perm}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-400 text-center py-4">No permissions</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="flex-1 flex items-center justify-center text-gray-400">
+                <div className="text-center">
+                  <Shield className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                  <p>Select a role to view details</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -183,8 +281,8 @@ export function RolesPage() {
       {showEditModal && selectedRole && (
         <RoleModal
           role={selectedRole}
-          onClose={() => { setShowEditModal(false); setSelectedRole(null); }}
-          onSave={() => { setShowEditModal(false); setSelectedRole(null); loadData(); }}
+          onClose={() => { setShowEditModal(false); }}
+          onSave={() => { setShowEditModal(false); loadData(); }}
           getAuthHeader={getAuthHeader}
         />
       )}
@@ -192,130 +290,160 @@ export function RolesPage() {
   );
 }
 
-function RoleCard({ role, onEdit, canManage }) {
-  const [expanded, setExpanded] = useState(false);
+// Compact members panel component
+function RoleMembersPanel({ roleId, members, loading, canManage, getAuthHeader, onRefresh }) {
+  const [showAddMember, setShowAddMember] = useState(false);
+  const [newMember, setNewMember] = useState({ username: '', type: 'enterprise', display_name: '' });
+  const [addingMember, setAddingMember] = useState(false);
+  const [memberError, setMemberError] = useState('');
+
+  const handleAddMember = async () => {
+    if (!newMember.username.trim()) {
+      setMemberError('Username required');
+      return;
+    }
+    setMemberError('');
+    setAddingMember(true);
+    try {
+      const res = await fetchApi(`/api/auth/roles/${roleId}/members`, {
+        method: 'POST',
+        headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(newMember)
+      });
+      if (res.success) {
+        setNewMember({ username: '', type: 'enterprise', display_name: '' });
+        setShowAddMember(false);
+        onRefresh();
+      } else {
+        setMemberError(res.error?.message || 'Failed');
+      }
+    } catch (err) {
+      setMemberError(err.message || 'Failed');
+    } finally {
+      setAddingMember(false);
+    }
+  };
+
+  const handleRemoveMember = async (username, type) => {
+    if (!confirm(`Remove ${username}?`)) return;
+    try {
+      await fetchApi(`/api/auth/roles/${roleId}/members/${encodeURIComponent(username)}?type=${type}`, {
+        method: 'DELETE',
+        headers: getAuthHeader()
+      });
+      onRefresh();
+    } catch (err) {
+      console.error('Error:', err);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+      </div>
+    );
+  }
 
   return (
-    <div className="bg-white rounded-xl border overflow-hidden">
-      <div 
-        className="flex items-center justify-between px-6 py-4 cursor-pointer hover:bg-gray-50"
-        onClick={() => setExpanded(!expanded)}
-      >
-        <div className="flex items-center gap-4">
-          <div className={cn(
-            "w-10 h-10 rounded-lg flex items-center justify-center",
-            role.is_system ? "bg-purple-100" : "bg-blue-100"
-          )}>
-            <Shield className={cn(
-              "w-5 h-5",
-              role.is_system ? "text-purple-600" : "text-blue-600"
-            )} />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h4 className="font-semibold text-gray-900">{role.display_name}</h4>
-              {role.is_system && (
-                <span className="px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full">
-                  System
-                </span>
-              )}
-            </div>
-            <p className="text-sm text-gray-500">{role.description}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="text-right">
-            <div className="flex items-center gap-1 text-sm text-gray-600">
-              <Users className="w-4 h-4" />
-              {role.user_count || 0} users
-            </div>
-            <div className="text-xs text-gray-400">
-              {role.permission_count || 0} permissions
-            </div>
-          </div>
-          {canManage && !role.is_system && (
+    <div className="space-y-2">
+      {/* Add Member */}
+      {canManage && (
+        <div className="mb-3">
+          {!showAddMember ? (
             <button
-              onClick={(e) => { e.stopPropagation(); onEdit(); }}
-              className="p-2 hover:bg-gray-100 rounded-lg"
+              onClick={() => setShowAddMember(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-blue-50 text-blue-600 rounded hover:bg-blue-100"
             >
-              <Pencil className="w-4 h-4 text-gray-500" />
+              <UserPlus className="w-3.5 h-3.5" />
+              Add Member
             </button>
-          )}
-          {expanded ? (
-            <ChevronDown className="w-5 h-5 text-gray-400" />
           ) : (
-            <ChevronRight className="w-5 h-5 text-gray-400" />
-          )}
-        </div>
-      </div>
-      
-      {expanded && (
-        <div className="px-6 py-4 bg-gray-50 border-t">
-          <h5 className="text-sm font-medium text-gray-700 mb-3">Assigned Permissions</h5>
-          {role.permissions && role.permissions.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {role.permissions.map((perm, idx) => (
-                <span
-                  key={idx}
-                  className="px-2 py-1 text-xs bg-white border rounded-md text-gray-600"
+            <div className="p-2.5 bg-gray-50 rounded-lg space-y-2">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newMember.username}
+                  onChange={(e) => setNewMember(prev => ({ ...prev, username: e.target.value }))}
+                  placeholder="Username"
+                  className="flex-1 px-2 py-1.5 text-xs border rounded"
+                />
+                <select
+                  value={newMember.type}
+                  onChange={(e) => setNewMember(prev => ({ ...prev, type: e.target.value }))}
+                  className="px-2 py-1.5 text-xs border rounded"
                 >
-                  {perm}
-                </span>
-              ))}
+                  <option value="enterprise">AD</option>
+                  <option value="local">Local</option>
+                </select>
+              </div>
+              {memberError && <p className="text-xs text-red-600">{memberError}</p>}
+              <div className="flex gap-1.5">
+                <button
+                  onClick={handleAddMember}
+                  disabled={addingMember}
+                  className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {addingMember ? '...' : 'Add'}
+                </button>
+                <button
+                  onClick={() => { setShowAddMember(false); setMemberError(''); }}
+                  className="px-2 py-1 text-xs text-gray-600 hover:bg-gray-200 rounded"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
-          ) : (
-            <p className="text-sm text-gray-400">No permissions assigned</p>
           )}
         </div>
       )}
-    </div>
-  );
-}
 
-function PermissionModuleSection({ moduleKey, module }) {
-  const [expanded, setExpanded] = useState(false);
-
-  return (
-    <div>
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between px-6 py-3 hover:bg-gray-50"
-      >
-        <div className="flex items-center gap-3">
-          <span className="text-xl">{module.icon}</span>
-          <span className="font-medium text-gray-900">{module.label}</span>
-          <span className="text-xs text-gray-400">({module.permissions.length} permissions)</span>
+      {/* Members List */}
+      {members.length === 0 ? (
+        <div className="text-center py-4 text-gray-400 text-sm">
+          No members
         </div>
-        {expanded ? (
-          <ChevronDown className="w-5 h-5 text-gray-400" />
-        ) : (
-          <ChevronRight className="w-5 h-5 text-gray-400" />
-        )}
-      </button>
-      
-      {expanded && (
-        <div className="px-6 pb-4">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-gray-500">
-                <th className="pb-2 font-medium">Permission</th>
-                <th className="pb-2 font-medium">Code</th>
-                <th className="pb-2 font-medium">Description</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {module.permissions.map((perm) => (
-                <tr key={perm.code}>
-                  <td className="py-2 font-medium text-gray-900">{perm.label}</td>
-                  <td className="py-2">
-                    <code className="px-2 py-0.5 bg-gray-100 rounded text-xs">{perm.code}</code>
-                  </td>
-                  <td className="py-2 text-gray-500">{perm.description}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      ) : (
+        members.map((member) => (
+          <div
+            key={member.id}
+            className="flex items-center justify-between p-2 bg-gray-50 rounded"
+          >
+            <div className="flex items-center gap-2">
+              <div className={cn(
+                "w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-medium",
+                member.type === 'enterprise' ? "bg-purple-500" : "bg-blue-500"
+              )}>
+                {(member.display_name || member.username || '?')[0].toUpperCase()}
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-medium text-gray-900">
+                    {member.display_name || member.username}
+                  </span>
+                  <span className={cn(
+                    "px-1 py-0.5 text-[10px] rounded",
+                    member.type === 'enterprise'
+                      ? "bg-purple-100 text-purple-700"
+                      : "bg-blue-100 text-blue-700"
+                  )}>
+                    {member.type === 'enterprise' ? 'AD' : 'Local'}
+                  </span>
+                </div>
+                <span className="text-xs text-gray-500">@{member.username}</span>
+              </div>
+            </div>
+            {canManage && (
+              <button
+                onClick={() => handleRemoveMember(member.username, member.type)}
+                className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+                title="Remove"
+              >
+                <UserMinus className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        ))
       )}
     </div>
   );

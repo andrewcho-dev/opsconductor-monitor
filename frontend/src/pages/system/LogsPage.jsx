@@ -2,8 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { PageLayout, PageHeader } from '../../components/layout';
 import { ScrollText, RefreshCw, Download, Search, Filter, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { fetchApi, formatDetailedTime } from '../../lib/utils';
+import { useAuth } from '../../contexts/AuthContext';
 
 export function LogsPage() {
+  const { getAuthHeader } = useAuth();
   const [logs, setLogs] = useState([]);
   const [sources, setSources] = useState([]);
   const [levels, setLevels] = useState([]);
@@ -42,7 +44,7 @@ export function LogsPage() {
       const queryString = params.toString();
       const url = queryString ? `/api/logs?${queryString}` : '/api/logs';
       
-      const response = await fetchApi(url);
+      const response = await fetchApi(url, { headers: getAuthHeader() });
       
       if (response.success) {
         setLogs(response.data.logs || []);
@@ -62,9 +64,9 @@ export function LogsPage() {
   const fetchMetadata = async () => {
     try {
       const [sourcesRes, levelsRes, statsRes] = await Promise.all([
-        fetchApi('/api/logs/sources'),
-        fetchApi('/api/logs/levels'),
-        fetchApi('/api/logs/stats?hours=24'),
+        fetchApi('/api/logs/sources', { headers: getAuthHeader() }),
+        fetchApi('/api/logs/levels', { headers: getAuthHeader() }),
+        fetchApi('/api/logs/stats?hours=24', { headers: getAuthHeader() }),
       ]);
       
       if (sourcesRes.success) setSources(sourcesRes.data.sources || []);

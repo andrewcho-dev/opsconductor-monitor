@@ -7,6 +7,7 @@ Routes for device group CRUD operations and membership management.
 from flask import Blueprint, request, jsonify
 from ..utils.responses import success_response, error_response, list_response
 from ..utils.errors import AppError, NotFoundError, ValidationError
+from ..middleware.permissions import require_permission, Permissions
 
 
 groups_bp = Blueprint('groups', __name__, url_prefix='/api/device_groups')
@@ -36,6 +37,7 @@ def handle_generic_error(error):
 
 
 @groups_bp.route('', methods=['GET'])
+@require_permission(Permissions.GROUPS_VIEW)
 def list_groups():
     """
     List all device groups with device counts.
@@ -50,6 +52,7 @@ def list_groups():
 
 
 @groups_bp.route('/<int:group_id>', methods=['GET'])
+@require_permission(Permissions.GROUPS_VIEW)
 def get_group(group_id):
     """
     Get a single group by ID.
@@ -76,6 +79,7 @@ def get_group(group_id):
 
 
 @groups_bp.route('', methods=['POST'])
+@require_permission(Permissions.GROUPS_MANAGE)
 def create_group():
     """
     Create a new device group.
@@ -102,6 +106,7 @@ def create_group():
 
 
 @groups_bp.route('/<int:group_id>', methods=['PUT'])
+@require_permission(Permissions.GROUPS_MANAGE)
 def update_group(group_id):
     """
     Update a device group.
@@ -129,6 +134,7 @@ def update_group(group_id):
 
 
 @groups_bp.route('/<int:group_id>', methods=['DELETE'])
+@require_permission(Permissions.GROUPS_MANAGE)
 def delete_group(group_id):
     """
     Delete a device group.
@@ -146,6 +152,7 @@ def delete_group(group_id):
 
 
 @groups_bp.route('/<int:group_id>/devices', methods=['GET'])
+@require_permission(Permissions.GROUPS_VIEW)
 def get_group_devices(group_id):
     """
     Get all devices in a group.
@@ -163,6 +170,7 @@ def get_group_devices(group_id):
 
 
 @groups_bp.route('/<int:group_id>/devices', methods=['POST'])
+@require_permission(Permissions.GROUPS_MANAGE)
 def add_device_to_group(group_id):
     """
     Add a device to a group.
@@ -194,6 +202,7 @@ def add_device_to_group(group_id):
 
 
 @groups_bp.route('/<int:group_id>/devices/<ip_address>', methods=['DELETE'])
+@require_permission(Permissions.GROUPS_MANAGE)
 def remove_device_from_group(group_id, ip_address):
     """
     Remove a device from a group.

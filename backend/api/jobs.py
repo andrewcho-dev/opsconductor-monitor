@@ -7,6 +7,7 @@ Routes for job definition CRUD operations.
 from flask import Blueprint, request, jsonify
 from ..utils.responses import success_response, error_response, list_response
 from ..utils.errors import AppError, NotFoundError, ValidationError
+from ..middleware.permissions import require_permission, Permissions
 
 
 jobs_bp = Blueprint('jobs', __name__, url_prefix='/api/job-definitions')
@@ -38,6 +39,7 @@ def handle_generic_error(error):
 
 
 @jobs_bp.route('', methods=['GET'])
+@require_permission(Permissions.JOBS_VIEW)
 def list_jobs():
     """
     List all job definitions.
@@ -67,6 +69,7 @@ def list_jobs():
 
 
 @jobs_bp.route('/<job_id>', methods=['GET'])
+@require_permission(Permissions.JOBS_VIEW)
 def get_job(job_id):
     """
     Get a single job definition by ID.
@@ -84,6 +87,7 @@ def get_job(job_id):
 
 
 @jobs_bp.route('', methods=['POST'])
+@require_permission(Permissions.JOBS_CREATE)
 def create_job():
     """
     Create a new job definition.
@@ -118,6 +122,7 @@ def create_job():
 
 
 @jobs_bp.route('/<job_id>', methods=['PUT'])
+@require_permission(Permissions.JOBS_EDIT)
 def update_job(job_id):
     """
     Update a job definition.
@@ -149,6 +154,7 @@ def update_job(job_id):
 
 
 @jobs_bp.route('/<job_id>', methods=['DELETE'])
+@require_permission(Permissions.JOBS_DELETE)
 def delete_job(job_id):
     """
     Delete a job definition.
@@ -166,6 +172,7 @@ def delete_job(job_id):
 
 
 @jobs_bp.route('/<job_id>/enable', methods=['POST'])
+@require_permission(Permissions.JOBS_EDIT)
 def enable_job(job_id):
     """
     Enable a job definition.
@@ -183,6 +190,7 @@ def enable_job(job_id):
 
 
 @jobs_bp.route('/<job_id>/disable', methods=['POST'])
+@require_permission(Permissions.JOBS_EDIT)
 def disable_job(job_id):
     """
     Disable a job definition.

@@ -198,11 +198,17 @@ class JobExecutor:
             'audit_events': [],  # Track audit event IDs for reference
         }
         
+        # Extract user attribution if present
+        triggered_by = job_definition.get('config', {}).get('triggered_by') or job_definition.get('triggered_by')
+        if triggered_by:
+            result['triggered_by'] = triggered_by
+        
         # Log job started
         self._log_audit('job_started', details={
             'job_name': job_name,
             'job_id': result['job_id'],
-            'total_actions': result['total_actions']
+            'total_actions': result['total_actions'],
+            'triggered_by': triggered_by
         })
         
         try:

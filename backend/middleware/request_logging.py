@@ -34,6 +34,10 @@ def init_request_logging(app):
             'request_id': g.request_id,
             'ip_address': request.remote_addr,
         }
+        
+        # Set user context in logging service if authenticated
+        from ..services.logging_service import set_context
+        set_context(request_id=g.request_id, ip_address=request.remote_addr)
     
     @app.after_request
     def after_request(response):
@@ -56,8 +60,11 @@ def init_request_logging(app):
         else:
             log_level = 'info'
         
-        # Build log message
-        message = f"{request.method} {request.path} {status_code}"
+        # Build log message with user info if available
+        user = g.get('current_user')
+        username = user.get('username') if user else None
+        user_display = f" [{username}]" if username else ""
+        message = f"{request.method} {request.path} {status_code}{user_display}"
         
         # Log the request
         log_func = getattr(logger, log_level)
@@ -72,6 +79,8 @@ def init_request_logging(app):
                 'query_string': request.query_string.decode('utf-8') if request.query_string else None,
                 'content_length': request.content_length,
                 'user_agent': request.user_agent.string if request.user_agent else None,
+                'username': username,
+                'user_id': user.get('user_id') if user else None,
             }
         )
         

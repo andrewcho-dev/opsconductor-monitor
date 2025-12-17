@@ -77,6 +77,7 @@ class WorkflowEngine:
         from .node_executors.database import DBQueryExecutor, DBUpsertExecutor
         from .node_executors.notifications import SlackExecutor, EmailExecutor, WebhookExecutor, TemplatedNotificationExecutor
         from .node_executors.netbox import NetBoxAutodiscoveryExecutor, NetBoxDeviceCreateExecutor, NetBoxLookupExecutor
+        from .node_executors.prtg import PRTG_EXECUTORS
         
         # Create executor instances
         ping_exec = PingExecutor()
@@ -142,6 +143,9 @@ class WorkflowEngine:
             'netbox:lookup-sites': lambda n, c: netbox_sites_exec.execute(n, c),
             'netbox:lookup-roles': lambda n, c: netbox_roles_exec.execute(n, c),
             'netbox:lookup-device-types': lambda n, c: netbox_types_exec.execute(n, c),
+            
+            # PRTG - register all PRTG executors
+            **{k: lambda n, c, ex=v: ex.execute(n, c) for k, v in PRTG_EXECUTORS.items()},
         }
     
     def register_executor(self, node_type: str, executor: Callable):

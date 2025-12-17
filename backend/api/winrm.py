@@ -7,6 +7,7 @@ Routes for Windows Remote Management operations.
 from flask import Blueprint, request, jsonify
 from ..utils.responses import success_response, error_response
 from ..executors.winrm_executor import WinRMExecutor
+from ..middleware.permissions import require_permission, Permissions
 
 
 winrm_bp = Blueprint('winrm', __name__, url_prefix='/api/winrm')
@@ -14,6 +15,7 @@ executor = WinRMExecutor()
 
 
 @winrm_bp.route('/test', methods=['POST'])
+@require_permission(Permissions.DEVICES_CONNECT)
 def test_connection():
     """
     Test WinRM connectivity to a Windows target.
@@ -50,6 +52,7 @@ def test_connection():
 
 
 @winrm_bp.route('/execute/cmd', methods=['POST'])
+@require_permission(Permissions.DEVICES_CONNECT)
 def execute_cmd():
     """
     Execute a CMD command on a Windows target.
@@ -83,6 +86,7 @@ def execute_cmd():
 
 
 @winrm_bp.route('/execute/powershell', methods=['POST'])
+@require_permission(Permissions.DEVICES_CONNECT)
 def execute_powershell():
     """
     Execute a PowerShell script on a Windows target.
@@ -116,6 +120,7 @@ def execute_powershell():
 
 
 @winrm_bp.route('/system-info', methods=['POST'])
+@require_permission(Permissions.DEVICES_CONNECT)
 def get_system_info():
     """Get system information from a Windows target."""
     data = request.get_json() or {}
@@ -137,6 +142,7 @@ def get_system_info():
 
 
 @winrm_bp.route('/services', methods=['POST'])
+@require_permission(Permissions.DEVICES_CONNECT)
 def get_services():
     """Get Windows services from a target."""
     data = request.get_json() or {}
@@ -163,6 +169,7 @@ def get_services():
 
 
 @winrm_bp.route('/services/manage', methods=['POST'])
+@require_permission(Permissions.DEVICES_CONNECT)
 def manage_service():
     """Start, stop, or restart a Windows service."""
     data = request.get_json() or {}
@@ -191,6 +198,7 @@ def manage_service():
 
 
 @winrm_bp.route('/processes', methods=['POST'])
+@require_permission(Permissions.DEVICES_CONNECT)
 def get_processes():
     """Get running processes from a Windows target."""
     data = request.get_json() or {}
@@ -216,6 +224,7 @@ def get_processes():
 
 
 @winrm_bp.route('/event-log', methods=['POST'])
+@require_permission(Permissions.DEVICES_CONNECT)
 def get_event_log():
     """Get Windows Event Log entries."""
     data = request.get_json() or {}
@@ -243,6 +252,7 @@ def get_event_log():
 
 
 @winrm_bp.route('/disk-space', methods=['POST'])
+@require_permission(Permissions.DEVICES_CONNECT)
 def get_disk_space():
     """Get disk space information from a Windows target."""
     data = request.get_json() or {}
@@ -264,6 +274,7 @@ def get_disk_space():
 
 
 @winrm_bp.route('/network-config', methods=['POST'])
+@require_permission(Permissions.DEVICES_CONNECT)
 def get_network_config():
     """Get network configuration from a Windows target."""
     data = request.get_json() or {}
@@ -285,6 +296,7 @@ def get_network_config():
 
 
 @winrm_bp.route('/reboot', methods=['POST'])
+@require_permission(Permissions.DEVICES_CONNECT)
 def reboot_system():
     """Reboot a Windows system."""
     data = request.get_json() or {}
@@ -315,6 +327,7 @@ def reboot_system():
 
 
 @winrm_bp.route('/shutdown', methods=['POST'])
+@require_permission(Permissions.DEVICES_CONNECT)
 def shutdown_system():
     """Shutdown a Windows system."""
     data = request.get_json() or {}

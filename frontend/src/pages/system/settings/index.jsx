@@ -3,6 +3,7 @@ export { DatabaseSettings } from './DatabaseSettings';
 export { PasswordPolicySettings } from './PasswordPolicySettings';
 export { LoggingSettings } from './LoggingSettings';
 export { NetBoxSettings } from './NetBoxSettings';
+export { default as PRTGSettings } from './PRTGSettings';
 
 // SecuritySettings now uses PasswordPolicySettings
 export { PasswordPolicySettings as SecuritySettings } from './PasswordPolicySettings';

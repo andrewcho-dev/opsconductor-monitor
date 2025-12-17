@@ -11,6 +11,7 @@ from backend.database import get_db as get_db_connection
 from backend.utils.responses import success_response, error_response
 from backend.services.credential_service import get_credential_service
 from backend.services.credential_audit_service import get_audit_service
+from backend.middleware.permissions import require_permission, require_admin, Permissions
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,7 @@ credentials_bp = Blueprint('credentials', __name__, url_prefix='/api/credentials
 # =============================================================================
 
 @credentials_bp.route('', methods=['GET'])
+@require_permission(Permissions.CREDENTIALS_VIEW)
 def list_credentials():
     """List all credentials (without sensitive data)."""
     credential_type = request.args.get('type')
@@ -46,6 +48,7 @@ def list_credentials():
 
 
 @credentials_bp.route('', methods=['POST'])
+@require_permission(Permissions.CREDENTIALS_CREATE)
 def create_credential():
     """Create a new credential."""
     data = request.get_json()
@@ -119,16 +122,21 @@ def create_credential():
             'group_search_filter': data.get('group_search_filter', ''),
         }
     elif credential_type == 'active_directory':
-        credential_data = {
-            'domain_controller': data.get('domain_controller', ''),
-            'domain': data.get('ad_domain', ''),
-            'port': data.get('ad_port', 389),
-            'use_ssl': data.get('ad_use_ssl', False),
-            'username': data.get('username', ''),
-            'password': data.get('password', ''),
-            'base_dn': data.get('base_dn', ''),
-            'user_search_filter': data.get('user_search_filter', '(sAMAccountName={username})'),
-        }
+        # Support both direct credential_data and individual fields
+        if data.get('credential_data'):
+            credential_data = data.get('credential_data')
+        else:
+            credential_data = {
+                'host': data.get('domain_controller', data.get('host', '')),
+                'domain': data.get('ad_domain', data.get('domain', '')),
+                'port': data.get('ad_port', data.get('port', 636)),
+                'use_ssl': data.get('ad_use_ssl', data.get('use_ssl', True)),
+                'username': data.get('username', ''),
+                'password': data.get('password', ''),
+                'base_dn': data.get('base_dn', ''),
+                'user_search_filter': data.get('user_search_filter', '(sAMAccountName={username})'),
+                'bind_dn_template': data.get('bind_dn_template', '{username}@' + data.get('ad_domain', data.get('domain', ''))),
+            }
     elif credential_type == 'tacacs':
         credential_data = {
             'server': data.get('tacacs_server', ''),
@@ -195,6 +203,7 @@ def create_credential():
 
 
 @credentials_bp.route('/<int:credential_id>', methods=['GET'])
+@require_permission(Permissions.CREDENTIALS_VIEW)
 def get_credential(credential_id):
     """Get a credential by ID."""
     try:
@@ -211,6 +220,7 @@ def get_credential(credential_id):
 
 
 @credentials_bp.route('/<int:credential_id>', methods=['PUT'])
+@require_permission(Permissions.CREDENTIALS_EDIT)
 def update_credential(credential_id):
     """Update a credential."""
     data = request.get_json()
@@ -284,6 +294,7 @@ def update_credential(credential_id):
 
 
 @credentials_bp.route('/<int:credential_id>', methods=['DELETE'])
+@require_permission(Permissions.CREDENTIALS_DELETE)
 def delete_credential(credential_id):
     """Delete a credential."""
     try:
@@ -304,6 +315,7 @@ def delete_credential(credential_id):
 # =============================================================================
 
 @credentials_bp.route('/groups', methods=['GET'])
+@require_permission(Permissions.CREDENTIALS_VIEW)
 def list_groups():
     """List all credential groups."""
     try:
@@ -316,6 +328,7 @@ def list_groups():
 
 
 @credentials_bp.route('/groups', methods=['POST'])
+@require_permission(Permissions.CREDENTIAL_GROUPS_MANAGE)
 def create_group():
     """Create a credential group."""
     data = request.get_json()
@@ -336,6 +349,7 @@ def create_group():
 
 
 @credentials_bp.route('/groups/<int:group_id>', methods=['DELETE'])
+@require_permission(Permissions.CREDENTIAL_GROUPS_MANAGE)
 def delete_group(group_id):
     """Delete a credential group."""
     try:
@@ -352,6 +366,7 @@ def delete_group(group_id):
 
 
 @credentials_bp.route('/groups/<int:group_id>/members', methods=['POST'])
+@require_permission(Permissions.CREDENTIAL_GROUPS_MANAGE)
 def add_group_member(group_id):
     """Add a credential to a group."""
     data = request.get_json()

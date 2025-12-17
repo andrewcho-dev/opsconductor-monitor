@@ -12,8 +12,10 @@ import {
   Activity
 } from 'lucide-react';
 import { fetchApi } from '../../lib/utils';
+import { useAuth } from '../../contexts/AuthContext';
 
 export function WorkersPage() {
+  const { getAuthHeader } = useAuth();
   const [loading, setLoading] = useState(true);
   const [queueStatus, setQueueStatus] = useState(null);
   const [error, setError] = useState(null);
@@ -22,7 +24,7 @@ export function WorkersPage() {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetchApi('/api/scheduler/queues');
+      const response = await fetchApi('/api/scheduler/queues', { headers: getAuthHeader() });
       const data = response.data || response;
       setQueueStatus(data);
     } catch (err) {

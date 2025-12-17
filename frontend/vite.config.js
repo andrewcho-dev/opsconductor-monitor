@@ -46,6 +46,7 @@ export default defineConfig({
       '/api/logs': 'http://192.168.10.50:5000',
       '/api/system': 'http://192.168.10.50:5000',
       '/api/netbox': 'http://192.168.10.50:5000',
+      '/api/prtg': 'http://192.168.10.50:5000',
     }
   },
   build: {

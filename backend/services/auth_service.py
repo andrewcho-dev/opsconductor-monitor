@@ -458,9 +458,25 @@ class AuthService:
             """, (user_id,))
             return [dict(row) for row in cursor.fetchall()]
     
-    def get_user_permissions(self, user_id: int) -> List[str]:
-        """Get all permission codes for a user (from all their roles)."""
+    def get_user_permissions(self, user_id) -> List[str]:
+        """
+        Get all permission codes for a user (from all their roles).
+        Handles both local users (integer ID) and enterprise users (string ID like 'enterprise_1').
+        """
         with self.db.cursor() as cursor:
+            # Handle enterprise users
+            if isinstance(user_id, str) and user_id.startswith('enterprise_'):
+                enterprise_id = int(user_id.replace('enterprise_', ''))
+                cursor.execute("""
+                    SELECT DISTINCT p.code
+                    FROM permissions p
+                    JOIN role_permissions rp ON p.id = rp.permission_id
+                    JOIN enterprise_user_roles eur ON rp.role_id = eur.role_id
+                    WHERE eur.id = %s
+                """, (enterprise_id,))
+                return [row['code'] for row in cursor.fetchall()]
+            
+            # Handle local users
             cursor.execute("""
                 SELECT DISTINCT p.code
                 FROM permissions p
@@ -471,8 +487,8 @@ class AuthService:
             """, (user_id,))
             return [row['code'] for row in cursor.fetchall()]
     
-    def user_has_permission(self, user_id: int, permission_code: str) -> bool:
-        """Check if user has a specific permission."""
+    def user_has_permission(self, user_id, permission_code: str) -> bool:
+        """Check if user has a specific permission (works for both local and enterprise users)."""
         permissions = self.get_user_permissions(user_id)
         return permission_code in permissions
     
@@ -713,17 +729,19 @@ class AuthService:
         }
     
     def validate_session(self, session_token: str) -> Optional[Dict[str, Any]]:
-        """Validate a session token and return user info."""
+        """Validate a session token and return user info (local or enterprise)."""
         token_hash = self.hash_token(session_token)
         
         with self.db.cursor() as cursor:
+            # First try to find a local user session
             cursor.execute("""
                 SELECT s.id as session_id, s.user_id, s.two_factor_verified,
-                       s.expires_at, s.last_activity_at,
+                       s.expires_at, s.last_activity_at, s.is_enterprise,
+                       s.enterprise_username,
                        u.username, u.email, u.display_name, u.status,
                        u.two_factor_enabled
                 FROM user_sessions s
-                JOIN users u ON s.user_id = u.id
+                LEFT JOIN users u ON s.user_id = u.id
                 WHERE s.session_token_hash = %s
                 AND s.revoked = FALSE
                 AND s.expires_at > NOW()
@@ -735,6 +753,42 @@ class AuthService:
             
             session = dict(row)
             
+            # Handle enterprise session
+            if session.get('is_enterprise'):
+                # Get enterprise user's roles and permissions
+                enterprise_username = session.get('enterprise_username')
+                cursor.execute("""
+                    SELECT eur.id, eur.username, eur.display_name, eur.email,
+                           array_agg(r.name) as roles
+                    FROM enterprise_user_roles eur
+                    JOIN roles r ON eur.role_id = r.id
+                    WHERE LOWER(eur.username) = LOWER(%s)
+                    GROUP BY eur.id, eur.username, eur.display_name, eur.email
+                """, (enterprise_username,))
+                eur_row = cursor.fetchone()
+                
+                if not eur_row:
+                    return None  # Enterprise user no longer has role assignment
+                
+                # Update last activity
+                cursor.execute("""
+                    UPDATE user_sessions SET last_activity_at = NOW()
+                    WHERE id = %s
+                """, (session['session_id'],))
+                self.db.get_connection().commit()
+                
+                return {
+                    'session_id': session['session_id'],
+                    'user_id': f"enterprise_{eur_row['id']}",
+                    'username': eur_row['username'],
+                    'email': eur_row.get('email') or '',
+                    'display_name': eur_row.get('display_name') or eur_row['username'],
+                    'status': 'active',
+                    'is_enterprise': True,
+                    'roles': eur_row['roles'] or []
+                }
+            
+            # Handle local user session
             # Check if user is still active
             if session['status'] != 'active':
                 return None
@@ -1449,35 +1503,34 @@ class AuthService:
                 )
                 return False, None, ldap_result.get('error', 'LDAP authentication failed')
             
-            # Get or create local user
-            user = self._get_or_create_ldap_user(username, ldap_result.get('user_info', {}), config)
+            # Look up existing user - enterprise users must be pre-assigned to a role
+            user = self._get_enterprise_user(username, ldap_result.get('user_info', {}), config)
             
             if not user:
-                return False, None, "Failed to create local user account"
+                self._log_auth_event(
+                    username=username,
+                    event_type='login_failed',
+                    event_status='failure',
+                    ip_address=ip_address,
+                    details={'reason': 'user_not_assigned', 'config_id': config_id}
+                )
+                return False, None, "User not authorized. Please contact your administrator to request access."
             
-            # Check if 2FA is required for enterprise users
-            if user.get('two_factor_enabled'):
-                return True, {
-                    'user_id': user['id'],
-                    'username': user['username'],
-                    'requires_2fa': True,
-                    'two_factor_method': user.get('two_factor_method')
-                }, None
+            # Enterprise users don't support 2FA (managed by AD)
             
-            # Create session
-            session = self._create_session(user['id'], ip_address, user_agent)
-            
-            # Update last login
-            self._update_last_login(user['id'], ip_address)
+            # Create session for enterprise user
+            session = self._create_enterprise_session(user, ip_address, user_agent)
             
             self._log_auth_event(
-                user_id=user['id'],
                 username=username,
                 event_type='login',
                 event_status='success',
                 ip_address=ip_address,
-                details={'auth_method': 'ldap', 'config_id': config_id}
+                details={'auth_method': 'ldap', 'config_id': config_id, 'is_enterprise': True}
             )
+            
+            # Get permissions for the user's roles
+            permissions = self._get_permissions_for_roles(user.get('roles', []))
             
             return True, {
                 'user_id': user['id'],
@@ -1486,7 +1539,10 @@ class AuthService:
                 'display_name': user.get('display_name'),
                 'session_token': session['session_token'],
                 'refresh_token': session['refresh_token'],
-                'expires_at': session['expires_at'].isoformat()
+                'expires_at': session['expires_at'].isoformat(),
+                'roles': user.get('roles', []),
+                'permissions': permissions,
+                'is_enterprise': True
             }, None
             
         except Exception as e:
@@ -1494,22 +1550,41 @@ class AuthService:
             return False, None, "Authentication service error"
     
     def _get_enterprise_auth_config(self, config_id: int) -> Optional[Dict[str, Any]]:
-        """Get enterprise auth configuration by ID."""
+        """Get enterprise auth configuration by ID, including credential data."""
         with self.db.cursor() as cursor:
             cursor.execute("""
                 SELECT * FROM enterprise_auth_configs
-                WHERE id = %s AND is_active = TRUE
+                WHERE id = %s AND enabled = TRUE
             """, (config_id,))
             row = cursor.fetchone()
-            return dict(row) if row else None
+            if not row:
+                return None
+            
+            config = dict(row)
+            
+            # If there's a linked credential, fetch and decrypt it
+            if config.get('credential_id'):
+                from backend.services.credential_service import CredentialService
+                cred_service = CredentialService()
+                cred = cred_service.get_credential(
+                    config['credential_id'], 
+                    include_secret=True,
+                    accessed_by='auth_service',
+                    access_reason='enterprise_auth_login'
+                )
+                if cred and cred.get('secret_data'):
+                    # Merge credential data into config
+                    config.update(cred['secret_data'])
+            
+            return config
     
     def get_enterprise_auth_configs_for_login(self) -> List[Dict[str, Any]]:
         """Get active enterprise auth configs available for login."""
         with self.db.cursor() as cursor:
             cursor.execute("""
-                SELECT id, name, auth_type, description
+                SELECT id, name, auth_type
                 FROM enterprise_auth_configs
-                WHERE is_active = TRUE
+                WHERE enabled = TRUE
                 ORDER BY name
             """)
             return [dict(row) for row in cursor.fetchall()]
@@ -1522,13 +1597,21 @@ class AuthService:
         """
         try:
             import ldap3
-            from ldap3 import Server, Connection, ALL, SUBTREE
+            import ssl
+            from ldap3 import Server, Connection, ALL, SUBTREE, Tls
             
-            # Build server connection
+            # Build server connection with optional SSL
+            use_ssl = config.get('use_ssl', False)
+            tls_config = None
+            if use_ssl:
+                # Allow self-signed certificates
+                tls_config = Tls(validate=ssl.CERT_NONE)
+            
             server = Server(
                 config['host'],
-                port=config.get('port', 389),
-                use_ssl=config.get('use_ssl', False),
+                port=config.get('port', 636 if use_ssl else 389),
+                use_ssl=use_ssl,
+                tls=tls_config,
                 get_info=ALL
             )
             
@@ -1589,50 +1672,120 @@ class AuthService:
             logger.error(f"LDAP bind error: {e}")
             return {'success': False, 'error': str(e)}
     
-    def _get_or_create_ldap_user(
+    def _get_enterprise_user(
         self,
         username: str,
         ldap_info: Dict[str, Any],
         config: Dict[str, Any]
     ) -> Optional[Dict[str, Any]]:
-        """Get existing user or create new one from LDAP info."""
-        # Check if user exists
-        user = self.get_user_by_username(username)
+        """
+        Get enterprise user role assignment by username.
         
-        if user:
-            # Update user info from LDAP if needed
-            if user['auth_method'] in ('ldap', 'active_directory'):
-                updates = {}
-                if ldap_info.get('email') and ldap_info['email'] != user.get('email'):
-                    updates['email'] = ldap_info['email']
-                if ldap_info.get('display_name') and ldap_info['display_name'] != user.get('display_name'):
-                    updates['display_name'] = ldap_info['display_name']
-                
-                if updates:
-                    self.update_user(user['id'], updates)
-                    user.update(updates)
-            
-            return user
+        Enterprise users are NOT stored in the users table. Instead, they are
+        mapped to roles via the enterprise_user_roles table. This keeps the
+        Users page clean (local users only) while allowing enterprise users
+        to be assigned to permission groups.
         
-        # Create new user from LDAP
-        try:
-            email = ldap_info.get('email') or f"{username}@{config.get('domain', 'local')}"
+        Returns:
+            Virtual user dict with role info if found, None otherwise
+        """
+        with self.db.cursor() as cursor:
+            # Look up enterprise user role assignment
+            cursor.execute("""
+                SELECT eur.id, eur.username, eur.display_name, eur.email,
+                       eur.config_id, array_agg(r.name) as roles
+                FROM enterprise_user_roles eur
+                JOIN roles r ON eur.role_id = r.id
+                WHERE LOWER(eur.username) = LOWER(%s)
+                GROUP BY eur.id, eur.username, eur.display_name, eur.email, eur.config_id
+            """, (username,))
+            row = cursor.fetchone()
             
-            user = self.create_user(
-                username=username,
-                email=email,
-                password=None,  # No local password for LDAP users
-                first_name=ldap_info.get('first_name'),
-                last_name=ldap_info.get('last_name'),
-                auth_method=config['auth_type'],
-                role_names=config.get('default_roles', ['viewer'])
-            )
+            if not row:
+                logger.info(f"Enterprise login denied: user '{username}' not assigned to any role")
+                return None
             
-            return user
+            # Update display name/email from LDAP if changed
+            updates = {}
+            if ldap_info.get('display_name') and ldap_info['display_name'] != row.get('display_name'):
+                updates['display_name'] = ldap_info['display_name']
+            if ldap_info.get('email') and ldap_info['email'] != row.get('email'):
+                updates['email'] = ldap_info['email']
             
-        except Exception as e:
-            logger.error(f"Error creating LDAP user: {e}")
-            return None
+            if updates:
+                update_parts = [f"{k} = %s" for k in updates.keys()]
+                cursor.execute(
+                    f"UPDATE enterprise_user_roles SET {', '.join(update_parts)} WHERE id = %s",
+                    list(updates.values()) + [row['id']]
+                )
+                self.db.get_connection().commit()
+            
+            # Return a virtual user dict (not a real users table record)
+            return {
+                'id': f"enterprise_{row['id']}",  # Prefix to distinguish from local users
+                'username': row['username'],
+                'email': ldap_info.get('email') or row.get('email') or '',
+                'display_name': ldap_info.get('display_name') or row.get('display_name') or username,
+                'auth_method': config['auth_type'],
+                'roles': row['roles'] or [],
+                'is_enterprise': True
+            }
+    
+    def _create_enterprise_session(
+        self,
+        user: Dict[str, Any],
+        ip_address: Optional[str] = None,
+        user_agent: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Create a session for an enterprise user.
+        
+        Enterprise users don't have a record in the users table, so we store
+        their session data differently - using their enterprise_user_roles ID
+        and username instead of a user_id.
+        """
+        session_token = secrets.token_urlsafe(32)
+        refresh_token = secrets.token_urlsafe(32)
+        expires_at = datetime.utcnow() + self.session_duration
+        
+        with self.db.cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO user_sessions (
+                    user_id, session_token_hash, refresh_token_hash, expires_at,
+                    ip_address, user_agent, is_enterprise, enterprise_username
+                ) VALUES (NULL, %s, %s, %s, %s, %s, TRUE, %s)
+                RETURNING id
+            """, (
+                self.hash_token(session_token),
+                self.hash_token(refresh_token),
+                expires_at,
+                ip_address,
+                user_agent,
+                user['username']
+            ))
+            self.db.get_connection().commit()
+        
+        return {
+            'session_token': session_token,
+            'refresh_token': refresh_token,
+            'expires_at': expires_at
+        }
+    
+    def _get_permissions_for_roles(self, role_names: List[str]) -> List[str]:
+        """Get all permissions for a list of role names."""
+        if not role_names:
+            return []
+        
+        with self.db.cursor() as cursor:
+            placeholders = ','.join(['%s'] * len(role_names))
+            cursor.execute(f"""
+                SELECT DISTINCT p.code
+                FROM permissions p
+                JOIN role_permissions rp ON p.id = rp.permission_id
+                JOIN roles r ON rp.role_id = r.id
+                WHERE r.name IN ({placeholders})
+            """, role_names)
+            return [row['code'] for row in cursor.fetchall()]
     
     def test_ldap_connection(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """Test LDAP connection with provided configuration."""

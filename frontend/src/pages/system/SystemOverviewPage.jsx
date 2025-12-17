@@ -12,9 +12,13 @@ import {
   XCircle,
   RefreshCw,
   Bell,
-  Check
+  Check,
+  Link,
+  ExternalLink,
+  Plug
 } from 'lucide-react';
 import { fetchApi, formatTimeOnly, formatShortTime, formatDuration } from '../../lib/utils';
+import { useAuth } from '../../contexts/AuthContext';
 
 function AlertItem({ alert, onAcknowledge }) {
   const severityColors = {
@@ -102,19 +106,113 @@ function StatusCard({ title, icon: Icon, status, details, color }) {
   );
 }
 
+// Integration status card component
+function IntegrationCard({ name, icon: Icon, status, url, version, lastSync, error, onConfigure }) {
+  const statusColors = {
+    connected: 'bg-green-100 text-green-700 border-green-200',
+    disconnected: 'bg-gray-100 text-gray-500 border-gray-200',
+    error: 'bg-red-100 text-red-700 border-red-200',
+    not_configured: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+  };
+  
+  const statusLabels = {
+    connected: 'Connected',
+    disconnected: 'Disconnected',
+    error: 'Error',
+    not_configured: 'Not Configured',
+  };
+  
+  const statusIcons = {
+    connected: <CheckCircle className="w-4 h-4 text-green-500" />,
+    disconnected: <XCircle className="w-4 h-4 text-gray-400" />,
+    error: <AlertTriangle className="w-4 h-4 text-red-500" />,
+    not_configured: <AlertTriangle className="w-4 h-4 text-yellow-500" />,
+  };
+
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 p-4">
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex items-center gap-3">
+          <div className={`p-2 rounded-lg ${status === 'connected' ? 'bg-green-100' : 'bg-gray-100'}`}>
+            <Icon className={`w-5 h-5 ${status === 'connected' ? 'text-green-600' : 'text-gray-500'}`} />
+          </div>
+          <div>
+            <h3 className="font-semibold text-gray-900">{name}</h3>
+            {url && (
+              <a 
+                href={url} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+              >
+                {url.replace(/^https?:\/\//, '').split('/')[0]}
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5">
+          {statusIcons[status]}
+          <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${statusColors[status]}`}>
+            {statusLabels[status]}
+          </span>
+        </div>
+      </div>
+      
+      {status === 'connected' && (
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          {version && (
+            <div>
+              <span className="text-gray-500">Version:</span>
+              <span className="ml-1 font-medium text-gray-700">{version}</span>
+            </div>
+          )}
+          {lastSync && (
+            <div>
+              <span className="text-gray-500">Last Sync:</span>
+              <span className="ml-1 font-medium text-gray-700">{lastSync}</span>
+            </div>
+          )}
+        </div>
+      )}
+      
+      {status === 'error' && error && (
+        <div className="text-xs text-red-600 bg-red-50 rounded p-2 mt-2">
+          {error}
+        </div>
+      )}
+      
+      {(status === 'not_configured' || status === 'disconnected') && onConfigure && (
+        <button
+          onClick={onConfigure}
+          className="mt-2 text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
+        >
+          <Plug className="w-3 h-3" />
+          Configure Integration
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function SystemOverviewPage() {
+  const { getAuthHeader } = useAuth();
   const [loading, setLoading] = useState(true);
   const [systemStatus, setSystemStatus] = useState(null);
   const [queueStatus, setQueueStatus] = useState(null);
   const [recentExecutions, setRecentExecutions] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [error, setError] = useState(null);
+  const [integrations, setIntegrations] = useState({
+    netbox: { status: 'not_configured' },
+    prtg: { status: 'not_configured' },
+  });
 
   const handleAcknowledgeAlert = async (alertId) => {
     try {
-      await fetchApi(`/api/alerts/${alertId}/acknowledge`, { method: 'POST' });
+      await fetchApi(`/api/alerts/${alertId}/acknowledge`, { method: 'POST', headers: getAuthHeader() });
       // Refresh alerts
-      const alertsResponse = await fetchApi('/api/alerts');
+      const alertsResponse = await fetchApi('/api/alerts', { headers: getAuthHeader() });
       const alertsData = alertsResponse.data || alertsResponse;
       setAlerts(alertsData.alerts || []);
     } catch (err) {
@@ -128,7 +226,7 @@ export function SystemOverviewPage() {
       setError(null);
       
       // Load queue status from existing endpoint
-      const queuesResponse = await fetchApi('/api/scheduler/queues');
+      const queuesResponse = await fetchApi('/api/scheduler/queues', { headers: getAuthHeader() });
       const queues = queuesResponse.data || queuesResponse;
       setQueueStatus(queues);
       
@@ -146,7 +244,7 @@ export function SystemOverviewPage() {
       
       // Load recent executions
       try {
-        const execResponse = await fetchApi('/api/scheduler/executions/recent?limit=15');
+        const execResponse = await fetchApi('/api/scheduler/executions/recent?limit=15', { headers: getAuthHeader() });
         const execData = execResponse.data || execResponse;
         // API returns data as array directly, not {executions: [...]}
         setRecentExecutions(Array.isArray(execData) ? execData : (execData.executions || []));
@@ -157,13 +255,91 @@ export function SystemOverviewPage() {
       
       // Load alerts
       try {
-        const alertsResponse = await fetchApi('/api/alerts');
+        const alertsResponse = await fetchApi('/api/alerts', { headers: getAuthHeader() });
         const alertsData = alertsResponse.data || alertsResponse;
         setAlerts(alertsData.alerts || []);
       } catch {
         // Non-critical, just show empty
         setAlerts([]);
       }
+      
+      // Load integration statuses
+      const newIntegrations = { ...integrations };
+      
+      // Check NetBox
+      try {
+        const netboxRes = await fetchApi('/api/netbox/settings', { headers: getAuthHeader() });
+        if (netboxRes.success && netboxRes.data?.url) {
+          // Test connection
+          try {
+            const testRes = await fetchApi('/api/netbox/test', {
+              method: 'POST',
+              headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                url: netboxRes.data.url,
+                token: netboxRes.data.token,
+                verify_ssl: netboxRes.data.verify_ssl !== 'false',
+              })
+            });
+            if (testRes.success) {
+              newIntegrations.netbox = {
+                status: 'connected',
+                url: netboxRes.data.url,
+                version: testRes.data?.netbox_version,
+              };
+            } else {
+              newIntegrations.netbox = {
+                status: 'error',
+                url: netboxRes.data.url,
+                error: testRes.error?.message || 'Connection failed',
+              };
+            }
+          } catch {
+            newIntegrations.netbox = {
+              status: 'disconnected',
+              url: netboxRes.data.url,
+            };
+          }
+        } else {
+          newIntegrations.netbox = { status: 'not_configured' };
+        }
+      } catch {
+        newIntegrations.netbox = { status: 'not_configured' };
+      }
+      
+      // Check PRTG
+      try {
+        const prtgRes = await fetchApi('/api/prtg/settings', { headers: getAuthHeader() });
+        if (prtgRes.success && prtgRes.data?.url) {
+          // Check PRTG status
+          try {
+            const statusRes = await fetchApi('/api/prtg/status', { headers: getAuthHeader() });
+            if (statusRes.success && statusRes.data?.connected) {
+              newIntegrations.prtg = {
+                status: 'connected',
+                url: prtgRes.data.url,
+                version: statusRes.data?.version,
+              };
+            } else {
+              newIntegrations.prtg = {
+                status: 'disconnected',
+                url: prtgRes.data.url,
+              };
+            }
+          } catch {
+            newIntegrations.prtg = {
+              status: 'disconnected',
+              url: prtgRes.data.url,
+            };
+          }
+        } else {
+          newIntegrations.prtg = { status: 'not_configured' };
+        }
+      } catch {
+        newIntegrations.prtg = { status: 'not_configured' };
+      }
+      
+      setIntegrations(newIntegrations);
     } catch (err) {
       setError(err.message);
       setSystemStatus({
@@ -248,6 +424,50 @@ export function SystemOverviewPage() {
               { label: 'Role', value: 'Message Broker' },
             ]}
           />
+        </div>
+
+        {/* External Integrations */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+          <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Link className="w-4 h-4 text-gray-500" />
+              <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                External Integrations
+              </h2>
+            </div>
+            <a 
+              href="/system/settings" 
+              className="text-xs text-blue-600 hover:text-blue-800"
+            >
+              Manage Settings →
+            </a>
+          </div>
+          <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <IntegrationCard
+              name="NetBox"
+              icon={Database}
+              status={integrations.netbox.status}
+              url={integrations.netbox.url}
+              version={integrations.netbox.version}
+              error={integrations.netbox.error}
+              onConfigure={() => window.location.href = '/system/settings/netbox'}
+            />
+            <IntegrationCard
+              name="PRTG Network Monitor"
+              icon={Activity}
+              status={integrations.prtg.status}
+              url={integrations.prtg.url}
+              version={integrations.prtg.version}
+              error={integrations.prtg.error}
+              onConfigure={() => window.location.href = '/system/settings/prtg'}
+            />
+            {/* Placeholder for future integrations */}
+            <div className="bg-gray-50 rounded-lg border border-dashed border-gray-300 p-4 flex flex-col items-center justify-center text-center">
+              <Plug className="w-8 h-8 text-gray-300 mb-2" />
+              <span className="text-sm text-gray-500">More integrations coming soon</span>
+              <span className="text-xs text-gray-400 mt-1">Ciena MCP, LibreNMS, etc.</span>
+            </div>
+          </div>
         </div>
 
         {/* Worker Details */}

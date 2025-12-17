@@ -12,6 +12,7 @@ from ..services.alert_service import (
     AlertService, AlertEvaluator, get_alert_service,
     AlertSeverity, AlertStatus, AlertCategory
 )
+from ..middleware.permissions import require_permission, require_auth
 
 alerts_bp = Blueprint('alerts', __name__, url_prefix='/api/alerts')
 
@@ -22,6 +23,7 @@ def get_service():
 
 
 @alerts_bp.route('', methods=['GET'])
+@require_auth
 def get_alerts():
     """
     Get active alerts.
@@ -53,6 +55,7 @@ def get_alerts():
 
 
 @alerts_bp.route('/<int:alert_id>', methods=['GET'])
+@require_auth
 def get_alert(alert_id):
     """Get a single alert by ID."""
     service = get_service()
@@ -65,6 +68,7 @@ def get_alert(alert_id):
 
 
 @alerts_bp.route('/<int:alert_id>/acknowledge', methods=['POST'])
+@require_auth
 def acknowledge_alert(alert_id):
     """
     Acknowledge an alert.
@@ -85,6 +89,7 @@ def acknowledge_alert(alert_id):
 
 
 @alerts_bp.route('/<int:alert_id>/resolve', methods=['POST'])
+@require_auth
 def resolve_alert(alert_id):
     """Resolve an alert and move to history."""
     service = get_service()
@@ -97,6 +102,7 @@ def resolve_alert(alert_id):
 
 
 @alerts_bp.route('/stats', methods=['GET'])
+@require_auth
 def get_alert_stats():
     """Get alert statistics."""
     service = get_service()
@@ -105,6 +111,7 @@ def get_alert_stats():
 
 
 @alerts_bp.route('/history', methods=['GET'])
+@require_auth
 def get_alert_history():
     """
     Get alert history.
@@ -127,6 +134,7 @@ def get_alert_history():
 
 
 @alerts_bp.route('/rules', methods=['GET'])
+@require_auth
 def get_alert_rules():
     """
     Get alert rules.
@@ -146,6 +154,7 @@ def get_alert_rules():
 
 
 @alerts_bp.route('/rules/<int:rule_id>', methods=['PUT'])
+@require_auth
 def update_alert_rule(rule_id):
     """
     Update an alert rule.
@@ -171,6 +180,7 @@ def update_alert_rule(rule_id):
 
 
 @alerts_bp.route('/evaluate', methods=['POST'])
+@require_auth
 def evaluate_alerts():
     """
     Manually trigger alert evaluation.

@@ -100,13 +100,13 @@ class DatabaseLogHandler(logging.Handler):
             insert_sql = """
                 INSERT INTO system_logs (
                     timestamp, level, source, category, message, details,
-                    request_id, user_id, ip_address, job_id, workflow_id,
+                    request_id, user_id, username, ip_address, job_id, workflow_id,
                     execution_id, device_ip, duration_ms, status_code
                 ) VALUES (
                     %(timestamp)s, %(level)s, %(source)s, %(category)s, 
                     %(message)s, %(details)s, %(request_id)s, %(user_id)s,
-                    %(ip_address)s, %(job_id)s, %(workflow_id)s, %(execution_id)s,
-                    %(device_ip)s, %(duration_ms)s, %(status_code)s
+                    %(username)s, %(ip_address)s, %(job_id)s, %(workflow_id)s, 
+                    %(execution_id)s, %(device_ip)s, %(duration_ms)s, %(status_code)s
                 )
             """
             
@@ -134,6 +134,7 @@ class DatabaseLogHandler(logging.Handler):
                 'details': json.dumps(getattr(record, 'details', None)),
                 'request_id': getattr(record, 'request_id', getattr(_context, 'request_id', None)),
                 'user_id': getattr(record, 'user_id', getattr(_context, 'user_id', None)),
+                'username': getattr(record, 'username', getattr(_context, 'username', None)),
                 'ip_address': getattr(record, 'ip_address', getattr(_context, 'ip_address', None)),
                 'job_id': getattr(record, 'job_id', None),
                 'workflow_id': getattr(record, 'workflow_id', None),
@@ -595,3 +596,45 @@ logging_service = LoggingService()
 def get_logger(name: str, source: str = LogSource.SYSTEM) -> ComponentLogger:
     """Convenience function to get a component logger."""
     return logging_service.get_logger(name, source)
+
+
+def set_context(request_id: str = None, user_id: int = None, username: str = None, 
+                ip_address: str = None, is_enterprise: bool = False):
+    """
+    Set the current request/user context for logging.
+    This context is automatically included in all log entries.
+    
+    Args:
+        request_id: Unique request identifier
+        user_id: User ID (for local users) or None for enterprise
+        username: Username for display in logs
+        ip_address: Client IP address
+        is_enterprise: Whether this is an enterprise (AD) user
+    """
+    if request_id is not None:
+        _context.request_id = request_id
+    if user_id is not None:
+        _context.user_id = user_id
+    if username is not None:
+        _context.username = username
+    if ip_address is not None:
+        _context.ip_address = ip_address
+    if is_enterprise:
+        _context.is_enterprise = is_enterprise
+
+
+def clear_context():
+    """Clear the current logging context."""
+    for attr in ['request_id', 'user_id', 'username', 'ip_address', 'is_enterprise']:
+        if hasattr(_context, attr):
+            delattr(_context, attr)
+
+
+def get_current_user_context() -> dict:
+    """Get the current user context for logging."""
+    return {
+        'user_id': getattr(_context, 'user_id', None),
+        'username': getattr(_context, 'username', None),
+        'ip_address': getattr(_context, 'ip_address', None),
+        'is_enterprise': getattr(_context, 'is_enterprise', False),
+    }

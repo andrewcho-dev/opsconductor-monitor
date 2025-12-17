@@ -17,8 +17,10 @@ import {
 } from "lucide-react";
 import { cn, fetchApi, formatTimeOnly, formatElapsedDuration, formatRelativeTime } from "../lib/utils";
 import { PageHeader } from "../components/layout";
+import { useAuth } from "../contexts/AuthContext";
 
 export function ActiveJobs() {
+  const { getAuthHeader } = useAuth();
   const [activeJobs, setActiveJobs] = useState([]);
   const [queuedJobs, setQueuedJobs] = useState([]);
   const [queueStatus, setQueueStatus] = useState(null);
@@ -33,12 +35,12 @@ export function ActiveJobs() {
       setError(null);
       
       // Fetch queue status which includes active/reserved/scheduled counts and worker details
-      const status = await fetchApi("/api/scheduler/queues");
+      const status = await fetchApi("/api/scheduler/queues", { headers: getAuthHeader() });
       const statusData = status.data || status;
       setQueueStatus(statusData);
       
       // Fetch scheduled jobs for upcoming list
-      const scheduledJobs = await fetchApi("/api/scheduler/jobs?enabled=true&limit=50");
+      const scheduledJobs = await fetchApi("/api/scheduler/jobs?enabled=true&limit=50", { headers: getAuthHeader() });
       const now = new Date();
       const upcoming = (scheduledJobs.data || scheduledJobs.jobs || [])
         .filter(j => j.next_run_at && new Date(j.next_run_at) > now)
@@ -48,7 +50,7 @@ export function ActiveJobs() {
       
       // Fetch running executions from recent executions endpoint
       try {
-        const execResponse = await fetchApi("/api/scheduler/executions/recent?limit=50&status=running");
+        const execResponse = await fetchApi("/api/scheduler/executions/recent?limit=50&status=running", { headers: getAuthHeader() });
         const execData = execResponse.data || execResponse;
         setActiveJobs(Array.isArray(execData) ? execData : []);
       } catch {

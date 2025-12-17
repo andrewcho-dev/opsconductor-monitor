@@ -210,7 +210,27 @@ def login_enterprise():
                 }
             })
         
-        # Get user roles and permissions
+        # For enterprise users, roles and permissions are already in the result
+        if result.get('is_enterprise'):
+            return jsonify({
+                'success': True,
+                'data': {
+                    'user': {
+                        'id': result['user_id'],
+                        'username': result['username'],
+                        'email': result.get('email', ''),
+                        'display_name': result.get('display_name', result['username']),
+                        'roles': result.get('roles', []),
+                        'permissions': result.get('permissions', []),
+                        'is_enterprise': True
+                    },
+                    'session_token': result['session_token'],
+                    'refresh_token': result['refresh_token'],
+                    'expires_at': result['expires_at']
+                }
+            })
+        
+        # Get user roles and permissions for local users
         roles = auth_service.get_user_roles(result['user_id'])
         permissions = auth_service.get_user_permissions(result['user_id'])
         
@@ -1144,4 +1164,449 @@ def revoke_all_sessions():
         return jsonify({
             'success': False,
             'error': {'code': 'SERVER_ERROR', 'message': 'Failed to revoke sessions'}
+        }), 500
+
+
+# =============================================================================
+# ENTERPRISE USER ROLE ASSIGNMENTS
+# =============================================================================
+
+@auth_bp.route('/enterprise-users', methods=['GET'])
+@permission_required('system.users.view')
+def list_enterprise_users():
+    """List all enterprise user role assignments."""
+    try:
+        auth_service = get_auth_service()
+        
+        with auth_service.db.cursor() as cursor:
+            cursor.execute("""
+                SELECT eur.id, eur.username, eur.display_name, eur.email,
+                       eur.config_id, eur.assigned_at,
+                       r.id as role_id, r.name as role_name, r.display_name as role_display_name,
+                       u.username as assigned_by_username
+                FROM enterprise_user_roles eur
+                JOIN roles r ON eur.role_id = r.id
+                LEFT JOIN users u ON eur.assigned_by = u.id
+                ORDER BY eur.username, r.name
+            """)
+            rows = cursor.fetchall()
+        
+        # Group by username
+        users = {}
+        for row in rows:
+            username = row['username']
+            if username not in users:
+                users[username] = {
+                    'id': row['id'],
+                    'username': username,
+                    'display_name': row['display_name'],
+                    'email': row['email'],
+                    'config_id': row['config_id'],
+                    'assigned_at': row['assigned_at'].isoformat() if row['assigned_at'] else None,
+                    'assigned_by': row['assigned_by_username'],
+                    'roles': []
+                }
+            users[username]['roles'].append({
+                'id': row['role_id'],
+                'name': row['role_name'],
+                'display_name': row['role_display_name']
+            })
+        
+        return jsonify({
+            'success': True,
+            'data': {'users': list(users.values())}
+        })
+        
+    except Exception as e:
+        logger.error(f"List enterprise users error: {e}")
+        return jsonify({
+            'success': False,
+            'error': {'code': 'SERVER_ERROR', 'message': 'Failed to list enterprise users'}
+        }), 500
+
+
+@auth_bp.route('/enterprise-users', methods=['POST'])
+@permission_required('system.users.create')
+def create_enterprise_user():
+    """
+    Add an enterprise user to a role group.
+    
+    Request body:
+        username: AD username (required)
+        role_id: Role ID to assign (required)
+        display_name: Optional display name
+        email: Optional email
+        config_id: Optional enterprise auth config ID
+    """
+    try:
+        data = request.get_json()
+        
+        if not data.get('username'):
+            return jsonify({
+                'success': False,
+                'error': {'code': 'VALIDATION_ERROR', 'message': 'username is required'}
+            }), 400
+        
+        if not data.get('role_id'):
+            return jsonify({
+                'success': False,
+                'error': {'code': 'VALIDATION_ERROR', 'message': 'role_id is required'}
+            }), 400
+        
+        auth_service = get_auth_service()
+        
+        with auth_service.db.cursor() as cursor:
+            # Check if role exists
+            cursor.execute("SELECT id, name FROM roles WHERE id = %s", (data['role_id'],))
+            role = cursor.fetchone()
+            if not role:
+                return jsonify({
+                    'success': False,
+                    'error': {'code': 'NOT_FOUND', 'message': 'Role not found'}
+                }), 404
+            
+            # Check if assignment already exists
+            cursor.execute("""
+                SELECT id FROM enterprise_user_roles 
+                WHERE LOWER(username) = LOWER(%s) AND role_id = %s
+            """, (data['username'], data['role_id']))
+            if cursor.fetchone():
+                return jsonify({
+                    'success': False,
+                    'error': {'code': 'DUPLICATE', 'message': 'User already assigned to this role'}
+                }), 409
+            
+            # Create assignment
+            cursor.execute("""
+                INSERT INTO enterprise_user_roles (username, role_id, display_name, email, config_id, assigned_by)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                RETURNING id
+            """, (
+                data['username'],
+                data['role_id'],
+                data.get('display_name'),
+                data.get('email'),
+                data.get('config_id'),
+                g.current_user.get('user_id') if not str(g.current_user.get('user_id', '')).startswith('enterprise_') else None
+            ))
+            new_id = cursor.fetchone()['id']
+            auth_service.db.get_connection().commit()
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'id': new_id,
+                'username': data['username'],
+                'role': role['name']
+            },
+            'message': f"User '{data['username']}' added to role '{role['name']}'"
+        }), 201
+        
+    except Exception as e:
+        logger.error(f"Create enterprise user error: {e}")
+        return jsonify({
+            'success': False,
+            'error': {'code': 'SERVER_ERROR', 'message': 'Failed to create enterprise user assignment'}
+        }), 500
+
+
+@auth_bp.route('/enterprise-users/<username>', methods=['DELETE'])
+@permission_required('system.users.delete')
+def delete_enterprise_user(username):
+    """Remove all role assignments for an enterprise user."""
+    try:
+        auth_service = get_auth_service()
+        
+        with auth_service.db.cursor() as cursor:
+            cursor.execute("""
+                DELETE FROM enterprise_user_roles WHERE LOWER(username) = LOWER(%s)
+                RETURNING id
+            """, (username,))
+            deleted = cursor.fetchall()
+            auth_service.db.get_connection().commit()
+        
+        if not deleted:
+            return jsonify({
+                'success': False,
+                'error': {'code': 'NOT_FOUND', 'message': 'Enterprise user not found'}
+            }), 404
+        
+        return jsonify({
+            'success': True,
+            'message': f"Removed {len(deleted)} role assignment(s) for '{username}'"
+        })
+        
+    except Exception as e:
+        logger.error(f"Delete enterprise user error: {e}")
+        return jsonify({
+            'success': False,
+            'error': {'code': 'SERVER_ERROR', 'message': 'Failed to delete enterprise user'}
+        }), 500
+
+
+@auth_bp.route('/enterprise-users/<username>/roles/<int:role_id>', methods=['DELETE'])
+@permission_required('system.users.edit')
+def remove_enterprise_user_role(username, role_id):
+    """Remove a specific role from an enterprise user."""
+    try:
+        auth_service = get_auth_service()
+        
+        with auth_service.db.cursor() as cursor:
+            cursor.execute("""
+                DELETE FROM enterprise_user_roles 
+                WHERE LOWER(username) = LOWER(%s) AND role_id = %s
+                RETURNING id
+            """, (username, role_id))
+            deleted = cursor.fetchone()
+            auth_service.db.get_connection().commit()
+        
+        if not deleted:
+            return jsonify({
+                'success': False,
+                'error': {'code': 'NOT_FOUND', 'message': 'Role assignment not found'}
+            }), 404
+        
+        return jsonify({
+            'success': True,
+            'message': f"Role removed from '{username}'"
+        })
+        
+    except Exception as e:
+        logger.error(f"Remove enterprise user role error: {e}")
+        return jsonify({
+            'success': False,
+            'error': {'code': 'SERVER_ERROR', 'message': 'Failed to remove role'}
+        }), 500
+
+
+@auth_bp.route('/roles/<int:role_id>/members', methods=['GET'])
+@login_required
+def get_role_members(role_id):
+    """
+    Get all members of a role (both local and enterprise users).
+    
+    Returns a unified list of members with a 'type' field indicating
+    whether they are 'local' or 'enterprise' users.
+    """
+    try:
+        auth_service = get_auth_service()
+        members = []
+        
+        with auth_service.db.cursor() as cursor:
+            # Get local users in this role
+            cursor.execute("""
+                SELECT u.id, u.username, u.display_name, u.email, ur.assigned_at,
+                       'local' as member_type
+                FROM users u
+                JOIN user_roles ur ON u.id = ur.user_id
+                WHERE ur.role_id = %s
+                ORDER BY u.username
+            """, (role_id,))
+            for row in cursor.fetchall():
+                members.append({
+                    'id': row['id'],
+                    'username': row['username'],
+                    'display_name': row['display_name'],
+                    'email': row['email'],
+                    'assigned_at': row['assigned_at'].isoformat() if row['assigned_at'] else None,
+                    'type': 'local'
+                })
+            
+            # Get enterprise users in this role
+            cursor.execute("""
+                SELECT eur.id, eur.username, eur.display_name, eur.email, eur.assigned_at,
+                       'enterprise' as member_type
+                FROM enterprise_user_roles eur
+                WHERE eur.role_id = %s
+                ORDER BY eur.username
+            """, (role_id,))
+            for row in cursor.fetchall():
+                members.append({
+                    'id': f"enterprise_{row['id']}",
+                    'username': row['username'],
+                    'display_name': row['display_name'],
+                    'email': row['email'],
+                    'assigned_at': row['assigned_at'].isoformat() if row['assigned_at'] else None,
+                    'type': 'enterprise'
+                })
+        
+        # Sort combined list by username
+        members.sort(key=lambda x: x['username'].lower())
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'members': members,
+                'local_count': len([m for m in members if m['type'] == 'local']),
+                'enterprise_count': len([m for m in members if m['type'] == 'enterprise'])
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Get role members error: {e}")
+        return jsonify({
+            'success': False,
+            'error': {'code': 'SERVER_ERROR', 'message': 'Failed to get role members'}
+        }), 500
+
+
+@auth_bp.route('/roles/<int:role_id>/members', methods=['POST'])
+@permission_required('system.roles.manage')
+def add_role_member(role_id):
+    """
+    Add a member to a role.
+    
+    Request body:
+        username: Username to add (required)
+        type: 'local' or 'enterprise' (required)
+        display_name: Optional display name (for enterprise users)
+        email: Optional email (for enterprise users)
+    """
+    try:
+        data = request.get_json()
+        
+        if not data.get('username'):
+            return jsonify({
+                'success': False,
+                'error': {'code': 'VALIDATION_ERROR', 'message': 'username is required'}
+            }), 400
+        
+        member_type = data.get('type', 'enterprise')  # Default to enterprise
+        
+        auth_service = get_auth_service()
+        
+        with auth_service.db.cursor() as cursor:
+            # Verify role exists
+            cursor.execute("SELECT id, name FROM roles WHERE id = %s", (role_id,))
+            role = cursor.fetchone()
+            if not role:
+                return jsonify({
+                    'success': False,
+                    'error': {'code': 'NOT_FOUND', 'message': 'Role not found'}
+                }), 404
+            
+            if member_type == 'local':
+                # Find local user and add to role
+                cursor.execute("SELECT id FROM users WHERE LOWER(username) = LOWER(%s)", (data['username'],))
+                user = cursor.fetchone()
+                if not user:
+                    return jsonify({
+                        'success': False,
+                        'error': {'code': 'NOT_FOUND', 'message': 'Local user not found'}
+                    }), 404
+                
+                # Check if already assigned
+                cursor.execute("""
+                    SELECT 1 FROM user_roles WHERE user_id = %s AND role_id = %s
+                """, (user['id'], role_id))
+                if cursor.fetchone():
+                    return jsonify({
+                        'success': False,
+                        'error': {'code': 'DUPLICATE', 'message': 'User already has this role'}
+                    }), 409
+                
+                # Add role assignment
+                cursor.execute("""
+                    INSERT INTO user_roles (user_id, role_id, assigned_by, assigned_at)
+                    VALUES (%s, %s, %s, NOW())
+                """, (
+                    user['id'],
+                    role_id,
+                    g.current_user.get('user_id') if not str(g.current_user.get('user_id', '')).startswith('enterprise_') else None
+                ))
+                
+            else:  # enterprise
+                # Check if already assigned
+                cursor.execute("""
+                    SELECT 1 FROM enterprise_user_roles 
+                    WHERE LOWER(username) = LOWER(%s) AND role_id = %s
+                """, (data['username'], role_id))
+                if cursor.fetchone():
+                    return jsonify({
+                        'success': False,
+                        'error': {'code': 'DUPLICATE', 'message': 'Enterprise user already has this role'}
+                    }), 409
+                
+                # Add enterprise user role assignment
+                cursor.execute("""
+                    INSERT INTO enterprise_user_roles (username, role_id, display_name, email, assigned_by, assigned_at)
+                    VALUES (%s, %s, %s, %s, %s, NOW())
+                """, (
+                    data['username'],
+                    role_id,
+                    data.get('display_name'),
+                    data.get('email'),
+                    g.current_user.get('user_id') if not str(g.current_user.get('user_id', '')).startswith('enterprise_') else None
+                ))
+            
+            auth_service.db.get_connection().commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f"Added '{data['username']}' to role '{role['name']}'"
+        }), 201
+        
+    except Exception as e:
+        logger.error(f"Add role member error: {e}")
+        return jsonify({
+            'success': False,
+            'error': {'code': 'SERVER_ERROR', 'message': 'Failed to add member'}
+        }), 500
+
+
+@auth_bp.route('/roles/<int:role_id>/members/<username>', methods=['DELETE'])
+@permission_required('system.roles.manage')
+def remove_role_member(role_id, username):
+    """
+    Remove a member from a role.
+    
+    Query params:
+        type: 'local' or 'enterprise' (optional, will try both if not specified)
+    """
+    try:
+        member_type = request.args.get('type')
+        auth_service = get_auth_service()
+        deleted = False
+        
+        with auth_service.db.cursor() as cursor:
+            if member_type in (None, 'local'):
+                # Try to remove from local user_roles
+                cursor.execute("""
+                    DELETE FROM user_roles 
+                    WHERE role_id = %s AND user_id = (
+                        SELECT id FROM users WHERE LOWER(username) = LOWER(%s)
+                    )
+                    RETURNING user_id
+                """, (role_id, username))
+                if cursor.fetchone():
+                    deleted = True
+            
+            if member_type in (None, 'enterprise') and not deleted:
+                # Try to remove from enterprise_user_roles
+                cursor.execute("""
+                    DELETE FROM enterprise_user_roles 
+                    WHERE role_id = %s AND LOWER(username) = LOWER(%s)
+                    RETURNING id
+                """, (role_id, username))
+                if cursor.fetchone():
+                    deleted = True
+            
+            auth_service.db.get_connection().commit()
+        
+        if not deleted:
+            return jsonify({
+                'success': False,
+                'error': {'code': 'NOT_FOUND', 'message': 'Member not found in this role'}
+            }), 404
+        
+        return jsonify({
+            'success': True,
+            'message': f"Removed '{username}' from role"
+        })
+        
+    except Exception as e:
+        logger.error(f"Remove role member error: {e}")
+        return jsonify({
+            'success': False,
+            'error': {'code': 'SERVER_ERROR', 'message': 'Failed to remove member'}
         }), 500
