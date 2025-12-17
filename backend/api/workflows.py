@@ -254,10 +254,7 @@ def update_workflow_tags(workflow_id):
 
 @workflows_bp.route('/<workflow_id>/run', methods=['POST'])
 def run_workflow(workflow_id):
-    """Execute a workflow immediately."""
-    from ..services.workflow_engine import WorkflowEngine
-    from database import DatabaseManager
-    
+    """Execute a workflow via Celery (async)."""
     workflow = get_workflow_repo().get_by_id(workflow_id)
     
     if not workflow:
@@ -272,27 +269,53 @@ def run_workflow(workflow_id):
     except Exception:
         data = {}
     trigger_data = data.get('trigger_data', {})
+    sync = data.get('sync', False)  # Allow sync execution if explicitly requested
     
-    # Execute the workflow with database access
-    db = DatabaseManager()
-    engine = WorkflowEngine(db_manager=db)
-    result = engine.execute(workflow, trigger_data)
-    
-    # Record execution
-    get_workflow_repo().record_execution(workflow_id)
-    
-    return jsonify({
-        'success': True,
-        'message': 'Workflow execution completed',
-        'data': result
-    })
+    # Try to use Celery for async execution
+    try:
+        from celery_app import celery_app
+        
+        if sync:
+            # Synchronous execution requested
+            from ..tasks.job_tasks import run_workflow as run_workflow_sync
+            result = run_workflow_sync(workflow_id, trigger_data)
+            return jsonify({
+                'success': True,
+                'message': 'Workflow execution completed',
+                'data': result
+            })
+        
+        # Submit to Celery queue
+        task = celery_app.send_task(
+            'opsconductor.workflow.run',
+            args=[workflow_id, trigger_data]
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': 'Workflow submitted to queue',
+            'data': {
+                'task_id': task.id,
+                'workflow_id': workflow_id,
+                'workflow_name': workflow.get('name'),
+                'status': 'queued'
+            }
+        })
+        
+    except ImportError:
+        # Celery not available, fall back to sync execution
+        from ..tasks.job_tasks import run_workflow as run_workflow_sync
+        result = run_workflow_sync(workflow_id, trigger_data)
+        return jsonify({
+            'success': True,
+            'message': 'Workflow execution completed (sync - Celery not available)',
+            'data': result
+        })
 
 
 @workflows_bp.route('/<workflow_id>/test', methods=['POST'])
 def test_workflow(workflow_id):
-    """Test run a workflow (dry run with simulated side effects)."""
-    from ..services.workflow_engine import WorkflowEngine
-    
+    """Test run a workflow via Celery (async)."""
     workflow = get_workflow_repo().get_by_id(workflow_id)
     
     if not workflow:
@@ -308,19 +331,84 @@ def test_workflow(workflow_id):
         data = {}
     trigger_data = data.get('trigger_data', {})
     trigger_data['_test_mode'] = True  # Flag for test mode
+    sync = data.get('sync', False)  # Allow sync execution if explicitly requested
     
-    # Execute the workflow in test mode
-    engine = WorkflowEngine()
-    result = engine.execute(workflow, trigger_data)
-    
-    # Mark result as test mode
-    result['test_mode'] = True
-    
-    return jsonify({
-        'success': True,
-        'message': 'Test run completed',
-        'data': result
-    })
+    # Try to use Celery for async execution
+    try:
+        from celery_app import celery_app
+        
+        if sync:
+            # Synchronous execution requested
+            from ..tasks.job_tasks import run_workflow as run_workflow_sync
+            result = run_workflow_sync(workflow_id, trigger_data)
+            result['test_mode'] = True
+            return jsonify({
+                'success': True,
+                'message': 'Test run completed',
+                'data': result
+            })
+        
+        # Submit to Celery queue
+        task = celery_app.send_task(
+            'opsconductor.workflow.run',
+            args=[workflow_id, trigger_data]
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': 'Test workflow submitted to queue',
+            'data': {
+                'task_id': task.id,
+                'workflow_id': workflow_id,
+                'workflow_name': workflow.get('name'),
+                'status': 'queued',
+                'test_mode': True
+            }
+        })
+        
+    except ImportError:
+        # Celery not available, fall back to sync execution
+        from ..tasks.job_tasks import run_workflow as run_workflow_sync
+        result = run_workflow_sync(workflow_id, trigger_data)
+        result['test_mode'] = True
+        return jsonify({
+            'success': True,
+            'message': 'Test run completed (sync - Celery not available)',
+            'data': result
+        })
+
+
+@workflows_bp.route('/tasks/<task_id>', methods=['GET'])
+def get_task_status(task_id):
+    """Get status of a workflow task."""
+    try:
+        from celery_app import celery_app
+        from celery.result import AsyncResult
+        
+        result = AsyncResult(task_id, app=celery_app)
+        
+        response = {
+            'task_id': task_id,
+            'status': result.status,
+            'ready': result.ready(),
+        }
+        
+        if result.ready():
+            if result.successful():
+                response['result'] = result.result
+            elif result.failed():
+                response['error'] = str(result.result)
+        
+        return jsonify({
+            'success': True,
+            'data': response
+        })
+        
+    except ImportError:
+        return jsonify({
+            'success': False,
+            'error': 'Celery not available'
+        }), 503
 
 
 # =============================================================================

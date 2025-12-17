@@ -7,6 +7,8 @@
  * - SCP Upload/Download
  */
 
+import { PLATFORMS, PROTOCOLS } from '../platforms';
+
 export default {
   id: 'ssh',
   name: 'SSH',
@@ -19,20 +21,43 @@ export default {
     'ssh:command': {
       name: 'SSH Command',
       description: 'Execute a command on remote hosts via SSH',
-      category: 'query',
+      category: 'configure',
+      subcategory: 'remote',
       icon: '💻',
       color: '#8B5CF6',
+      platforms: [PLATFORMS.LINUX, PLATFORMS.UNIX, PLATFORMS.NETWORK_DEVICE],
+      protocols: [PROTOCOLS.SSH],
       
       inputs: [
         { id: 'trigger', type: 'trigger', label: 'Trigger', required: true },
-        { id: 'targets', type: 'string[]', label: 'Targets (override)' },
+        { 
+          id: 'targets', 
+          type: 'ip[]', 
+          label: 'Target Hosts',
+          description: 'List of hosts to execute command on',
+          acceptsFrom: ['network:ping.online', 'netbox:device-list.devices'],
+        },
       ],
       outputs: [
         { id: 'success', type: 'trigger', label: 'On Success' },
         { id: 'failure', type: 'trigger', label: 'On Failure' },
-        { id: 'results', type: 'object[]', label: 'All Results' },
-        { id: 'stdout', type: 'string[]', label: 'Standard Output' },
-        { id: 'stderr', type: 'string[]', label: 'Standard Error' },
+        { 
+          id: 'results', 
+          type: 'object[]', 
+          label: 'All Results',
+          description: 'Complete results from all hosts',
+          schema: {
+            host: { type: 'string', description: 'Target hostname/IP' },
+            stdout: { type: 'string', description: 'Command standard output' },
+            stderr: { type: 'string', description: 'Command standard error' },
+            exit_code: { type: 'number', description: 'Command exit code' },
+            success: { type: 'boolean', description: 'Whether command succeeded' },
+            duration_ms: { type: 'number', description: 'Execution time in ms' },
+          },
+        },
+        { id: 'stdout', type: 'string', label: 'Combined Output', description: 'Combined stdout from all hosts' },
+        { id: 'successful_hosts', type: 'ip[]', label: 'Successful Hosts', description: 'Hosts where command succeeded' },
+        { id: 'failed_hosts', type: 'ip[]', label: 'Failed Hosts', description: 'Hosts where command failed' },
       ],
       
       parameters: [
@@ -169,11 +194,6 @@ export default {
         type: 'action',
         executor: 'ssh_command',
         context: 'remote_ssh',
-        platform: 'any',
-        requirements: {
-          connection: 'ssh',
-          credentials: ['ssh_credentials'],
-        },
       },
     },
 
@@ -181,8 +201,11 @@ export default {
       name: 'SSH Script',
       description: 'Execute a multi-line script on remote hosts',
       category: 'configure',
+      subcategory: 'remote',
       icon: '📜',
       color: '#8B5CF6',
+      platforms: [PLATFORMS.LINUX, PLATFORMS.UNIX],
+      protocols: [PROTOCOLS.SSH],
       
       inputs: [
         { id: 'trigger', type: 'trigger', label: 'Trigger', required: true },
@@ -259,12 +282,7 @@ export default {
         type: 'action',
         executor: 'ssh_script',
         context: 'remote_ssh',
-        platform: 'linux',
         requires_confirmation: true,
-        requirements: {
-          connection: 'ssh',
-          credentials: ['ssh_credentials'],
-        },
       },
     },
 
@@ -272,8 +290,11 @@ export default {
       name: 'SCP Download',
       description: 'Download files from remote hosts via SCP',
       category: 'data',
+      subcategory: 'files',
       icon: '📥',
       color: '#8B5CF6',
+      platforms: [PLATFORMS.LINUX, PLATFORMS.UNIX, PLATFORMS.NETWORK_DEVICE],
+      protocols: [PROTOCOLS.SSH],
       
       inputs: [
         { id: 'trigger', type: 'trigger', label: 'Trigger', required: true },
@@ -329,11 +350,6 @@ export default {
         type: 'action',
         executor: 'scp_download',
         context: 'remote_ssh',
-        platform: 'any',
-        requirements: {
-          connection: 'ssh',
-          credentials: ['ssh_credentials'],
-        },
       },
     },
 
@@ -341,8 +357,11 @@ export default {
       name: 'SCP Upload',
       description: 'Upload files to remote hosts via SCP',
       category: 'configure',
+      subcategory: 'remote',
       icon: '📤',
       color: '#8B5CF6',
+      platforms: [PLATFORMS.LINUX, PLATFORMS.UNIX, PLATFORMS.NETWORK_DEVICE],
+      protocols: [PROTOCOLS.SSH],
       
       inputs: [
         { id: 'trigger', type: 'trigger', label: 'Trigger', required: true },
@@ -398,12 +417,7 @@ export default {
         type: 'action',
         executor: 'scp_upload',
         context: 'remote_ssh',
-        platform: 'any',
         requires_confirmation: true,
-        requirements: {
-          connection: 'ssh',
-          credentials: ['ssh_credentials'],
-        },
       },
     },
   },

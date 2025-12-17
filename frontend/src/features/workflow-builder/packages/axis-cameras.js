@@ -10,6 +10,15 @@
  * - Device info
  */
 
+import { PLATFORMS, PROTOCOLS } from '../platforms';
+
+// Common platform config for all Axis camera nodes
+const axisPlatform = {
+  platforms: [PLATFORMS.AXIS_CAMERA],
+  protocols: [PROTOCOLS.HTTP],
+  vendor: 'Axis',
+};
+
 // Common target parameters used by all nodes
 const targetParams = [
   {
@@ -85,6 +94,8 @@ export default {
       name: 'PTZ Go Home',
       description: 'Move PTZ camera to its home position',
       category: 'configure',
+      subcategory: 'remote',
+      ...axisPlatform,
       icon: '🏠',
       color: '#FFD200',
       inputs: standardInputs,
@@ -103,6 +114,8 @@ export default {
       name: 'PTZ Go to Preset',
       description: 'Move PTZ camera to a saved preset position',
       category: 'configure',
+      subcategory: 'remote',
+      ...axisPlatform,
       icon: '📍',
       color: '#FFD200',
       inputs: standardInputs,
@@ -124,6 +137,8 @@ export default {
       name: 'PTZ Move',
       description: 'Move PTZ camera in a specific direction or to position',
       category: 'configure',
+      subcategory: 'remote',
+      ...axisPlatform,
       icon: '🕹️',
       color: '#FFD200',
       inputs: standardInputs,
@@ -156,7 +171,9 @@ export default {
     'axis:ptz-list-presets': {
       name: 'List PTZ Presets',
       description: 'Get list of saved PTZ preset positions',
-      category: 'query',
+      category: 'discover',
+      subcategory: 'network',
+      ...axisPlatform,
       icon: '📋',
       color: '#FFD200',
       inputs: standardInputs,
@@ -170,7 +187,9 @@ export default {
     'axis:snapshot': {
       name: 'Take Snapshot',
       description: 'Capture a still image from the camera',
-      category: 'query',
+      category: 'discover',
+      subcategory: 'network',
+      ...axisPlatform,
       icon: '📸',
       color: '#FFD200',
       inputs: standardInputs,
@@ -195,6 +214,8 @@ export default {
       name: 'Auto Focus',
       description: 'Trigger auto-focus on the camera',
       category: 'configure',
+      subcategory: 'remote',
+      ...axisPlatform,
       icon: '🎯',
       color: '#FFD200',
       inputs: standardInputs,
@@ -217,6 +238,8 @@ export default {
       name: 'Reboot Camera',
       description: 'Restart the camera (requires admin privileges)',
       category: 'configure',
+      subcategory: 'remote',
+      ...axisPlatform,
       icon: '🔄',
       color: '#FFD200',
       inputs: standardInputs,
@@ -235,7 +258,9 @@ export default {
     'axis:device-info': {
       name: 'Get Device Info',
       description: 'Retrieve camera device information (model, firmware, serial)',
-      category: 'query',
+      category: 'discover',
+      subcategory: 'network',
+      ...axisPlatform,
       icon: 'ℹ️',
       color: '#FFD200',
       inputs: standardInputs,
@@ -257,7 +282,9 @@ export default {
     'axis:stream-config': {
       name: 'Get Stream Config',
       description: 'Retrieve video stream configuration and profiles',
-      category: 'query',
+      category: 'discover',
+      subcategory: 'network',
+      ...axisPlatform,
       icon: '📺',
       color: '#FFD200',
       inputs: standardInputs,
@@ -271,7 +298,9 @@ export default {
     'axis:get-time': {
       name: 'Get Time Settings',
       description: 'Retrieve camera date/time and NTP configuration',
-      category: 'query',
+      category: 'discover',
+      subcategory: 'network',
+      ...axisPlatform,
       icon: '🕐',
       color: '#FFD200',
       inputs: standardInputs,
@@ -286,6 +315,8 @@ export default {
       name: 'Set Time Settings',
       description: 'Configure camera date/time and NTP settings',
       category: 'configure',
+      subcategory: 'remote',
+      ...axisPlatform,
       icon: '⏰',
       color: '#FFD200',
       inputs: standardInputs,
@@ -314,7 +345,9 @@ export default {
     'axis:image-settings': {
       name: 'Get Image Settings',
       description: 'Retrieve camera image settings (brightness, contrast, etc.)',
-      category: 'query',
+      category: 'discover',
+      subcategory: 'network',
+      ...axisPlatform,
       icon: '🖼️',
       color: '#FFD200',
       inputs: standardInputs,
@@ -329,6 +362,8 @@ export default {
       name: 'Set Image Settings',
       description: 'Configure camera image settings',
       category: 'configure',
+      subcategory: 'remote',
+      ...axisPlatform,
       icon: '🎨',
       color: '#FFD200',
       inputs: standardInputs,
@@ -354,7 +389,9 @@ export default {
     'axis:get-events': {
       name: 'Get Event Log',
       description: 'Retrieve camera event/alarm log',
-      category: 'query',
+      category: 'discover',
+      subcategory: 'network',
+      ...axisPlatform,
       icon: '📜',
       color: '#FFD200',
       inputs: standardInputs,
@@ -369,6 +406,8 @@ export default {
       name: 'Trigger I/O Port',
       description: 'Activate or deactivate camera I/O port (for external devices)',
       category: 'configure',
+      subcategory: 'remote',
+      ...axisPlatform,
       icon: '🔌',
       color: '#FFD200',
       inputs: standardInputs,
@@ -391,7 +430,9 @@ export default {
     'axis:storage-info': {
       name: 'Get Storage Info',
       description: 'Retrieve SD card/edge storage status and capacity',
-      category: 'query',
+      category: 'discover',
+      subcategory: 'network',
+      ...axisPlatform,
       icon: '💾',
       color: '#FFD200',
       inputs: standardInputs,
@@ -406,6 +447,8 @@ export default {
       name: 'Recording Control',
       description: 'Start or stop edge recording on the camera',
       category: 'configure',
+      subcategory: 'remote',
+      ...axisPlatform,
       icon: '⏺️',
       color: '#FFD200',
       inputs: standardInputs,
@@ -427,7 +470,9 @@ export default {
     'axis:network-settings': {
       name: 'Get Network Settings',
       description: 'Retrieve camera network configuration',
-      category: 'query',
+      category: 'discover',
+      subcategory: 'network',
+      ...axisPlatform,
       icon: '🌐',
       color: '#FFD200',
       inputs: standardInputs,
@@ -441,7 +486,9 @@ export default {
     'axis:firmware-check': {
       name: 'Check Firmware',
       description: 'Check current firmware version and update availability',
-      category: 'query',
+      category: 'discover',
+      subcategory: 'network',
+      ...axisPlatform,
       icon: '🔧',
       color: '#FFD200',
       inputs: standardInputs,

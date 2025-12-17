@@ -12,6 +12,7 @@ import React, { memo, useMemo } from 'react';
 import { Handle, Position } from 'reactflow';
 import { getNodeDefinition } from '../packages';
 import { cn } from '../../../lib/utils';
+import { PlatformIndicator } from '../components/PlatformBadge';
 
 const WorkflowNode = memo(({ id, data, selected }) => {
   const nodeDefinition = useMemo(() => 
@@ -40,6 +41,7 @@ const WorkflowNode = memo(({ id, data, selected }) => {
     inputs = [], 
     outputs = [],
     category,
+    platforms = [],
   } = nodeDefinition;
 
   const label = data.label || name;
@@ -117,8 +119,13 @@ const WorkflowNode = memo(({ id, data, selected }) => {
 
       {/* Content Section */}
       <div className="flex-1 py-3 px-3 min-w-0">
-        <div className="font-semibold text-sm text-gray-900 truncate leading-tight">
-          {label}
+        <div className="flex items-center gap-1.5">
+          <div className="font-semibold text-sm text-gray-900 truncate leading-tight flex-1">
+            {label}
+          </div>
+          {platforms && platforms.length > 0 && (
+            <PlatformIndicator platforms={platforms} className="flex-shrink-0" />
+          )}
         </div>
         {(subtitle || paramSummary) && (
           <div className="text-xs text-gray-500 truncate mt-0.5">

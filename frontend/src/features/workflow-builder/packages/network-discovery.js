@@ -8,6 +8,14 @@
  * - ARP scan
  */
 
+import { PLATFORMS, PROTOCOLS } from '../platforms';
+
+// Network discovery nodes are platform-agnostic (run from the server)
+const networkPlatform = {
+  platforms: [PLATFORMS.ANY],
+  protocols: [],
+};
+
 export default {
   id: 'network-discovery',
   name: 'Network Discovery',
@@ -20,9 +28,11 @@ export default {
     'network:ping': {
       name: 'Ping Scan',
       description: 'Test network connectivity using ICMP ping',
-      category: 'discovery',
+      category: 'discover',
+      subcategory: 'network',
       icon: '📡',
       color: '#3B82F6',
+      ...networkPlatform,
       
       inputs: [
         { id: 'trigger', type: 'trigger', label: 'Trigger', required: true },
@@ -31,9 +41,43 @@ export default {
       outputs: [
         { id: 'success', type: 'trigger', label: 'On Success' },
         { id: 'failure', type: 'trigger', label: 'On Failure' },
-        { id: 'results', type: 'object[]', label: 'All Results' },
-        { id: 'online', type: 'string[]', label: 'Online Hosts' },
-        { id: 'offline', type: 'string[]', label: 'Offline Hosts' },
+        { 
+          id: 'results', 
+          type: 'object[]', 
+          label: 'All Results',
+          description: 'Complete ping results for all targets',
+          schema: {
+            ip_address: { type: 'string', description: 'Target IP address' },
+            status: { type: 'string', description: 'online, offline, or timeout' },
+            rtt_ms: { type: 'number', description: 'Round-trip time in milliseconds' },
+            packets_sent: { type: 'number', description: 'Packets sent' },
+            packets_received: { type: 'number', description: 'Packets received' },
+          },
+        },
+        { 
+          id: 'online', 
+          type: 'ip[]', 
+          label: 'Online Hosts',
+          description: 'List of IP addresses that responded to ping',
+        },
+        { 
+          id: 'offline', 
+          type: 'ip[]', 
+          label: 'Offline Hosts',
+          description: 'List of IP addresses that did not respond',
+        },
+        { 
+          id: 'count_online', 
+          type: 'number', 
+          label: 'Online Count',
+          description: 'Number of hosts that responded',
+        },
+        { 
+          id: 'count_offline', 
+          type: 'number', 
+          label: 'Offline Count',
+          description: 'Number of hosts that did not respond',
+        },
       ],
       
       parameters: [
@@ -162,7 +206,9 @@ export default {
     'network:port-scan': {
       name: 'Port Scan',
       description: 'Scan for open TCP/UDP ports on target hosts',
-      category: 'discovery',
+      category: 'discover',
+      subcategory: 'network',
+      ...networkPlatform,
       icon: '🔌',
       color: '#3B82F6',
       
@@ -260,7 +306,9 @@ export default {
     'network:traceroute': {
       name: 'Traceroute',
       description: 'Trace network path to target hosts',
-      category: 'discovery',
+      category: 'discover',
+      subcategory: 'network',
+      ...networkPlatform,
       icon: '🛤️',
       color: '#3B82F6',
       
@@ -333,7 +381,9 @@ export default {
     'network:arp-scan': {
       name: 'ARP Scan',
       description: 'Discover devices on local network using ARP',
-      category: 'discovery',
+      category: 'discover',
+      subcategory: 'network',
+      ...networkPlatform,
       icon: '📶',
       color: '#3B82F6',
       

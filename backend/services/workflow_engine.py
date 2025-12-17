@@ -76,6 +76,7 @@ class WorkflowEngine:
         from .node_executors.ssh import SSHCommandExecutor
         from .node_executors.database import DBQueryExecutor, DBUpsertExecutor
         from .node_executors.notifications import SlackExecutor, EmailExecutor, WebhookExecutor, TemplatedNotificationExecutor
+        from .node_executors.netbox import NetBoxAutodiscoveryExecutor, NetBoxDeviceCreateExecutor, NetBoxLookupExecutor
         
         # Create executor instances
         ping_exec = PingExecutor()
@@ -90,6 +91,11 @@ class WorkflowEngine:
         email_exec = EmailExecutor()
         webhook_exec = WebhookExecutor()
         templated_notify_exec = TemplatedNotificationExecutor()
+        netbox_autodiscovery_exec = NetBoxAutodiscoveryExecutor()
+        netbox_device_create_exec = NetBoxDeviceCreateExecutor()
+        netbox_sites_exec = NetBoxLookupExecutor('sites')
+        netbox_roles_exec = NetBoxLookupExecutor('device-roles')
+        netbox_types_exec = NetBoxLookupExecutor('device-types')
         
         self.node_executors = {
             # Triggers
@@ -129,6 +135,13 @@ class WorkflowEngine:
             'notify:slack': lambda n, c: slack_exec.execute(n, c),
             'notify:webhook': lambda n, c: webhook_exec.execute(n, c),
             'notify:send': lambda n, c: templated_notify_exec.execute(n, c),  # Templated notification
+            
+            # NetBox
+            'netbox:autodiscovery': lambda n, c: netbox_autodiscovery_exec.execute(n, c),
+            'netbox:device-create': lambda n, c: netbox_device_create_exec.execute(n, c),
+            'netbox:lookup-sites': lambda n, c: netbox_sites_exec.execute(n, c),
+            'netbox:lookup-roles': lambda n, c: netbox_roles_exec.execute(n, c),
+            'netbox:lookup-device-types': lambda n, c: netbox_types_exec.execute(n, c),
         }
     
     def register_executor(self, node_type: str, executor: Callable):

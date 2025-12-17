@@ -5,6 +5,8 @@
  * Cannot be disabled.
  */
 
+import { PLATFORMS, PROTOCOLS } from '../platforms';
+
 export default {
   id: 'core',
   name: 'Core',
@@ -23,6 +25,10 @@ export default {
       category: 'triggers',
       icon: '▶️',
       color: '#22C55E',
+      
+      // Platform compatibility
+      platforms: [PLATFORMS.ANY],
+      protocols: [],
       
       inputs: [],
       outputs: [
@@ -43,8 +49,6 @@ export default {
         type: 'trigger',
         executor: 'manual_trigger',
         context: 'internal',
-        platform: 'any',
-        requirements: {},
       },
     },
 
@@ -54,6 +58,8 @@ export default {
       category: 'triggers',
       icon: '⏰',
       color: '#22C55E',
+      platforms: [PLATFORMS.ANY],
+      protocols: [],
       
       inputs: [],
       outputs: [
@@ -106,8 +112,6 @@ export default {
         type: 'trigger',
         executor: 'schedule_trigger',
         context: 'local',
-        platform: 'any',
-        requirements: {},
       },
     },
 
@@ -117,6 +121,8 @@ export default {
       category: 'triggers',
       icon: '🔗',
       color: '#22C55E',
+      platforms: [PLATFORMS.ANY],
+      protocols: [PROTOCOLS.HTTP],
       
       inputs: [],
       outputs: [
@@ -150,10 +156,6 @@ export default {
         type: 'trigger',
         executor: 'webhook_trigger',
         context: 'local',
-        platform: 'any',
-        requirements: {
-          network: true,
-        },
       },
     },
 
@@ -164,6 +166,8 @@ export default {
       category: 'logic',
       icon: '🔀',
       color: '#A855F7',
+      platforms: [PLATFORMS.ANY],
+      protocols: [],
       
       inputs: [
         { id: 'trigger', type: 'trigger', label: 'Input' },
@@ -212,8 +216,6 @@ export default {
         type: 'logic',
         executor: 'if_executor',
         context: 'internal',
-        platform: 'any',
-        requirements: {},
       },
     },
 
@@ -223,6 +225,8 @@ export default {
       category: 'logic',
       icon: '🔀',
       color: '#A855F7',
+      platforms: [PLATFORMS.ANY],
+      protocols: [],
       
       inputs: [
         { id: 'trigger', type: 'trigger', label: 'Input' },
@@ -258,8 +262,6 @@ export default {
         type: 'logic',
         executor: 'switch_executor',
         context: 'internal',
-        platform: 'any',
-        requirements: {},
       },
     },
 
@@ -269,6 +271,8 @@ export default {
       category: 'logic',
       icon: '🔄',
       color: '#A855F7',
+      platforms: [PLATFORMS.ANY],
+      protocols: [],
       
       inputs: [
         { id: 'trigger', type: 'trigger', label: 'Input' },
@@ -312,8 +316,6 @@ export default {
         type: 'logic',
         executor: 'loop_executor',
         context: 'internal',
-        platform: 'any',
-        requirements: {},
       },
     },
 
@@ -323,6 +325,8 @@ export default {
       category: 'logic',
       icon: '⏱️',
       color: '#A855F7',
+      platforms: [PLATFORMS.ANY],
+      protocols: [],
       
       inputs: [
         { id: 'trigger', type: 'trigger', label: 'Input' },
@@ -372,8 +376,6 @@ export default {
         type: 'logic',
         executor: 'wait_executor',
         context: 'internal',
-        platform: 'any',
-        requirements: {},
       },
     },
 
@@ -383,6 +385,8 @@ export default {
       category: 'logic',
       icon: '🔗',
       color: '#A855F7',
+      platforms: [PLATFORMS.ANY],
+      protocols: [],
       
       inputs: [
         { id: 'input_1', type: 'trigger', label: 'Input 1' },
@@ -411,8 +415,6 @@ export default {
         type: 'logic',
         executor: 'merge_executor',
         context: 'internal',
-        platform: 'any',
-        requirements: {},
       },
     },
 
@@ -421,8 +423,11 @@ export default {
       name: 'Set Variable',
       description: 'Store a value in a workflow variable',
       category: 'data',
+      subcategory: 'variables',
       icon: '📝',
       color: '#F59E0B',
+      platforms: [PLATFORMS.ANY],
+      protocols: [],
       
       inputs: [
         { id: 'trigger', type: 'trigger', label: 'Input' },
@@ -454,8 +459,6 @@ export default {
         type: 'data',
         executor: 'set_variable_executor',
         context: 'internal',
-        platform: 'any',
-        requirements: {},
       },
     },
 
@@ -463,8 +466,11 @@ export default {
       name: 'Debug',
       description: 'Inspect data flowing through the workflow',
       category: 'data',
+      subcategory: 'variables',
       icon: '🔍',
       color: '#F59E0B',
+      platforms: [PLATFORMS.ANY],
+      protocols: [],
       
       inputs: [
         { id: 'trigger', type: 'trigger', label: 'Input' },
@@ -501,8 +507,6 @@ export default {
         type: 'data',
         executor: 'debug_executor',
         context: 'internal',
-        platform: 'any',
-        requirements: {},
       },
     },
 
@@ -510,8 +514,11 @@ export default {
       name: 'Transform',
       description: 'Transform data using JavaScript expressions',
       category: 'data',
+      subcategory: 'transform',
       icon: '🔄',
       color: '#F59E0B',
+      platforms: [PLATFORMS.ANY],
+      protocols: [],
       
       inputs: [
         { id: 'trigger', type: 'trigger', label: 'Input' },
@@ -549,8 +556,6 @@ export default {
         type: 'data',
         executor: 'transform_executor',
         context: 'internal',
-        platform: 'any',
-        requirements: {},
       },
     },
   },

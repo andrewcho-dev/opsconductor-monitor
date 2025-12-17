@@ -9,6 +9,15 @@
  * - Configuration commands
  */
 
+import { PLATFORMS, PROTOCOLS } from '../platforms';
+
+// Common platform config for all Ciena SAOS nodes
+const cienaPlatform = {
+  platforms: [PLATFORMS.CIENA_SAOS],
+  protocols: [PROTOCOLS.SSH],
+  vendor: 'Ciena',
+};
+
 export default {
   id: 'ciena-saos',
   name: 'Ciena SAOS',
@@ -22,9 +31,11 @@ export default {
     'ciena:show-interface': {
       name: 'Show Interface',
       description: 'Display interface status and statistics on Ciena SAOS switches',
-      category: 'query',
+      category: 'discover',
+      subcategory: 'network',
       icon: '🔌',
       color: '#0066CC',
+      ...cienaPlatform,
       
       inputs: [
         { id: 'trigger', type: 'trigger', label: 'Trigger', required: true },
@@ -133,7 +144,9 @@ export default {
     'ciena:show-optics': {
       name: 'Show Optics',
       description: 'Display optical power levels and SFP status on Ciena SAOS switches',
-      category: 'query',
+      category: 'discover',
+      subcategory: 'network',
+      ...cienaPlatform,
       icon: '💡',
       color: '#0066CC',
       
@@ -329,7 +342,9 @@ export default {
     'ciena:show-alarms': {
       name: 'Show Alarms',
       description: 'Display active and historical alarms on Ciena SAOS switches',
-      category: 'query',
+      category: 'discover',
+      subcategory: 'network',
+      ...cienaPlatform,
       icon: '🚨',
       color: '#EF4444',
       
@@ -415,7 +430,9 @@ export default {
     'ciena:show-version': {
       name: 'Show Version',
       description: 'Display software version and hardware information',
-      category: 'query',
+      category: 'discover',
+      subcategory: 'network',
+      ...cienaPlatform,
       icon: 'ℹ️',
       color: '#0066CC',
       
@@ -481,7 +498,9 @@ export default {
     'ciena:custom-command': {
       name: 'Custom SAOS Command',
       description: 'Execute a custom CLI command on Ciena SAOS switches',
-      category: 'query',
+      category: 'discover',
+      subcategory: 'network',
+      ...cienaPlatform,
       icon: '⌨️',
       color: '#0066CC',
       
@@ -572,7 +591,9 @@ export default {
     'ciena:show-port': {
       name: 'Show Port',
       description: 'Display port status, configuration, and statistics',
-      category: 'query',
+      category: 'discover',
+      subcategory: 'network',
+      ...cienaPlatform,
       icon: '🔌',
       color: '#0066CC',
       
@@ -656,7 +677,9 @@ export default {
     'ciena:show-xcvr': {
       name: 'Show XCVR',
       description: 'Display transceiver (SFP/QSFP) information and diagnostics',
-      category: 'query',
+      category: 'discover',
+      subcategory: 'network',
+      ...cienaPlatform,
       icon: '📡',
       color: '#0066CC',
       
@@ -782,6 +805,8 @@ export default {
       name: 'Enable Port',
       description: 'Enable/bring up a port on Ciena SAOS switch',
       category: 'configure',
+      subcategory: 'remote',
+      ...cienaPlatform,
       icon: '✅',
       color: '#22C55E',
       
@@ -848,6 +873,8 @@ export default {
       name: 'Disable Port',
       description: 'Disable/shutdown a port on Ciena SAOS switch',
       category: 'configure',
+      subcategory: 'remote',
+      ...cienaPlatform,
       icon: '🚫',
       color: '#EF4444',
       
@@ -914,6 +941,8 @@ export default {
       name: 'Set Port Description',
       description: 'Set the description/alias for a port',
       category: 'configure',
+      subcategory: 'remote',
+      ...cienaPlatform,
       icon: '🏷️',
       color: '#0066CC',
       
@@ -988,7 +1017,9 @@ export default {
     'ciena:show-vlan': {
       name: 'Show VLAN',
       description: 'Display VLAN configuration and membership',
-      category: 'query',
+      category: 'discover',
+      subcategory: 'network',
+      ...cienaPlatform,
       icon: '🏷️',
       color: '#0066CC',
       
@@ -1067,6 +1098,8 @@ export default {
       name: 'Create VLAN',
       description: 'Create a new VLAN on Ciena SAOS switch',
       category: 'configure',
+      subcategory: 'remote',
+      ...cienaPlatform,
       icon: '➕',
       color: '#22C55E',
       
@@ -1141,6 +1174,8 @@ export default {
       name: 'Add Port to VLAN',
       description: 'Add a port to a VLAN (tagged or untagged)',
       category: 'configure',
+      subcategory: 'remote',
+      ...cienaPlatform,
       icon: '🔗',
       color: '#0066CC',
       
@@ -1226,7 +1261,9 @@ export default {
     'ciena:show-service': {
       name: 'Show Service',
       description: 'Display service configuration (EPL, EVPL, etc.)',
-      category: 'query',
+      category: 'discover',
+      subcategory: 'network',
+      ...cienaPlatform,
       icon: '🔧',
       color: '#0066CC',
       
@@ -1304,7 +1341,9 @@ export default {
     'ciena:show-virtual-switch': {
       name: 'Show Virtual Switch',
       description: 'Display virtual switch configuration',
-      category: 'query',
+      category: 'discover',
+      subcategory: 'network',
+      ...cienaPlatform,
       icon: '🔀',
       color: '#0066CC',
       
@@ -1372,7 +1411,9 @@ export default {
     'ciena:show-chassis': {
       name: 'Show Chassis',
       description: 'Display chassis and hardware information',
-      category: 'query',
+      category: 'discover',
+      subcategory: 'network',
+      ...cienaPlatform,
       icon: '🖥️',
       color: '#0066CC',
       
@@ -1432,6 +1473,8 @@ export default {
       name: 'Save Configuration',
       description: 'Save running configuration to startup',
       category: 'configure',
+      subcategory: 'remote',
+      ...cienaPlatform,
       icon: '💾',
       color: '#22C55E',
       
@@ -1496,7 +1539,9 @@ export default {
     'ciena:show-running-config': {
       name: 'Show Running Config',
       description: 'Display current running configuration',
-      category: 'query',
+      category: 'discover',
+      subcategory: 'network',
+      ...cienaPlatform,
       icon: '📄',
       color: '#0066CC',
       
@@ -1569,7 +1614,9 @@ export default {
     'ciena:show-traffic-profile': {
       name: 'Show Traffic Profile',
       description: 'Display traffic profiles and QoS settings',
-      category: 'query',
+      category: 'discover',
+      subcategory: 'network',
+      ...cienaPlatform,
       icon: '📊',
       color: '#0066CC',
       
@@ -1637,7 +1684,9 @@ export default {
     'ciena:show-ring': {
       name: 'Show Ring Protection',
       description: 'Display ring protection (G.8032/ERPS) status',
-      category: 'query',
+      category: 'discover',
+      subcategory: 'network',
+      ...cienaPlatform,
       icon: '🔄',
       color: '#0066CC',
       

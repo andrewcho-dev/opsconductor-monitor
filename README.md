@@ -1,53 +1,106 @@
 # OpsConductor Monitor
 
-A modular network operations platform for device discovery, monitoring, job scheduling, and optical power tracking.
+A comprehensive network operations platform for device discovery, monitoring, workflow automation, and infrastructure management. Built with a Flask backend and React frontend, OpsConductor provides a visual workflow builder for creating complex automation tasks without code.
 
-## Features
+## Key Features
 
-- **Device Discovery** - Ping, SNMP, and SSH-based network scanning
+### Inventory Management
+- **Device Discovery** - Ping, SNMP, SSH, and WinRM-based network scanning
+- **Device Groups** - Organize devices into logical groups for targeting
 - **Interface Monitoring** - Track port status, transceivers, and LLDP neighbors
-- **Optical Power Tracking** - Time-series monitoring of TX/RX power levels
-- **Job Scheduler** - Define and schedule recurring network operations
-- **Job Builder** - Visual UI for composing multi-step automation jobs
-- **Topology Visualization** - Network topology based on LLDP data
-- **Notifications** - Apprise-based alerts via email, Slack, Teams, etc.
+- **NetBox Integration** - Sync with NetBox as source of truth for device inventory
 
-## Architecture
+### Visual Workflow Builder
+- **Drag-and-Drop Canvas** - Build automation workflows visually with React Flow
+- **17+ Node Packages** - Pre-built nodes for network, SSH, SNMP, database, notifications, and more
+- **Platform-Specific Nodes** - Ciena SAOS, Axis Cameras, Windows Systems, NetBox
+- **Data Mapping** - Pass data between nodes with expression-based variable resolution
+- **Validation** - Real-time workflow validation with prerequisite checking
+
+### Monitoring & Alerting
+- **Dashboard** - Real-time system overview with device status
+- **Optical Power Tracking** - Time-series monitoring of TX/RX power levels
+- **Topology Visualization** - Network topology based on LLDP data
+- **Alert Rules** - Configurable alerting with multiple notification channels
+- **Job History** - Complete execution history with detailed logs
+
+### Security & Authentication
+- **Role-Based Access Control (RBAC)** - Fine-grained permissions system
+- **Two-Factor Authentication** - TOTP and email-based 2FA
+- **Credential Vault** - Encrypted storage for SSH, SNMP, API keys, and certificates
+- **Audit Logging** - Complete audit trail for credential access
+
+### Notifications
+- **Multi-Channel** - Email, Slack, Microsoft Teams, webhooks, and more via Apprise
+- **Templates** - Customizable notification templates with variable substitution
+- **Alert Rules** - Trigger notifications based on conditions
+
+## Architecture Overview
 
 ```
-├── backend/                 # Flask API server
-│   ├── api/                 # REST API blueprints
-│   ├── config/              # Settings and logging configuration
-│   ├── executors/           # SSH, SNMP, Ping executors
-│   ├── migrations/          # Database schema migrations
-│   ├── parsers/             # Ciena and other device parsers
-│   ├── repositories/        # Data access layer
-│   ├── services/            # Business logic layer
-│   ├── targeting/           # Target resolution strategies
-│   └── tasks/               # Celery background tasks
-├── frontend/                # React (Vite) application
-│   ├── src/api/             # API client modules
-│   ├── src/components/      # Reusable UI components
-│   ├── src/hooks/           # Custom React hooks
-│   └── src/pages/           # Page components
-├── tests/                   # Test suite
-│   ├── unit/                # Unit tests
-│   └── integration/         # Integration tests
-├── config/                  # YAML configuration files
-├── data/                    # Data files (gitignored)
-├── logs/                    # Log files (gitignored)
-└── docs/                    # Documentation
+opsconductor/
+├── backend/                    # Flask API Server (Python)
+│   ├── api/                    # REST API Blueprints (18 modules)
+│   ├── services/               # Business Logic Layer
+│   │   ├── workflow_engine.py  # Workflow execution engine
+│   │   ├── auth_service.py     # Authentication & RBAC
+│   │   ├── credential_service.py # Encrypted credential vault
+│   │   └── node_executors/     # Workflow node implementations
+│   ├── executors/              # Device Communication (SSH, SNMP, Ping, WinRM)
+│   ├── repositories/           # Data Access Layer
+│   ├── parsers/                # Device Output Parsers
+│   ├── migrations/             # Database Schema Migrations
+│   └── tasks/                  # Celery Background Tasks
+│
+├── frontend/                   # React Application (Vite)
+│   ├── src/
+│   │   ├── features/
+│   │   │   └── workflow-builder/  # Visual Workflow Builder
+│   │   │       ├── components/    # Canvas, Toolbar, Node Editor
+│   │   │       ├── packages/      # 17 Node Packages
+│   │   │       └── hooks/         # Workflow state management
+│   │   ├── pages/              # Application Pages
+│   │   │   ├── inventory/      # Devices, Groups
+│   │   │   ├── workflows/      # Workflow List & Builder
+│   │   │   ├── monitor/        # Dashboard, Topology, Alerts
+│   │   │   ├── credentials/    # Credential Vault
+│   │   │   └── system/         # Settings, Users, Logs
+│   │   ├── components/         # Shared UI Components
+│   │   └── api/                # API Client Modules
+│
+├── docs/                       # Documentation
+│   ├── BACKEND.md              # Backend architecture & API reference
+│   ├── FRONTEND.md             # Frontend architecture & components
+│   ├── WORKFLOW_BUILDER.md     # Workflow builder guide
+│   ├── CREDENTIALS.md          # Credential vault & authentication
+│   └── API_REFERENCE.md        # Complete API documentation
+│
+├── config/                     # Configuration Files
+├── tests/                      # Test Suite
+└── systemd/                    # Systemd Service Files
 ```
 
 ## Quick Start
 
 ### Prerequisites
-- Python 3.10+
-- Node.js 18+
-- PostgreSQL 14+
-- Redis (for Celery)
+- **Python 3.10+**
+- **Node.js 18+**
+- **PostgreSQL 14+**
+- **Redis** (for Celery background tasks)
 
-### Backend Setup
+### 1. Clone and Configure
+
+```bash
+# Clone repository
+git clone <repository-url>
+cd opsconductor
+
+# Create and configure environment
+cp .env.example .env
+# Edit .env with your settings (see Environment Variables below)
+```
+
+### 2. Backend Setup
 
 ```bash
 # Create virtual environment
@@ -57,54 +110,119 @@ source .venv/bin/activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Configure environment
-cp .env.example .env
-# Edit .env with your database credentials
-
-# Run migrations
+# Run database migrations
 python3 backend/migrations/migrate.py
 
-# Start the server
-python3 run.py
+# Start the backend server
+python3 app.py
+# Backend runs on http://localhost:5000
 ```
 
-### Frontend Setup
+### 3. Frontend Setup
 
 ```bash
 cd frontend
 npm install
 npm run dev -- --host 0.0.0.0 --port 3000
+# Frontend runs on http://localhost:3000
 ```
 
-### Environment Variables
+### 4. Start Background Workers (Optional)
+
+```bash
+# Start Celery worker for background tasks
+celery -A celery_app worker -l info --concurrency=4
+
+# Start Celery beat for scheduled tasks
+celery -A celery_app beat -l info
+```
+
+### Quick Start Script
+
+```bash
+# Start all services at once
+./start.sh
+
+# Stop all services
+./stop.sh
+```
+
+## Environment Variables
 
 ```env
-# Database
+# Database (PostgreSQL)
 PG_HOST=localhost
 PG_PORT=5432
 PG_DATABASE=network_scan
 PG_USER=postgres
-PG_PASSWORD=postgres
+PG_PASSWORD=your_password
 
 # Redis (for Celery)
 REDIS_HOST=localhost
 REDIS_PORT=6379
 
+# Flask
+FLASK_HOST=0.0.0.0
+FLASK_PORT=5000
+FLASK_DEBUG=true
+
+# Security
+SECRET_KEY=your-secret-key
+CREDENTIAL_MASTER_KEY=your-encryption-key  # For credential vault
+ENCRYPTION_KEY=your-fernet-key             # For auth tokens
+
+# NetBox Integration (optional)
+NETBOX_URL=https://netbox.example.com
+NETBOX_TOKEN=your-netbox-token
+
 # Logging
 LOG_LEVEL=INFO
 ```
 
-## API Endpoints
+## Application Modules
 
-| Endpoint | Description |
+### Inventory (`/inventory`)
+- **Devices** - View, search, and manage discovered devices
+- **Device Detail** - Interface status, power levels, LLDP neighbors
+- **Groups** - Create and manage device groups for targeting
+
+### Workflows (`/workflows`)
+- **Workflow List** - Browse, search, and manage workflows
+- **Workflow Builder** - Visual drag-and-drop workflow editor
+- **Execution** - Run workflows and view results
+
+### Monitor (`/monitor`)
+- **Dashboard** - System overview with device status
+- **Topology** - Network topology visualization
+- **Power Trends** - Optical power level charts
+- **Alerts** - Active and historical alerts
+- **Active Jobs** - Currently running jobs
+- **Job History** - Execution history with logs
+
+### Credentials (`/credentials`)
+- **Credential Vault** - Encrypted credential storage
+- **Credential Groups** - Organize credentials by purpose
+- **Expiring** - Track credential expiration
+- **Audit Log** - Credential access history
+
+### System (`/system`)
+- **Overview** - System health and statistics
+- **Settings** - Application configuration
+- **Users** - User management
+- **Roles** - RBAC role configuration
+- **Notifications** - Notification channels and rules
+- **Logs** - System and application logs
+- **Workers** - Celery worker status
+
+## Documentation
+
+| Document | Description |
 |----------|-------------|
-| `GET /health` | Health check |
-| `GET /api/devices` | List all devices |
-| `GET /api/groups` | List device groups |
-| `GET /api/job-definitions` | List job definitions |
-| `GET /api/scheduler/jobs` | List scheduled jobs |
-| `GET /progress` | Scan progress status |
-| `POST /scan` | Start network scan |
+| [docs/BACKEND.md](docs/BACKEND.md) | Backend architecture, services, and API structure |
+| [docs/FRONTEND.md](docs/FRONTEND.md) | Frontend architecture, components, and routing |
+| [docs/WORKFLOW_BUILDER.md](docs/WORKFLOW_BUILDER.md) | Visual workflow builder guide and node packages |
+| [docs/CREDENTIALS.md](docs/CREDENTIALS.md) | Credential vault and authentication system |
+| [docs/API_REFERENCE.md](docs/API_REFERENCE.md) | Complete REST API documentation |
 
 ## Testing
 
@@ -114,29 +232,31 @@ python3 -m pytest tests/ -v
 
 # Run with coverage
 python3 -m pytest tests/ --cov=backend
+
+# Run specific test file
+python3 -m pytest tests/unit/test_workflow_engine.py -v
 ```
 
-## Project Structure
+## Technology Stack
 
-### Backend Modules
+### Backend
+- **Flask 2.3** - Web framework
+- **PostgreSQL** - Primary database
+- **Celery 5.3** - Background task queue
+- **Redis** - Message broker for Celery
+- **Paramiko** - SSH client
+- **PyWinRM** - Windows Remote Management
+- **Apprise** - Multi-platform notifications
+- **bcrypt/pyotp** - Authentication and 2FA
 
-- **Executors** - `SSHExecutor`, `SNMPExecutor`, `PingExecutor` for device communication
-- **Parsers** - `CienaPortXcvrParser`, `CienaLldpRemoteParser`, etc. for output parsing
-- **Targeting** - `StaticTargeting`, `GroupTargeting`, `NetworkRangeTargeting` for job targets
-- **Services** - `JobExecutor`, `NotificationService` for business logic
-
-### Frontend Modules
-
-- **API Client** - Centralized `apiClient` with error handling
-- **Hooks** - `useDevices`, `useGroups`, `useScanProgress` for data fetching
-- **Components** - `DeviceTable`, `JobBuilder`, `ScanProgress` UI components
-
-## Documentation
-
-- `docs/ARCHITECTURE_AND_ROADMAP.md` - System architecture and roadmap
-- `docs/REFACTORING_PLAN.md` - Modularization progress
-- `docs/MIGRATION_PLAN.md` - Migration from monolithic to modular
-- `docs/REMEDIATION_PLAN.md` - Code quality improvements
+### Frontend
+- **React 19** - UI framework
+- **Vite 7** - Build tool and dev server
+- **React Flow** - Workflow canvas
+- **TailwindCSS** - Styling
+- **Lucide React** - Icons
+- **Chart.js/Recharts** - Data visualization
+- **React Router 6** - Client-side routing
 
 ## License
 

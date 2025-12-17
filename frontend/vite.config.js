@@ -45,6 +45,7 @@ export default defineConfig({
       '/api/credentials': 'http://192.168.10.50:5000',
       '/api/logs': 'http://192.168.10.50:5000',
       '/api/system': 'http://192.168.10.50:5000',
+      '/api/netbox': 'http://192.168.10.50:5000',
     }
   },
   build: {

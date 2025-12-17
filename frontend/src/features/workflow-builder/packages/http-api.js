@@ -8,6 +8,14 @@
  * - Respond to Webhook
  */
 
+import { PLATFORMS, PROTOCOLS } from '../platforms';
+
+// HTTP nodes are platform-agnostic
+const httpPlatform = {
+  platforms: [PLATFORMS.ANY],
+  protocols: [PROTOCOLS.HTTP, PROTOCOLS.HTTPS],
+};
+
 export default {
   id: 'http-api',
   name: 'HTTP / API',
@@ -21,8 +29,12 @@ export default {
       name: 'HTTP Request',
       description: 'Make HTTP requests to external APIs',
       category: 'data',
+      subcategory: 'api',
+      ...httpPlatform,
+      subcategory: 'api',
       icon: '🌐',
       color: '#3B82F6',
+      ...httpPlatform,
       
       inputs: [
         { id: 'input', type: 'trigger', label: 'Input', required: true },
@@ -203,6 +215,7 @@ export default {
       name: 'Webhook Trigger',
       description: 'Trigger workflow when a webhook is received',
       category: 'triggers',
+      ...httpPlatform,
       icon: '🪝',
       color: '#3B82F6',
       
@@ -301,6 +314,8 @@ export default {
       name: 'Respond to Webhook',
       description: 'Send a response back to the webhook caller',
       category: 'data',
+      subcategory: 'api',
+      ...httpPlatform,
       icon: '↩️',
       color: '#3B82F6',
       
@@ -368,6 +383,8 @@ export default {
       name: 'GraphQL',
       description: 'Execute GraphQL queries and mutations',
       category: 'data',
+      subcategory: 'api',
+      ...httpPlatform,
       icon: '◈',
       color: '#E10098',
       

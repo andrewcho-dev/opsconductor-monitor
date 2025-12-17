@@ -7,6 +7,14 @@
  * - SNMP Set
  */
 
+import { PLATFORMS, PROTOCOLS } from '../platforms';
+
+// Common platform config for SNMP nodes (works on any SNMP-enabled device)
+const snmpPlatform = {
+  platforms: [PLATFORMS.NETWORK_DEVICE, PLATFORMS.LINUX, PLATFORMS.WINDOWS],
+  protocols: [PROTOCOLS.SNMP],
+};
+
 export default {
   id: 'snmp',
   name: 'SNMP',
@@ -19,19 +27,41 @@ export default {
     'snmp:get': {
       name: 'SNMP Get',
       description: 'Get specific OID values from devices via SNMP',
-      category: 'query',
+      category: 'discover',
+      subcategory: 'snmp',
       icon: '🔍',
       color: '#10B981',
+      ...snmpPlatform,
       
       inputs: [
         { id: 'trigger', type: 'trigger', label: 'Trigger', required: true },
-        { id: 'targets', type: 'string[]', label: 'Targets (override)' },
+        { 
+          id: 'targets', 
+          type: 'ip[]', 
+          label: 'Target Hosts',
+          description: 'List of hosts to query via SNMP',
+          acceptsFrom: ['network:ping.online', 'network:port-scan.hosts'],
+        },
       ],
       outputs: [
         { id: 'success', type: 'trigger', label: 'On Success' },
         { id: 'failure', type: 'trigger', label: 'On Failure' },
-        { id: 'results', type: 'object[]', label: 'All Results' },
-        { id: 'values', type: 'object', label: 'OID Values' },
+        { 
+          id: 'results', 
+          type: 'object[]', 
+          label: 'All Results',
+          description: 'SNMP results from all hosts',
+          schema: {
+            host: { type: 'string', description: 'Target hostname/IP' },
+            oid: { type: 'string', description: 'OID queried' },
+            value: { type: 'any', description: 'SNMP value returned' },
+            type: { type: 'string', description: 'SNMP value type' },
+            success: { type: 'boolean', description: 'Whether query succeeded' },
+          },
+        },
+        { id: 'values', type: 'object', label: 'OID Values', description: 'Map of OID to value' },
+        { id: 'successful_hosts', type: 'ip[]', label: 'Successful Hosts', description: 'Hosts that responded' },
+        { id: 'failed_hosts', type: 'ip[]', label: 'Failed Hosts', description: 'Hosts that failed/timed out' },
       ],
       
       parameters: [
@@ -199,20 +229,17 @@ export default {
         type: 'action',
         executor: 'snmp_get',
         context: 'remote_snmp',
-        platform: 'any',
-        requirements: {
-          connection: 'snmp',
-          credentials: ['snmp_credentials'],
-        },
       },
     },
 
     'snmp:walk': {
       name: 'SNMP Walk',
       description: 'Walk an OID tree to get all values under a branch',
-      category: 'query',
+      category: 'discover',
+      subcategory: 'snmp',
       icon: '🌳',
       color: '#10B981',
+      ...snmpPlatform,
       
       inputs: [
         { id: 'trigger', type: 'trigger', label: 'Trigger', required: true },
@@ -305,11 +332,6 @@ export default {
         type: 'action',
         executor: 'snmp_walk',
         context: 'remote_snmp',
-        platform: 'any',
-        requirements: {
-          connection: 'snmp',
-          credentials: ['snmp_credentials'],
-        },
       },
     },
 
@@ -317,8 +339,10 @@ export default {
       name: 'SNMP Set',
       description: 'Set OID values on devices via SNMP',
       category: 'configure',
+      subcategory: 'snmp',
       icon: '✏️',
       color: '#10B981',
+      ...snmpPlatform,
       
       inputs: [
         { id: 'trigger', type: 'trigger', label: 'Trigger', required: true },
@@ -406,12 +430,7 @@ export default {
         type: 'action',
         executor: 'snmp_set',
         context: 'remote_snmp',
-        platform: 'any',
         requires_confirmation: true,
-        requirements: {
-          connection: 'snmp',
-          credentials: ['snmp_credentials'],
-        },
       },
     },
   },

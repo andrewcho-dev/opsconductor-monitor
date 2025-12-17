@@ -1,3 +1,10 @@
+import { PLATFORMS } from '../platforms';
+
+const universalPlatform = {
+  platforms: [PLATFORMS.ANY],
+  protocols: [],
+};
+
 /**
  * Flow Control Package
  * 
@@ -22,6 +29,7 @@ export default {
       name: 'Wait',
       description: 'Pause workflow execution for a specified time',
       category: 'logic',
+      ...universalPlatform,
       icon: '⏱️',
       color: '#EC4899',
       
@@ -95,6 +103,7 @@ export default {
       name: 'Delay',
       description: 'Add a simple delay between nodes',
       category: 'logic',
+      ...universalPlatform,
       icon: '⏸️',
       color: '#EC4899',
       
@@ -129,6 +138,7 @@ export default {
       name: 'Retry',
       description: 'Retry failed operations with configurable backoff',
       category: 'logic',
+      ...universalPlatform,
       icon: '🔁',
       color: '#EC4899',
       
@@ -190,6 +200,7 @@ export default {
       name: 'Error Trigger',
       description: 'Trigger when an error occurs in the workflow',
       category: 'triggers',
+      ...universalPlatform,
       icon: '⚠️',
       color: '#EF4444',
       
@@ -238,6 +249,7 @@ export default {
       name: 'Stop and Error',
       description: 'Stop workflow execution with an error',
       category: 'logic',
+      ...universalPlatform,
       icon: '🛑',
       color: '#EF4444',
       
@@ -280,6 +292,7 @@ export default {
       name: 'No Operation',
       description: 'Pass data through without modification (for debugging)',
       category: 'logic',
+      ...universalPlatform,
       icon: '➡️',
       color: '#6B7280',
       
@@ -320,6 +333,7 @@ export default {
       name: 'Switch',
       description: 'Route data to different outputs based on conditions',
       category: 'logic',
+      ...universalPlatform,
       icon: '🔀',
       color: '#EC4899',
       
@@ -390,6 +404,7 @@ export default {
       name: 'Loop',
       description: 'Loop over items or repeat a fixed number of times',
       category: 'logic',
+      ...universalPlatform,
       icon: '🔄',
       color: '#EC4899',
       

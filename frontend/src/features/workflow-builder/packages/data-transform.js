@@ -1,3 +1,10 @@
+import { PLATFORMS } from '../platforms';
+
+const universalPlatform = {
+  platforms: [PLATFORMS.ANY],
+  protocols: [],
+};
+
 /**
  * Data Transformation Package
  * 
@@ -25,6 +32,7 @@ export default {
       name: 'Set Fields',
       description: 'Add, rename, or remove fields from data items',
       category: 'data',
+      ...universalPlatform,
       icon: '✏️',
       color: '#8B5CF6',
       
@@ -85,6 +93,7 @@ export default {
       name: 'Split Out',
       description: 'Split array items into separate items',
       category: 'data',
+      ...universalPlatform,
       icon: '↔️',
       color: '#8B5CF6',
       
@@ -134,6 +143,7 @@ export default {
       name: 'Merge',
       description: 'Merge data from multiple inputs',
       category: 'data',
+      ...universalPlatform,
       icon: '🔀',
       color: '#8B5CF6',
       
@@ -200,6 +210,7 @@ export default {
       name: 'Aggregate',
       description: 'Aggregate items (sum, count, average, group by)',
       category: 'data',
+      ...universalPlatform,
       icon: '📊',
       color: '#8B5CF6',
       
@@ -243,6 +254,7 @@ export default {
       name: 'Sort',
       description: 'Sort items by one or more fields',
       category: 'data',
+      ...universalPlatform,
       icon: '↕️',
       color: '#8B5CF6',
       
@@ -284,6 +296,7 @@ export default {
       name: 'Limit',
       description: 'Limit the number of items',
       category: 'data',
+      ...universalPlatform,
       icon: '✂️',
       color: '#8B5CF6',
       
@@ -327,6 +340,7 @@ export default {
       name: 'Filter',
       description: 'Filter items based on conditions',
       category: 'data',
+      ...universalPlatform,
       icon: '🔍',
       color: '#8B5CF6',
       
@@ -372,6 +386,7 @@ export default {
       name: 'Code',
       description: 'Run custom JavaScript code to transform data',
       category: 'data',
+      ...universalPlatform,
       icon: '💻',
       color: '#F59E0B',
       
@@ -427,6 +442,7 @@ return items.map(item => ({
       name: 'Remove Duplicates',
       description: 'Remove duplicate items based on a field',
       category: 'data',
+      ...universalPlatform,
       icon: '🧹',
       color: '#8B5CF6',
       
@@ -473,6 +489,7 @@ return items.map(item => ({
       name: 'Rename Keys',
       description: 'Rename field keys in data items',
       category: 'data',
+      ...universalPlatform,
       icon: '🏷️',
       color: '#8B5CF6',
       

@@ -1,3 +1,10 @@
+import { PLATFORMS } from '../platforms';
+
+const universalPlatform = {
+  platforms: [PLATFORMS.ANY],
+  protocols: [],
+};
+
 /**
  * File/Storage Package
  * 
@@ -21,6 +28,7 @@ export default {
       name: 'Read File',
       description: 'Read content from a file',
       category: 'data',
+      ...universalPlatform,
       icon: '📖',
       color: '#F59E0B',
       
@@ -97,6 +105,7 @@ export default {
       name: 'Write File',
       description: 'Write content to a file',
       category: 'data',
+      ...universalPlatform,
       icon: '📝',
       color: '#F59E0B',
       
@@ -195,6 +204,7 @@ export default {
       name: 'SFTP',
       description: 'Transfer files via SFTP',
       category: 'data',
+      ...universalPlatform,
       icon: '📤',
       color: '#F59E0B',
       
@@ -305,6 +315,7 @@ export default {
       name: 'FTP',
       description: 'Transfer files via FTP',
       category: 'data',
+      ...universalPlatform,
       icon: '📂',
       color: '#F59E0B',
       
@@ -393,6 +404,7 @@ export default {
       name: 'AWS S3',
       description: 'Read and write files to AWS S3',
       category: 'data',
+      ...universalPlatform,
       icon: '☁️',
       color: '#FF9900',
       

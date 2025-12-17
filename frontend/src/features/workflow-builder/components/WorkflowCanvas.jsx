@@ -18,12 +18,18 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 
 import WorkflowNode from '../nodes/WorkflowNode';
+import DataEdge from './DataEdge';
 import { getNodeDefinition } from '../packages';
 import { cn } from '../../../lib/utils';
 
 // Custom node types
 const nodeTypes = {
   workflow: WorkflowNode,
+};
+
+// Custom edge types
+const edgeTypes = {
+  data: DataEdge,
 };
 
 // Custom edge options - Node-RED style bezier curves
@@ -177,25 +183,26 @@ const WorkflowCanvasInner = ({
     [nodes, selectedNodes]
   );
 
-  // Style edges - Node-RED style (simple gray lines, selectable)
+  // Style edges with data type information
   const styledEdges = useMemo(() => 
     edges.map(edge => {
-      const isFailurePath = edge.sourceHandle === 'failure' || edge.sourceHandle === 'false';
-      const isSelected = edge.selected;
+      const sourceNode = nodes.find(n => n.id === edge.source);
+      const sourceNodeDef = sourceNode ? getNodeDefinition(sourceNode.data?.nodeType) : null;
+      const sourceOutput = sourceNodeDef?.outputs?.find(o => o.id === edge.sourceHandle);
+      const isTrigger = sourceOutput?.type === 'trigger';
+      
       return {
         ...edge,
-        type: 'default', // bezier curve
-        style: { 
-          strokeWidth: isSelected ? 3 : 2, 
-          stroke: isSelected ? '#3B82F6' : (isFailurePath ? '#EF4444' : '#999'),
-          cursor: 'pointer',
+        type: isTrigger ? 'default' : 'data', // Use custom DataEdge for data connections
+        data: {
+          sourceNodeDef,
+          sourceNode,
         },
-        // Wider click area for easier selection
         interactionWidth: 20,
-        className: isSelected ? 'selected-edge' : '',
+        className: edge.selected ? 'selected-edge' : '',
       };
     }),
-    [edges]
+    [edges, nodes]
   );
 
   // MiniMap node color
@@ -223,6 +230,7 @@ const WorkflowCanvasInner = ({
         onMoveEnd={handleMoveEnd}
         isValidConnection={isValidConnection}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         defaultEdgeOptions={defaultEdgeOptions}
         connectionLineStyle={connectionLineStyle}
         defaultViewport={viewport}

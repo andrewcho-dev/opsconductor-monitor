@@ -1,3 +1,10 @@
+import { PLATFORMS } from '../platforms';
+
+const universalPlatform = {
+  platforms: [PLATFORMS.ANY],
+  protocols: [],
+};
+
 /**
  * Database Package
  * 
@@ -22,18 +29,31 @@ export default {
       name: 'Insert Records',
       description: 'Insert new records into a database table',
       category: 'data',
+      ...universalPlatform,
       icon: '➕',
       color: '#F59E0B',
       
       inputs: [
         { id: 'trigger', type: 'trigger', label: 'Trigger', required: true },
-        { id: 'data', type: 'object[]', label: 'Data to Insert' },
+        { 
+          id: 'data', 
+          type: 'object[]', 
+          label: 'Data to Insert',
+          description: 'Array of objects to insert as records',
+          acceptsFrom: ['network:ping.results', 'snmp:get.results', 'ssh:command.results'],
+        },
       ],
       outputs: [
         { id: 'success', type: 'trigger', label: 'On Success' },
         { id: 'failure', type: 'trigger', label: 'On Failure' },
-        { id: 'inserted', type: 'object[]', label: 'Inserted Records' },
-        { id: 'ids', type: 'string[]', label: 'Inserted IDs' },
+        { 
+          id: 'inserted', 
+          type: 'object[]', 
+          label: 'Inserted Records',
+          description: 'Records that were successfully inserted',
+        },
+        { id: 'ids', type: 'number[]', label: 'Inserted IDs', description: 'Database IDs of inserted records' },
+        { id: 'count', type: 'number', label: 'Insert Count', description: 'Number of records inserted' },
       ],
       
       parameters: [
@@ -133,6 +153,7 @@ export default {
       name: 'Update Records',
       description: 'Update existing records in a database table',
       category: 'data',
+      ...universalPlatform,
       icon: '✏️',
       color: '#F59E0B',
       
@@ -205,6 +226,7 @@ export default {
       name: 'Upsert Records',
       description: 'Insert or update records (insert if not exists, update if exists)',
       category: 'data',
+      ...universalPlatform,
       icon: '🔄',
       color: '#F59E0B',
       
@@ -295,6 +317,7 @@ export default {
       name: 'Delete Records',
       description: 'Delete records from a database table',
       category: 'data',
+      ...universalPlatform,
       icon: '🗑️',
       color: '#EF4444',
       

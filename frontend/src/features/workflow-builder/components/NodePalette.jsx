@@ -1,21 +1,38 @@
 /**
  * NodePalette Component
  * 
- * n8n/Node-RED style sidebar showing available nodes.
- * Features search, collapsible package libraries, and drag-to-canvas.
+ * Action-based node organization for intuitive workflow building.
+ * Nodes are grouped by what they DO (Triggers, Discover, Configure, etc.)
+ * with platform badges showing compatibility.
  */
 
 import React, { useState, useMemo } from 'react';
-import { ChevronDown, ChevronRight, Search, X, Folder, FolderOpen, AlertTriangle, Key, Wifi, Server, Terminal } from 'lucide-react';
-import { getNodesByCategory, getAllPackages, getNodesByPackage } from '../packages';
+import { ChevronDown, ChevronRight, Search, X, Key, Terminal, Wifi, Server, Layers, LayoutGrid } from 'lucide-react';
+import { getAllPackages, getNodesByPackage } from '../packages';
+import { CATEGORIES, getSortedCategories } from '../packages/categories';
+import { PLATFORMS, PLATFORM_INFO, getPlatformInfo } from '../platforms';
 import { cn } from '../../../lib/utils';
+import { PlatformIndicator } from './PlatformBadge';
+
+// Platform filter options - commonly used platforms for filtering
+const FILTER_PLATFORMS = [
+  { id: 'any', name: 'Universal', icon: '⚡', color: '#10B981' },
+  { id: 'linux', name: 'Linux', icon: '🐧', color: '#FCC624' },
+  { id: 'windows', name: 'Windows', icon: '🪟', color: '#00A4EF' },
+  { id: 'network-device', name: 'Network', icon: '🌐', color: '#6366F1' },
+  { id: 'ciena-saos', name: 'Ciena SAOS', icon: '📡', color: '#0EA5E9' },
+  { id: 'cisco-ios', name: 'Cisco', icon: '🔷', color: '#1BA0D7' },
+  { id: 'axis-camera', name: 'Axis Camera', icon: '📷', color: '#FFB800' },
+];
 
 const NodePalette = ({ enabledPackages, onDragStart }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [viewMode, setViewMode] = useState('packages'); // 'packages' or 'categories'
-  const [expandedPackages, setExpandedPackages] = useState({});
-  const [expandedSubgroups, setExpandedSubgroups] = useState({});
+  const [viewMode, setViewMode] = useState('categories'); // 'categories' or 'packages'
+  const [expandedCategories, setExpandedCategories] = useState({ triggers: true }); // Start with triggers open
+  const [expandedSubcategories, setExpandedSubcategories] = useState({});
+  const [selectedPlatforms, setSelectedPlatforms] = useState([]); // Multi-select platform filter
 
+  // Get all enabled packages
   const enabledIds = useMemo(() => {
     if (Array.isArray(enabledPackages) && enabledPackages.length > 0) {
       return enabledPackages;
@@ -23,120 +40,176 @@ const NodePalette = ({ enabledPackages, onDragStart }) => {
     return undefined;
   }, [enabledPackages]);
 
-  // Get all packages
-  const packages = getAllPackages();
-
-  // Get nodes organized by package with subgroups
-  const nodesByPackage = useMemo(() => {
-    const result = {};
+  // Get all nodes from all enabled packages
+  const allNodes = useMemo(() => {
+    const packages = getAllPackages();
+    const nodes = [];
     
     packages.forEach(pkg => {
       if (enabledIds && !enabledIds.includes(pkg.id)) return;
       
       const pkgNodes = getNodesByPackage(pkg.id);
-      if (!pkgNodes || pkgNodes.length === 0) return;
-      
-      // Group nodes by their category within the package
-      const subgroups = {};
-      pkgNodes.forEach(node => {
-        const category = node.category || 'other';
-        if (!subgroups[category]) {
-          subgroups[category] = {
-            name: getCategoryName(category),
-            icon: getCategoryIcon(category),
-            nodes: [],
-          };
-        }
-        subgroups[category].nodes.push(node);
-      });
-      
-      result[pkg.id] = {
-        ...pkg,
-        subgroups,
-        totalNodes: pkgNodes.length,
-      };
+      nodes.push(...pkgNodes);
     });
     
-    return result;
-  }, [packages, enabledIds]);
+    return nodes;
+  }, [enabledIds]);
 
-  // Filter nodes by search term
-  const filteredPackages = useMemo(() => {
-    if (!searchTerm.trim()) return nodesByPackage;
+  // Organize nodes by action category
+  const nodesByCategory = useMemo(() => {
+    const categories = {};
+    const sortedCats = getSortedCategories();
+    
+    // Initialize all categories
+    sortedCats.forEach(cat => {
+      categories[cat.id] = {
+        ...cat,
+        subcategories: {},
+        nodes: [],
+        totalNodes: 0,
+      };
+      
+      // Initialize subcategories if defined
+      if (cat.subcategories) {
+        Object.entries(cat.subcategories).forEach(([subId, sub]) => {
+          categories[cat.id].subcategories[subId] = {
+            ...sub,
+            id: subId,
+            nodes: [],
+          };
+        });
+      }
+    });
+    
+    // Sort nodes into categories
+    allNodes.forEach(node => {
+      const catId = node.category || 'logic';
+      const subCatId = node.subcategory;
+      
+      if (!categories[catId]) {
+        // Unknown category - put in logic
+        categories.logic.nodes.push(node);
+        categories.logic.totalNodes++;
+        return;
+      }
+      
+      // If node has subcategory and it exists, add there
+      if (subCatId && categories[catId].subcategories[subCatId]) {
+        categories[catId].subcategories[subCatId].nodes.push(node);
+      } else {
+        // Add to main category nodes
+        categories[catId].nodes.push(node);
+      }
+      categories[catId].totalNodes++;
+    });
+    
+    return categories;
+  }, [allNodes]);
+
+  // Check if node matches platform filter
+  const nodeMatchesPlatformFilter = (node) => {
+    if (selectedPlatforms.length === 0) return true;
+    
+    const nodePlatforms = node.platforms || [];
+    
+    // If node supports 'any' platform, it matches all filters
+    if (nodePlatforms.includes('any') || nodePlatforms.includes(PLATFORMS.ANY)) {
+      return true;
+    }
+    
+    // Check if any of the node's platforms match any selected filter
+    return selectedPlatforms.some(filterPlatform => {
+      // Direct match
+      if (nodePlatforms.includes(filterPlatform)) return true;
+      
+      // Network device matches any network vendor
+      if (filterPlatform === 'network-device') {
+        return nodePlatforms.some(p => 
+          p.includes('cisco') || p.includes('juniper') || p.includes('arista') ||
+          p.includes('ciena') || p.includes('paloalto') || p.includes('fortinet') ||
+          p.includes('mikrotik') || p.includes('ubiquiti') || p.includes('hpe') ||
+          p.includes('dell') || p === 'network-device'
+        );
+      }
+      
+      // Cisco filter matches all Cisco variants
+      if (filterPlatform === 'cisco-ios') {
+        return nodePlatforms.some(p => p.includes('cisco'));
+      }
+      
+      return false;
+    });
+  };
+
+  // Filter nodes by search term and platform
+  const filteredCategories = useMemo(() => {
+    const hasSearchFilter = searchTerm.trim();
+    const hasPlatformFilter = selectedPlatforms.length > 0;
+    
+    if (!hasSearchFilter && !hasPlatformFilter) return nodesByCategory;
 
     const term = searchTerm.toLowerCase();
     const filtered = {};
 
-    for (const [pkgId, pkg] of Object.entries(nodesByPackage)) {
-      const filteredSubgroups = {};
-      let totalMatches = 0;
-      
-      for (const [subId, subgroup] of Object.entries(pkg.subgroups)) {
-        const matchingNodes = subgroup.nodes.filter(node =>
+    for (const [catId, cat] of Object.entries(nodesByCategory)) {
+      const matchingNodes = cat.nodes.filter(node => {
+        const matchesSearch = !hasSearchFilter || 
           node.name.toLowerCase().includes(term) ||
-          node.description?.toLowerCase().includes(term)
-        );
+          node.description?.toLowerCase().includes(term) ||
+          node.id.toLowerCase().includes(term);
+        const matchesPlatform = nodeMatchesPlatformFilter(node);
+        return matchesSearch && matchesPlatform;
+      });
+      
+      const matchingSubcats = {};
+      let subMatches = 0;
+      
+      for (const [subId, sub] of Object.entries(cat.subcategories)) {
+        const subMatchingNodes = sub.nodes.filter(node => {
+          const matchesSearch = !hasSearchFilter ||
+            node.name.toLowerCase().includes(term) ||
+            node.description?.toLowerCase().includes(term) ||
+            node.id.toLowerCase().includes(term);
+          const matchesPlatform = nodeMatchesPlatformFilter(node);
+          return matchesSearch && matchesPlatform;
+        });
         
-        if (matchingNodes.length > 0) {
-          filteredSubgroups[subId] = {
-            ...subgroup,
-            nodes: matchingNodes,
-          };
-          totalMatches += matchingNodes.length;
+        if (subMatchingNodes.length > 0) {
+          matchingSubcats[subId] = { ...sub, nodes: subMatchingNodes };
+          subMatches += subMatchingNodes.length;
         }
       }
       
+      const totalMatches = matchingNodes.length + subMatches;
+      
       if (totalMatches > 0) {
-        filtered[pkgId] = {
-          ...pkg,
-          subgroups: filteredSubgroups,
+        filtered[catId] = {
+          ...cat,
+          nodes: matchingNodes,
+          subcategories: matchingSubcats,
           totalNodes: totalMatches,
         };
       }
     }
 
     return filtered;
-  }, [nodesByPackage, searchTerm]);
+  }, [nodesByCategory, searchTerm, selectedPlatforms]);
 
-  // Helper functions for category display
-  function getCategoryName(category) {
-    const names = {
-      triggers: 'Triggers',
-      discovery: 'Discovery',
-      query: 'Query / Show',
-      configure: 'Configure',
-      data: 'Data',
-      logic: 'Logic',
-      notify: 'Notifications',
-      other: 'Other',
-    };
-    return names[category] || category.charAt(0).toUpperCase() + category.slice(1);
-  }
+  // Toggle platform filter selection
+  const togglePlatformFilter = (platformId) => {
+    setSelectedPlatforms(prev => {
+      if (prev.includes(platformId)) {
+        return prev.filter(p => p !== platformId);
+      } else {
+        return [...prev, platformId];
+      }
+    });
+  };
 
-  function getCategoryIcon(category) {
-    const icons = {
-      triggers: '⚡',
-      discovery: '🔍',
-      query: '📋',
-      configure: '⚙️',
-      data: '💾',
-      logic: '🔀',
-      notify: '🔔',
-      other: '📦',
-    };
-    return icons[category] || '📦';
-  }
-
-  // Get platform badge info
-  function getPlatformBadge(platform) {
-    const badges = {
-      'any': null, // No badge needed for universal nodes
-      'linux': { label: 'Linux', color: 'bg-orange-100 text-orange-700 border-orange-200' },
-      'ciena-saos-8': { label: 'SAOS', color: 'bg-blue-100 text-blue-700 border-blue-200' },
-      'windows': { label: 'Win', color: 'bg-cyan-100 text-cyan-700 border-cyan-200' },
-    };
-    return badges[platform] || (platform && platform !== 'any' ? { label: platform, color: 'bg-gray-100 text-gray-700 border-gray-200' } : null);
-  }
+  // Clear all platform filters
+  const clearPlatformFilters = () => {
+    setSelectedPlatforms([]);
+  };
 
   // Get context icon
   function getContextIcon(context) {
@@ -155,18 +228,18 @@ const NodePalette = ({ enabledPackages, onDragStart }) => {
     return requirements?.credentials && requirements.credentials.length > 0;
   }
 
-  const togglePackage = (pkgId) => {
-    setExpandedPackages(prev => ({
+  const toggleCategory = (catId) => {
+    setExpandedCategories(prev => ({
       ...prev,
-      [pkgId]: !prev[pkgId],
+      [catId]: !prev[catId],
     }));
   };
 
-  const toggleSubgroup = (pkgId, subId) => {
-    const key = `${pkgId}:${subId}`;
-    setExpandedSubgroups(prev => ({
+  const toggleSubcategory = (catId, subId) => {
+    const key = `${catId}:${subId}`;
+    setExpandedSubcategories(prev => ({
       ...prev,
-      [key]: !prev[key],
+      [key]: prev[key] === undefined ? false : !prev[key],
     }));
   };
 
@@ -185,38 +258,10 @@ const NodePalette = ({ enabledPackages, onDragStart }) => {
   // Render a single node card
   const renderNodeCard = (node) => {
     const execution = node.execution || {};
-    const platform = execution.platform;
+    const platforms = node.platforms || [];
     const context = execution.context;
-    const platformBadge = getPlatformBadge(platform);
     const needsCredentials = hasCredentialRequirements(node);
     const contextIcon = getContextIcon(context);
-    
-    // Build tooltip with requirements info
-    let tooltip = node.description || '';
-    if (execution.requirements) {
-      const reqs = [];
-      if (execution.requirements.credentials) {
-        reqs.push(`Credentials: ${execution.requirements.credentials.join(', ')}`);
-      }
-      if (execution.requirements.tools) {
-        reqs.push(`Tools: ${execution.requirements.tools.join(', ')}`);
-      }
-      if (execution.requirements.network) {
-        reqs.push('Requires network access');
-      }
-      if (execution.requirements.database) {
-        reqs.push('Requires database connection');
-      }
-      if (reqs.length > 0) {
-        tooltip += `\n\nRequirements:\n• ${reqs.join('\n• ')}`;
-      }
-    }
-    if (platform && platform !== 'any') {
-      tooltip += `\n\nPlatform: ${platform}`;
-    }
-    if (context) {
-      tooltip += `\nContext: ${context}`;
-    }
     
     return (
       <div
@@ -226,31 +271,25 @@ const NodePalette = ({ enabledPackages, onDragStart }) => {
         className={cn(
           'flex items-center gap-2 p-2 rounded-lg cursor-grab',
           'bg-white border border-gray-200 shadow-sm',
-          'hover:shadow-md hover:border-gray-300 hover:scale-[1.01]',
+          'hover:shadow-md hover:border-gray-300 hover:scale-[1.02]',
           'transition-all duration-150',
           'active:cursor-grabbing active:scale-100 active:shadow-lg'
         )}
-        title={tooltip}
+        title={node.description || node.name}
       >
         <div 
-          className="w-8 h-8 flex items-center justify-center rounded-md flex-shrink-0"
+          className="w-9 h-9 flex items-center justify-center rounded-lg flex-shrink-0 text-white"
           style={{ backgroundColor: node.color || '#6366F1' }}
         >
-          <span className="text-base">{node.icon}</span>
+          <span className="text-lg">{node.icon}</span>
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-sm font-medium text-gray-900 truncate">
             {node.name}
           </div>
-          {/* Platform and requirements badges */}
-          <div className="flex items-center gap-1 mt-0.5">
-            {platformBadge && (
-              <span className={cn(
-                'text-[10px] px-1 py-0 rounded border font-medium',
-                platformBadge.color
-              )}>
-                {platformBadge.label}
-              </span>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            {platforms.length > 0 && (
+              <PlatformIndicator platforms={platforms} />
             )}
             {contextIcon && (
               <span className="text-gray-400" title={`Runs ${context}`}>
@@ -268,11 +307,48 @@ const NodePalette = ({ enabledPackages, onDragStart }) => {
     );
   };
 
+  // Render nodes list
+  const renderNodes = (nodes) => {
+    if (!nodes || nodes.length === 0) return null;
+    return (
+      <div className="space-y-1.5 py-2">
+        {nodes.map(renderNodeCard)}
+      </div>
+    );
+  };
+
   return (
-    <div className="w-72 bg-gray-50 border-r border-gray-200 flex flex-col h-full">
-      {/* Header with search */}
+    <div className="w-80 bg-gray-50 border-r border-gray-200 flex flex-col h-full">
+      {/* Header */}
       <div className="p-3 bg-white border-b border-gray-200">
-        <div className="relative">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="font-semibold text-gray-900 text-sm">Node Library</h3>
+          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5">
+            <button
+              onClick={() => setViewMode('categories')}
+              className={cn(
+                'p-1.5 rounded-md transition-colors',
+                viewMode === 'categories' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-700'
+              )}
+              title="View by action"
+            >
+              <Layers className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('packages')}
+              className={cn(
+                'p-1.5 rounded-md transition-colors',
+                viewMode === 'packages' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-700'
+              )}
+              title="View by package"
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+        
+        {/* Search */}
+        <div className="relative mb-2">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
@@ -290,80 +366,131 @@ const NodePalette = ({ enabledPackages, onDragStart }) => {
             </button>
           )}
         </div>
+
+        {/* Platform Filter Badges - Always visible, compact inline */}
+        <div className="flex flex-wrap gap-1">
+          {FILTER_PLATFORMS.map(platform => {
+            const isSelected = selectedPlatforms.includes(platform.id);
+            return (
+              <button
+                key={platform.id}
+                onClick={() => togglePlatformFilter(platform.id)}
+                className={cn(
+                  'inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium transition-all border',
+                  isSelected
+                    ? 'border-current shadow-sm'
+                    : 'border-transparent opacity-60 hover:opacity-100'
+                )}
+                style={{
+                  backgroundColor: isSelected ? `${platform.color}25` : `${platform.color}10`,
+                  color: platform.color,
+                }}
+                title={`Filter: ${platform.name}`}
+              >
+                <span className="text-xs">{platform.icon}</span>
+                <span>{platform.name}</span>
+              </button>
+            );
+          })}
+          {selectedPlatforms.length > 0 && (
+            <button
+              onClick={clearPlatformFilters}
+              className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+              title="Clear all filters"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Package Libraries - Folder Structure */}
+      {/* Category List */}
       <div className="flex-1 overflow-y-auto">
-        {Object.entries(filteredPackages).map(([pkgId, pkg]) => (
-          <div key={pkgId} className="border-b border-gray-200 last:border-b-0">
-            {/* Package Header (Top-level folder) */}
-            <button
-              onClick={() => togglePackage(pkgId)}
-              className={cn(
-                "w-full flex items-center gap-2 px-3 py-2.5 text-sm font-medium transition-colors",
-                expandedPackages[pkgId] 
-                  ? "bg-white text-gray-900 border-l-2 border-l-blue-500" 
-                  : "text-gray-700 hover:bg-white"
-              )}
-            >
-              {expandedPackages[pkgId] ? (
-                <FolderOpen className="w-4 h-4 text-blue-500" />
-              ) : (
-                <Folder className="w-4 h-4 text-gray-400" />
-              )}
-              <span className="text-base">{pkg.icon}</span>
-              <span className="flex-1 text-left truncate">{pkg.name}</span>
-              <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
-                {pkg.totalNodes}
-              </span>
-              {expandedPackages[pkgId] ? (
-                <ChevronDown className="w-4 h-4 text-gray-400" />
-              ) : (
-                <ChevronRight className="w-4 h-4 text-gray-400" />
-              )}
-            </button>
+        {Object.entries(filteredCategories).map(([catId, cat]) => {
+          if (cat.totalNodes === 0) return null;
+          
+          const isExpanded = expandedCategories[catId] || searchTerm.trim();
+          const hasSubcategories = Object.keys(cat.subcategories).length > 0;
+          
+          return (
+            <div key={catId} className="border-b border-gray-200">
+              {/* Category Header */}
+              <button
+                onClick={() => toggleCategory(catId)}
+                className={cn(
+                  'w-full flex items-center gap-3 px-3 py-3 text-sm font-semibold transition-all',
+                  isExpanded 
+                    ? 'bg-white text-gray-900 border-l-3' 
+                    : 'text-gray-700 hover:bg-white'
+                )}
+                style={isExpanded ? { borderLeftColor: cat.color } : {}}
+              >
+                <span 
+                  className="w-8 h-8 flex items-center justify-center rounded-lg text-white text-lg"
+                  style={{ backgroundColor: cat.color }}
+                >
+                  {cat.icon}
+                </span>
+                <div className="flex-1 text-left">
+                  <div>{cat.name}</div>
+                  <div className="text-xs font-normal text-gray-500">{cat.description}</div>
+                </div>
+                <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-full">
+                  {cat.totalNodes}
+                </span>
+                {isExpanded ? (
+                  <ChevronDown className="w-4 h-4 text-gray-400" />
+                ) : (
+                  <ChevronRight className="w-4 h-4 text-gray-400" />
+                )}
+              </button>
 
-            {/* Package Contents */}
-            {expandedPackages[pkgId] && (
-              <div className="bg-gray-50/50">
-                {Object.entries(pkg.subgroups).map(([subId, subgroup]) => {
-                  const subKey = `${pkgId}:${subId}`;
-                  const isSubExpanded = expandedSubgroups[subKey] !== false; // Default open
+              {/* Category Contents */}
+              {isExpanded && (
+                <div className="bg-gray-50/80 px-3 pb-2">
+                  {/* Direct nodes (no subcategory) */}
+                  {cat.nodes.length > 0 && renderNodes(cat.nodes)}
                   
-                  return (
-                    <div key={subId}>
-                      {/* Subgroup Header (Sub-folder) */}
-                      <button
-                        onClick={() => toggleSubgroup(pkgId, subId)}
-                        className="w-full flex items-center gap-2 pl-8 pr-3 py-2 text-xs font-medium text-gray-600 hover:bg-white transition-colors"
-                      >
-                        {isSubExpanded ? (
-                          <ChevronDown className="w-3 h-3 text-gray-400" />
-                        ) : (
-                          <ChevronRight className="w-3 h-3 text-gray-400" />
+                  {/* Subcategories */}
+                  {hasSubcategories && Object.entries(cat.subcategories).map(([subId, sub]) => {
+                    if (sub.nodes.length === 0) return null;
+                    
+                    const subKey = `${catId}:${subId}`;
+                    const isSubExpanded = expandedSubcategories[subKey] !== false;
+                    
+                    return (
+                      <div key={subId} className="mt-2">
+                        <button
+                          onClick={() => toggleSubcategory(catId, subId)}
+                          className="w-full flex items-center gap-2 px-2 py-1.5 text-xs font-medium text-gray-600 hover:bg-white rounded-md transition-colors"
+                        >
+                          {isSubExpanded ? (
+                            <ChevronDown className="w-3 h-3 text-gray-400" />
+                          ) : (
+                            <ChevronRight className="w-3 h-3 text-gray-400" />
+                          )}
+                          <span>{sub.icon}</span>
+                          <span className="flex-1 text-left">{sub.name}</span>
+                          <span className="text-xs text-gray-400">
+                            {sub.nodes.length}
+                          </span>
+                        </button>
+                        
+                        {isSubExpanded && (
+                          <div className="pl-4">
+                            {renderNodes(sub.nodes)}
+                          </div>
                         )}
-                        <span>{subgroup.icon}</span>
-                        <span className="flex-1 text-left">{subgroup.name}</span>
-                        <span className="text-xs text-gray-400">
-                          {subgroup.nodes.length}
-                        </span>
-                      </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
 
-                      {/* Subgroup Nodes */}
-                      {isSubExpanded && (
-                        <div className="pl-10 pr-2 pb-2 space-y-1">
-                          {subgroup.nodes.map(renderNodeCard)}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        ))}
-
-        {Object.keys(filteredPackages).length === 0 && (
+        {Object.keys(filteredCategories).length === 0 && (
           <div className="flex flex-col items-center justify-center text-gray-400 py-12">
             <Search className="w-8 h-8 mb-2 opacity-50" />
             <div className="text-sm">No nodes found</div>
@@ -372,9 +499,9 @@ const NodePalette = ({ enabledPackages, onDragStart }) => {
         )}
       </div>
 
-      {/* Footer hint */}
+      {/* Footer */}
       <div className="p-2 bg-white border-t border-gray-200 text-xs text-gray-500 text-center">
-        📁 Click folders to expand • Drag nodes to canvas
+        🎯 Drag nodes to canvas to build your workflow
       </div>
     </div>
   );

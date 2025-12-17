@@ -10,7 +10,10 @@ import {
   AlertCircle,
   CheckCircle,
   Timer,
-  Server
+  Server,
+  Cpu,
+  Zap,
+  Info
 } from "lucide-react";
 import { cn, fetchApi, formatTimeOnly, formatElapsedDuration, formatRelativeTime } from "../lib/utils";
 import { PageHeader } from "../components/layout";
@@ -21,15 +24,18 @@ export function ActiveJobs() {
   const [queueStatus, setQueueStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedJob, setSelectedJob] = useState(null);
   const refreshInterval = useRef(null);
+  const [lastUpdate, setLastUpdate] = useState(new Date());
 
   const loadData = async () => {
     try {
       setError(null);
       
-      // Fetch queue status which includes active/reserved/scheduled counts
+      // Fetch queue status which includes active/reserved/scheduled counts and worker details
       const status = await fetchApi("/api/scheduler/queues");
-      setQueueStatus(status);
+      const statusData = status.data || status;
+      setQueueStatus(statusData);
       
       // Fetch scheduled jobs for upcoming list
       const scheduledJobs = await fetchApi("/api/scheduler/jobs?enabled=true&limit=50");
@@ -40,10 +46,16 @@ export function ActiveJobs() {
         .slice(0, 20);
       setQueuedJobs(upcoming);
       
-      // For active jobs, we'd need an executions endpoint with status=running
-      // For now, show empty if not available
-      setActiveJobs([]);
+      // Fetch running executions from recent executions endpoint
+      try {
+        const execResponse = await fetchApi("/api/scheduler/executions/recent?limit=50&status=running");
+        const execData = execResponse.data || execResponse;
+        setActiveJobs(Array.isArray(execData) ? execData : []);
+      } catch {
+        setActiveJobs([]);
+      }
       
+      setLastUpdate(new Date());
     } catch (err) {
       setError(err.message || "Failed to load job status");
     } finally {
@@ -119,39 +131,66 @@ export function ActiveJobs() {
           </div>
         )}
 
-        {/* Queue Status Summary */}
-        {queueStatus && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <div className="flex items-center gap-2 text-blue-600 mb-1">
-                <Play className="w-4 h-4" />
-                <span className="text-xs font-medium uppercase tracking-wide">Running</span>
-              </div>
-              <div className="text-2xl font-bold text-gray-900">{queueStatus.active_total || queueStatus.active || 0}</div>
+        {/* Queue Status Summary - Updated every refresh */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+          <div className={cn(
+            "rounded-lg border p-4 transition-all",
+            activeJobs.length > 0 ? "bg-blue-50 border-blue-200" : "bg-white border-gray-200"
+          )}>
+            <div className="flex items-center gap-2 text-blue-600 mb-1">
+              <Loader2 className={cn("w-4 h-4", activeJobs.length > 0 && "animate-spin")} />
+              <span className="text-xs font-medium uppercase tracking-wide">Running</span>
             </div>
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <div className="flex items-center gap-2 text-orange-600 mb-1">
-                <Clock className="w-4 h-4" />
-                <span className="text-xs font-medium uppercase tracking-wide">Reserved</span>
-              </div>
-              <div className="text-2xl font-bold text-gray-900">{queueStatus.reserved_total || queueStatus.reserved || 0}</div>
+            <div className="text-2xl font-bold text-gray-900">{activeJobs.length}</div>
+            <div className="text-[10px] text-gray-500 mt-1">From DB executions</div>
+          </div>
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="flex items-center gap-2 text-orange-600 mb-1">
+              <Cpu className="w-4 h-4" />
+              <span className="text-xs font-medium uppercase tracking-wide">Celery Active</span>
             </div>
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <div className="flex items-center gap-2 text-purple-600 mb-1">
-                <Timer className="w-4 h-4" />
-                <span className="text-xs font-medium uppercase tracking-wide">Scheduled</span>
-              </div>
-              <div className="text-2xl font-bold text-gray-900">{queueStatus.scheduled_total || queueStatus.scheduled || 0}</div>
+            <div className="text-2xl font-bold text-gray-900">{queueStatus?.active_total || 0}</div>
+            <div className="text-[10px] text-gray-500 mt-1">Tasks in workers</div>
+          </div>
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="flex items-center gap-2 text-purple-600 mb-1">
+              <Clock className="w-4 h-4" />
+              <span className="text-xs font-medium uppercase tracking-wide">Reserved</span>
             </div>
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <div className="flex items-center gap-2 text-green-600 mb-1">
-                <Server className="w-4 h-4" />
-                <span className="text-xs font-medium uppercase tracking-wide">Workers</span>
-              </div>
-              <div className="text-2xl font-bold text-gray-900">{queueStatus.active_by_worker ? Object.keys(queueStatus.active_by_worker).length : 0}</div>
+            <div className="text-2xl font-bold text-gray-900">{queueStatus?.reserved_total || 0}</div>
+            <div className="text-[10px] text-gray-500 mt-1">Queued for workers</div>
+          </div>
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="flex items-center gap-2 text-indigo-600 mb-1">
+              <Timer className="w-4 h-4" />
+              <span className="text-xs font-medium uppercase tracking-wide">Scheduled</span>
+            </div>
+            <div className="text-2xl font-bold text-gray-900">{queuedJobs.length}</div>
+            <div className="text-[10px] text-gray-500 mt-1">Upcoming jobs</div>
+          </div>
+          <div className={cn(
+            "rounded-lg border p-4",
+            (queueStatus?.workers?.length || 0) > 0 ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"
+          )}>
+            <div className={cn(
+              "flex items-center gap-2 mb-1",
+              (queueStatus?.workers?.length || 0) > 0 ? "text-green-600" : "text-red-600"
+            )}>
+              <Server className="w-4 h-4" />
+              <span className="text-xs font-medium uppercase tracking-wide">Workers</span>
+            </div>
+            <div className="text-2xl font-bold text-gray-900">{queueStatus?.workers?.length || 0}</div>
+            <div className="text-[10px] text-gray-500 mt-1">
+              {(queueStatus?.workers?.length || 0) > 0 ? "Online" : "No workers!"}
             </div>
           </div>
-        )}
+        </div>
+        
+        {/* Last Update indicator */}
+        <div className="text-[10px] text-gray-400 mb-4 flex items-center gap-2">
+          <Zap className="w-3 h-3" />
+          Last updated: {lastUpdate.toLocaleTimeString()} • Auto-refresh every 5s
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Running Jobs */}
@@ -167,7 +206,7 @@ export function ActiveJobs() {
               </h2>
               <span className="text-xs text-gray-500">{activeJobs.length} active</span>
             </div>
-            <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
+            <div className="divide-y divide-gray-100 max-h-[500px] overflow-y-auto">
               {loading && activeJobs.length === 0 ? (
                 <div className="p-8 text-center text-gray-400">
                   <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
@@ -180,21 +219,77 @@ export function ActiveJobs() {
                 </div>
               ) : (
                 activeJobs.map((job) => (
-                  <div key={job.id} className="px-3 py-2 hover:bg-gray-50">
+                  <div 
+                    key={job.id} 
+                    className={cn(
+                      "px-4 py-3 hover:bg-blue-50 cursor-pointer transition-colors",
+                      selectedJob?.id === job.id && "bg-blue-50 border-l-4 border-blue-500"
+                    )}
+                    onClick={() => setSelectedJob(selectedJob?.id === job.id ? null : job)}
+                  >
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex-1 min-w-0">
-                        <div className="text-xs font-medium text-gray-900 truncate" title={job.job_name || job.task_id}>{cleanJobName(job.job_name || job.task_id)}</div>
-                        <div className="text-[10px] text-gray-500">
-                          {formatTimeOnly(job.started_at)} • {formatElapsedDuration(job.started_at)}
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="w-3 h-3 text-blue-500 animate-spin flex-shrink-0" />
+                          <span className="text-sm font-medium text-gray-900 truncate" title={job.job_name || job.task_id}>
+                            {cleanJobName(job.job_name || job.task_id)}
+                          </span>
                         </div>
+                        <div className="flex items-center gap-3 mt-1 text-[11px] text-gray-500">
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            Started: {formatTimeOnly(job.started_at)}
+                          </span>
+                          <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-blue-600">
+                            {formatElapsedDuration(job.started_at)}
+                          </span>
+                          {job.worker && (
+                            <span className="flex items-center gap-1 text-gray-400">
+                              <Server className="w-3 h-3" />
+                              {job.worker.split('@')[0]}
+                            </span>
+                          )}
+                        </div>
+                        {/* Expanded details */}
+                        {selectedJob?.id === job.id && (
+                          <div className="mt-3 pt-3 border-t border-gray-200 space-y-2 text-xs">
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <span className="text-gray-500">Task ID:</span>
+                                <div className="font-mono text-[10px] text-gray-700 truncate" title={job.task_id}>{job.task_id}</div>
+                              </div>
+                              <div>
+                                <span className="text-gray-500">Task Name:</span>
+                                <div className="font-mono text-[10px] text-gray-700 truncate" title={job.task_name}>{job.task_name}</div>
+                              </div>
+                            </div>
+                            {job.config && Object.keys(job.config).length > 0 && (
+                              <div>
+                                <span className="text-gray-500">Config:</span>
+                                <pre className="mt-1 p-2 bg-gray-50 rounded text-[10px] overflow-x-auto max-h-32">
+                                  {JSON.stringify(job.config, null, 2)}
+                                </pre>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
-                      <button
-                        onClick={() => handleCancelJob(job.id)}
-                        className="ml-2 p-1.5 text-red-600 hover:bg-red-50 rounded"
-                        title="Cancel job"
-                      >
-                        <XCircle className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setSelectedJob(selectedJob?.id === job.id ? null : job); }}
+                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
+                          title="View details"
+                        >
+                          <Info className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleCancelJob(job.id); }}
+                          className="p-1.5 text-red-600 hover:bg-red-50 rounded"
+                          title="Cancel job"
+                        >
+                          <XCircle className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))

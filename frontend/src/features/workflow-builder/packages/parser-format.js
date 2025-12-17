@@ -1,3 +1,10 @@
+import { PLATFORMS } from '../platforms';
+
+const universalPlatform = {
+  platforms: [PLATFORMS.ANY],
+  protocols: [],
+};
+
 /**
  * Parser/Format Package
  * 
@@ -22,6 +29,7 @@ export default {
       name: 'JSON',
       description: 'Parse JSON string or stringify object to JSON',
       category: 'data',
+      ...universalPlatform,
       icon: '{ }',
       color: '#6366F1',
       
@@ -79,6 +87,7 @@ export default {
       name: 'CSV',
       description: 'Parse CSV to objects or generate CSV from objects',
       category: 'data',
+      ...universalPlatform,
       icon: '📊',
       color: '#6366F1',
       
@@ -157,6 +166,7 @@ export default {
       name: 'XML',
       description: 'Parse XML to objects or generate XML from objects',
       category: 'data',
+      ...universalPlatform,
       icon: '📄',
       color: '#6366F1',
       
@@ -228,6 +238,7 @@ export default {
       name: 'Regex Extract',
       description: 'Extract data using regular expressions',
       category: 'data',
+      ...universalPlatform,
       icon: '🔤',
       color: '#6366F1',
       
@@ -298,6 +309,7 @@ export default {
       name: 'Template',
       description: 'Generate text using templates with variable substitution',
       category: 'data',
+      ...universalPlatform,
       icon: '📝',
       color: '#6366F1',
       
@@ -349,6 +361,7 @@ export default {
       name: 'HTML Extract',
       description: 'Extract data from HTML using CSS selectors',
       category: 'data',
+      ...universalPlatform,
       icon: '🌐',
       color: '#6366F1',
       
@@ -392,6 +405,7 @@ export default {
       name: 'Markdown',
       description: 'Convert between Markdown and HTML',
       category: 'data',
+      ...universalPlatform,
       icon: '📑',
       color: '#6366F1',
       

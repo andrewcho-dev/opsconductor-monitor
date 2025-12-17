@@ -21,6 +21,7 @@ import parserFormatPackage from './parser-format';
 import debugUtilityPackage from './debug-utility';
 import axisCamerasPackage from './axis-cameras';
 import windowsSystemsPackage from './windows-systems';
+import netboxPackage from './netbox';
 
 // All available packages
 export const PACKAGES = {
@@ -40,6 +41,7 @@ export const PACKAGES = {
   'debug-utility': debugUtilityPackage,
   'axis-cameras': axisCamerasPackage,
   'windows-systems': windowsSystemsPackage,
+  'netbox': netboxPackage,
 };
 
 // Default enabled packages - export this so other components can use it
@@ -60,6 +62,7 @@ export const DEFAULT_ENABLED_PACKAGES = [
   'debug-utility',
   'axis-cameras',
   'windows-systems',
+  'netbox',
 ];
 
 /**

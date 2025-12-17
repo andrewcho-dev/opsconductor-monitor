@@ -4,7 +4,7 @@
  * Top toolbar for the workflow builder with actions like save, run, undo/redo.
  */
 
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Save, 
   Play, 
@@ -17,11 +17,13 @@ import {
   ChevronLeft,
   TestTube,
   Clock,
+  Pencil,
 } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 
 const WorkflowToolbar = ({
   workflowName,
+  onNameChange,
   isDirty,
   canUndo,
   canRedo,
@@ -40,6 +42,43 @@ const WorkflowToolbar = ({
   isSaving,
   isRunning,
 }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(workflowName || '');
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
+
+  useEffect(() => {
+    setEditValue(workflowName || '');
+  }, [workflowName]);
+
+  const handleStartEdit = () => {
+    setEditValue(workflowName || '');
+    setIsEditing(true);
+  };
+
+  const handleSave = () => {
+    const trimmed = editValue.trim();
+    if (trimmed && onNameChange) {
+      onNameChange(trimmed);
+    }
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      handleSave();
+    } else if (e.key === 'Escape') {
+      setEditValue(workflowName || '');
+      setIsEditing(false);
+    }
+  };
+
   return (
     <div className="h-14 bg-white border-b border-gray-200 flex items-center px-4 gap-2">
       {/* Back Button */}
@@ -53,9 +92,27 @@ const WorkflowToolbar = ({
 
       {/* Workflow Name */}
       <div className="flex items-center gap-2 min-w-0 flex-1">
-        <h1 className="text-lg font-semibold text-gray-900 truncate">
-          {workflowName || 'Untitled Workflow'}
-        </h1>
+        {isEditing ? (
+          <input
+            ref={inputRef}
+            type="text"
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onBlur={handleSave}
+            onKeyDown={handleKeyDown}
+            className="text-lg font-semibold text-gray-900 bg-transparent border-b-2 border-blue-500 outline-none px-1 min-w-[200px]"
+            placeholder="Workflow name..."
+          />
+        ) : (
+          <button
+            onClick={handleStartEdit}
+            className="flex items-center gap-2 text-lg font-semibold text-gray-900 hover:text-blue-600 group"
+            title="Click to rename workflow"
+          >
+            <span className="truncate">{workflowName || 'Untitled Workflow'}</span>
+            <Pencil className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity text-gray-400" />
+          </button>
+        )}
         {isDirty && (
           <span className="text-xs text-orange-500 font-medium">
             (unsaved)

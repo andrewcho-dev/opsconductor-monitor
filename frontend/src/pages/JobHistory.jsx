@@ -34,33 +34,21 @@ export function JobHistory() {
       setLoading(true);
       setError(null);
       
-      // First get all jobs, then fetch executions for each
-      const jobsData = await fetchApi("/api/scheduler/jobs");
-      const jobs = jobsData.data || jobsData.jobs || [];
+      // Fetch recent executions directly from the API
+      const execResponse = await fetchApi("/api/scheduler/executions/recent?limit=200");
+      const execData = execResponse.data || execResponse;
       
-      // Fetch executions for each job (limit to first 20 jobs to avoid too many requests)
-      const allExecutions = [];
-      for (const job of jobs.slice(0, 20)) {
-        try {
-          const execData = await fetchApi(`/api/scheduler/jobs/${encodeURIComponent(job.name)}/executions?limit=20`);
-          const jobExecs = (execData.data || execData.executions || []).map(e => ({
-            ...e,
-            job_name: job.name
-          }));
-          allExecutions.push(...jobExecs);
-        } catch {
-          // Skip jobs that fail to load executions
-        }
-      }
+      // Handle both array and object responses
+      const allExecutions = Array.isArray(execData) ? execData : (execData.executions || []);
       
-      // Sort by started_at descending
+      // Sort by started_at descending (API should already do this, but ensure it)
       allExecutions.sort((a, b) => {
         const aTime = a.started_at ? new Date(a.started_at) : new Date(0);
         const bTime = b.started_at ? new Date(b.started_at) : new Date(0);
         return bTime - aTime;
       });
       
-      setExecutions(allExecutions.slice(0, 200));
+      setExecutions(allExecutions);
     } catch (err) {
       setError(err.message || "Failed to load execution history");
     } finally {

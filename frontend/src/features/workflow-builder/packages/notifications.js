@@ -8,6 +8,14 @@
  * - Log
  */
 
+import { PLATFORMS } from '../platforms';
+
+// Notification nodes are platform-agnostic
+const notifyPlatform = {
+  platforms: [PLATFORMS.ANY],
+  protocols: [],
+};
+
 export default {
   id: 'notifications',
   name: 'Notifications',
@@ -20,9 +28,13 @@ export default {
     'notify:email': {
       name: 'Send Email',
       description: 'Send an email notification',
-      category: 'notify',
+      category: 'output',
+      subcategory: 'output',
+      subcategory: 'notify',
+      ...notifyPlatform,
       icon: '📧',
       color: '#EC4899',
+      ...notifyPlatform,
       
       inputs: [
         { id: 'trigger', type: 'trigger', label: 'Trigger', required: true },
@@ -132,7 +144,9 @@ export default {
     'notify:slack': {
       name: 'Send Slack Message',
       description: 'Send a message to a Slack channel',
-      category: 'notify',
+      category: 'output',
+      subcategory: 'notify',
+      ...notifyPlatform,
       icon: '💬',
       color: '#4A154B',
       
@@ -239,7 +253,9 @@ export default {
     'notify:webhook': {
       name: 'Send Webhook',
       description: 'Send an HTTP webhook to an external service',
-      category: 'notify',
+      category: 'output',
+      subcategory: 'notify',
+      ...notifyPlatform,
       icon: '🔗',
       color: '#6366F1',
       
@@ -401,7 +417,9 @@ export default {
     'notify:log': {
       name: 'Log Message',
       description: 'Write a message to the workflow log',
-      category: 'notify',
+      category: 'output',
+      subcategory: 'notify',
+      ...notifyPlatform,
       icon: '📝',
       color: '#6B7280',
       

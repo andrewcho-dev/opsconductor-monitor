@@ -6,9 +6,12 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { X, ChevronDown, ChevronRight, AlertCircle, HelpCircle, Loader2 } from 'lucide-react';
+import { X, ChevronDown, ChevronRight, AlertCircle, HelpCircle, Loader2, Link2 } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import NetBoxDeviceSelector from './NetBoxDeviceSelector';
+import { NetBoxSiteSelector, NetBoxRoleSelector, NetBoxDeviceTypeSelector, NetBoxTagsSelector } from './NetBoxSelectors';
+import DataMappingPanel from './DataMappingPanel';
+import ExpressionInput from './ExpressionInput';
 
 const NodeEditor = ({
   isOpen,
@@ -21,8 +24,12 @@ const NodeEditor = ({
   onDelete,
   updateField,
   shouldShowParameter,
+  allNodes,
+  edges,
+  onMapInput,
 }) => {
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [activeTab, setActiveTab] = useState('parameters');
   const [tables, setTables] = useState([]);
   const [tableColumns, setTableColumns] = useState({});
   const [loadingTables, setLoadingTables] = useState(false);
@@ -132,11 +139,23 @@ const NodeEditor = ({
         </label>
 
         {/* Text Input */}
-        {(param.type === 'text' || param.type === 'expression') && (
+        {param.type === 'text' && (
           <input
             type="text"
             placeholder={param.placeholder}
             {...commonProps}
+          />
+        )}
+
+        {/* Expression Input with autocomplete */}
+        {param.type === 'expression' && (
+          <ExpressionInput
+            value={value}
+            onChange={(val) => updateField(param.id, val)}
+            placeholder={param.placeholder || '{{nodeId.output}}'}
+            currentNodeId={node?.id}
+            allNodes={allNodes}
+            edges={edges}
           />
         )}
 
@@ -193,6 +212,36 @@ const NodeEditor = ({
             />
             <span className="text-sm text-gray-600">{param.checkboxLabel || 'Enable'}</span>
           </label>
+        )}
+
+        {/* Multi-Select (checkbox group) */}
+        {param.type === 'multi-select' && (
+          <div className="space-y-1.5 p-2 bg-gray-50 rounded-lg border border-gray-200">
+            {param.options?.map(opt => {
+              const selected = Array.isArray(value) ? value : (param.default || []);
+              const isChecked = selected.includes(opt.value);
+              return (
+                <label key={opt.value} className="flex items-center gap-2 cursor-pointer hover:bg-gray-100 px-2 py-1 rounded">
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={(e) => {
+                      const current = Array.isArray(value) ? [...value] : [...(param.default || [])];
+                      if (e.target.checked) {
+                        if (!current.includes(opt.value)) current.push(opt.value);
+                      } else {
+                        const idx = current.indexOf(opt.value);
+                        if (idx >= 0) current.splice(idx, 1);
+                      }
+                      updateField(param.id, current);
+                    }}
+                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700">{opt.label}</span>
+                </label>
+              );
+            })}
+          </div>
         )}
 
         {/* Key-Value pairs */}
@@ -365,6 +414,41 @@ const NodeEditor = ({
           />
         )}
 
+        {/* NetBox Site Selector */}
+        {param.type === 'netbox-site-selector' && (
+          <NetBoxSiteSelector
+            value={value}
+            onChange={(val) => updateField(param.id, val)}
+            required={param.required}
+          />
+        )}
+
+        {/* NetBox Role Selector */}
+        {param.type === 'netbox-role-selector' && (
+          <NetBoxRoleSelector
+            value={value}
+            onChange={(val) => updateField(param.id, val)}
+            required={param.required}
+          />
+        )}
+
+        {/* NetBox Device Type Selector */}
+        {param.type === 'netbox-device-type-selector' && (
+          <NetBoxDeviceTypeSelector
+            value={value}
+            onChange={(val) => updateField(param.id, val)}
+            required={param.required}
+          />
+        )}
+
+        {/* NetBox Tags Selector */}
+        {param.type === 'netbox-tags-selector' && (
+          <NetBoxTagsSelector
+            value={value}
+            onChange={(val) => updateField(param.id, val)}
+          />
+        )}
+
         {/* Table Selector - Dynamic from API */}
         {param.type === 'table-selector' && (
           <div>
@@ -531,10 +615,38 @@ const NodeEditor = ({
           
           {/* Tabs - n8n style */}
           <div className="flex border-b border-gray-100">
-            <button className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-900 border-b-2 border-blue-500 bg-blue-50/50">
+            <button 
+              onClick={() => setActiveTab('parameters')}
+              className={cn(
+                'flex-1 px-4 py-2.5 text-sm font-medium transition-colors',
+                activeTab === 'parameters' 
+                  ? 'text-gray-900 border-b-2 border-blue-500 bg-blue-50/50' 
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+              )}
+            >
               Parameters
             </button>
-            <button className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-50">
+            <button 
+              onClick={() => setActiveTab('data')}
+              className={cn(
+                'flex-1 px-4 py-2.5 text-sm font-medium transition-colors flex items-center justify-center gap-1.5',
+                activeTab === 'data' 
+                  ? 'text-gray-900 border-b-2 border-blue-500 bg-blue-50/50' 
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+              )}
+            >
+              <Link2 className="w-4 h-4" />
+              Data
+            </button>
+            <button 
+              onClick={() => setActiveTab('settings')}
+              className={cn(
+                'flex-1 px-4 py-2.5 text-sm font-medium transition-colors',
+                activeTab === 'settings' 
+                  ? 'text-gray-900 border-b-2 border-blue-500 bg-blue-50/50' 
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+              )}
+            >
               Settings
             </button>
           </div>
@@ -542,57 +654,101 @@ const NodeEditor = ({
 
         {/* Body - Scrollable */}
         <div className="flex-1 overflow-y-auto">
-          {/* Node Name & Description */}
-          <div className="px-4 py-4 border-b border-gray-100 bg-gray-50/50">
-            <div className="mb-3">
-              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-                Name
-              </label>
-              <input
-                type="text"
-                value={formData.label || ''}
-                onChange={(e) => updateField('label', e.target.value)}
-                placeholder={nodeDefinition.name}
-                className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-                Notes
-              </label>
-              <input
-                type="text"
-                value={formData.description || ''}
-                onChange={(e) => updateField('description', e.target.value)}
-                placeholder="Add a note..."
-                className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-          </div>
+          {/* Parameters Tab */}
+          {activeTab === 'parameters' && (
+            <>
+              {/* Node Name & Description */}
+              <div className="px-4 py-4 border-b border-gray-100 bg-gray-50/50">
+                <div className="mb-3">
+                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                    Name
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.label || ''}
+                    onChange={(e) => updateField('label', e.target.value)}
+                    placeholder={nodeDefinition.name}
+                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                    Notes
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.description || ''}
+                    onChange={(e) => updateField('description', e.target.value)}
+                    placeholder="Add a note..."
+                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
 
-          {/* Parameters Section */}
-          {parameters.length > 0 && (
+              {/* Parameters Section */}
+              {parameters.length > 0 && (
+                <div className="px-4 py-4">
+                  {parameters.map(renderField)}
+                </div>
+              )}
+
+              {/* Advanced Section */}
+              {advancedParams.length > 0 && (
+                <div className="px-4 py-4 border-t border-gray-100">
+                  <button
+                    onClick={() => setShowAdvanced(!showAdvanced)}
+                    className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 mb-3 w-full"
+                  >
+                    {showAdvanced ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                    <span>Options</span>
+                  </button>
+                  
+                  {showAdvanced && (
+                    <div className="space-y-4">
+                      {advancedParams.map(renderField)}
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Data Tab - Data Mapping */}
+          {activeTab === 'data' && (
             <div className="px-4 py-4">
-              {parameters.map(renderField)}
+              <DataMappingPanel
+                currentNode={node}
+                currentNodeDef={nodeDefinition}
+                allNodes={allNodes}
+                edges={edges}
+                onMapInput={onMapInput}
+                mappedInputs={formData._inputMappings || {}}
+              />
             </div>
           )}
 
-          {/* Advanced Section */}
-          {advancedParams.length > 0 && (
-            <div className="px-4 py-4 border-t border-gray-100">
-              <button
-                onClick={() => setShowAdvanced(!showAdvanced)}
-                className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 mb-3 w-full"
-              >
-                {showAdvanced ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                <span>Options</span>
-              </button>
-              
-              {showAdvanced && (
-                <div className="space-y-4">
-                  {advancedParams.map(renderField)}
+          {/* Settings Tab */}
+          {activeTab === 'settings' && (
+            <div className="px-4 py-4">
+              <div className="text-sm text-gray-500">
+                <h4 className="font-medium text-gray-700 mb-2">Node Information</h4>
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Node ID:</span>
+                    <span className="font-mono text-gray-700">{node?.id}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Type:</span>
+                    <span className="font-mono text-gray-700">{node?.data?.nodeType}</span>
+                  </div>
+                  {nodeDefinition.execution && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Executor:</span>
+                      <span className="font-mono text-gray-700">{nodeDefinition.execution.executor}</span>
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
           )}
         </div>

@@ -1,3 +1,10 @@
+import { PLATFORMS } from '../platforms';
+
+const universalPlatform = {
+  platforms: [PLATFORMS.ANY],
+  protocols: [],
+};
+
 /**
  * Scheduling Package
  * 
@@ -20,6 +27,7 @@ export default {
       name: 'Cron Trigger',
       description: 'Trigger workflow on a cron schedule',
       category: 'triggers',
+      ...universalPlatform,
       icon: '📅',
       color: '#10B981',
       
@@ -97,6 +105,7 @@ export default {
       name: 'Interval Trigger',
       description: 'Trigger workflow at regular intervals',
       category: 'triggers',
+      ...universalPlatform,
       icon: '🔁',
       color: '#10B981',
       
@@ -146,6 +155,7 @@ export default {
       name: 'Time Trigger',
       description: 'Trigger workflow at specific times',
       category: 'triggers',
+      ...universalPlatform,
       icon: '🕐',
       color: '#10B981',
       
@@ -208,6 +218,7 @@ export default {
       name: 'Date Trigger',
       description: 'Trigger workflow on specific dates',
       category: 'triggers',
+      ...universalPlatform,
       icon: '📆',
       color: '#10B981',
       

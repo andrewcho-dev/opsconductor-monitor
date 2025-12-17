@@ -1,3 +1,10 @@
+import { PLATFORMS } from '../platforms';
+
+const universalPlatform = {
+  platforms: [PLATFORMS.ANY],
+  protocols: [],
+};
+
 /**
  * Debug/Utility Package
  * 
@@ -21,6 +28,7 @@ export default {
       name: 'Debug',
       description: 'Log data for debugging purposes',
       category: 'logic',
+      ...universalPlatform,
       icon: '🐛',
       color: '#6B7280',
       
@@ -86,6 +94,7 @@ export default {
       name: 'Comment',
       description: 'Add a comment/note to the workflow (no execution)',
       category: 'logic',
+      ...universalPlatform,
       icon: '💬',
       color: '#9CA3AF',
       
@@ -134,6 +143,7 @@ export default {
       name: 'Set Variable',
       description: 'Set a workflow variable for use in other nodes',
       category: 'logic',
+      ...universalPlatform,
       icon: '📌',
       color: '#6B7280',
       
@@ -209,6 +219,7 @@ export default {
       name: 'Get Variable',
       description: 'Get a workflow variable value',
       category: 'logic',
+      ...universalPlatform,
       icon: '📎',
       color: '#6B7280',
       
@@ -255,6 +266,7 @@ export default {
       name: 'Execution Data',
       description: 'Get metadata about the current workflow execution',
       category: 'logic',
+      ...universalPlatform,
       icon: 'ℹ️',
       color: '#6B7280',
       
@@ -302,6 +314,7 @@ export default {
       name: 'Assert',
       description: 'Assert a condition and fail if not met',
       category: 'logic',
+      ...universalPlatform,
       icon: '✓',
       color: '#6B7280',
       

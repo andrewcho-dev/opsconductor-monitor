@@ -11,11 +11,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useWorkflow } from '../hooks/useWorkflow';
 import { useNodeEditor } from '../hooks/useNodeEditor';
+import { useWorkflowValidation } from '../hooks/useWorkflowValidation';
 import WorkflowToolbar from './WorkflowToolbar';
 import WorkflowCanvas from './WorkflowCanvas';
 import NodePalette from './NodePalette';
 import NodeEditor from './NodeEditor';
 import ExecutionDebugView from './ExecutionDebugView';
+import ValidationPanel from './ValidationPanel';
+import SaveValidationDialog from './SaveValidationDialog';
 import { getNodeDefinition, DEFAULT_ENABLED_PACKAGES } from '../packages';
 import { autoLayout } from '../utils/layout';
 
@@ -74,6 +77,11 @@ const WorkflowBuilder = ({
   const [isExecuting, setIsExecuting] = useState(false);
   const [isTestMode, setIsTestMode] = useState(false);
 
+  // Validation state
+  const validationResult = useWorkflowValidation(nodes, edges);
+  const [validationPanelExpanded, setValidationPanelExpanded] = useState(false);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+
   // Load initial workflow
   useEffect(() => {
     if (initialWorkflow) {
@@ -122,12 +130,25 @@ const WorkflowBuilder = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [undo, redo, duplicateSelected, deleteSelected, selectedNodes, selectedEdges]);
 
-  // Handle save
+  // Handle save with validation
   const handleSave = useCallback(async () => {
+    // Check for validation issues
+    if (!validationResult.isValid || validationResult.hasWarnings) {
+      setShowSaveDialog(true);
+      return;
+    }
+    
+    // No issues, save directly
+    await performSave();
+  }, [validationResult]);
+
+  // Perform the actual save
+  const performSave = useCallback(async () => {
     if (onSave) {
       try {
         await onSave(workflow);
         markClean();
+        setShowSaveDialog(false);
       } catch (error) {
         console.error('Failed to save workflow:', error);
       }
@@ -169,6 +190,12 @@ const WorkflowBuilder = ({
       
       try {
         const result = await onTest(workflow);
+        // Handle case where workflow wasn't saved (returns null)
+        if (result === null) {
+          setDebugViewOpen(false);
+          setIsExecuting(false);
+          return;
+        }
         setExecutionResult(result);
       } catch (error) {
         console.error('Test run failed:', error);
@@ -259,6 +286,7 @@ const WorkflowBuilder = ({
       {/* Toolbar */}
       <WorkflowToolbar
         workflowName={workflow.name}
+        onNameChange={(name) => updateWorkflowMeta({ name })}
         isDirty={isDirty}
         canUndo={canUndo}
         canRedo={canRedo}
@@ -283,19 +311,35 @@ const WorkflowBuilder = ({
           enabledPackages={enabledPackages}
         />
 
-        {/* Canvas */}
-        <WorkflowCanvas
-          nodes={nodes}
-          edges={edges}
-          viewport={viewport}
-          selectedNodes={selectedNodes}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          onNodeDoubleClick={handleNodeDoubleClick}
-          onDrop={handleNodeDrop}
-          onViewportChange={updateViewport}
-        />
+        {/* Canvas with Validation Panel */}
+        <div className="flex-1 flex flex-col min-w-0">
+          <WorkflowCanvas
+            nodes={nodes}
+            edges={edges}
+            viewport={viewport}
+            selectedNodes={selectedNodes}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onNodeDoubleClick={handleNodeDoubleClick}
+            onDrop={handleNodeDrop}
+            onViewportChange={updateViewport}
+            validationResult={validationResult}
+          />
+          
+          {/* Validation Panel */}
+          {nodes.length > 0 && (
+            <ValidationPanel
+              validationResult={validationResult}
+              isExpanded={validationPanelExpanded}
+              onToggle={() => setValidationPanelExpanded(!validationPanelExpanded)}
+              onNodeClick={(nodeId) => {
+                // Focus on the node - could implement zoom to node
+                console.log('Focus node:', nodeId);
+              }}
+            />
+          )}
+        </div>
       </div>
 
       {/* Node Editor Modal */}
@@ -310,6 +354,14 @@ const WorkflowBuilder = ({
         onDelete={handleEditorDelete}
         updateField={updateField}
         shouldShowParameter={shouldShowParameter}
+        allNodes={nodes}
+        edges={edges}
+        onMapInput={(inputId, mapping) => {
+          updateField('_inputMappings', {
+            ...formData._inputMappings,
+            [inputId]: mapping,
+          });
+        }}
       />
 
       {/* Execution Debug View */}
@@ -321,6 +373,16 @@ const WorkflowBuilder = ({
         isTestMode={isTestMode}
         executionResult={executionResult}
         isRunning={isExecuting}
+      />
+
+      {/* Save Validation Dialog */}
+      <SaveValidationDialog
+        isOpen={showSaveDialog}
+        onClose={() => setShowSaveDialog(false)}
+        onSave={performSave}
+        onCancel={() => setShowSaveDialog(false)}
+        validationResult={validationResult}
+        workflowName={workflow.name}
       />
     </div>
   );

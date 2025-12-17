@@ -6,6 +6,8 @@ from .ssh_executor import SSHExecutor
 from .ping_executor import PingExecutor
 from .snmp_executor import SNMPExecutor
 from .discovery_executor import DiscoveryExecutor
+from .netbox_executor import NetBoxExecutor
+from .netbox_autodiscovery_executor import NetBoxAutodiscoveryExecutor
 
 __all__ = [
     'BaseExecutor',
@@ -14,4 +16,6 @@ __all__ = [
     'PingExecutor',
     'SNMPExecutor',
     'DiscoveryExecutor',
+    'NetBoxExecutor',
+    'NetBoxAutodiscoveryExecutor',
 ]
