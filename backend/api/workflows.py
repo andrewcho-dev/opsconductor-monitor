@@ -284,9 +284,6 @@ def run_workflow(workflow_id):
     # Capture current user for audit trail (get user from token if available)
     triggered_by = None
     user = get_current_user()
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.info(f"[AUDIT] get_current_user() returned: {user}")
     if user:
         triggered_by = {
             'user_id': user.get('user_id'),
@@ -294,14 +291,10 @@ def run_workflow(workflow_id):
             'display_name': user.get('display_name', user.get('username')),
             'is_enterprise': isinstance(user.get('user_id'), str) and str(user.get('user_id')).startswith('enterprise_'),
         }
-        logger.info(f"[AUDIT] triggered_by set to: {triggered_by}")
-    else:
-        logger.warning("[AUDIT] No user found from get_current_user()")
     
     # Add triggered_by to trigger_data so it's passed to the task
     if triggered_by:
         trigger_data['_triggered_by'] = triggered_by
-        logger.info(f"[AUDIT] Added _triggered_by to trigger_data")
     
     # Try to use Celery for async execution
     try:

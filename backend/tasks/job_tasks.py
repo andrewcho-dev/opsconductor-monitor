@@ -214,9 +214,6 @@ def run_workflow(workflow_id, trigger_data=None):
     triggered_by = None
     if trigger_data:
         triggered_by = trigger_data.pop('_triggered_by', None)
-        logger.info(f"Extracted triggered_by from trigger_data: {triggered_by}")
-    else:
-        logger.warning(f"trigger_data is empty or None: {trigger_data}")
     
     # Create execution record with user attribution
     execution_repo.create_execution(

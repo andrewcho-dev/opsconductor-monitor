@@ -18,7 +18,6 @@ export function ScanProgress({ progress, onStartScan, onRefresh, onOpenSettings,
         method: "POST", 
         body: JSON.stringify({}) 
       });
-      console.log("SNMP scan started:", result);
       alert(`SNMP scan started: ${result.message || 'Started'}`);
     } catch (err) {
       console.error("SNMP scan failed:", err);
@@ -36,7 +35,6 @@ export function ScanProgress({ progress, onStartScan, onRefresh, onOpenSettings,
         method: "POST", 
         body: JSON.stringify({}) 
       });
-      console.log("SSH scan started:", result);
       alert(`SSH scan started: ${result.message || 'Started'}`);
     } catch (err) {
       console.error("SSH scan failed:", err);

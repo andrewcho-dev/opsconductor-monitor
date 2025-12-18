@@ -1,24 +1,18 @@
+/**
+ * NotificationsPage
+ * 
+ * Main page for managing notification channels, rules, and templates.
+ * Modal components are extracted to ./notifications/ for maintainability.
+ */
+
 import React, { useState, useEffect } from 'react';
 import { PageLayout, PageHeader } from '../../components/layout';
 import { 
-  Bell, 
-  Plus, 
-  Mail, 
-  MessageSquare, 
-  Phone,
-  Edit,
-  Trash2,
-  TestTube,
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
-  Webhook,
-  X,
-  Loader2,
-  FileText,
-  Eye
+  Bell, Plus, Mail, MessageSquare, Phone, Edit, Trash2, TestTube,
+  CheckCircle, XCircle, AlertTriangle, Webhook, Loader2, FileText
 } from 'lucide-react';
 import { fetchApi } from '../../lib/utils';
+import { ChannelModal, RuleModal, TemplateModal } from './notifications';
 
 export function NotificationsPage() {
   const [activeTab, setActiveTab] = useState('channels');
@@ -49,7 +43,7 @@ export function NotificationsPage() {
       setRules(rulesRes.data?.rules || []);
       setTemplates(templatesRes.data?.templates || []);
     } catch (err) {
-      console.error('Failed to load notifications data:', err);
+      // Error loading data
     } finally {
       setLoading(false);
     }
@@ -64,7 +58,7 @@ export function NotificationsPage() {
       } else {
         alert('Failed to send test notification: ' + (res.error || 'Unknown error'));
       }
-      loadData(); // Refresh to get updated test status
+      loadData();
     } catch (err) {
       alert('Error testing channel: ' + err.message);
     } finally {
@@ -95,49 +89,6 @@ export function NotificationsPage() {
     }
   };
 
-  const channelIcons = {
-    email: Mail,
-    slack: MessageSquare,
-    pagerduty: Phone,
-    webhook: Webhook,
-    teams: MessageSquare,
-    discord: MessageSquare,
-  };
-
-  const channelTypeLabels = {
-    email: 'Email (SMTP)',
-    slack: 'Slack',
-    webhook: 'Webhook',
-    pagerduty: 'PagerDuty',
-    teams: 'Microsoft Teams',
-    discord: 'Discord',
-  };
-
-  const severityColors = {
-    warning: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-    error: 'bg-red-100 text-red-700 border-red-200',
-    critical: 'bg-red-100 text-red-700 border-red-200',
-    info: 'bg-blue-100 text-blue-700 border-blue-200',
-  };
-
-  // Get channel names for rule display
-  const getChannelNames = (channelIds) => {
-    if (!channelIds || !Array.isArray(channelIds)) return '—';
-    return channelIds
-      .map(id => channels.find(c => c.id === id)?.name || `#${id}`)
-      .join(', ');
-  };
-
-  if (loading) {
-    return (
-      <PageLayout module="system">
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-        </div>
-      </PageLayout>
-    );
-  }
-
   const handleDeleteRule = async (ruleId) => {
     if (!confirm('Delete this notification rule?')) return;
     try {
@@ -157,6 +108,41 @@ export function NotificationsPage() {
       alert('Error deleting template: ' + err.message);
     }
   };
+
+  const channelIcons = {
+    email: Mail,
+    slack: MessageSquare,
+    pagerduty: Phone,
+    webhook: Webhook,
+    teams: MessageSquare,
+    discord: MessageSquare,
+  };
+
+  const channelTypeLabels = {
+    email: 'Email (SMTP)',
+    slack: 'Slack',
+    webhook: 'Webhook',
+    pagerduty: 'PagerDuty',
+    teams: 'Microsoft Teams',
+    discord: 'Discord',
+  };
+
+  const getChannelNames = (channelIds) => {
+    if (!channelIds || !Array.isArray(channelIds)) return '—';
+    return channelIds
+      .map(id => channels.find(c => c.id === id)?.name || `#${id}`)
+      .join(', ');
+  };
+
+  if (loading) {
+    return (
+      <PageLayout module="system">
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+        </div>
+      </PageLayout>
+    );
+  }
 
   const tabs = [
     { id: 'channels', label: 'Channels', count: channels.length },
@@ -489,642 +475,6 @@ export function NotificationsPage() {
         />
       )}
     </PageLayout>
-  );
-}
-
-function ChannelModal({ channel, onClose, onSave }) {
-  const [formData, setFormData] = useState({
-    name: channel?.name || '',
-    channel_type: channel?.channel_type || 'slack',
-    enabled: channel?.enabled ?? true,
-    config: channel?.config || {}
-  });
-  const [saving, setSaving] = useState(false);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      if (channel) {
-        await fetchApi(`/api/notifications/channels/${channel.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData)
-        });
-      } else {
-        await fetchApi('/api/notifications/channels', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData)
-        });
-      }
-      onSave();
-    } catch (err) {
-      alert('Error saving channel: ' + err.message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const updateConfig = (key, value) => {
-    setFormData(prev => ({
-      ...prev,
-      config: { ...prev.config, [key]: value }
-    }));
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4">
-        <div className="flex items-center justify-between px-6 py-4 border-b">
-          <h2 className="text-lg font-semibold">{channel ? 'Edit Channel' : 'Add Channel'}</h2>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="My Slack Channel"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-            <select
-              value={formData.channel_type}
-              onChange={(e) => setFormData(prev => ({ ...prev, channel_type: e.target.value, config: {} }))}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="slack">Slack</option>
-              <option value="email">Email (SMTP)</option>
-              <option value="webhook">Webhook</option>
-              <option value="teams">Microsoft Teams</option>
-              <option value="discord">Discord</option>
-              <option value="pagerduty">PagerDuty</option>
-            </select>
-          </div>
-
-          {/* Type-specific config fields */}
-          {formData.channel_type === 'slack' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Webhook URL</label>
-              <input
-                type="url"
-                value={formData.config.webhook || ''}
-                onChange={(e) => updateConfig('webhook', e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="https://hooks.slack.com/services/..."
-              />
-            </div>
-          )}
-
-          {formData.channel_type === 'email' && (
-            <>
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700 mb-2">
-                <strong>Note:</strong> The "To Address" below is used <strong>only for testing</strong> this channel. Actual notification recipients are configured in notification rules.
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">SMTP Server</label>
-                  <input
-                    type="text"
-                    value={formData.config.server || ''}
-                    onChange={(e) => updateConfig('server', e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg"
-                    placeholder="smtp.gmail.com"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Port</label>
-                  <input
-                    type="number"
-                    value={formData.config.port || '587'}
-                    onChange={(e) => updateConfig('port', e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg"
-                    placeholder="587"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Security</label>
-                <select
-                  value={formData.config.secure || 'starttls'}
-                  onChange={(e) => updateConfig('secure', e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg"
-                >
-                  <option value="starttls">STARTTLS (Port 587) - Recommended</option>
-                  <option value="ssl">SSL/TLS (Port 465)</option>
-                  <option value="none">None (Port 25) - Not recommended</option>
-                </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  STARTTLS is recommended for most providers (Gmail, Office 365, etc.)
-                </p>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
-                  <input
-                    type="text"
-                    value={formData.config.username || ''}
-                    onChange={(e) => updateConfig('username', e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg"
-                    placeholder="your-email@gmail.com"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Password / App Password</label>
-                  <input
-                    type="password"
-                    value={formData.config.password || ''}
-                    onChange={(e) => updateConfig('password', e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg"
-                    placeholder="App password for Gmail"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">From Address</label>
-                  <input
-                    type="email"
-                    value={formData.config.from || ''}
-                    onChange={(e) => updateConfig('from', e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg"
-                    placeholder="alerts@company.com"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Sender address shown in emails</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Test Address <span className="text-red-500">*</span></label>
-                  <input
-                    type="email"
-                    value={formData.config.to || ''}
-                    onChange={(e) => updateConfig('to', e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg"
-                    placeholder="your-email@company.com"
-                    required
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Used only for testing this channel</p>
-                </div>
-              </div>
-            </>
-          )}
-
-          {formData.channel_type === 'webhook' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Webhook URL</label>
-              <input
-                type="url"
-                value={formData.config.url || ''}
-                onChange={(e) => updateConfig('url', e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg"
-                placeholder="https://example.com/webhook"
-              />
-            </div>
-          )}
-
-          {formData.channel_type === 'teams' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Webhook URL</label>
-              <input
-                type="url"
-                value={formData.config.webhook || ''}
-                onChange={(e) => updateConfig('webhook', e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg"
-                placeholder="https://outlook.office.com/webhook/..."
-              />
-            </div>
-          )}
-
-          {formData.channel_type === 'discord' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Webhook URL</label>
-              <input
-                type="url"
-                value={formData.config.webhook || ''}
-                onChange={(e) => updateConfig('webhook', e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg"
-                placeholder="https://discord.com/api/webhooks/..."
-              />
-            </div>
-          )}
-
-          {formData.channel_type === 'pagerduty' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Integration Key</label>
-              <input
-                type="text"
-                value={formData.config.integration_key || ''}
-                onChange={(e) => updateConfig('integration_key', e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg"
-                placeholder="Your PagerDuty integration key"
-              />
-            </div>
-          )}
-
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="enabled"
-              checked={formData.enabled}
-              onChange={(e) => setFormData(prev => ({ ...prev, enabled: e.target.checked }))}
-              className="rounded"
-            />
-            <label htmlFor="enabled" className="text-sm text-gray-700">Enabled</label>
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50 flex items-center gap-2"
-            >
-              {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-              {channel ? 'Save Changes' : 'Create Channel'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-function RuleModal({ rule, channels, templates, onClose, onSave }) {
-  const [formData, setFormData] = useState({
-    name: rule?.name || '',
-    description: rule?.description || '',
-    trigger_type: rule?.trigger_type || 'alert',
-    channel_ids: rule?.channel_ids || [],
-    template_id: rule?.template_id || null,
-    severity_filter: rule?.severity_filter || [],
-    enabled: rule?.enabled ?? true,
-    cooldown_minutes: rule?.cooldown_minutes || 5
-  });
-  const [saving, setSaving] = useState(false);
-
-  const severityOptions = ['info', 'warning', 'error', 'critical'];
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      const payload = {
-        ...formData,
-        severity_filter: formData.severity_filter.length > 0 ? formData.severity_filter : null
-      };
-      
-      if (rule) {
-        await fetchApi(`/api/notifications/rules/${rule.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-      } else {
-        await fetchApi('/api/notifications/rules', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-      }
-      onSave();
-    } catch (err) {
-      alert('Error saving rule: ' + err.message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const toggleChannel = (channelId) => {
-    setFormData(prev => ({
-      ...prev,
-      channel_ids: prev.channel_ids.includes(channelId)
-        ? prev.channel_ids.filter(id => id !== channelId)
-        : [...prev.channel_ids, channelId]
-    }));
-  };
-
-  const toggleSeverity = (severity) => {
-    setFormData(prev => ({
-      ...prev,
-      severity_filter: prev.severity_filter.includes(severity)
-        ? prev.severity_filter.filter(s => s !== severity)
-        : [...prev.severity_filter, severity]
-    }));
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-6 py-4 border-b sticky top-0 bg-white">
-          <h2 className="text-lg font-semibold">{rule ? 'Edit Rule' : 'Add Rule'}</h2>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-              placeholder="Alert Notifications"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Trigger Type</label>
-            <select
-              value={formData.trigger_type}
-              onChange={(e) => setFormData(prev => ({ ...prev, trigger_type: e.target.value }))}
-              className="w-full px-3 py-2 border rounded-lg"
-            >
-              <option value="alert">System Alert</option>
-              <option value="job_completed">Job Completed</option>
-              <option value="job_failed">Job Failed</option>
-              <option value="workflow_step">Workflow Step</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Channels</label>
-            <div className="space-y-2 max-h-32 overflow-y-auto border rounded-lg p-2">
-              {channels.length === 0 ? (
-                <p className="text-sm text-gray-500">No channels configured</p>
-              ) : (
-                channels.map((channel) => (
-                  <label key={channel.id} className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.channel_ids.includes(channel.id)}
-                      onChange={() => toggleChannel(channel.id)}
-                      className="rounded"
-                    />
-                    <span className="text-sm">{channel.name}</span>
-                    <span className="text-xs text-gray-400">({channel.channel_type})</span>
-                  </label>
-                ))
-              )}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Template</label>
-            <select
-              value={formData.template_id || ''}
-              onChange={(e) => setFormData(prev => ({ ...prev, template_id: e.target.value ? parseInt(e.target.value) : null }))}
-              className="w-full px-3 py-2 border rounded-lg"
-            >
-              <option value="">Default (no template)</option>
-              {templates
-                .filter(t => formData.trigger_type === 'alert' ? t.template_type === 'system' : t.template_type === 'job')
-                .map((template) => (
-                  <option key={template.id} value={template.id}>{template.name}</option>
-                ))
-              }
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Severity Filter (leave empty for all)</label>
-            <div className="flex gap-2 flex-wrap">
-              {severityOptions.map((severity) => (
-                <button
-                  key={severity}
-                  type="button"
-                  onClick={() => toggleSeverity(severity)}
-                  className={`px-3 py-1 text-xs rounded-full border ${
-                    formData.severity_filter.includes(severity)
-                      ? 'bg-blue-100 border-blue-300 text-blue-700'
-                      : 'bg-gray-50 border-gray-200 text-gray-600'
-                  }`}
-                >
-                  {severity}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Cooldown (minutes)</label>
-            <input
-              type="number"
-              value={formData.cooldown_minutes}
-              onChange={(e) => setFormData(prev => ({ ...prev, cooldown_minutes: parseInt(e.target.value) || 5 }))}
-              className="w-full px-3 py-2 border rounded-lg"
-              min="0"
-            />
-          </div>
-
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="rule-enabled"
-              checked={formData.enabled}
-              onChange={(e) => setFormData(prev => ({ ...prev, enabled: e.target.checked }))}
-              className="rounded"
-            />
-            <label htmlFor="rule-enabled" className="text-sm text-gray-700">Enabled</label>
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg">
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={saving || formData.channel_ids.length === 0}
-              className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50 flex items-center gap-2"
-            >
-              {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-              {rule ? 'Save Changes' : 'Create Rule'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-function TemplateModal({ template, onClose, onSave }) {
-  const [formData, setFormData] = useState({
-    name: template?.name || '',
-    description: template?.description || '',
-    template_type: template?.template_type || 'system',
-    title_template: template?.title_template || '',
-    body_template: template?.body_template || '',
-    available_variables: template?.available_variables || []
-  });
-  const [saving, setSaving] = useState(false);
-  const [newVariable, setNewVariable] = useState('');
-
-  const systemVariables = [
-    'alert.title', 'alert.message', 'alert.severity', 'alert.category', 'alert.triggered_at', 'alert.details'
-  ];
-  const jobVariables = [
-    'job.name', 'job.id', 'job.status', 'job.duration', 'job.started_at', 'job.finished_at', 
-    'job.error', 'job.summary', 'job.results', 'workflow.name', 'workflow.variables'
-  ];
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      if (template) {
-        await fetchApi(`/api/notifications/templates/${template.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData)
-        });
-      } else {
-        await fetchApi('/api/notifications/templates', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData)
-        });
-      }
-      onSave();
-    } catch (err) {
-      alert('Error saving template: ' + err.message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const insertVariable = (variable) => {
-    const textarea = document.getElementById('body-template');
-    if (textarea) {
-      const start = textarea.selectionStart;
-      const end = textarea.selectionEnd;
-      const text = formData.body_template;
-      const newText = text.substring(0, start) + `{{${variable}}}` + text.substring(end);
-      setFormData(prev => ({ ...prev, body_template: newText }));
-    } else {
-      setFormData(prev => ({ ...prev, body_template: prev.body_template + `{{${variable}}}` }));
-    }
-  };
-
-  const suggestedVariables = formData.template_type === 'system' ? systemVariables : jobVariables;
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-6 py-4 border-b sticky top-0 bg-white">
-          <h2 className="text-lg font-semibold">{template ? 'Edit Template' : 'Add Template'}</h2>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                className="w-full px-3 py-2 border rounded-lg"
-                placeholder="My Template"
-                required
-                disabled={template?.is_default}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-              <select
-                value={formData.template_type}
-                onChange={(e) => setFormData(prev => ({ ...prev, template_type: e.target.value }))}
-                className="w-full px-3 py-2 border rounded-lg"
-                disabled={template?.is_default}
-              >
-                <option value="system">System (Alerts)</option>
-                <option value="job">Job (Workflows)</option>
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-            <input
-              type="text"
-              value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              className="w-full px-3 py-2 border rounded-lg"
-              placeholder="Optional description"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Title Template</label>
-            <input
-              type="text"
-              value={formData.title_template}
-              onChange={(e) => setFormData(prev => ({ ...prev, title_template: e.target.value }))}
-              className="w-full px-3 py-2 border rounded-lg font-mono text-sm"
-              placeholder="[{{alert.severity}}] {{alert.title}}"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Body Template</label>
-            <textarea
-              id="body-template"
-              value={formData.body_template}
-              onChange={(e) => setFormData(prev => ({ ...prev, body_template: e.target.value }))}
-              className="w-full px-3 py-2 border rounded-lg font-mono text-sm h-40"
-              placeholder="{{alert.message}}&#10;&#10;Severity: {{alert.severity}}"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Available Variables (click to insert)</label>
-            <div className="flex gap-1 flex-wrap">
-              {suggestedVariables.map((variable) => (
-                <button
-                  key={variable}
-                  type="button"
-                  onClick={() => insertVariable(variable)}
-                  className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded font-mono"
-                >
-                  {`{{${variable}}}`}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg">
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50 flex items-center gap-2"
-            >
-              {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-              {template ? 'Save Changes' : 'Create Template'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
   );
 }
 

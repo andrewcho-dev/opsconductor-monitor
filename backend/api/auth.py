@@ -23,23 +23,17 @@ def get_current_user():
     """Get current user from request headers."""
     auth_header = request.headers.get('Authorization', '')
     
-    logger.debug(f"[AUTH] Authorization header: {auth_header[:50] if auth_header else 'NONE'}...")
-    
     if not auth_header.startswith('Bearer '):
-        logger.debug("[AUTH] No Bearer token found")
         return None
     
     token = auth_header[7:]  # Remove 'Bearer ' prefix
-    logger.debug(f"[AUTH] Token extracted, length: {len(token)}")
     
     auth_service = get_auth_service()
     session = auth_service.validate_session(token)
     
     if not session:
-        logger.debug("[AUTH] Session validation failed")
         return None
     
-    logger.debug(f"[AUTH] Session valid, user: {session.get('username')}")
     return session
 
 

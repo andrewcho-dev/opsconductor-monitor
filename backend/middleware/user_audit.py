@@ -219,12 +219,9 @@ def get_action_type_from_request():
 
 def log_request_action(response=None, error=None):
     """Log the current request as a user action."""
-    logger.debug(f"[AUDIT] log_request_action called for {request.method} {request.path}")
     if not should_log_request():
-        logger.debug(f"[AUDIT] Skipping request {request.method} {request.path}")
         return
     
-    logger.info(f"[AUDIT] Logging action for {request.method} {request.path}")
     try:
         path = request.path
         resource_type, resource_id, sub_action = extract_resource_info_from_path(path)
@@ -258,7 +255,6 @@ def log_request_action(response=None, error=None):
                 except:
                     error_message = f"HTTP {response.status_code}"
         
-        logger.info(f"[AUDIT] Calling log_user_action: action={action_type}, resource={resource_type}, id={resource_id}")
         log_user_action(
             action_type=action_type,
             resource_type=resource_type,
@@ -267,9 +263,8 @@ def log_request_action(response=None, error=None):
             success=success,
             error_message=error_message
         )
-        logger.info(f"[AUDIT] log_user_action completed successfully")
     except Exception as e:
-        logger.error(f"Failed to log request action: {e}", exc_info=True)
+        logger.error(f"Failed to log request action: {e}")
 
 
 def init_audit_middleware(app):
@@ -282,11 +277,8 @@ def init_audit_middleware(app):
     """
     @app.after_request
     def audit_after_request(response):
-        logger.debug(f"[AUDIT] after_request triggered for {request.method} {request.path}")
         try:
             log_request_action(response=response)
         except Exception as e:
             logger.error(f"Audit middleware error: {e}")
         return response
-    
-    logger.info("User audit middleware initialized")

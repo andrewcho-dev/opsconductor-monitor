@@ -263,13 +263,11 @@ const WorkflowBuilder = ({
   // Handle settings (placeholder)
   const handleOpenSettings = useCallback(() => {
     // TODO: Open settings modal
-    console.log('Settings not yet implemented');
   }, []);
 
   // Handle schedule (placeholder)
   const handleOpenSchedule = useCallback(() => {
     // TODO: Open schedule modal
-    console.log('Schedule not yet implemented');
   }, []);
 
   return (
@@ -326,7 +324,6 @@ const WorkflowBuilder = ({
               onToggle={() => setValidationPanelExpanded(!validationPanelExpanded)}
               onNodeClick={(nodeId) => {
                 // Focus on the node - could implement zoom to node
-                console.log('Focus node:', nodeId);
               }}
             />
           )}
