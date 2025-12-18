@@ -429,6 +429,10 @@ class WorkflowEngine:
             # Execute the node with resolved parameters
             output_data = executor(resolved_node, context)
             
+            # Check if the executor dispatched a Celery chord and wait for completion
+            if isinstance(output_data, dict) and output_data.get('chord_dispatched'):
+                output_data = self._wait_for_chord_completion(output_data, context, node_label)
+            
             finished_at = now_utc()
             duration_ms = int((finished_at - started_at).total_seconds() * 1000)
             
@@ -540,6 +544,113 @@ class WorkflowEngine:
                 finished_at=finished_at,
                 duration_ms=duration_ms,
             )
+    
+    def _wait_for_chord_completion(self, chord_result: Dict, context: ExecutionContext, node_label: str) -> Dict:
+        """
+        Wait for a Celery chord to complete and return the final results.
+        
+        This is called when a node executor dispatches a chord and returns immediately.
+        We poll the chord callback task until it completes, then return the actual results.
+        
+        Args:
+            chord_result: Initial result containing chord_task_id
+            context: Execution context
+            node_label: Label of the node for progress updates
+        
+        Returns:
+            Final results from the chord callback
+        """
+        import time
+        
+        chord_task_id = chord_result.get('chord_task_id')
+        if not chord_task_id:
+            logger.warning("Chord dispatched but no chord_task_id provided")
+            return chord_result
+        
+        logger.info(f"Waiting for chord {chord_task_id} to complete...")
+        
+        # Update progress to show we're waiting
+        self._update_execution_progress(
+            context, node_label, 'running',
+            message=f'Waiting for {chord_result.get("chord_chunks", 0)} parallel tasks...'
+        )
+        
+        try:
+            from celery.result import AsyncResult
+            from celery_app import celery_app
+            
+            result = AsyncResult(chord_task_id, app=celery_app)
+            
+            # Poll for completion with timeout
+            timeout = 600  # 10 minutes
+            poll_interval = 2  # Check every 2 seconds
+            elapsed = 0
+            
+            while elapsed < timeout:
+                if result.ready():
+                    if result.successful():
+                        final_result = result.get()
+                        logger.info(f"Chord {chord_task_id} completed successfully")
+                        
+                        # Merge chord results with original result structure
+                        if isinstance(final_result, dict):
+                            # Build proper result structure for downstream nodes
+                            # Include actual device data for SNMP Walker
+                            merged = {
+                                'success': final_result.get('success', True),
+                                'created_devices': final_result.get('created_devices', []),
+                                'updated_devices': final_result.get('updated_devices', []),
+                                'skipped_devices': final_result.get('skipped_devices', []),
+                                'discovered_devices': final_result.get('discovered_devices', []),
+                                'failed_hosts': [],
+                                'discovery_report': {
+                                    'total_targets': chord_result.get('discovery_report', {}).get('total_targets', 0),
+                                    'hosts_online': chord_result.get('discovery_report', {}).get('hosts_online', 0),
+                                    'snmp_success': final_result.get('snmp_success', 0),
+                                    'devices_created': final_result.get('created', 0),
+                                    'devices_updated': final_result.get('updated', 0),
+                                    'devices_skipped': final_result.get('skipped', 0),
+                                    'errors': final_result.get('errors', []),
+                                },
+                            }
+                            return merged
+                        return final_result
+                    else:
+                        error = str(result.result) if result.result else "Chord failed"
+                        logger.error(f"Chord {chord_task_id} failed: {error}")
+                        return {
+                            'success': False,
+                            'error': error,
+                            'chord_failed': True,
+                        }
+                
+                time.sleep(poll_interval)
+                elapsed += poll_interval
+                
+                # Update progress periodically
+                if elapsed % 10 == 0:
+                    self._update_execution_progress(
+                        context, node_label, 'running',
+                        message=f'Waiting for parallel tasks... ({elapsed}s elapsed)'
+                    )
+            
+            # Timeout
+            logger.error(f"Chord {chord_task_id} timed out after {timeout}s")
+            return {
+                'success': False,
+                'error': f'Chord timed out after {timeout} seconds',
+                'chord_timeout': True,
+            }
+            
+        except ImportError:
+            logger.warning("Celery not available, cannot wait for chord")
+            return chord_result
+        except Exception as e:
+            logger.error(f"Error waiting for chord: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+            }
     
     def _get_outputs_to_follow(self, result: NodeResult, node: Dict) -> List[str]:
         """

@@ -176,12 +176,19 @@ class SNMPWalkerExecutor:
             logger.warning(f"SNMP Walker: Looking for targets in variables. Keys: {list(variables.keys())}")
             
             # Collect all potential targets from all sources
+            all_discovered = []
             all_skipped = []
             all_created = []
             created = []  # Initialize created list
             
             for key, value in variables.items():
                 if isinstance(value, dict):
+                    # Collect discovered_devices first (from chord pattern - contains all SNMP data)
+                    discovered = value.get('discovered_devices', [])
+                    if discovered and isinstance(discovered, list):
+                        logger.warning(f"SNMP Walker: Found {len(discovered)} discovered_devices in '{key}'")
+                        all_discovered.extend(discovered)
+                    
                     # Collect skipped_devices (existing devices that were found)
                     skipped = value.get('skipped_devices', [])
                     if skipped and isinstance(skipped, list):
@@ -194,8 +201,11 @@ class SNMPWalkerExecutor:
                         logger.warning(f"SNMP Walker: Found {len(created_list)} created_devices in '{key}'")
                         all_created.extend(created_list)
             
-            # Use skipped_devices first (existing devices), then created_devices
-            if all_skipped:
+            # Priority: discovered_devices (has SNMP data) > skipped > created
+            if all_discovered:
+                created = all_discovered
+                logger.warning(f"SNMP Walker: Using {len(created)} discovered_devices as targets")
+            elif all_skipped:
                 created = all_skipped
                 logger.warning(f"SNMP Walker: Using {len(created)} skipped_devices as targets")
             elif all_created:
@@ -203,7 +213,9 @@ class SNMPWalkerExecutor:
                 logger.warning(f"SNMP Walker: Using {len(created)} created_devices as targets")
             else:
                 # Fallback to direct variable access
-                created = variables.get('skipped_devices', [])
+                created = variables.get('discovered_devices', [])
+                if not created:
+                    created = variables.get('skipped_devices', [])
                 if not created:
                     created = variables.get('created_devices', [])
                 if not created:

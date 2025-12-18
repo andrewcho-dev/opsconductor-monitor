@@ -424,9 +424,8 @@ class NetBoxAutodiscoveryExecutor(BaseExecutor):
         start_time = time.time()
         
         # Check if we should use chord pattern (for large scans)
-        # IMPORTANT: Chord returns immediately, so subsequent workflow nodes won't have results
-        # Only use chord for standalone discovery, not when part of a workflow with more nodes
-        use_chord = config.get('use_chord', False)  # Disabled by default for workflow compatibility
+        # Chord distributes work across all 32 Celery processes for maximum parallelism
+        use_chord = config.get('use_chord', True)  # Enabled by default for performance
         chord_threshold = config.get('chord_threshold', 20)  # Use chord for 20+ hosts
         
         # Initialize result structure

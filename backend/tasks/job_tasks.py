@@ -391,6 +391,7 @@ if celery:
         executor = NetBoxAutodiscoveryExecutor()
         sync_results = executor._sync_to_netbox(all_devices, config)
         
+        # Include actual device data for downstream nodes (SNMP Walker needs this)
         result = {
             'success': True,
             'total_devices': len(all_devices),
@@ -400,6 +401,11 @@ if celery:
             'skipped': len(sync_results.get('skipped', [])),
             'failed': len(sync_results.get('failed', [])),
             'errors': sync_results.get('errors', []),
+            # Include actual device lists for SNMP Walker and other downstream nodes
+            'created_devices': sync_results.get('created', []),
+            'updated_devices': sync_results.get('updated', []),
+            'skipped_devices': sync_results.get('skipped', []),
+            'discovered_devices': all_devices,  # All discovered devices with SNMP data
         }
         
         logger.info(f"Celery chord complete: {result['created']} created, {result['updated']} updated, {result['skipped']} skipped")
