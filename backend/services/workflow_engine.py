@@ -79,6 +79,7 @@ class WorkflowEngine:
         from .node_executors.notifications import SlackExecutor, EmailExecutor, WebhookExecutor, TemplatedNotificationExecutor
         from .node_executors.netbox import NetBoxAutodiscoveryExecutor, NetBoxDeviceCreateExecutor, NetBoxLookupExecutor, NetBoxInterfaceSyncExecutor
         from .node_executors.prtg import PRTG_EXECUTORS
+        from .node_executors.debug import DebugExecutor, SetVariableExecutor, GetVariableExecutor, AssertExecutor
         
         # Create executor instances
         ping_exec = PingExecutor()
@@ -100,6 +101,10 @@ class WorkflowEngine:
         netbox_sites_exec = NetBoxLookupExecutor('sites')
         netbox_roles_exec = NetBoxLookupExecutor('device-roles')
         netbox_types_exec = NetBoxLookupExecutor('device-types')
+        debug_exec = DebugExecutor()
+        set_var_exec = SetVariableExecutor()
+        get_var_exec = GetVariableExecutor()
+        assert_exec = AssertExecutor()
         
         self.node_executors = {
             # Triggers
@@ -155,6 +160,12 @@ class WorkflowEngine:
             
             # PRTG - register all PRTG executors
             **{k: lambda n, c, ex=v: ex.execute(n, c) for k, v in PRTG_EXECUTORS.items()},
+            
+            # Debug/Utility - like Node-RED debug nodes
+            'debug:log': lambda n, c: debug_exec.execute(n, c),
+            'debug:set-variable': lambda n, c: set_var_exec.execute(n, c),
+            'debug:get-variable': lambda n, c: get_var_exec.execute(n, c),
+            'debug:assert': lambda n, c: assert_exec.execute(n, c),
         }
     
     def register_executor(self, node_type: str, executor: Callable):
