@@ -260,7 +260,7 @@ class SNMPWalkerExecutor:
         # Auto-detect optimal parallelism based on system resources
         import os
         cpu_count = os.cpu_count() or 4
-        parallel = min(cpu_count * 10, len(targets), 200)  # 10x cores, max 200
+        parallel = min(cpu_count * 50, len(targets), 1000)  # 50x cores, max 1000
         logger.info(f"SNMP walk using {parallel} threads for {len(targets)} targets (CPU cores: {cpu_count})")
         
         logger.info(
@@ -969,7 +969,7 @@ class SNMPWalkerExecutor:
         # Execute in parallel
         import os
         cpu_count = os.cpu_count() or 4
-        parallel = min(cpu_count * 10, len(targets), 200)
+        parallel = min(cpu_count * 50, len(targets), 1000)
         
         all_interfaces = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=parallel) as executor:
@@ -1009,7 +1009,7 @@ class SNMPWalkerExecutor:
         # Execute in parallel
         import os
         cpu_count = os.cpu_count() or 4
-        parallel = min(cpu_count * 10, len(targets), 200)
+        parallel = min(cpu_count * 50, len(targets), 1000)
         
         all_neighbors = []
         topology = {'nodes': [], 'links': []}

@@ -49,7 +49,7 @@ def get_optimal_worker_count(max_workers: int = 32) -> int:
 
 # Pre-calculated values for quick access
 CPU_COUNT = get_cpu_count()
-MAX_NETWORK_THREADS = min(CPU_COUNT * 10, 200)
+MAX_NETWORK_THREADS = min(CPU_COUNT * 50, 1000)
 MAX_CELERY_WORKERS = min(CPU_COUNT * 2, 32)
 
 

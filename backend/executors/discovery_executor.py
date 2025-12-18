@@ -163,7 +163,7 @@ class DiscoveryExecutor(BaseExecutor):
         }
         
         # Execute discovery in parallel with optimal concurrency
-        max_workers = min(cpu_count * 10, len(ips), 200)  # 10x cores, max 200
+        max_workers = min(cpu_count * 50, len(ips), 1000)  # 50x cores, max 1000
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_ip = {
                 executor.submit(self.execute, ip, config): ip 

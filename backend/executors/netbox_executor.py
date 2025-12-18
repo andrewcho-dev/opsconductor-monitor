@@ -723,7 +723,7 @@ class NetBoxExecutor(BaseExecutor):
         from concurrent.futures import ThreadPoolExecutor
         import os
         cpu_count = os.cpu_count() or 4
-        max_workers = min(cpu_count * 10, len(targets), 200)
+        max_workers = min(cpu_count * 50, len(targets), 1000)
         
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             results = list(executor.map(ping_target, targets))

@@ -651,7 +651,7 @@ class NetBoxAutodiscoveryExecutor(BaseExecutor):
         # Auto-detect optimal concurrency based on system resources
         import os
         cpu_count = os.cpu_count() or 4
-        concurrency = min(cpu_count * 10, len(targets), 200)  # 10x cores, max 200
+        concurrency = min(cpu_count * 50, len(targets), 1000)  # 50x cores, max 1000
         logger.info(f"Ping scan using {concurrency} threads for {len(targets)} targets (CPU cores: {cpu_count})")
         
         def ping_host(ip: str) -> Optional[str]:
@@ -682,7 +682,7 @@ class NetBoxAutodiscoveryExecutor(BaseExecutor):
         # Auto-detect optimal concurrency based on system resources
         import os
         cpu_count = os.cpu_count() or 4
-        concurrency = min(cpu_count * 10, len(hosts), 200)  # 10x cores, max 200
+        concurrency = min(cpu_count * 50, len(hosts), 1000)  # 50x cores, max 1000
         logger.info(f"Host discovery using {concurrency} threads for {len(hosts)} hosts (CPU cores: {cpu_count})")
         
         def discover_host(ip: str) -> Dict[str, Any]:

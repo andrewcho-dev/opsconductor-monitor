@@ -39,7 +39,7 @@ class PingExecutor:
         # Auto-detect optimal concurrency based on system resources
         import os
         cpu_count = os.cpu_count() or 4
-        concurrency = min(cpu_count * 10, len(targets) or 1, 200)  # 10x cores, max 200
+        concurrency = min(cpu_count * 50, len(targets) or 1, 1000)  # 50x cores, max 1000
         
         results = []
         online = []

@@ -437,7 +437,7 @@ class JobExecutor:
         
         # Execute SSH commands in parallel
         cpu_count = os.cpu_count() or 4
-        max_workers = min(cpu_count * 10, len(targets), 200)
+        max_workers = min(cpu_count * 50, len(targets), 1000)
         
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_results = list(executor.map(execute_ssh_target, targets))
@@ -481,7 +481,7 @@ class JobExecutor:
         
         # Execute pings in parallel
         cpu_count = os.cpu_count() or 4
-        max_workers = min(cpu_count * 10, len(targets), 200)
+        max_workers = min(cpu_count * 50, len(targets), 1000)
         
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             results = list(executor.map(ping_target, targets))
@@ -535,7 +535,7 @@ class JobExecutor:
         
         # Execute SNMP queries in parallel
         cpu_count = os.cpu_count() or 4
-        max_workers = min(cpu_count * 10, len(targets), 200)
+        max_workers = min(cpu_count * 50, len(targets), 1000)
         
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             results = list(executor.map(snmp_target, targets))
@@ -592,7 +592,7 @@ class JobExecutor:
                 return executor.execute(target, discovery_config)
             
             cpu_count = os.cpu_count() or 4
-            max_workers = min(cpu_count * 10, len(targets), 200)
+            max_workers = min(cpu_count * 50, len(targets), 1000)
             
             with ThreadPoolExecutor(max_workers=max_workers) as pool:
                 results = list(pool.map(discover_target, targets))

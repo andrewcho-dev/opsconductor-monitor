@@ -402,9 +402,9 @@ export function SystemOverviewPage() {
             icon={Cpu}
             status={systemStatus?.workers?.count > 0 ? 'online' : 'warning'}
             details={[
+              { label: 'Workers', value: systemStatus?.workers?.count || 1 },
               { label: 'Processes', value: systemStatus?.workers?.concurrency || 32 },
               { label: 'Active Tasks', value: systemStatus?.workers?.active || 0 },
-              { label: 'Scheduled', value: systemStatus?.workers?.scheduled || 0 },
             ]}
           />
           <StatusCard
