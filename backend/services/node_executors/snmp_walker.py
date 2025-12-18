@@ -116,10 +116,18 @@ class SNMPWalkerExecutor:
         else:
             return {'error': f'Unknown command: {command}', 'success': False}
     
-    def _get_targets(self, params: Dict, context: Dict) -> List[Dict]:
+    def _get_targets(self, params: Dict, context) -> List[Dict]:
         """Extract targets from parameters or context."""
         target_source = params.get('target_source', 'from_autodiscovery')
         targets = []
+        
+        # Handle both dict context and ExecutionContext dataclass
+        if hasattr(context, 'variables'):
+            variables = context.variables
+        elif isinstance(context, dict):
+            variables = context.get('variables', {})
+        else:
+            variables = {}
         
         if target_source == 'ip_list':
             ip_list = params.get('ip_list', '')
@@ -131,9 +139,10 @@ class SNMPWalkerExecutor:
                         'community': params.get('snmp_community', 'public'),
                     })
         elif target_source == 'from_input':
-            input_targets = context.get('inputs', {}).get('targets', [])
+            # Get targets from variables (set by previous node outputs)
+            input_targets = variables.get('targets', [])
             if not input_targets:
-                input_targets = context.get('inputs', {}).get('snmp_hosts', [])
+                input_targets = variables.get('snmp_hosts', [])
             
             for t in input_targets:
                 if isinstance(t, str):
@@ -149,21 +158,33 @@ class SNMPWalkerExecutor:
                         'device_name': t.get('name'),
                     })
         else:  # from_autodiscovery
-            # Try to get from autodiscovery outputs
-            created = context.get('inputs', {}).get('targets', [])
+            # Try to get from autodiscovery outputs stored in variables
+            # Look for created_devices, skipped_devices, or snmp_active from previous node
+            created = variables.get('created_devices', [])
             if not created:
-                created = context.get('variables', {}).get('created_devices', [])
+                created = variables.get('skipped_devices', [])
             if not created:
-                created = context.get('variables', {}).get('snmp_active', [])
+                created = variables.get('snmp_active', [])
+            
+            # Also check for node outputs stored by label
+            if not created:
+                for key, value in variables.items():
+                    if isinstance(value, dict):
+                        if 'created_devices' in value:
+                            created = value.get('created_devices', [])
+                            break
+                        if 'skipped_devices' in value:
+                            created = value.get('skipped_devices', [])
+                            break
             
             for device in created:
                 if isinstance(device, dict):
-                    ip = device.get('ip_address') or device.get('primary_ip', {}).get('address', '').split('/')[0]
+                    ip = device.get('ip_address') or device.get('primary_ip', {}).get('address', '').split('/')[0] if isinstance(device.get('primary_ip'), dict) else device.get('primary_ip', '').split('/')[0] if device.get('primary_ip') else None
                     if ip:
                         targets.append({
                             'ip_address': ip,
                             'community': device.get('snmp_community') or params.get('snmp_community', 'public'),
-                            'device_id': device.get('id'),
+                            'device_id': device.get('id') or device.get('netbox_id'),
                             'device_name': device.get('name'),
                         })
                 elif isinstance(device, str):
