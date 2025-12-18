@@ -237,6 +237,7 @@ export function SystemOverviewPage() {
         redis: { status: queues.workers?.length > 0 ? 'online' : 'warning' },
         workers: {
           count: queues.workers?.length || 0,
+          concurrency: queues.concurrency || 32,
           active: queues.active_total || 0,
           scheduled: queues.scheduled_total || 0,
         }
@@ -393,7 +394,7 @@ export function SystemOverviewPage() {
             status={systemStatus?.backend?.status || 'unknown'}
             details={[
               { label: 'Port', value: '5000' },
-              { label: 'Workers', value: '4' },
+              { label: 'Mode', value: 'Development' },
             ]}
           />
           <StatusCard
@@ -401,7 +402,7 @@ export function SystemOverviewPage() {
             icon={Cpu}
             status={systemStatus?.workers?.count > 0 ? 'online' : 'warning'}
             details={[
-              { label: 'Workers', value: systemStatus?.workers?.count || 0 },
+              { label: 'Processes', value: systemStatus?.workers?.concurrency || 32 },
               { label: 'Active Tasks', value: systemStatus?.workers?.active || 0 },
               { label: 'Scheduled', value: systemStatus?.workers?.scheduled || 0 },
             ]}

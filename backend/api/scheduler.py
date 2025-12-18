@@ -501,20 +501,28 @@ def get_queue_status():
         # Get list of all workers from active, reserved, or scheduled
         all_workers = set(active.keys()) | set(reserved.keys()) | set(scheduled.keys())
         
+        # Get worker stats for concurrency info
+        stats = inspect.stats() or {}
+        
         # Build worker details
         worker_details = {}
+        total_concurrency = 0
         for worker in all_workers:
+            worker_stats = stats.get(worker, {}).get('pool', {})
+            concurrency = worker_stats.get('max-concurrency', 32)
+            total_concurrency += concurrency
             worker_details[worker] = {
                 'active': len(active.get(worker, [])),
                 'active_tasks': active.get(worker, []),
                 'reserved': len(reserved.get(worker, [])),
                 'scheduled': len(scheduled.get(worker, [])),
-                'concurrency': None,  # Would need stats() call
+                'concurrency': concurrency,
             }
         
         return jsonify(success_response({
             'workers': list(all_workers),
             'worker_details': worker_details,
+            'concurrency': total_concurrency,
             'active': active_total,
             'active_total': active_total,
             'active_by_worker': {k: len(v) for k, v in active.items()},
