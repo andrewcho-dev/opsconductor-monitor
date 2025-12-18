@@ -459,18 +459,11 @@ class NetBoxAutodiscoveryExecutor(BaseExecutor):
             
             logger.info(f"Found {len(online_hosts)} online hosts")
             
-            # Stage 3-7: Discover each host (use parallel Celery tasks for large scans)
-            parallel_threshold = config.get('parallel_threshold', 10)  # Lower threshold for testing
-            use_celery_parallel = config.get('use_celery_parallel', True)
-            
-            logger.info(f"Online hosts: {len(online_hosts)}, parallel_threshold: {parallel_threshold}, use_celery_parallel: {use_celery_parallel}")
-            
-            if use_celery_parallel and len(online_hosts) >= parallel_threshold:
-                logger.info(f"Using parallel Celery discovery for {len(online_hosts)} hosts")
-                discovered_devices = self._discover_hosts_parallel(online_hosts, config)
-            else:
-                logger.info(f"Using local discovery for {len(online_hosts)} hosts")
-                discovered_devices = self._discover_hosts(online_hosts, config)
+            # Stage 3-7: Discover each host using ThreadPoolExecutor
+            # Note: Celery parallel discovery is disabled because result.get() cannot be called within a task
+            # ThreadPoolExecutor with 200 threads provides excellent parallelism within a single worker
+            logger.info(f"Discovering {len(online_hosts)} hosts using ThreadPoolExecutor")
+            discovered_devices = self._discover_hosts(online_hosts, config)
             
             result['discovery_report']['snmp_success'] = sum(
                 1 for d in discovered_devices if d.get('snmp_success')
