@@ -393,24 +393,52 @@ export function JobHistory() {
                     </pre>
                   ) : (
                     <div className="space-y-3">
-                      {/* Summary stats */}
+                      {/* Summary stats - supports both workflow and legacy job formats */}
                       <div className="bg-gray-50 rounded-lg p-3 text-xs grid grid-cols-2 md:grid-cols-4 gap-3">
-                        {selectedExecution.result.job_name && (
+                        {/* Workflow format: duration_ms */}
+                        {selectedExecution.result.duration_ms !== undefined && (
                           <div>
-                            <div className="text-gray-500">Job</div>
-                            <div className="font-medium">{selectedExecution.result.job_name}</div>
+                            <div className="text-gray-500">Duration</div>
+                            <div className="font-medium">{(selectedExecution.result.duration_ms / 1000).toFixed(2)}s</div>
                           </div>
                         )}
+                        {/* Legacy format: duration_seconds */}
                         {selectedExecution.result.duration_seconds !== undefined && (
                           <div>
                             <div className="text-gray-500">Duration</div>
                             <div className="font-medium">{selectedExecution.result.duration_seconds.toFixed(3)}s</div>
                           </div>
                         )}
+                        {/* Workflow format: nodes_completed */}
+                        {selectedExecution.result.nodes_total !== undefined && (
+                          <div>
+                            <div className="text-gray-500">Nodes</div>
+                            <div className="font-medium">
+                              {selectedExecution.result.nodes_completed}/{selectedExecution.result.nodes_total}
+                              {selectedExecution.result.nodes_failed > 0 && (
+                                <span className="text-red-500 ml-1">({selectedExecution.result.nodes_failed} failed)</span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        {/* Legacy format: actions_completed */}
                         {selectedExecution.result.actions_completed !== undefined && (
                           <div>
                             <div className="text-gray-500">Actions</div>
                             <div className="font-medium">{selectedExecution.result.actions_completed}/{selectedExecution.result.total_actions}</div>
+                          </div>
+                        )}
+                        {/* Workflow status */}
+                        {selectedExecution.result.status && (
+                          <div>
+                            <div className="text-gray-500">Status</div>
+                            <div className={cn(
+                              "font-medium",
+                              selectedExecution.result.status === 'success' && "text-green-600",
+                              selectedExecution.result.status === 'failure' && "text-red-600"
+                            )}>
+                              {selectedExecution.result.status}
+                            </div>
                           </div>
                         )}
                         {selectedExecution.result.execution_meta?.worker_hostname && (
@@ -421,7 +449,65 @@ export function JobHistory() {
                         )}
                       </div>
 
-                      {/* Action results - dynamically find action_* keys */}
+                      {/* Workflow node_results */}
+                      {selectedExecution.result.node_results && Object.keys(selectedExecution.result.node_results).length > 0 && (
+                        <div className="space-y-2">
+                          <div className="text-xs font-semibold text-gray-600">Node Results</div>
+                          {Object.entries(selectedExecution.result.node_results).map(([nodeId, nodeResult]) => (
+                            <div key={nodeId} className={cn(
+                              "rounded-lg p-3 border",
+                              nodeResult.status === 'success' && "bg-green-50 border-green-200",
+                              nodeResult.status === 'failure' && "bg-red-50 border-red-200",
+                              !['success', 'failure'].includes(nodeResult.status) && "bg-gray-50 border-gray-200"
+                            )}>
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  {nodeResult.status === 'success' ? (
+                                    <CheckCircle className="w-4 h-4 text-green-500" />
+                                  ) : nodeResult.status === 'failure' ? (
+                                    <XCircle className="w-4 h-4 text-red-500" />
+                                  ) : (
+                                    <Clock className="w-4 h-4 text-gray-400" />
+                                  )}
+                                  <span className="text-xs font-medium text-gray-800">
+                                    {nodeResult.node_type?.replace(':', ': ').replace(/-/g, ' ')}
+                                  </span>
+                                </div>
+                                <span className="text-[10px] text-gray-500">
+                                  {nodeResult.duration_ms}ms
+                                </span>
+                              </div>
+                              {nodeResult.error_message && (
+                                <div className="text-xs text-red-600 mt-1">{nodeResult.error_message}</div>
+                              )}
+                              {/* Show key output data */}
+                              {nodeResult.output_data && Object.keys(nodeResult.output_data).length > 0 && (
+                                <div className="mt-2 text-[10px] text-gray-600 space-y-1">
+                                  {nodeResult.output_data.discovery_report && (
+                                    <div className="grid grid-cols-4 gap-2 bg-white/50 rounded p-2">
+                                      <div><span className="text-gray-400">Targets:</span> {nodeResult.output_data.discovery_report.total_targets}</div>
+                                      <div><span className="text-gray-400">Online:</span> {nodeResult.output_data.discovery_report.hosts_online}</div>
+                                      <div><span className="text-gray-400">SNMP:</span> {nodeResult.output_data.discovery_report.snmp_success}</div>
+                                      <div><span className="text-gray-400">Created:</span> {nodeResult.output_data.discovery_report.devices_created}</div>
+                                    </div>
+                                  )}
+                                  {nodeResult.output_data.created_devices?.length > 0 && (
+                                    <div className="text-green-600">Created {nodeResult.output_data.created_devices.length} devices</div>
+                                  )}
+                                  {nodeResult.output_data.updated_devices?.length > 0 && (
+                                    <div className="text-blue-600">Updated {nodeResult.output_data.updated_devices.length} devices</div>
+                                  )}
+                                  {nodeResult.output_data.skipped_devices?.length > 0 && (
+                                    <div className="text-gray-500">Skipped {nodeResult.output_data.skipped_devices.length} devices (no changes)</div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Legacy action results - dynamically find action_* keys */}
                       {Object.entries(selectedExecution.result)
                         .filter(([key]) => key.startsWith('action_'))
                         .map(([actionKey, actionData]) => (
@@ -441,7 +527,6 @@ export function JobHistory() {
                                   <div key={idx} className="text-xs bg-white rounded px-2 py-1 flex items-center justify-between">
                                     <span className="font-mono">{deviceIp || r.hostname || JSON.stringify(r).slice(0, 50)}</span>
                                     <div className="flex items-center gap-2">
-                                      {/* Show optical interfaces count with link if present */}
                                       {r.optical_interfaces !== undefined && (
                                         hasOptical && deviceIp ? (
                                           <a 
@@ -457,26 +542,20 @@ export function JobHistory() {
                                           </span>
                                         )
                                       )}
-                                      {/* Show interface count if present */}
                                       {r.interfaces !== undefined && (
                                         <span className="text-[10px] text-gray-500">
                                           {r.interfaces} intf
                                         </span>
                                       )}
-                                      {/* Status badge */}
                                       <span className={cn(
                                         "px-1.5 py-0.5 rounded text-[10px] font-medium",
                                         (r.ping_status === 'online' || r.success === true) && "bg-green-100 text-green-700",
                                         (r.ping_status === 'offline' || r.success === false) && "bg-red-100 text-red-700",
                                         r.status === 'success' && "bg-green-100 text-green-700",
                                         r.status === 'error' && "bg-red-100 text-red-700",
-                                        r.snmp_status === 'YES' && "bg-green-100 text-green-700",
-                                        r.snmp_status === 'NO' && "bg-red-100 text-red-700",
-                                        r.ssh_status === 'YES' && "bg-green-100 text-green-700",
-                                        r.ssh_status === 'NO' && "bg-red-100 text-red-700",
-                                        !r.ping_status && r.success === undefined && !r.status && !r.snmp_status && !r.ssh_status && "bg-gray-100 text-gray-600"
+                                        !r.ping_status && r.success === undefined && !r.status && "bg-gray-100 text-gray-600"
                                       )}>
-                                        {r.ping_status || (r.success === true ? 'success' : r.success === false ? 'failed' : null) || r.status || r.snmp_status || r.ssh_status || 'done'}
+                                        {r.ping_status || (r.success === true ? 'success' : r.success === false ? 'failed' : null) || r.status || 'done'}
                                       </span>
                                     </div>
                                   </div>

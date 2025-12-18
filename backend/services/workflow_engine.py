@@ -188,6 +188,21 @@ class WorkflowEngine:
             variables={'trigger': trigger_data or {}},
         )
         
+        # Copy task_id and total_nodes from trigger_data to context variables
+        if trigger_data:
+            context.variables['_task_id'] = trigger_data.get('_task_id')
+            context.variables['_total_nodes'] = trigger_data.get('_total_nodes')
+        
+        # Log job started audit event
+        self._log_audit_event(
+            context, 'job_started',
+            details={
+                'workflow_id': workflow.get('id'),
+                'workflow_name': workflow.get('name'),
+                'execution_id': execution_id,
+            }
+        )
+        
         # Parse workflow definition
         definition = workflow.get('definition', {})
         nodes = {n['id']: n for n in definition.get('nodes', [])}
@@ -253,6 +268,25 @@ class WorkflowEngine:
             )
             status = 'failure'
             context.variables['error'] = str(e)
+            
+            # Log job failed audit event
+            self._log_audit_event(
+                context, 'job_completed',
+                success=False,
+                error_message=str(e),
+                details={'status': 'failure'}
+            )
+        else:
+            # Log job completed audit event
+            self._log_audit_event(
+                context, 'job_completed',
+                success=(status == 'success'),
+                details={
+                    'status': status,
+                    'nodes_completed': len([r for r in context.node_results.values() if r.status == NodeStatus.SUCCESS]),
+                    'nodes_failed': len([r for r in context.node_results.values() if r.status == NodeStatus.FAILURE]),
+                }
+            )
         
         return self._create_execution_result(
             execution_id, workflow.get('id'), started_at,
@@ -344,6 +378,15 @@ class WorkflowEngine:
             message=f'Executing {node_label}'
         )
         
+        # Log action started audit event
+        action_index = len(context.node_results)
+        self._log_audit_event(
+            context, 'action_started',
+            action_name=node_label,
+            action_index=action_index,
+            details={'node_id': node_id, 'node_type': node_type}
+        )
+        
         started_at = now_utc()
         
         try:
@@ -402,6 +445,16 @@ class WorkflowEngine:
                     message=error_message
                 )
                 
+                # Log action completed (failed) audit event
+                self._log_audit_event(
+                    context, 'action_completed',
+                    action_name=node_label,
+                    action_index=action_index,
+                    success=False,
+                    error_message=error_message,
+                    details={'node_id': node_id, 'node_type': node_type, 'duration_ms': duration_ms}
+                )
+                
                 return NodeResult(
                     node_id=node_id,
                     node_type=node_type,
@@ -418,6 +471,15 @@ class WorkflowEngine:
                 context, node_label, 'completed',
                 message=f'Completed {node_label}',
                 step_data={'duration_ms': duration_ms}
+            )
+            
+            # Log action completed (success) audit event
+            self._log_audit_event(
+                context, 'action_completed',
+                action_name=node_label,
+                action_index=action_index,
+                success=True,
+                details={'node_id': node_id, 'node_type': node_type, 'duration_ms': duration_ms}
             )
             
             return NodeResult(
@@ -445,6 +507,16 @@ class WorkflowEngine:
             self._update_execution_progress(
                 context, node_label, 'failed',
                 message=str(e)
+            )
+            
+            # Log action completed (exception) audit event
+            self._log_audit_event(
+                context, 'action_completed',
+                action_name=node_label,
+                action_index=action_index,
+                success=False,
+                error_message=str(e),
+                details={'node_id': node_id, 'node_type': node_type, 'duration_ms': duration_ms}
             )
             
             return NodeResult(
@@ -538,6 +610,59 @@ class WorkflowEngine:
         except Exception as e:
             # Don't fail execution if progress update fails
             logger.warning(f"Failed to update execution progress: {e}")
+    
+    def _log_audit_event(
+        self,
+        context: ExecutionContext,
+        event_type: str,
+        action_name: str = None,
+        action_index: int = None,
+        success: bool = True,
+        error_message: str = None,
+        details: Dict = None
+    ):
+        """
+        Log an audit event to the job_audit_events table.
+        
+        Args:
+            context: Execution context
+            event_type: Type of event (job_started, job_completed, action_started, action_completed)
+            action_name: Name of the action/node
+            action_index: Index of the action
+            success: Whether the operation succeeded
+            error_message: Error message if failed
+            details: Additional details
+        """
+        try:
+            task_id = context.variables.get('_task_id')
+            if not task_id:
+                return
+            
+            from database import DatabaseManager
+            from ..repositories.audit_repo import JobAuditRepository
+            from ..repositories.execution_repo import ExecutionRepository
+            
+            db = DatabaseManager()
+            
+            # Get execution_id from task_id
+            execution_repo = ExecutionRepository(db)
+            execution = execution_repo.get_by_task_id(task_id)
+            execution_id = execution.get('id') if execution else None
+            
+            audit_repo = JobAuditRepository(db)
+            audit_repo.log_event(
+                event_type=event_type,
+                execution_id=execution_id,
+                task_id=task_id,
+                action_name=action_name,
+                action_index=action_index,
+                success=success,
+                error_message=error_message,
+                details=details
+            )
+        except Exception as e:
+            # Don't fail execution if audit logging fails
+            logger.warning(f"Failed to log audit event: {e}")
     
     def _create_execution_result(
         self,
