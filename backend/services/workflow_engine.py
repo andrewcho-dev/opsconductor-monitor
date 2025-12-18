@@ -576,12 +576,13 @@ class WorkflowEngine:
         )
         
         try:
-            from celery.result import AsyncResult
+            from celery.result import AsyncResult, allow_join_result
             from celery_app import celery_app
             
             result = AsyncResult(chord_task_id, app=celery_app)
             
-            # Poll for completion with timeout
+            # Use allow_join_result context to permit waiting for chord inside a task
+            # This is safe because we're waiting for a DIFFERENT task (the chord callback)
             timeout = 600  # 10 minutes
             poll_interval = 2  # Check every 2 seconds
             elapsed = 0
@@ -589,7 +590,9 @@ class WorkflowEngine:
             while elapsed < timeout:
                 if result.ready():
                     if result.successful():
-                        final_result = result.get()
+                        # Use allow_join_result to get the result
+                        with allow_join_result():
+                            final_result = result.get()
                         logger.info(f"Chord {chord_task_id} completed successfully")
                         
                         # Merge chord results with original result structure
