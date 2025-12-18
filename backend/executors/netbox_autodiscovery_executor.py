@@ -1245,15 +1245,19 @@ class NetBoxAutodiscoveryExecutor(BaseExecutor):
         """Find existing device in NetBox."""
         try:
             if match_by == 'ip':
-                # Search by primary IP
-                result = service._request('GET', 'dcim/devices/', params={
-                    'primary_ip': device['ip_address'],
+                # Search by IP using ipam/ip-addresses API (more reliable)
+                ip_result = service._request('GET', 'ipam/ip-addresses/', params={
+                    'address': device['ip_address'],
                 })
-                logger.info(f"NetBox search by IP {device['ip_address']}: {len(result.get('results', []))} results")
-                if result.get('results'):
-                    found = result['results'][0]
-                    logger.info(f"Found existing device by IP: {found.get('name')} (ID: {found.get('id')})")
-                    return found
+                if ip_result.get('results'):
+                    ip_obj = ip_result['results'][0]
+                    assigned = ip_obj.get('assigned_object')
+                    if assigned and assigned.get('device'):
+                        device_id = assigned['device']['id']
+                        found = service._request('GET', f"dcim/devices/{device_id}/")
+                        if found and found.get('id'):
+                            logger.info(f"Found existing device by IP {device['ip_address']}: {found.get('name')} (ID: {found.get('id')})")
+                            return found
             
             elif match_by == 'name':
                 result = service._request('GET', 'dcim/devices/', params={
@@ -1266,22 +1270,19 @@ class NetBoxAutodiscoveryExecutor(BaseExecutor):
                     return found
             
             elif match_by == 'ip_or_name':
-                # Try IP first, then name
-                result = service._request('GET', 'dcim/devices/', params={
-                    'primary_ip': device['ip_address'],
+                # Try IP first using ipam/ip-addresses API (more reliable)
+                ip_result = service._request('GET', 'ipam/ip-addresses/', params={
+                    'address': device['ip_address'],
                 })
-                logger.info(f"NetBox search by IP {device['ip_address']}: {len(result.get('results', []))} results")
-                if result.get('results'):
-                    found = result['results'][0]
-                    # Verify the IP actually matches
-                    found_ip = found.get('primary_ip4', {})
-                    if found_ip:
-                        found_ip_addr = found_ip.get('address', '').split('/')[0]
-                        if found_ip_addr == device['ip_address']:
-                            logger.info(f"Found existing device by IP: {found.get('name')} (ID: {found.get('id')})")
+                if ip_result.get('results'):
+                    ip_obj = ip_result['results'][0]
+                    assigned = ip_obj.get('assigned_object')
+                    if assigned and assigned.get('device'):
+                        device_id = assigned['device']['id']
+                        found = service._request('GET', f"dcim/devices/{device_id}/")
+                        if found and found.get('id'):
+                            logger.info(f"Found existing device by IP {device['ip_address']}: {found.get('name')} (ID: {found.get('id')})")
                             return found
-                        else:
-                            logger.info(f"IP mismatch: searched for {device['ip_address']}, found {found_ip_addr}")
                 
                 # Use exact name match to avoid false positives
                 result = service._request('GET', 'dcim/devices/', params={
