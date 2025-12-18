@@ -431,15 +431,6 @@ export const autodiscoveryNodes = {
         max: 5,
       },
       {
-        id: 'concurrency',
-        type: 'number',
-        label: 'Concurrency',
-        default: 50,
-        min: 1,
-        max: 500,
-        help: 'Number of parallel operations',
-      },
-      {
         id: 'port_scan_timeout',
         type: 'number',
         label: 'Port Scan Timeout (seconds)',

@@ -149,14 +149,6 @@ export default {
           min: 1,
           max: 600,
         },
-        {
-          id: 'concurrency',
-          type: 'number',
-          label: 'Concurrency',
-          default: 10,
-          min: 1,
-          max: 50,
-        },
       ],
       
       advanced: [

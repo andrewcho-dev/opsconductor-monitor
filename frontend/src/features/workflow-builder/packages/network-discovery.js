@@ -154,15 +154,6 @@ export default {
           max: 30,
           help: 'Time to wait for response',
         },
-        {
-          id: 'concurrency',
-          type: 'number',
-          label: 'Concurrency',
-          default: 50,
-          min: 1,
-          max: 500,
-          help: 'Number of parallel pings',
-        },
       ],
       
       advanced: [
@@ -281,14 +272,6 @@ export default {
           default: 3,
           min: 1,
           max: 30,
-        },
-        {
-          id: 'concurrency',
-          type: 'number',
-          label: 'Concurrency',
-          default: 100,
-          min: 1,
-          max: 1000,
         },
       ],
       

@@ -257,13 +257,11 @@ class SNMPWalkerExecutor:
         version = params.get('snmp_version', '2c')
         sync_to_netbox = params.get('sync_to_netbox', True)  # Default to syncing
         
-        # Auto-detect optimal parallelism based on CPU cores
-        # All network I/O uses same formula: 10x cores, max 200
+        # Auto-detect optimal parallelism based on system resources
         import os
         cpu_count = os.cpu_count() or 4
-        default_parallel = min(cpu_count * 10, len(targets), 200)
-        parallel = params.get('parallel_walks', default_parallel)
-        logger.info(f"SNMP walk using {parallel} threads for {len(targets)} targets")
+        parallel = min(cpu_count * 10, len(targets), 200)  # 10x cores, max 200
+        logger.info(f"SNMP walk using {parallel} threads for {len(targets)} targets (CPU cores: {cpu_count})")
         
         logger.info(
             f"Starting comprehensive SNMP walk on {len(targets)} targets",

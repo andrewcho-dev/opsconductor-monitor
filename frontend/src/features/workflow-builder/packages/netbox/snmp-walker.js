@@ -209,15 +209,6 @@ export const snmpWalkerNodes = {
         help: 'Maximum entries to collect per table',
       },
       {
-        id: 'parallel_walks',
-        type: 'number',
-        label: 'Parallel Walks',
-        default: 5,
-        min: 1,
-        max: 20,
-        help: 'Number of hosts to walk simultaneously',
-      },
-      {
         id: 'retry_count',
         type: 'number',
         label: 'Retry Count',

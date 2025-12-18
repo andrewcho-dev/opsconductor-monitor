@@ -655,12 +655,11 @@ class NetBoxAutodiscoveryExecutor(BaseExecutor):
         timeout = config.get('ping_timeout', 1)
         count = config.get('ping_count', 2)
         
-        # Auto-detect optimal concurrency - all network I/O is similar
+        # Auto-detect optimal concurrency based on system resources
         import os
         cpu_count = os.cpu_count() or 4
-        default_concurrency = min(cpu_count * 10, len(targets), 200)  # 10x cores, max 200
-        concurrency = config.get('concurrency', default_concurrency)
-        logger.info(f"Ping scan using {concurrency} threads for {len(targets)} targets")
+        concurrency = min(cpu_count * 10, len(targets), 200)  # 10x cores, max 200
+        logger.info(f"Ping scan using {concurrency} threads for {len(targets)} targets (CPU cores: {cpu_count})")
         
         def ping_host(ip: str) -> Optional[str]:
             try:
@@ -742,12 +741,11 @@ class NetBoxAutodiscoveryExecutor(BaseExecutor):
         """Discover detailed information for each host."""
         discovered = []
         
-        # Auto-detect optimal concurrency - same as ping scan for consistency
+        # Auto-detect optimal concurrency based on system resources
         import os
         cpu_count = os.cpu_count() or 4
-        default_concurrency = min(cpu_count * 10, len(hosts), 200)  # 10x cores, max 200
-        concurrency = config.get('concurrency', default_concurrency)
-        logger.info(f"Host discovery using {concurrency} threads for {len(hosts)} hosts")
+        concurrency = min(cpu_count * 10, len(hosts), 200)  # 10x cores, max 200
+        logger.info(f"Host discovery using {concurrency} threads for {len(hosts)} hosts (CPU cores: {cpu_count})")
         
         def discover_host(ip: str) -> Dict[str, Any]:
             device = {
