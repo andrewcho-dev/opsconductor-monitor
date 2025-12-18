@@ -410,6 +410,11 @@ class NetBoxAutodiscoveryExecutor(BaseExecutor):
         """
         Execute comprehensive autodiscovery.
         
+        Uses Celery chord pattern to distribute discovery across multiple workers:
+        1. Ping scan to find online hosts (single task)
+        2. Split hosts into chunks and dispatch parallel discovery tasks (chord header)
+        3. Aggregate results and sync to NetBox (chord callback)
+        
         Args:
             config: Discovery configuration from node parameters
         
@@ -417,6 +422,10 @@ class NetBoxAutodiscoveryExecutor(BaseExecutor):
             Discovery results with created/updated devices
         """
         start_time = time.time()
+        
+        # Check if we should use chord pattern (for large scans)
+        use_chord = config.get('use_chord', True)
+        chord_threshold = config.get('chord_threshold', 20)  # Use chord for 20+ hosts
         
         # Initialize result structure
         result = {
@@ -459,11 +468,14 @@ class NetBoxAutodiscoveryExecutor(BaseExecutor):
             
             logger.info(f"Found {len(online_hosts)} online hosts")
             
-            # Stage 3-7: Discover each host using ThreadPoolExecutor
-            # Note: Celery parallel discovery is disabled because result.get() cannot be called within a task
-            # ThreadPoolExecutor with 200 threads provides excellent parallelism within a single worker
-            logger.info(f"Discovering {len(online_hosts)} hosts using ThreadPoolExecutor")
-            discovered_devices = self._discover_hosts(online_hosts, config)
+            # Decide whether to use chord pattern or ThreadPoolExecutor
+            if use_chord and len(online_hosts) >= chord_threshold:
+                # Use Celery chord for parallel discovery across multiple workers
+                return self._execute_with_chord(online_hosts, config, result, start_time)
+            else:
+                # Use ThreadPoolExecutor for smaller scans (stays in single process)
+                logger.info(f"Using ThreadPoolExecutor for {len(online_hosts)} hosts (below chord threshold)")
+                discovered_devices = self._discover_hosts(online_hosts, config)
             
             result['discovery_report']['snmp_success'] = sum(
                 1 for d in discovered_devices if d.get('snmp_success')
@@ -488,6 +500,102 @@ class NetBoxAutodiscoveryExecutor(BaseExecutor):
             logger.exception(f"Autodiscovery failed: {e}")
             result['discovery_report']['errors'].append(str(e))
         
+        result['discovery_report']['duration_seconds'] = round(time.time() - start_time, 2)
+        
+        return result
+    
+    def _execute_with_chord(self, online_hosts: List[str], config: Dict[str, Any], 
+                            result: Dict[str, Any], start_time: float) -> Dict[str, Any]:
+        """
+        Execute discovery using Celery chord pattern for parallel processing.
+        
+        IMPORTANT: This method dispatches the chord and returns immediately.
+        The chord callback (celery_aggregate_and_sync) will handle the final
+        sync to NetBox when all chunks complete.
+        
+        This is fire-and-forget - we don't wait for results because calling
+        .get() inside a Celery task causes deadlock.
+        """
+        try:
+            from celery import chord
+            from celery_app import celery_app
+        except ImportError:
+            logger.warning("Celery not available, falling back to ThreadPoolExecutor")
+            discovered_devices = self._discover_hosts(online_hosts, config)
+            return self._finalize_result(discovered_devices, config, result, start_time)
+        
+        import os
+        
+        # Calculate optimal chunk size
+        cpu_count = os.cpu_count() or 4
+        num_workers = min(cpu_count * 2, 32)
+        chunk_size = max(5, len(online_hosts) // num_workers)
+        
+        # Split into chunks
+        chunks = [online_hosts[i:i + chunk_size] for i in range(0, len(online_hosts), chunk_size)]
+        
+        logger.info(f"Using Celery chord: {len(chunks)} parallel tasks × {chunk_size} hosts/chunk")
+        
+        # Get current task ID for status updates in callback
+        workflow_task_id = None
+        try:
+            from celery import current_task
+            if current_task:
+                workflow_task_id = current_task.request.id
+        except:
+            pass
+        
+        # Create chord tasks
+        from backend.tasks.job_tasks import celery_scan_chunk, celery_aggregate_and_sync
+        
+        header = [celery_scan_chunk.s(chunk, config) for chunk in chunks]
+        callback = celery_aggregate_and_sync.s(config, workflow_task_id)
+        
+        # Execute chord (fire-and-forget - returns immediately)
+        # The callback will update the workflow execution status when complete
+        try:
+            chord_result = chord(header)(callback)
+            
+            logger.info(f"Chord dispatched: {len(chunks)} tasks, callback task ID: {chord_result.id}")
+            
+            # Return immediately with "in progress" status
+            # The chord callback will update the final status
+            result['success'] = True
+            result['discovery_report']['hosts_online'] = len(online_hosts)
+            result['discovery_report']['duration_seconds'] = round(time.time() - start_time, 2)
+            result['chord_dispatched'] = True
+            result['chord_task_id'] = chord_result.id
+            result['chord_chunks'] = len(chunks)
+            result['message'] = f'Dispatched {len(chunks)} parallel discovery tasks. Results will be synced when complete.'
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Chord dispatch failed: {e}, falling back to ThreadPoolExecutor")
+            # Fallback to ThreadPoolExecutor
+            discovered_devices = self._discover_hosts(online_hosts, config)
+            return self._finalize_result(discovered_devices, config, result, start_time)
+    
+    def _finalize_result(self, discovered_devices: List[Dict], config: Dict[str, Any],
+                         result: Dict[str, Any], start_time: float) -> Dict[str, Any]:
+        """Finalize result after discovery (sync to NetBox and build response)."""
+        result['discovery_report']['snmp_success'] = sum(
+            1 for d in discovered_devices if d.get('snmp_success')
+        )
+        
+        sync_results = self._sync_to_netbox(discovered_devices, config)
+        
+        result['created_devices'] = sync_results['created']
+        result['updated_devices'] = sync_results['updated']
+        result['skipped_devices'] = sync_results['skipped']
+        result['failed_hosts'] = sync_results['failed']
+        
+        result['discovery_report']['devices_created'] = len(sync_results['created'])
+        result['discovery_report']['devices_updated'] = len(sync_results['updated'])
+        result['discovery_report']['devices_skipped'] = len(sync_results['skipped'])
+        result['discovery_report']['errors'].extend(sync_results['errors'])
+        
+        result['success'] = True
         result['discovery_report']['duration_seconds'] = round(time.time() - start_time, 2)
         
         return result
