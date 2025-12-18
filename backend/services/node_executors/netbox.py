@@ -346,7 +346,7 @@ class NetBoxInterfaceSyncExecutor:
             from concurrent.futures import ThreadPoolExecutor
             import os
             cpu_count = os.cpu_count() or 4
-            max_workers = min(cpu_count * 5, len(device_interfaces), 100)
+            max_workers = max(1, min(cpu_count * 5, len(device_interfaces), 100))
             
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 results = list(executor.map(sync_device_interfaces, device_interfaces.items()))
