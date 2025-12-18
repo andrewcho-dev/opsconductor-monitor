@@ -254,6 +254,126 @@ class ExecutionRepository(BaseRepository):
         results = self.execute_query(query, tuple(params) if params else None)
         return len(results) if results else 0
     
+    def update_progress(
+        self,
+        task_id: str,
+        current_step: str = None,
+        step_status: str = None,
+        message: str = None,
+        percent: int = None,
+        step_data: Dict = None
+    ) -> bool:
+        """
+        Update execution progress for real-time tracking.
+        
+        Args:
+            task_id: Celery task ID
+            current_step: Name of current step being executed
+            step_status: Status of current step (started, completed, failed)
+            message: Progress message
+            percent: Overall completion percentage (0-100)
+            step_data: Additional step data
+        
+        Returns:
+            True if updated
+        """
+        import json
+        from datetime import datetime
+        
+        # Get current progress
+        execution = self.get_by_task_id(task_id)
+        if not execution:
+            return False
+        
+        progress = execution.get('progress') or {'steps': [], 'current_step': None, 'percent': 0}
+        if isinstance(progress, str):
+            progress = json.loads(progress)
+        
+        steps = progress.get('steps', [])
+        
+        if current_step and step_status:
+            # Find existing step or create new one
+            existing_step = next((s for s in steps if s['name'] == current_step), None)
+            
+            if step_status == 'started':
+                if not existing_step:
+                    steps.append({
+                        'name': current_step,
+                        'status': 'running',
+                        'started_at': datetime.utcnow().isoformat(),
+                        'message': message,
+                        'data': step_data
+                    })
+                else:
+                    existing_step['status'] = 'running'
+                    existing_step['started_at'] = datetime.utcnow().isoformat()
+                    if message:
+                        existing_step['message'] = message
+                progress['current_step'] = current_step
+                
+            elif step_status == 'completed':
+                if existing_step:
+                    existing_step['status'] = 'completed'
+                    existing_step['finished_at'] = datetime.utcnow().isoformat()
+                    if message:
+                        existing_step['message'] = message
+                    if step_data:
+                        existing_step['data'] = step_data
+                progress['current_step'] = None
+                
+            elif step_status == 'failed':
+                if existing_step:
+                    existing_step['status'] = 'failed'
+                    existing_step['finished_at'] = datetime.utcnow().isoformat()
+                    if message:
+                        existing_step['message'] = message
+                progress['current_step'] = None
+        
+        if message and not current_step:
+            progress['message'] = message
+        
+        if percent is not None:
+            progress['percent'] = min(100, max(0, percent))
+        
+        progress['steps'] = steps
+        progress['updated_at'] = datetime.utcnow().isoformat()
+        
+        query = """
+            UPDATE scheduler_job_executions
+            SET progress = %s
+            WHERE task_id = %s
+        """
+        self.execute_query(query, (json.dumps(progress), task_id), fetch=False)
+        return True
+    
+    def get_live_progress(self, task_id: str) -> Optional[Dict]:
+        """
+        Get live progress for a running execution.
+        
+        Args:
+            task_id: Celery task ID
+        
+        Returns:
+            Progress data or None
+        """
+        import json
+        
+        execution = self.get_by_task_id(task_id)
+        if not execution:
+            return None
+        
+        progress = execution.get('progress')
+        if isinstance(progress, str):
+            progress = json.loads(progress)
+        
+        return {
+            'task_id': task_id,
+            'status': execution.get('status'),
+            'job_name': execution.get('job_name'),
+            'started_at': execution.get('started_at'),
+            'progress': progress or {'steps': [], 'current_step': None, 'percent': 0}
+        }
+    
     def mark_stale_executions(self, timeout_seconds: int = 600) -> int:
         """
         Mark stale running/queued executions as timed out.

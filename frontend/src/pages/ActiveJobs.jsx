@@ -13,7 +13,9 @@ import {
   Server,
   Cpu,
   Zap,
-  Info
+  Info,
+  ChevronRight,
+  Circle
 } from "lucide-react";
 import { cn, fetchApi, formatTimeOnly, formatElapsedDuration, formatRelativeTime } from "../lib/utils";
 import { PageHeader } from "../components/layout";
@@ -27,6 +29,7 @@ export function ActiveJobs() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedJob, setSelectedJob] = useState(null);
+  const [jobProgress, setJobProgress] = useState({});
   const refreshInterval = useRef(null);
   const [lastUpdate, setLastUpdate] = useState(new Date());
 
@@ -52,7 +55,22 @@ export function ActiveJobs() {
       try {
         const execResponse = await fetchApi("/api/scheduler/executions/recent?limit=50&status=running", { headers: getAuthHeader() });
         const execData = execResponse.data || execResponse;
-        setActiveJobs(Array.isArray(execData) ? execData : []);
+        const jobs = Array.isArray(execData) ? execData : [];
+        setActiveJobs(jobs);
+        
+        // Fetch progress for each running job
+        const progressPromises = jobs.map(async (job) => {
+          try {
+            const progressRes = await fetchApi(`/api/scheduler/executions/${job.id}/progress`, { headers: getAuthHeader() });
+            return { id: job.id, progress: progressRes.data?.progress || progressRes.progress };
+          } catch {
+            return { id: job.id, progress: null };
+          }
+        });
+        const progressResults = await Promise.all(progressPromises);
+        const progressMap = {};
+        progressResults.forEach(p => { if (p.progress) progressMap[p.id] = p.progress; });
+        setJobProgress(progressMap);
       } catch {
         setActiveJobs([]);
       }
@@ -252,9 +270,58 @@ export function ActiveJobs() {
                             </span>
                           )}
                         </div>
+                        {/* Progress bar */}
+                        {jobProgress[job.id] && (
+                          <div className="mt-2">
+                            <div className="flex items-center justify-between text-[10px] text-gray-500 mb-1">
+                              <span>{jobProgress[job.id].current_step || jobProgress[job.id].message || 'Processing...'}</span>
+                              <span>{jobProgress[job.id].percent || 0}%</span>
+                            </div>
+                            <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-blue-500 transition-all duration-300"
+                                style={{ width: `${jobProgress[job.id].percent || 0}%` }}
+                              />
+                            </div>
+                          </div>
+                        )}
                         {/* Expanded details */}
                         {selectedJob?.id === job.id && (
-                          <div className="mt-3 pt-3 border-t border-gray-200 space-y-2 text-xs">
+                          <div className="mt-3 pt-3 border-t border-gray-200 space-y-3 text-xs">
+                            {/* Live Steps */}
+                            {jobProgress[job.id]?.steps?.length > 0 && (
+                              <div>
+                                <span className="text-gray-500 font-medium">Execution Steps:</span>
+                                <div className="mt-2 space-y-1 max-h-48 overflow-y-auto">
+                                  {jobProgress[job.id].steps.map((step, idx) => (
+                                    <div key={idx} className="flex items-center gap-2 py-1 px-2 bg-gray-50 rounded">
+                                      {step.status === 'running' ? (
+                                        <Loader2 className="w-3 h-3 text-blue-500 animate-spin flex-shrink-0" />
+                                      ) : step.status === 'completed' ? (
+                                        <CheckCircle className="w-3 h-3 text-green-500 flex-shrink-0" />
+                                      ) : step.status === 'failed' ? (
+                                        <XCircle className="w-3 h-3 text-red-500 flex-shrink-0" />
+                                      ) : (
+                                        <Circle className="w-3 h-3 text-gray-300 flex-shrink-0" />
+                                      )}
+                                      <span className={cn(
+                                        "flex-1 truncate",
+                                        step.status === 'running' && "text-blue-700 font-medium",
+                                        step.status === 'completed' && "text-gray-600",
+                                        step.status === 'failed' && "text-red-600"
+                                      )}>
+                                        {step.name}
+                                      </span>
+                                      {step.data?.duration_ms && (
+                                        <span className="text-[10px] text-gray-400">
+                                          {step.data.duration_ms}ms
+                                        </span>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                             <div className="grid grid-cols-2 gap-2">
                               <div>
                                 <span className="text-gray-500">Task ID:</span>

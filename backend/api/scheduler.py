@@ -386,6 +386,43 @@ def mark_stale_executions():
     return jsonify(success_response({'marked': marked}, message=f'Marked {marked} stale executions'))
 
 
+@scheduler_bp.route('/executions/<int:execution_id>/progress', methods=['GET'])
+
+def get_execution_progress(execution_id):
+    """
+    Get live progress for a running execution.
+    
+    Args:
+        execution_id: Execution ID
+    
+    Returns:
+        Progress data including steps, current step, and percent complete
+    """
+    from database import DatabaseManager
+    from ..repositories.execution_repo import ExecutionRepository
+    
+    db = DatabaseManager()
+    execution_repo = ExecutionRepository(db)
+    execution = execution_repo.get_by_id(execution_id)
+    
+    if not execution:
+        raise NotFoundError(f'Execution {execution_id} not found')
+    
+    task_id = execution.get('task_id')
+    progress_data = execution_repo.get_live_progress(task_id) if task_id else None
+    
+    if not progress_data:
+        progress_data = {
+            'task_id': task_id,
+            'status': execution.get('status'),
+            'job_name': execution.get('job_name'),
+            'started_at': execution.get('started_at'),
+            'progress': {'steps': [], 'current_step': None, 'percent': 0}
+        }
+    
+    return jsonify(success_response(progress_data))
+
+
 @scheduler_bp.route('/executions/<int:execution_id>/cancel', methods=['POST'])
 
 def cancel_execution(execution_id):

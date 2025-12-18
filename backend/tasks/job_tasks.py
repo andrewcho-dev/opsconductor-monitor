@@ -237,9 +237,18 @@ def run_workflow(workflow_id, trigger_data=None):
     logger.info(f"Starting workflow execution: {workflow_name} (ID: {workflow_id}, Task: {task_id})")
     
     try:
+        # Count total nodes for progress tracking
+        definition = workflow.get('definition', {})
+        total_nodes = len(definition.get('nodes', []))
+        
+        # Add task_id and total_nodes to trigger_data for progress tracking
+        enhanced_trigger_data = trigger_data or {}
+        enhanced_trigger_data['_task_id'] = task_id
+        enhanced_trigger_data['_total_nodes'] = total_nodes
+        
         # Execute the workflow
         engine = WorkflowEngine(db_manager=db)
-        result = engine.execute(workflow, trigger_data or {})
+        result = engine.execute(workflow, enhanced_trigger_data)
         
         # Record execution in workflow table
         workflow_repo.record_execution(workflow_id)

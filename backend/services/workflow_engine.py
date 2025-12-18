@@ -328,6 +328,7 @@ class WorkflowEngine:
         
         node_id = node['id']
         node_type = node.get('data', {}).get('nodeType', 'unknown')
+        node_label = node.get('data', {}).get('label', node_type)
         
         logger.info(
             f"Executing node {node_id} ({node_type})",
@@ -335,6 +336,12 @@ class WorkflowEngine:
             execution_id=context.execution_id,
             category='node_execution',
             details={'node_id': node_id, 'node_type': node_type}
+        )
+        
+        # Update progress - step started
+        self._update_execution_progress(
+            context, node_label, 'started', 
+            message=f'Executing {node_label}'
         )
         
         started_at = now_utc()
@@ -389,6 +396,12 @@ class WorkflowEngine:
                     category='node_execution',
                     details={'node_id': node_id, 'node_type': node_type, 'error': error_message}
                 )
+                # Update progress - step failed
+                self._update_execution_progress(
+                    context, node_label, 'failed',
+                    message=error_message
+                )
+                
                 return NodeResult(
                     node_id=node_id,
                     node_type=node_type,
@@ -399,6 +412,13 @@ class WorkflowEngine:
                     finished_at=finished_at,
                     duration_ms=duration_ms,
                 )
+            
+            # Update progress - step completed
+            self._update_execution_progress(
+                context, node_label, 'completed',
+                message=f'Completed {node_label}',
+                step_data={'duration_ms': duration_ms}
+            )
             
             return NodeResult(
                 node_id=node_id,
@@ -420,6 +440,12 @@ class WorkflowEngine:
             )
             finished_at = now_utc()
             duration_ms = int((finished_at - started_at).total_seconds() * 1000)
+            
+            # Update progress - step failed with exception
+            self._update_execution_progress(
+                context, node_label, 'failed',
+                message=str(e)
+            )
             
             return NodeResult(
                 node_id=node_id,
@@ -466,6 +492,52 @@ class WorkflowEngine:
             return ['success', 'trigger', 'results', 'online', 'offline', 'data']
         else:
             return ['failure']
+    
+    def _update_execution_progress(
+        self,
+        context: ExecutionContext,
+        step_name: str,
+        step_status: str,
+        message: str = None,
+        step_data: Dict = None
+    ):
+        """
+        Update execution progress in the database.
+        
+        Args:
+            context: Execution context with task_id
+            step_name: Name of the current step
+            step_status: Status (started, completed, failed)
+            message: Optional progress message
+            step_data: Optional step data
+        """
+        try:
+            # Get task_id from context variables (set by job_tasks.py)
+            task_id = context.variables.get('_task_id')
+            if not task_id:
+                return
+            
+            # Calculate percent based on completed nodes
+            total_nodes = context.variables.get('_total_nodes', 0)
+            completed = len([r for r in context.node_results.values() if r.status == NodeStatus.SUCCESS])
+            percent = int((completed / total_nodes) * 100) if total_nodes > 0 else 0
+            
+            from database import DatabaseManager
+            from ..repositories.execution_repo import ExecutionRepository
+            
+            db = DatabaseManager()
+            execution_repo = ExecutionRepository(db)
+            execution_repo.update_progress(
+                task_id=task_id,
+                current_step=step_name,
+                step_status=step_status,
+                message=message,
+                percent=percent,
+                step_data=step_data
+            )
+        except Exception as e:
+            # Don't fail execution if progress update fails
+            logger.warning(f"Failed to update execution progress: {e}")
     
     def _create_execution_result(
         self,
