@@ -159,23 +159,29 @@ class SNMPWalkerExecutor:
                     })
         else:  # from_autodiscovery
             # Try to get from autodiscovery outputs stored in variables
-            # Look for created_devices, skipped_devices, or snmp_active from previous node
-            created = variables.get('created_devices', [])
+            # First check for node outputs stored by label (most common case)
+            # The workflow engine stores outputs under node label like "NetBox Autodiscovery"
+            for key, value in variables.items():
+                if isinstance(value, dict):
+                    # Prefer skipped_devices (existing devices) over created_devices
+                    # since autodiscovery typically skips existing devices
+                    if value.get('skipped_devices'):
+                        created = value.get('skipped_devices', [])
+                        break
+                    if value.get('created_devices'):
+                        created = value.get('created_devices', [])
+                        break
+                    if value.get('snmp_active'):
+                        created = value.get('snmp_active', [])
+                        break
+            
+            # Fallback to direct variable access
             if not created:
                 created = variables.get('skipped_devices', [])
             if not created:
-                created = variables.get('snmp_active', [])
-            
-            # Also check for node outputs stored by label
+                created = variables.get('created_devices', [])
             if not created:
-                for key, value in variables.items():
-                    if isinstance(value, dict):
-                        if 'created_devices' in value:
-                            created = value.get('created_devices', [])
-                            break
-                        if 'skipped_devices' in value:
-                            created = value.get('skipped_devices', [])
-                            break
+                created = variables.get('snmp_active', [])
             
             for device in created:
                 if isinstance(device, dict):
