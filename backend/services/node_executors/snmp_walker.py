@@ -102,8 +102,19 @@ OIDS = {
 class SNMPWalkerExecutor:
     """Executor for comprehensive SNMP walking."""
     
-    def execute(self, node: Dict, context: Dict) -> Dict:
+    def execute(self, node: Dict, context) -> Dict:
         """Execute the SNMP walker based on command."""
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # Debug: Log context type and contents
+        logger.warning(f"SNMP Walker execute called. Context type: {type(context)}")
+        if hasattr(context, 'variables'):
+            logger.warning(f"SNMP Walker: context.variables keys: {list(context.variables.keys())}")
+            for k, v in context.variables.items():
+                if isinstance(v, dict):
+                    logger.warning(f"SNMP Walker: '{k}' is dict with keys: {list(v.keys())[:10]}")
+        
         params = node.get('data', {}).get('parameters', {})
         command = node.get('data', {}).get('execution', {}).get('command', 'walk.comprehensive')
         
@@ -159,33 +170,60 @@ class SNMPWalkerExecutor:
                     })
         else:  # from_autodiscovery
             # Try to get from autodiscovery outputs stored in variables
-            # First check for node outputs stored by label (most common case)
-            # The workflow engine stores outputs under node label like "NetBox Autodiscovery"
+            # Look for skipped_devices or created_devices in any dict variable
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"SNMP Walker: Looking for targets in variables. Keys: {list(variables.keys())}")
+            
+            # Collect all potential targets from all sources
+            all_skipped = []
+            all_created = []
+            created = []  # Initialize created list
+            
             for key, value in variables.items():
                 if isinstance(value, dict):
-                    # Prefer skipped_devices (existing devices) over created_devices
-                    # since autodiscovery typically skips existing devices
-                    if value.get('skipped_devices'):
-                        created = value.get('skipped_devices', [])
-                        break
-                    if value.get('created_devices'):
-                        created = value.get('created_devices', [])
-                        break
-                    if value.get('snmp_active'):
-                        created = value.get('snmp_active', [])
-                        break
+                    # Collect skipped_devices (existing devices that were found)
+                    skipped = value.get('skipped_devices', [])
+                    if skipped and isinstance(skipped, list):
+                        logger.warning(f"SNMP Walker: Found {len(skipped)} skipped_devices in '{key}'")
+                        all_skipped.extend(skipped)
+                    
+                    # Collect created_devices (newly created devices)
+                    created_list = value.get('created_devices', [])
+                    if created_list and isinstance(created_list, list):
+                        logger.warning(f"SNMP Walker: Found {len(created_list)} created_devices in '{key}'")
+                        all_created.extend(created_list)
             
-            # Fallback to direct variable access
-            if not created:
+            # Use skipped_devices first (existing devices), then created_devices
+            if all_skipped:
+                created = all_skipped
+                logger.warning(f"SNMP Walker: Using {len(created)} skipped_devices as targets")
+            elif all_created:
+                created = all_created
+                logger.warning(f"SNMP Walker: Using {len(created)} created_devices as targets")
+            else:
+                # Fallback to direct variable access
                 created = variables.get('skipped_devices', [])
-            if not created:
-                created = variables.get('created_devices', [])
-            if not created:
-                created = variables.get('snmp_active', [])
+                if not created:
+                    created = variables.get('created_devices', [])
+                if not created:
+                    created = variables.get('snmp_active', [])
+            
+            logger.warning(f"SNMP Walker: Final target count: {len(created)}")
+            if created:
+                logger.warning(f"SNMP Walker: First target sample: {created[0] if created else 'none'}")
             
             for device in created:
                 if isinstance(device, dict):
-                    ip = device.get('ip_address') or device.get('primary_ip', {}).get('address', '').split('/')[0] if isinstance(device.get('primary_ip'), dict) else device.get('primary_ip', '').split('/')[0] if device.get('primary_ip') else None
+                    # Extract IP address - check ip_address first, then primary_ip
+                    ip = device.get('ip_address')
+                    if not ip:
+                        primary_ip = device.get('primary_ip')
+                        if isinstance(primary_ip, dict):
+                            ip = primary_ip.get('address', '').split('/')[0]
+                        elif isinstance(primary_ip, str):
+                            ip = primary_ip.split('/')[0]
+                    
                     if ip:
                         targets.append({
                             'ip_address': ip,
@@ -202,7 +240,7 @@ class SNMPWalkerExecutor:
         return targets
     
     def _walk_comprehensive(self, params: Dict, context: Dict) -> Dict:
-        """Perform comprehensive SNMP walk on all targets."""
+        """Perform comprehensive SNMP walk on all targets and sync to NetBox."""
         start_time = time.time()
         targets = self._get_targets(params, context)
         
@@ -216,19 +254,47 @@ class SNMPWalkerExecutor:
         walk_tables = params.get('walk_tables', ['system', 'interfaces', 'ip_addresses', 'arp'])
         timeout = params.get('timeout_seconds', 30)
         max_results = params.get('max_results_per_table', 500)
-        parallel = params.get('parallel_walks', 5)
         version = params.get('snmp_version', '2c')
+        sync_to_netbox = params.get('sync_to_netbox', True)  # Default to syncing
+        
+        # Auto-detect optimal parallelism based on CPU cores
+        # All network I/O uses same formula: 10x cores, max 200
+        import os
+        cpu_count = os.cpu_count() or 4
+        default_parallel = min(cpu_count * 10, len(targets), 200)
+        parallel = params.get('parallel_walks', default_parallel)
+        logger.info(f"SNMP walk using {parallel} threads for {len(targets)} targets")
         
         logger.info(
             f"Starting comprehensive SNMP walk on {len(targets)} targets",
             category='walk',
-            details={'tables': walk_tables, 'parallel': parallel}
+            details={'tables': walk_tables, 'parallel': parallel, 'sync_to_netbox': sync_to_netbox}
         )
         
         walk_results = []
         failed_hosts = []
         all_interfaces = []
         all_neighbors = []
+        
+        # NetBox sync stats
+        netbox_stats = {
+            'interfaces_created': 0,
+            'interfaces_updated': 0,
+            'interfaces_skipped': 0,
+            'sync_errors': [],
+        }
+        
+        # Get NetBox service if syncing
+        netbox_service = None
+        if sync_to_netbox:
+            try:
+                from ...api.netbox import get_netbox_service
+                netbox_service = get_netbox_service()
+                if not netbox_service.is_configured:
+                    logger.warning("NetBox not configured, skipping sync")
+                    netbox_service = None
+            except Exception as e:
+                logger.warning(f"Could not initialize NetBox service: {e}")
         
         # Walk targets in parallel
         with concurrent.futures.ThreadPoolExecutor(max_workers=parallel) as executor:
@@ -253,6 +319,26 @@ class SNMPWalkerExecutor:
                         all_interfaces.extend(result.get('interfaces', []))
                         all_neighbors.extend(result.get('lldp_neighbors', []))
                         all_neighbors.extend(result.get('cdp_neighbors', []))
+                        
+                        # Sync to NetBox immediately after each device
+                        if netbox_service and result.get('device_id'):
+                            try:
+                                sync_result = self._sync_device_to_netbox(
+                                    netbox_service,
+                                    result,
+                                    target
+                                )
+                                netbox_stats['interfaces_created'] += sync_result.get('created', 0)
+                                netbox_stats['interfaces_updated'] += sync_result.get('updated', 0)
+                                netbox_stats['interfaces_skipped'] += sync_result.get('skipped', 0)
+                                if sync_result.get('errors'):
+                                    netbox_stats['sync_errors'].extend(sync_result['errors'])
+                            except Exception as e:
+                                logger.error(f"NetBox sync failed for {target['ip_address']}: {e}")
+                                netbox_stats['sync_errors'].append({
+                                    'device': target.get('device_name') or target['ip_address'],
+                                    'error': str(e)
+                                })
                     else:
                         failed_hosts.append(target['ip_address'])
                 except Exception as e:
@@ -268,6 +354,7 @@ class SNMPWalkerExecutor:
             'total_interfaces': len(all_interfaces),
             'total_neighbors': len(all_neighbors),
             'duration_seconds': round(duration, 2),
+            'netbox_sync': netbox_stats if sync_to_netbox else None,
         }
         
         logger.info(
@@ -283,7 +370,146 @@ class SNMPWalkerExecutor:
             'neighbors_discovered': all_neighbors,
             'failed_hosts': failed_hosts,
             'summary': summary,
+            'netbox_sync': netbox_stats if sync_to_netbox else None,
         }
+    
+    def _sync_device_to_netbox(self, netbox_service, walk_result: Dict, target: Dict) -> Dict:
+        """Sync discovered data for a single device to NetBox."""
+        device_id = walk_result.get('device_id') or target.get('device_id')
+        device_name = walk_result.get('device_name') or target.get('device_name')
+        
+        created = 0
+        updated = 0
+        skipped = 0
+        errors = []
+        
+        if not device_id:
+            return {'created': 0, 'updated': 0, 'skipped': 0, 'errors': ['No device_id']}
+        
+        try:
+            # Get existing interfaces for this device
+            existing = netbox_service.get_interfaces(device_id=device_id, limit=1000)
+            existing_names = {i['name']: i for i in existing.get('results', [])}
+            
+            # Sync interfaces
+            for iface in walk_result.get('interfaces', []):
+                iface_name = iface.get('name', '')
+                if not iface_name:
+                    continue
+                
+                # Map SNMP interface type to NetBox type
+                netbox_type = self._map_interface_type(iface)
+                
+                # Build interface data
+                iface_data = {
+                    'name': iface_name,
+                    'type': netbox_type,
+                    'enabled': iface.get('admin_status') == 'up',
+                    'description': iface.get('description', ''),
+                }
+                
+                # Add MAC address if available
+                mac = iface.get('mac_address')
+                if mac and mac != '00:00:00:00:00:00':
+                    iface_data['mac_address'] = mac.upper()
+                
+                # Add speed if available
+                speed = iface.get('speed_mbps')
+                if speed and speed > 0:
+                    iface_data['speed'] = speed * 1000  # NetBox uses kbps
+                
+                try:
+                    if iface_name in existing_names:
+                        # Update existing interface
+                        existing_iface = existing_names[iface_name]
+                        netbox_service._request(
+                            'PATCH',
+                            f'dcim/interfaces/{existing_iface["id"]}/',
+                            json=iface_data
+                        )
+                        updated += 1
+                    else:
+                        # Create new interface
+                        iface_data['device'] = device_id
+                        netbox_service._request('POST', 'dcim/interfaces/', json=iface_data)
+                        created += 1
+                except Exception as e:
+                    logger.warning(f"Failed to sync interface {iface_name} on {device_name}: {e}")
+                    skipped += 1
+            
+            # Update device with system info if available
+            system_info = walk_result.get('system_info', {})
+            if system_info:
+                device_update = {}
+                
+                # Update serial number if found
+                if system_info.get('sysDescr'):
+                    # Try to extract serial from sysDescr or store in comments
+                    device_update['comments'] = f"SNMP sysDescr: {system_info.get('sysDescr', '')[:500]}"
+                
+                if device_update:
+                    try:
+                        netbox_service._request('PATCH', f'dcim/devices/{device_id}/', json=device_update)
+                    except Exception as e:
+                        logger.warning(f"Failed to update device {device_name}: {e}")
+            
+            logger.info(f"NetBox sync for {device_name}: created={created}, updated={updated}, skipped={skipped}")
+            
+        except Exception as e:
+            logger.error(f"Failed to sync device {device_name} to NetBox: {e}")
+            errors.append({'device': device_name, 'error': str(e)})
+        
+        return {
+            'created': created,
+            'updated': updated,
+            'skipped': skipped,
+            'errors': errors,
+        }
+    
+    def _map_interface_type(self, iface: Dict) -> str:
+        """Map SNMP interface type to NetBox interface type."""
+        snmp_type = iface.get('type')
+        speed = iface.get('speed_mbps', 0)
+        name = iface.get('name', '').lower()
+        
+        # Map based on speed first
+        if speed >= 100000:
+            return '100gbase-x-qsfp28'
+        elif speed >= 40000:
+            return '40gbase-x-qsfpp'
+        elif speed >= 25000:
+            return '25gbase-x-sfp28'
+        elif speed >= 10000:
+            return '10gbase-x-sfpp'
+        elif speed >= 1000:
+            return '1000base-t'
+        elif speed >= 100:
+            return '100base-tx'
+        elif speed >= 10:
+            return '10base-t'
+        
+        # Map based on name patterns
+        if 'gig' in name or 'ge' in name:
+            return '1000base-t'
+        if 'fast' in name or 'fe' in name:
+            return '100base-tx'
+        if 'ten' in name or 'te' in name or '10g' in name:
+            return '10gbase-x-sfpp'
+        if 'vlan' in name:
+            return 'virtual'
+        if 'loopback' in name or name == 'lo':
+            return 'virtual'
+        if 'mgmt' in name or 'management' in name:
+            return '1000base-t'
+        
+        # Default based on SNMP type
+        # Type 6 = ethernetCsmacd
+        # Type 24 = softwareLoopback
+        # Type 1 = other
+        if snmp_type == '24' or snmp_type == 24:
+            return 'virtual'
+        
+        return '1000base-t'  # Default
     
     def _walk_single_target(
         self,

@@ -180,7 +180,8 @@ class SchedulerService(BaseService):
         self,
         job_name: str = None,
         limit: int = 100,
-        status: str = None
+        status: str = None,
+        exclude_result: bool = True
     ) -> List[Dict]:
         """
         Get recent job executions.
@@ -189,13 +190,14 @@ class SchedulerService(BaseService):
             job_name: Optional job name filter
             limit: Maximum results
             status: Optional status filter
+            exclude_result: Exclude large result column for performance
         
         Returns:
             List of executions
         """
         if job_name:
             return self.execution_repo.get_executions_for_job(job_name, limit, status)
-        return self.execution_repo.get_recent_executions(limit, status)
+        return self.execution_repo.get_recent_executions(limit, status, exclude_result)
     
     def create_execution(
         self,

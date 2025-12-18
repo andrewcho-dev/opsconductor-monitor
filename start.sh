@@ -29,13 +29,18 @@ else
 fi
 
 echo "🚀 Starting Celery workers..."
-nohup celery -A celery_app worker -l info --concurrency=4 -n worker1@%h > /tmp/opsconductor_worker.log 2>&1 &
+# Use prefork pool with concurrency based on CPU cores (2x cores for I/O bound tasks)
+CPU_COUNT=$(nproc 2>/dev/null || echo 4)
+CONCURRENCY=$((CPU_COUNT * 2))
+if [ $CONCURRENCY -gt 32 ]; then CONCURRENCY=32; fi
+echo "   Using concurrency: $CONCURRENCY (based on $CPU_COUNT cores)"
+nohup python3 -m celery -A celery_app worker -l info --concurrency=$CONCURRENCY --prefetch-multiplier=1 -n worker1@%h > /tmp/opsconductor_worker.log 2>&1 &
 WORKER_PID=$!
 sleep 2
 echo "✅ Celery worker started (PID: $WORKER_PID)"
 
 echo "🚀 Starting Celery beat scheduler..."
-nohup celery -A celery_app beat -l info > /tmp/opsconductor_beat.log 2>&1 &
+nohup python3 -m celery -A celery_app beat -l info > /tmp/opsconductor_beat.log 2>&1 &
 BEAT_PID=$!
 sleep 1
 echo "✅ Celery beat started (PID: $BEAT_PID)"

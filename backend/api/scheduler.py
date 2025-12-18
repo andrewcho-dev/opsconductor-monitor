@@ -320,7 +320,6 @@ def clear_job_executions(name):
 
 
 @scheduler_bp.route('/executions/recent', methods=['GET'])
-
 def get_recent_executions():
     """
     Get recent executions across all jobs.
@@ -328,6 +327,7 @@ def get_recent_executions():
     Query params:
         limit: Max results (default: 100)
         status: Filter by status
+        include_result: Include full result data (default: false for list view)
     
     Returns:
         List of executions
@@ -336,8 +336,14 @@ def get_recent_executions():
     
     limit = int(request.args.get('limit', '100'))
     status = request.args.get('status')
+    include_result = request.args.get('include_result', 'false').lower() == 'true'
     
-    executions = service.get_recent_executions(limit=limit, status=status)
+    # Exclude result at database level for performance (32MB+ of data)
+    executions = service.get_recent_executions(
+        limit=limit,
+        status=status,
+        exclude_result=not include_result
+    )
     
     return jsonify(list_response(executions))
 

@@ -194,7 +194,8 @@ class ExecutionRepository(BaseRepository):
     def get_recent_executions(
         self,
         limit: int = 100,
-        status: str = None
+        status: str = None,
+        exclude_result: bool = True
     ) -> List[Dict]:
         """
         Get recent executions across all jobs.
@@ -202,19 +203,53 @@ class ExecutionRepository(BaseRepository):
         Args:
             limit: Maximum results
             status: Optional status filter
+            exclude_result: Exclude large result JSONB column (default True for performance)
         
         Returns:
             List of execution records
         """
-        filters = {}
-        if status:
-            filters['status'] = status
+        if not exclude_result:
+            # Use standard method if result is needed
+            filters = {}
+            if status:
+                filters['status'] = status
+            return self.get_all(
+                filters=filters if filters else None,
+                order_by='created_at DESC',
+                limit=limit
+            )
         
-        return self.get_all(
-            filters=filters if filters else None,
-            order_by='created_at DESC',
-            limit=limit
-        )
+        # Custom query excluding the large result column for performance
+        columns = [
+            'id', 'job_name', 'task_name', 'task_id', 'status',
+            'started_at', 'finished_at', 'created_at', 'worker',
+            'triggered_by', 'config'
+        ]
+        
+        query = f"SELECT {', '.join(columns)} FROM {self.table_name}"
+        params = []
+        
+        if status:
+            query += " WHERE status = %s"
+            params.append(status)
+        
+        query += " ORDER BY created_at DESC LIMIT %s"
+        params.append(limit)
+        
+        from psycopg2.extras import RealDictCursor
+        
+        try:
+            with self.db.get_connection() as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    cur.execute(query, params)
+                    rows = cur.fetchall()
+                    # RealDictCursor handles JSONB columns properly
+                    return [dict(row) for row in rows]
+        except Exception as e:
+            # Log error and return empty list instead of crashing
+            import logging
+            logging.getLogger(__name__).error(f"Error fetching recent executions: {e}")
+            return []
     
     def clear_executions(
         self,

@@ -654,7 +654,13 @@ class NetBoxAutodiscoveryExecutor(BaseExecutor):
         online = []
         timeout = config.get('ping_timeout', 1)
         count = config.get('ping_count', 2)
-        concurrency = config.get('concurrency', 50)
+        
+        # Auto-detect optimal concurrency - all network I/O is similar
+        import os
+        cpu_count = os.cpu_count() or 4
+        default_concurrency = min(cpu_count * 10, len(targets), 200)  # 10x cores, max 200
+        concurrency = config.get('concurrency', default_concurrency)
+        logger.info(f"Ping scan using {concurrency} threads for {len(targets)} targets")
         
         def ping_host(ip: str) -> Optional[str]:
             try:
@@ -692,8 +698,13 @@ class NetBoxAutodiscoveryExecutor(BaseExecutor):
             return self._discover_hosts(hosts, config)
         
         # Calculate chunk size based on number of workers and hosts
-        num_workers = config.get('parallel_workers', 4)
-        chunk_size = max(25, len(hosts) // num_workers)
+        # Auto-detect optimal workers based on CPU cores
+        import os
+        cpu_count = os.cpu_count() or 4
+        default_workers = min(cpu_count * 2, 32)  # Match Celery worker count
+        num_workers = config.get('parallel_workers', default_workers)
+        chunk_size = max(5, len(hosts) // num_workers)  # Small chunks for even distribution
+        logger.info(f"Parallel discovery using {num_workers} workers, chunk size {chunk_size}")
         
         # Split hosts into chunks
         chunks = [hosts[i:i + chunk_size] for i in range(0, len(hosts), chunk_size)]
@@ -730,7 +741,13 @@ class NetBoxAutodiscoveryExecutor(BaseExecutor):
     def _discover_hosts(self, hosts: List[str], config: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Discover detailed information for each host."""
         discovered = []
-        concurrency = config.get('concurrency', 50)
+        
+        # Auto-detect optimal concurrency - same as ping scan for consistency
+        import os
+        cpu_count = os.cpu_count() or 4
+        default_concurrency = min(cpu_count * 10, len(hosts), 200)  # 10x cores, max 200
+        concurrency = config.get('concurrency', default_concurrency)
+        logger.info(f"Host discovery using {concurrency} threads for {len(hosts)} hosts")
         
         def discover_host(ip: str) -> Dict[str, Any]:
             device = {

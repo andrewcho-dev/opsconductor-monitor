@@ -33,7 +33,7 @@ class NetBoxService:
     
     @property
     def session(self) -> requests.Session:
-        """Get or create requests session with auth headers."""
+        """Get or create requests session with auth headers and connection pooling."""
         if self._session is None:
             self._session = requests.Session()
             self._session.headers.update({
@@ -42,6 +42,26 @@ class NetBoxService:
                 'Accept': 'application/json',
             })
             self._session.verify = self.verify_ssl
+            
+            # Configure connection pooling for high concurrency
+            from requests.adapters import HTTPAdapter
+            from urllib3.util.retry import Retry
+            
+            # Retry strategy for transient failures
+            retry_strategy = Retry(
+                total=3,
+                backoff_factor=0.5,
+                status_forcelist=[429, 500, 502, 503, 504],
+            )
+            
+            # Increase pool size for parallel requests
+            adapter = HTTPAdapter(
+                pool_connections=50,
+                pool_maxsize=100,
+                max_retries=retry_strategy
+            )
+            self._session.mount('http://', adapter)
+            self._session.mount('https://', adapter)
         return self._session
     
     @property

@@ -77,7 +77,7 @@ class WorkflowEngine:
         from .node_executors.ssh import SSHCommandExecutor
         from .node_executors.database import DBQueryExecutor, DBUpsertExecutor
         from .node_executors.notifications import SlackExecutor, EmailExecutor, WebhookExecutor, TemplatedNotificationExecutor
-        from .node_executors.netbox import NetBoxAutodiscoveryExecutor, NetBoxDeviceCreateExecutor, NetBoxLookupExecutor
+        from .node_executors.netbox import NetBoxAutodiscoveryExecutor, NetBoxDeviceCreateExecutor, NetBoxLookupExecutor, NetBoxInterfaceSyncExecutor
         from .node_executors.prtg import PRTG_EXECUTORS
         
         # Create executor instances
@@ -96,6 +96,7 @@ class WorkflowEngine:
         templated_notify_exec = TemplatedNotificationExecutor()
         netbox_autodiscovery_exec = NetBoxAutodiscoveryExecutor()
         netbox_device_create_exec = NetBoxDeviceCreateExecutor()
+        interface_sync_exec = NetBoxInterfaceSyncExecutor()
         netbox_sites_exec = NetBoxLookupExecutor('sites')
         netbox_roles_exec = NetBoxLookupExecutor('device-roles')
         netbox_types_exec = NetBoxLookupExecutor('device-types')
@@ -119,7 +120,7 @@ class WorkflowEngine:
             # SNMP Walker (comprehensive discovery)
             'snmp_walker': lambda n, c: snmp_walker_exec.execute(n, c),
             'netbox:snmp-walker': lambda n, c: snmp_walker_exec.execute(n, c),
-            'netbox:snmp-interface-sync': lambda n, c: snmp_walker_exec.execute(n, c),
+            'netbox:snmp-interface-sync': lambda n, c: interface_sync_exec.execute(n, c),
             'netbox:snmp-neighbor-discovery': lambda n, c: snmp_walker_exec.execute(n, c),
             
             # SSH
