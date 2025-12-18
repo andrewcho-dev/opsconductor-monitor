@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Save, RotateCcw, TestTube, Database } from 'lucide-react';
+import { fetchApi } from '../../../lib/utils';
 
 export function DatabaseSettings() {
   const [settings, setSettings] = useState({
@@ -16,13 +17,36 @@ export function DatabaseSettings() {
   const [testing, setTesting] = useState(false);
   const [message, setMessage] = useState(null);
 
+  // Load current settings on mount
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const response = await fetchApi('/api/settings/database');
+        if (response.data) {
+          setSettings(prev => ({ ...prev, ...response.data }));
+        }
+      } catch (err) {
+        // Use defaults if API not available
+      }
+    };
+    loadSettings();
+  }, []);
+
   const testConnection = async () => {
     setTesting(true);
     setMessage(null);
-    setTimeout(() => {
-      setMessage({ type: 'success', text: 'Database connection successful' });
+    try {
+      const response = await fetchApi('/api/settings/database/test', { method: 'POST' });
+      if (response.success) {
+        setMessage({ type: 'success', text: 'Database connection successful' });
+      } else {
+        setMessage({ type: 'error', text: response.error || 'Connection failed' });
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: err.message || 'Connection test failed' });
+    } finally {
       setTesting(false);
-    }, 1000);
+    }
   };
 
   return (

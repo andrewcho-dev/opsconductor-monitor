@@ -134,6 +134,35 @@ def test_settings():
     return jsonify(success_response(results))
 
 
+@settings_bp.route('/database', methods=['GET'])
+def get_database_settings():
+    """Get database connection settings."""
+    import os
+    return jsonify(success_response({
+        'db_host': os.getenv('PG_HOST', 'localhost'),
+        'db_port': int(os.getenv('PG_PORT', 5432)),
+        'db_name': os.getenv('PG_DATABASE', 'opsconductor'),
+        'db_username': os.getenv('PG_USER', 'postgres'),
+        'db_ssl_mode': 'prefer',
+    }))
+
+
+@settings_bp.route('/database/test', methods=['POST'])
+def test_database_connection():
+    """Test database connection."""
+    try:
+        from database import DatabaseManager
+        db = DatabaseManager()
+        # Simple query to test connection
+        result = db.execute_query("SELECT 1 as test")
+        if result:
+            return jsonify(success_response({'connected': True}, message='Database connection successful'))
+        else:
+            return jsonify(error_response('DB_ERROR', 'Query returned no results')), 500
+    except Exception as e:
+        return jsonify(error_response('DB_ERROR', f'Connection failed: {str(e)}')), 500
+
+
 # Legacy routes for backward compatibility
 @settings_bp.route('/get_settings', methods=['GET'])
 def get_settings_legacy():

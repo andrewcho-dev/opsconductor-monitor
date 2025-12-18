@@ -413,7 +413,7 @@ export function SystemOverviewPage() {
             status={systemStatus?.database?.status || 'unknown'}
             details={[
               { label: 'Type', value: 'PostgreSQL' },
-              { label: 'Status', value: 'Connected' },
+              { label: 'Status', value: systemStatus?.database?.status === 'online' ? 'Connected' : 'Disconnected' },
             ]}
           />
           <StatusCard
