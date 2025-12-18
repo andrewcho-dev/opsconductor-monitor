@@ -35,14 +35,18 @@ class PingExecutor:
         # Ping parameters
         count = int(params.get('count', 3))
         timeout = int(params.get('timeout', 1))
-        concurrency = int(params.get('concurrency', 50))
+        
+        # Auto-detect optimal concurrency based on system resources
+        import os
+        cpu_count = os.cpu_count() or 4
+        concurrency = min(cpu_count * 10, len(targets) or 1, 200)  # 10x cores, max 200
         
         results = []
         online = []
         offline = []
         
         # Execute pings in parallel
-        with ThreadPoolExecutor(max_workers=min(concurrency, len(targets) or 1)) as executor:
+        with ThreadPoolExecutor(max_workers=concurrency) as executor:
             futures = {
                 executor.submit(self._ping_host, target, count, timeout): target
                 for target in targets
@@ -238,7 +242,7 @@ class PortScanExecutor:
     """Executor for port scan nodes."""
     
     def execute(self, node: Dict, context: Dict) -> Dict:
-        """Execute a port scan."""
+        """Execute a port scan - parallel for speed."""
         import socket
         
         params = node.get('data', {}).get('parameters', {})
@@ -259,27 +263,33 @@ class PortScanExecutor:
             elif part.isdigit():
                 ports.append(int(part))
         
-        open_ports = []
-        closed_ports = []
+        ports = ports[:100]  # Limit to 100 ports
         
-        for port in ports[:100]:  # Limit to 100 ports
+        def check_port(port: int) -> tuple:
             try:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 sock.settimeout(timeout)
                 result = sock.connect_ex((target, port))
                 sock.close()
-                
-                if result == 0:
+                return (port, result == 0)
+            except Exception as e:
+                logger.debug(f"Port scan error for {target}:{port}: {e}")
+                return (port, False)
+        
+        # Scan all ports in parallel
+        open_ports = []
+        closed_ports = []
+        with ThreadPoolExecutor(max_workers=len(ports)) as executor:
+            results = list(executor.map(check_port, ports))
+            for port, is_open in results:
+                if is_open:
                     open_ports.append(port)
                 else:
                     closed_ports.append(port)
-            except Exception as e:
-                logger.debug(f"Port scan error for {target}:{port}: {e}")
-                closed_ports.append(port)
         
         return {
             'target': target,
-            'open_ports': open_ports,
-            'closed_ports': closed_ports,
+            'open_ports': sorted(open_ports),
+            'closed_ports': sorted(closed_ports),
             'total_scanned': len(ports),
         }

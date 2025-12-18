@@ -294,7 +294,7 @@ class SNMPWalkerExecutor:
             except Exception as e:
                 logger.warning(f"Could not initialize NetBox service: {e}")
         
-        # Walk targets in parallel
+        # Walk targets in parallel - collect results first, then sync to NetBox
         with concurrent.futures.ThreadPoolExecutor(max_workers=parallel) as executor:
             future_to_target = {
                 executor.submit(
@@ -313,35 +313,43 @@ class SNMPWalkerExecutor:
                 try:
                     result = future.result()
                     if result.get('success'):
-                        walk_results.append(result)
+                        walk_results.append((result, target))  # Store tuple for later sync
                         all_interfaces.extend(result.get('interfaces', []))
                         all_neighbors.extend(result.get('lldp_neighbors', []))
                         all_neighbors.extend(result.get('cdp_neighbors', []))
-                        
-                        # Sync to NetBox immediately after each device
-                        if netbox_service and result.get('device_id'):
-                            try:
-                                sync_result = self._sync_device_to_netbox(
-                                    netbox_service,
-                                    result,
-                                    target
-                                )
-                                netbox_stats['interfaces_created'] += sync_result.get('created', 0)
-                                netbox_stats['interfaces_updated'] += sync_result.get('updated', 0)
-                                netbox_stats['interfaces_skipped'] += sync_result.get('skipped', 0)
-                                if sync_result.get('errors'):
-                                    netbox_stats['sync_errors'].extend(sync_result['errors'])
-                            except Exception as e:
-                                logger.error(f"NetBox sync failed for {target['ip_address']}: {e}")
-                                netbox_stats['sync_errors'].append({
-                                    'device': target.get('device_name') or target['ip_address'],
-                                    'error': str(e)
-                                })
                     else:
                         failed_hosts.append(target['ip_address'])
                 except Exception as e:
                     logger.error(f"Walk failed for {target['ip_address']}: {e}")
                     failed_hosts.append(target['ip_address'])
+        
+        # Sync to NetBox in parallel AFTER all walks complete
+        if netbox_service and walk_results:
+            logger.info(f"Starting parallel NetBox sync for {len(walk_results)} devices")
+            
+            def sync_device(result_target):
+                result, target = result_target
+                if result.get('device_id'):
+                    try:
+                        return self._sync_device_to_netbox(netbox_service, result, target)
+                    except Exception as e:
+                        logger.error(f"NetBox sync failed for {target['ip_address']}: {e}")
+                        return {'created': 0, 'updated': 0, 'skipped': 0, 'errors': [str(e)]}
+                return {'created': 0, 'updated': 0, 'skipped': 0, 'errors': []}
+            
+            # Use parallel sync with optimal thread count
+            sync_parallel = min(cpu_count * 5, len(walk_results), 100)  # 5x cores for API calls
+            with concurrent.futures.ThreadPoolExecutor(max_workers=sync_parallel) as sync_executor:
+                sync_results = list(sync_executor.map(sync_device, walk_results))
+                for sync_result in sync_results:
+                    netbox_stats['interfaces_created'] += sync_result.get('created', 0)
+                    netbox_stats['interfaces_updated'] += sync_result.get('updated', 0)
+                    netbox_stats['interfaces_skipped'] += sync_result.get('skipped', 0)
+                    if sync_result.get('errors'):
+                        netbox_stats['sync_errors'].extend(sync_result['errors'])
+            
+            # Convert back to just results for return value
+            walk_results = [r for r, t in walk_results]
         
         duration = time.time() - start_time
         
@@ -372,7 +380,7 @@ class SNMPWalkerExecutor:
         }
     
     def _sync_device_to_netbox(self, netbox_service, walk_result: Dict, target: Dict) -> Dict:
-        """Sync discovered data for a single device to NetBox."""
+        """Sync discovered data for a single device to NetBox using batch operations."""
         device_id = walk_result.get('device_id') or target.get('device_id')
         device_name = walk_result.get('device_name') or target.get('device_name')
         
@@ -389,7 +397,10 @@ class SNMPWalkerExecutor:
             existing = netbox_service.get_interfaces(device_id=device_id, limit=1000)
             existing_names = {i['name']: i for i in existing.get('results', [])}
             
-            # Sync interfaces
+            # Build batch lists for create and update
+            to_create = []
+            to_update = []
+            
             for iface in walk_result.get('interfaces', []):
                 iface_name = iface.get('name', '')
                 if not iface_name:
@@ -416,24 +427,46 @@ class SNMPWalkerExecutor:
                 if speed and speed > 0:
                     iface_data['speed'] = speed * 1000  # NetBox uses kbps
                 
+                if iface_name in existing_names:
+                    # Queue for batch update
+                    existing_iface = existing_names[iface_name]
+                    iface_data['id'] = existing_iface['id']
+                    to_update.append(iface_data)
+                else:
+                    # Queue for batch create
+                    iface_data['device'] = device_id
+                    to_create.append(iface_data)
+            
+            # Batch create new interfaces (single API call)
+            if to_create:
                 try:
-                    if iface_name in existing_names:
-                        # Update existing interface
-                        existing_iface = existing_names[iface_name]
-                        netbox_service._request(
-                            'PATCH',
-                            f'dcim/interfaces/{existing_iface["id"]}/',
-                            json=iface_data
-                        )
-                        updated += 1
-                    else:
-                        # Create new interface
-                        iface_data['device'] = device_id
-                        netbox_service._request('POST', 'dcim/interfaces/', json=iface_data)
-                        created += 1
+                    netbox_service._request('POST', 'dcim/interfaces/', json=to_create)
+                    created = len(to_create)
                 except Exception as e:
-                    logger.warning(f"Failed to sync interface {iface_name} on {device_name}: {e}")
-                    skipped += 1
+                    logger.warning(f"Batch create failed for {device_name}, falling back to individual: {e}")
+                    # Fallback to individual creates
+                    for iface_data in to_create:
+                        try:
+                            netbox_service._request('POST', 'dcim/interfaces/', json=iface_data)
+                            created += 1
+                        except Exception as e2:
+                            skipped += 1
+            
+            # Batch update existing interfaces (single API call)
+            if to_update:
+                try:
+                    netbox_service._request('PATCH', 'dcim/interfaces/', json=to_update)
+                    updated = len(to_update)
+                except Exception as e:
+                    logger.warning(f"Batch update failed for {device_name}, falling back to individual: {e}")
+                    # Fallback to individual updates
+                    for iface_data in to_update:
+                        try:
+                            iface_id = iface_data.pop('id')
+                            netbox_service._request('PATCH', f'dcim/interfaces/{iface_id}/', json=iface_data)
+                            updated += 1
+                        except Exception as e2:
+                            skipped += 1
             
             # Update device with system info if available
             system_info = walk_result.get('system_info', {})

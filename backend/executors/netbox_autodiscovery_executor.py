@@ -906,22 +906,31 @@ class NetBoxAutodiscoveryExecutor(BaseExecutor):
         return ports
     
     def _port_scan(self, ip: str, ports: List[int], config: Dict[str, Any]) -> List[int]:
-        """Scan for open ports."""
-        open_ports = []
-        timeout = config.get('port_scan_timeout', 2)
+        """Scan for open ports - parallel scanning for speed."""
+        timeout = config.get('port_scan_timeout', 1)  # Reduced from 2s to 1s
         
-        for port in ports:
+        def check_port(port: int) -> Optional[int]:
             try:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 sock.settimeout(timeout)
                 result = sock.connect_ex((ip, port))
                 sock.close()
                 if result == 0:
-                    open_ports.append(port)
+                    return port
             except Exception:
                 pass
+            return None
         
-        return open_ports
+        # Scan all ports in parallel
+        open_ports = []
+        with ThreadPoolExecutor(max_workers=len(ports)) as executor:
+            futures = {executor.submit(check_port, port): port for port in ports}
+            for future in as_completed(futures):
+                result = future.result()
+                if result is not None:
+                    open_ports.append(result)
+        
+        return sorted(open_ports)
     
     def _snmp_discover(self, ip: str, config: Dict[str, Any]) -> Dict[str, Any]:
         """Discover device info via SNMP."""
@@ -931,8 +940,8 @@ class NetBoxAutodiscoveryExecutor(BaseExecutor):
         if config.get('snmp_communities'):
             communities = [c.strip() for c in config['snmp_communities'].split('\n') if c.strip()]
         
-        timeout = config.get('snmp_timeout', 5)
-        retries = config.get('snmp_retries', 2)
+        timeout = config.get('snmp_timeout', 2)  # Reduced from 5s to 2s
+        retries = config.get('snmp_retries', 1)  # Reduced from 2 to 1
         
         # Standard MIB-2 system OIDs
         oids = {
@@ -952,19 +961,26 @@ class NetBoxAutodiscoveryExecutor(BaseExecutor):
                 'retries': retries,
             }
             
-            for field, oid in oids.items():
+            # Query all OIDs in parallel for speed
+            def query_oid(field_oid):
+                field, oid = field_oid
                 try:
                     snmp_result = self.snmp_executor.execute(ip, oid, snmp_config)
                     if snmp_result.get('success'):
-                        result['success'] = True
                         value = snmp_result.get('output', '')
-                        
                         if isinstance(value, bytes):
                             value = value.decode('utf-8', errors='ignore')
-                        
-                        result[field] = str(value).strip() if value else None
+                        return (field, str(value).strip() if value else None, True)
                 except Exception as e:
                     logger.debug(f"SNMP {field} failed for {ip}: {e}")
+                return (field, None, False)
+            
+            with ThreadPoolExecutor(max_workers=len(oids)) as executor:
+                futures = list(executor.map(query_oid, oids.items()))
+                for field, value, success in futures:
+                    if success:
+                        result['success'] = True
+                        result[field] = value
             
             if result['success']:
                 # Found working community, try to get interfaces
@@ -1105,49 +1121,57 @@ class NetBoxAutodiscoveryExecutor(BaseExecutor):
                 result['failed'] = [d['ip_address'] for d in devices]
                 return result
             
-            for device in devices:
+            # Process devices in parallel for speed
+            def sync_single_device(device):
+                device_result = {'type': None, 'data': None, 'error': None}
                 try:
                     # Determine device name
                     name = self._get_device_name(device, device_naming, name_prefix)
                     if not name:
-                        result['skipped'].append({
+                        device_result['type'] = 'skipped'
+                        device_result['data'] = {
                             'ip_address': device['ip_address'],
                             'reason': 'Could not determine device name',
-                        })
-                        continue
+                        }
+                        return device_result
                     
                     # Check if device exists
                     existing = self._find_existing_device(service, device, name, match_by)
                     
                     if existing:
                         if sync_mode == 'create_only':
-                            result['skipped'].append({
+                            device_result['type'] = 'skipped'
+                            device_result['data'] = {
                                 'ip_address': device['ip_address'],
                                 'name': name,
                                 'reason': 'Device exists (create_only mode)',
                                 'netbox_id': existing.get('id'),
-                            })
-                            continue
+                            }
+                            return device_result
                         
                         # Update existing device
                         updated = self._update_device(service, existing, device, config)
                         if updated:
-                            result['updated'].append(updated)
+                            device_result['type'] = 'updated'
+                            device_result['data'] = updated
                         else:
-                            result['skipped'].append({
+                            device_result['type'] = 'skipped'
+                            device_result['data'] = {
                                 'ip_address': device['ip_address'],
                                 'name': name,
                                 'reason': 'No changes needed',
                                 'netbox_id': existing.get('id'),
-                            })
+                            }
+                        device['netbox_device_id'] = existing.get('id')
                     else:
                         if sync_mode == 'update_only':
-                            result['skipped'].append({
+                            device_result['type'] = 'skipped'
+                            device_result['data'] = {
                                 'ip_address': device['ip_address'],
                                 'name': name,
                                 'reason': 'Device not found (update_only mode)',
-                            })
-                            continue
+                            }
+                            return device_result
                         
                         # Create new device
                         created = self._create_device(
@@ -1156,13 +1180,9 @@ class NetBoxAutodiscoveryExecutor(BaseExecutor):
                             default_status, config
                         )
                         if created:
-                            result['created'].append(created)
-                            # Store the NetBox device ID for IP address creation
+                            device_result['type'] = 'created'
+                            device_result['data'] = created
                             device['netbox_device_id'] = created.get('id')
-                    
-                    # For existing devices, store the ID
-                    if existing:
-                        device['netbox_device_id'] = existing.get('id')
                     
                     # Create interfaces if enabled
                     if config.get('create_interfaces', True) and device.get('interfaces'):
@@ -1174,8 +1194,30 @@ class NetBoxAutodiscoveryExecutor(BaseExecutor):
                     
                 except Exception as e:
                     logger.error(f"Failed to sync device {device.get('ip_address')}: {e}")
-                    result['failed'].append(device['ip_address'])
-                    result['errors'].append(f"{device.get('ip_address')}: {str(e)}")
+                    device_result['type'] = 'failed'
+                    device_result['error'] = f"{device.get('ip_address')}: {str(e)}"
+                
+                return device_result
+            
+            # Use parallel processing for NetBox sync
+            import os
+            cpu_count = os.cpu_count() or 4
+            sync_parallel = min(cpu_count * 5, len(devices), 100)  # 5x cores for API calls
+            
+            from concurrent.futures import ThreadPoolExecutor
+            with ThreadPoolExecutor(max_workers=sync_parallel) as executor:
+                sync_results = list(executor.map(sync_single_device, devices))
+            
+            for device_result in sync_results:
+                if device_result['type'] == 'created':
+                    result['created'].append(device_result['data'])
+                elif device_result['type'] == 'updated':
+                    result['updated'].append(device_result['data'])
+                elif device_result['type'] == 'skipped':
+                    result['skipped'].append(device_result['data'])
+                elif device_result['type'] == 'failed':
+                    result['failed'].append(device_result['error'].split(':')[0])
+                    result['errors'].append(device_result['error'])
             
         except Exception as e:
             logger.exception(f"NetBox sync failed: {e}")
