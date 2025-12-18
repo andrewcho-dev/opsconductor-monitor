@@ -424,7 +424,9 @@ class NetBoxAutodiscoveryExecutor(BaseExecutor):
         start_time = time.time()
         
         # Check if we should use chord pattern (for large scans)
-        use_chord = config.get('use_chord', True)
+        # IMPORTANT: Chord returns immediately, so subsequent workflow nodes won't have results
+        # Only use chord for standalone discovery, not when part of a workflow with more nodes
+        use_chord = config.get('use_chord', False)  # Disabled by default for workflow compatibility
         chord_threshold = config.get('chord_threshold', 20)  # Use chord for 20+ hosts
         
         # Initialize result structure
@@ -1491,9 +1493,110 @@ class NetBoxAutodiscoveryExecutor(BaseExecutor):
             raise
     
     def _create_interfaces(self, service, device: Dict[str, Any], config: Dict[str, Any]):
-        """Create interfaces for device in NetBox."""
-        # Implementation depends on having device ID and interface data
-        pass
+        """Create interfaces for device in NetBox from SNMP discovery data."""
+        device_id = device.get('netbox_device_id')
+        interfaces = device.get('interfaces', [])
+        
+        if not device_id or not interfaces:
+            return
+        
+        created_count = 0
+        for iface in interfaces:
+            try:
+                iface_name = iface.get('name') or iface.get('ifDescr') or f"eth{iface.get('ifIndex', 0)}"
+                
+                # Check if interface already exists
+                existing = service._request('GET', 'dcim/interfaces/', params={
+                    'device_id': device_id,
+                    'name': iface_name,
+                })
+                
+                if existing.get('results'):
+                    # Update existing interface
+                    iface_id = existing['results'][0]['id']
+                    updates = {}
+                    
+                    if iface.get('mac_address') and not existing['results'][0].get('mac_address'):
+                        updates['mac_address'] = iface['mac_address']
+                    
+                    if iface.get('mtu') and not existing['results'][0].get('mtu'):
+                        updates['mtu'] = iface['mtu']
+                    
+                    if iface.get('speed') and not existing['results'][0].get('speed'):
+                        updates['speed'] = iface['speed']
+                    
+                    if iface.get('ifOperStatus') == 'up':
+                        updates['enabled'] = True
+                    
+                    if updates:
+                        service._request('PATCH', f'dcim/interfaces/{iface_id}/', json=updates)
+                else:
+                    # Create new interface
+                    iface_data = {
+                        'device': device_id,
+                        'name': iface_name,
+                        'type': self._get_interface_type(iface),
+                    }
+                    
+                    if iface.get('mac_address'):
+                        iface_data['mac_address'] = iface['mac_address']
+                    
+                    if iface.get('mtu'):
+                        iface_data['mtu'] = iface['mtu']
+                    
+                    if iface.get('speed'):
+                        iface_data['speed'] = iface['speed']
+                    
+                    if iface.get('ifOperStatus') == 'up':
+                        iface_data['enabled'] = True
+                    
+                    if iface.get('ifAlias'):
+                        iface_data['description'] = iface['ifAlias'][:200]
+                    
+                    service._request('POST', 'dcim/interfaces/', json=iface_data)
+                    created_count += 1
+                    
+            except Exception as e:
+                logger.debug(f"Failed to create interface {iface.get('name')}: {e}")
+        
+        if created_count > 0:
+            logger.info(f"Created {created_count} interfaces for device {device_id}")
+    
+    def _get_interface_type(self, iface: Dict[str, Any]) -> str:
+        """Determine NetBox interface type from SNMP data."""
+        # Map SNMP ifType to NetBox interface types
+        if_type = iface.get('ifType', 0)
+        speed = iface.get('speed', 0)
+        name = (iface.get('name') or '').lower()
+        
+        # Check name patterns first
+        if 'loopback' in name or 'lo' == name:
+            return 'virtual'
+        if 'vlan' in name:
+            return 'virtual'
+        if 'tunnel' in name or 'gre' in name:
+            return 'virtual'
+        if 'bridge' in name or 'br' in name:
+            return 'bridge'
+        if 'lag' in name or 'bond' in name or 'port-channel' in name:
+            return 'lag'
+        
+        # Check speed
+        if speed >= 100000000000:  # 100G+
+            return '100gbase-x-qsfp28'
+        if speed >= 40000000000:  # 40G
+            return '40gbase-x-qsfpp'
+        if speed >= 25000000000:  # 25G
+            return '25gbase-x-sfp28'
+        if speed >= 10000000000:  # 10G
+            return '10gbase-x-sfpp'
+        if speed >= 1000000000:  # 1G
+            return '1000base-t'
+        if speed >= 100000000:  # 100M
+            return '100base-tx'
+        
+        # Default to 1G ethernet
+        return '1000base-t'
     
     def _create_ip_address(self, service, device: Dict[str, Any], config: Dict[str, Any]):
         """Create IP address record in NetBox and assign to device."""
