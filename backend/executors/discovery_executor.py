@@ -130,8 +130,11 @@ class DiscoveryExecutor(BaseExecutor):
             Discovery results for all IPs
         """
         config = config or {}
-        max_workers = config.get('max_workers', 20)
         skip_network_broadcast = config.get('skip_network_broadcast', True)
+        
+        # Auto-detect optimal concurrency based on system resources
+        import os
+        cpu_count = os.cpu_count() or 4
         
         try:
             net = ipaddress.ip_network(network, strict=False)
@@ -159,7 +162,8 @@ class DiscoveryExecutor(BaseExecutor):
             'devices': [],
         }
         
-        # Execute discovery in parallel
+        # Execute discovery in parallel with optimal concurrency
+        max_workers = min(cpu_count * 10, len(ips), 200)  # 10x cores, max 200
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_ip = {
                 executor.submit(self.execute, ip, config): ip 

@@ -12,6 +12,8 @@ from typing import Dict, Any, List, Optional
 from ..executors import ExecutorRegistry, SSHExecutor, PingExecutor, SNMPExecutor, DiscoveryExecutor
 from ..parsers.registry import ParserRegistry
 from ..targeting import TargetingRegistry
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import os
 from ..config.constants import ACTION_TYPES, JOB_STATUS_SUCCESS, JOB_STATUS_FAILED
 from .credential_service import get_credential_service
 
@@ -374,7 +376,7 @@ class JobExecutor:
         results = []
         success_count = 0
         
-        for target in targets:
+        def execute_ssh_target(target):
             target_result = {
                 'target': target,
                 'commands': [],
@@ -426,15 +428,24 @@ class JobExecutor:
                     
                     if not exec_result.get('success'):
                         target_result['success'] = False
-                
-                if target_result['success']:
-                    success_count += 1
                     
             except Exception as e:
                 target_result['success'] = False
                 target_result['error'] = str(e)
             
+            return target_result
+        
+        # Execute SSH commands in parallel
+        cpu_count = os.cpu_count() or 4
+        max_workers = min(cpu_count * 10, len(targets), 200)
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_results = list(executor.map(execute_ssh_target, targets))
+        
+        for target_result in future_results:
             results.append(target_result)
+            if target_result['success']:
+                success_count += 1
         
         return {
             'success': success_count > 0,
@@ -451,7 +462,7 @@ class JobExecutor:
         job_config: Dict[str, Any],
         action_name: str = None
     ) -> Dict[str, Any]:
-        """Execute ping action."""
+        """Execute ping action in parallel."""
         execution = action.get('execution', {})
         
         ping_config = {
@@ -459,24 +470,23 @@ class JobExecutor:
             'count': execution.get('count', 1),
         }
         
-        results = []
-        online_count = 0
-        
-        executor = PingExecutor()
-        
-        for target in targets:
+        def ping_target(target):
+            executor = PingExecutor()
             result = executor.execute(target, config=ping_config)
-            
-            target_result = {
+            return {
                 'target': target,
                 'reachable': result.get('reachable', False),
                 'response_time_ms': result.get('response_time_ms'),
             }
-            
-            if result.get('reachable'):
-                online_count += 1
-            
-            results.append(target_result)
+        
+        # Execute pings in parallel
+        cpu_count = os.cpu_count() or 4
+        max_workers = min(cpu_count * 10, len(targets), 200)
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            results = list(executor.map(ping_target, targets))
+        
+        online_count = sum(1 for r in results if r.get('reachable'))
         
         return {
             'success': True,
@@ -493,16 +503,11 @@ class JobExecutor:
         job_config: Dict[str, Any],
         action_name: str = None
     ) -> Dict[str, Any]:
-        """Execute SNMP action."""
+        """Execute SNMP action in parallel."""
         execution = action.get('execution', {})
         oid = execution.get('oid', '1.3.6.1.2.1.1.1.0')
         
-        results = []
-        success_count = 0
-        
-        executor = SNMPExecutor()
-        
-        for target in targets:
+        def snmp_target(target):
             # Get SNMP credentials from vault, then job config, then settings
             vault_creds = self._get_credentials_for_target(target, 'snmp', job_config)
             
@@ -518,19 +523,24 @@ class JobExecutor:
                 'priv_password': vault_creds.get('priv_password'),
             }
             
+            executor = SNMPExecutor()
             result = executor.execute(target, oid, snmp_config)
             
-            target_result = {
+            return {
                 'target': target,
                 'success': result.get('success', False),
                 'value': result.get('output'),
                 'error': result.get('error'),
             }
-            
-            if result.get('success'):
-                success_count += 1
-            
-            results.append(target_result)
+        
+        # Execute SNMP queries in parallel
+        cpu_count = os.cpu_count() or 4
+        max_workers = min(cpu_count * 10, len(targets), 200)
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            results = list(executor.map(snmp_target, targets))
+        
+        success_count = sum(1 for r in results if r.get('success'))
         
         return {
             'success': success_count > 0,
@@ -577,22 +587,19 @@ class JobExecutor:
                 'devices': result.get('devices', []),
             }
         else:
-            # List of individual IPs
-            results = []
-            online_count = 0
-            snmp_count = 0
-            netbox_count = 0
+            # List of individual IPs - execute in parallel
+            def discover_target(target):
+                return executor.execute(target, discovery_config)
             
-            for target in targets:
-                device_result = executor.execute(target, discovery_config)
-                results.append(device_result)
-                
-                if device_result.get('ping_status') == 'online':
-                    online_count += 1
-                if device_result.get('snmp_status') == 'responding':
-                    snmp_count += 1
-                if device_result.get('netbox_synced'):
-                    netbox_count += 1
+            cpu_count = os.cpu_count() or 4
+            max_workers = min(cpu_count * 10, len(targets), 200)
+            
+            with ThreadPoolExecutor(max_workers=max_workers) as pool:
+                results = list(pool.map(discover_target, targets))
+            
+            online_count = sum(1 for r in results if r.get('ping_status') == 'online')
+            snmp_count = sum(1 for r in results if r.get('snmp_status') == 'responding')
+            netbox_count = sum(1 for r in results if r.get('netbox_synced'))
             
             return {
                 'success': True,
