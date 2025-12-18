@@ -28,12 +28,12 @@ else
     exit 1
 fi
 
-echo "🚀 Starting Celery workers..."
-# Use prefork pool with concurrency based on CPU cores (2x cores for I/O bound tasks)
+echo "🚀 Starting Celery worker..."
+# Single worker with 32 processes - chord tasks distribute across all processes
 CPU_COUNT=$(nproc 2>/dev/null || echo 4)
 CONCURRENCY=$((CPU_COUNT * 2))
 if [ $CONCURRENCY -gt 32 ]; then CONCURRENCY=32; fi
-echo "   Using concurrency: $CONCURRENCY (based on $CPU_COUNT cores)"
+echo "   1 worker × $CONCURRENCY processes (based on $CPU_COUNT cores)"
 nohup python3 -m celery -A celery_app worker -l info --concurrency=$CONCURRENCY --prefetch-multiplier=1 -n worker1@%h > /tmp/opsconductor_worker.log 2>&1 &
 WORKER_PID=$!
 sleep 2

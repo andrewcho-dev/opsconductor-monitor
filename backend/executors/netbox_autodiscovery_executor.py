@@ -526,10 +526,15 @@ class NetBoxAutodiscoveryExecutor(BaseExecutor):
         
         import os
         
-        # Calculate optimal chunk size
+        # Calculate optimal chunk count to maximize parallelism
+        # Use all 32 processes if we have enough hosts
         cpu_count = os.cpu_count() or 4
-        num_workers = min(cpu_count * 2, 32)
-        chunk_size = max(5, len(online_hosts) // num_workers)
+        num_processes = min(cpu_count * 2, 32)  # 32 on your system
+        
+        # Target: 1 chunk per process, minimum 2 hosts per chunk
+        num_chunks = min(num_processes, len(online_hosts) // 2)
+        num_chunks = max(num_chunks, 1)  # At least 1 chunk
+        chunk_size = max(2, (len(online_hosts) + num_chunks - 1) // num_chunks)
         
         # Split into chunks
         chunks = [online_hosts[i:i + chunk_size] for i in range(0, len(online_hosts), chunk_size)]
