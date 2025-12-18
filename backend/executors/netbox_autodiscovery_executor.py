@@ -675,61 +675,6 @@ class NetBoxAutodiscoveryExecutor(BaseExecutor):
         
         return online
     
-    def _discover_hosts_parallel(self, hosts: List[str], config: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """
-        Discover hosts using parallel Celery tasks across multiple workers.
-        
-        Splits the host list into chunks and submits each chunk as a separate
-        Celery task, allowing work to be distributed across multiple workers.
-        """
-        try:
-            from celery_app import celery_app
-            from celery import group
-        except ImportError:
-            logger.warning("Celery not available, falling back to local discovery")
-            return self._discover_hosts(hosts, config)
-        
-        # Calculate chunk size based on number of workers and hosts
-        # Auto-detect optimal workers based on CPU cores
-        import os
-        cpu_count = os.cpu_count() or 4
-        default_workers = min(cpu_count * 2, 32)  # Match Celery worker count
-        num_workers = config.get('parallel_workers', default_workers)
-        chunk_size = max(5, len(hosts) // num_workers)  # Small chunks for even distribution
-        logger.info(f"Parallel discovery using {num_workers} workers, chunk size {chunk_size}")
-        
-        # Split hosts into chunks
-        chunks = [hosts[i:i + chunk_size] for i in range(0, len(hosts), chunk_size)]
-        
-        logger.info(f"Splitting {len(hosts)} hosts into {len(chunks)} parallel tasks (chunk size: {chunk_size})")
-        
-        # Submit all chunks as parallel Celery tasks
-        tasks = group(
-            celery_app.signature('opsconductor.discovery.scan_chunk', args=[chunk, config])
-            for chunk in chunks
-        )
-        
-        # Execute all tasks in parallel and wait for results
-        result = tasks.apply_async()
-        
-        # Wait for all tasks to complete (with timeout)
-        timeout = config.get('parallel_timeout', 600)  # 10 minutes default
-        try:
-            chunk_results = result.get(timeout=timeout)
-        except Exception as e:
-            logger.error(f"Parallel discovery failed: {e}")
-            # Fall back to local discovery on failure
-            return self._discover_hosts(hosts, config)
-        
-        # Flatten results from all chunks
-        discovered = []
-        for chunk_result in chunk_results:
-            if isinstance(chunk_result, list):
-                discovered.extend(chunk_result)
-        
-        logger.info(f"Parallel discovery complete: {len(discovered)} devices from {len(chunks)} tasks")
-        return discovered
-    
     def _discover_hosts(self, hosts: List[str], config: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Discover detailed information for each host."""
         discovered = []
