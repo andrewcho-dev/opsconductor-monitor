@@ -167,7 +167,7 @@ class BaseExecutor(ABC):
         config: Dict = None
     ) -> List[Dict]:
         """
-        Execute command against multiple targets sequentially.
+        Execute command against multiple targets in parallel.
         
         Args:
             targets: List of target addresses
@@ -177,9 +177,19 @@ class BaseExecutor(ABC):
         Returns:
             List of execution results
         """
-        results = []
-        for target in targets:
+        from concurrent.futures import ThreadPoolExecutor
+        import os
+        
+        def execute_target(target):
             result = self.safe_execute(target, command, config)
             result['target'] = target
-            results.append(result)
+            return result
+        
+        # Use optimal parallelism based on system resources
+        cpu_count = os.cpu_count() or 4
+        max_workers = min(cpu_count * 10, len(targets), 200)
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            results = list(executor.map(execute_target, targets))
+        
         return results

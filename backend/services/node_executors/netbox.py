@@ -256,12 +256,22 @@ class NetBoxInterfaceSyncExecutor:
                         device_interfaces[device_id] = []
                     device_interfaces[device_id].append(iface)
             
-            # Sync interfaces for each device
-            for device_id, device_ifaces in device_interfaces.items():
+            # Sync interfaces for each device using batch operations
+            def sync_device_interfaces(device_id_ifaces):
+                device_id, device_ifaces = device_id_ifaces
+                local_created = 0
+                local_updated = 0
+                local_skipped = 0
+                local_errors = []
+                
                 try:
                     # Get existing interfaces for this device
                     existing = service.get_interfaces(device_id=device_id, limit=1000)
                     existing_names = {i['name']: i for i in existing.get('results', [])}
+                    
+                    # Build batch lists
+                    to_create = []
+                    to_update = []
                     
                     for iface in device_ifaces:
                         iface_name = iface.get('name', '')
@@ -290,38 +300,62 @@ class NetBoxInterfaceSyncExecutor:
                             iface_data['speed'] = speed * 1000  # NetBox uses kbps
                         
                         if iface_name in existing_names:
-                            # Update existing interface
                             existing_iface = existing_names[iface_name]
-                            try:
-                                service._request(
-                                    'PATCH',
-                                    f'dcim/interfaces/{existing_iface["id"]}/',
-                                    json=iface_data
-                                )
-                                updated += 1
-                            except Exception as e:
-                                logger.warning(f"Failed to update interface {iface_name}: {e}")
-                                skipped += 1
+                            iface_data['id'] = existing_iface['id']
+                            to_update.append(iface_data)
                         else:
-                            # Create new interface
-                            try:
-                                iface_data['device'] = device_id
-                                service._request('POST', 'dcim/interfaces/', json=iface_data)
-                                created += 1
-                            except Exception as e:
-                                logger.warning(f"Failed to create interface {iface_name}: {e}")
-                                errors.append({
-                                    'device_id': device_id,
-                                    'interface': iface_name,
-                                    'error': str(e)
-                                })
-                                
+                            iface_data['device'] = device_id
+                            to_create.append(iface_data)
+                    
+                    # Batch create
+                    if to_create:
+                        try:
+                            service._request('POST', 'dcim/interfaces/', json=to_create)
+                            local_created = len(to_create)
+                        except Exception as e:
+                            logger.warning(f"Batch create failed, falling back: {e}")
+                            for iface_data in to_create:
+                                try:
+                                    service._request('POST', 'dcim/interfaces/', json=iface_data)
+                                    local_created += 1
+                                except:
+                                    local_skipped += 1
+                    
+                    # Batch update
+                    if to_update:
+                        try:
+                            service._request('PATCH', 'dcim/interfaces/', json=to_update)
+                            local_updated = len(to_update)
+                        except Exception as e:
+                            logger.warning(f"Batch update failed, falling back: {e}")
+                            for iface_data in to_update:
+                                try:
+                                    iface_id = iface_data.pop('id')
+                                    service._request('PATCH', f'dcim/interfaces/{iface_id}/', json=iface_data)
+                                    local_updated += 1
+                                except:
+                                    local_skipped += 1
+                                    
                 except Exception as e:
                     logger.error(f"Failed to sync interfaces for device {device_id}: {e}")
-                    errors.append({
-                        'device_id': device_id,
-                        'error': str(e)
-                    })
+                    local_errors.append({'device_id': device_id, 'error': str(e)})
+                
+                return (local_created, local_updated, local_skipped, local_errors)
+            
+            # Process devices in parallel
+            from concurrent.futures import ThreadPoolExecutor
+            import os
+            cpu_count = os.cpu_count() or 4
+            max_workers = min(cpu_count * 5, len(device_interfaces), 100)
+            
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                results = list(executor.map(sync_device_interfaces, device_interfaces.items()))
+            
+            for local_created, local_updated, local_skipped, local_errors in results:
+                created += local_created
+                updated += local_updated
+                skipped += local_skipped
+                errors.extend(local_errors)
             
             return {
                 'success': len(errors) == 0 or (created + updated) > 0,

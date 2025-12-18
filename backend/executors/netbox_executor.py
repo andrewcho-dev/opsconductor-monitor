@@ -710,35 +710,48 @@ class NetBoxExecutor(BaseExecutor):
         create_devices = config.get('create_devices', False)
         
         ping_executor = PingExecutor()
-        results = []
-        responding = []
         
-        for ip in targets:
+        # Ping all targets in parallel
+        def ping_target(ip):
             result = ping_executor.execute(ip, 'ping', {'count': 1, 'timeout': 2})
-            results.append({
+            return {
                 'ip': ip,
                 'reachable': result.get('success', False),
                 'latency': result.get('data', {}).get('avg_latency'),
-            })
-            if result.get('success'):
-                responding.append(ip)
+            }
         
-        # Create devices for responding hosts if requested
+        from concurrent.futures import ThreadPoolExecutor
+        import os
+        cpu_count = os.cpu_count() or 4
+        max_workers = min(cpu_count * 10, len(targets), 200)
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            results = list(executor.map(ping_target, targets))
+        
+        responding = [r['ip'] for r in results if r.get('reachable')]
+        
+        # Create devices for responding hosts if requested - in parallel
         created_devices = []
         if create_devices and responding:
             service = get_netbox_service()
-            for ip in responding:
+            
+            def create_device(ip):
                 try:
-                    result = service.upsert_discovered_device(
+                    return service.upsert_discovered_device(
                         ip_address=ip,
                         site_id=config.get('site_id'),
                         role_id=config.get('role_id'),
                         device_type_id=config.get('device_type_id'),
                         tags=config.get('tags'),
                     )
-                    created_devices.append(result)
                 except Exception as e:
                     logger.warning(f"Failed to create device for {ip}: {e}")
+                    return None
+            
+            create_workers = min(cpu_count * 5, len(responding), 100)
+            with ThreadPoolExecutor(max_workers=create_workers) as executor:
+                device_results = list(executor.map(create_device, responding))
+                created_devices = [d for d in device_results if d is not None]
         
         return {
             'success': True,

@@ -949,24 +949,33 @@ class SNMPWalkerExecutor:
         return neighbors
     
     def _walk_interfaces(self, params: Dict, context: Dict) -> Dict:
-        """Lightweight interface-only walk."""
+        """Lightweight interface-only walk - parallel execution."""
         targets = self._get_targets(params, context)
         if not targets:
             return {'error': 'No targets', 'success': False}
         
-        all_interfaces = []
         version = params.get('snmp_version', '2c')
         timeout = params.get('timeout_seconds', 30)
         
-        for target in targets:
-            interfaces = self._walk_interfaces_table(
+        def walk_target_interfaces(target):
+            return self._walk_interfaces_table(
                 target['ip_address'],
                 target.get('community', 'public'),
                 version,
                 timeout,
                 500
             )
-            all_interfaces.extend(interfaces)
+        
+        # Execute in parallel
+        import os
+        cpu_count = os.cpu_count() or 4
+        parallel = min(cpu_count * 10, len(targets), 200)
+        
+        all_interfaces = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=parallel) as executor:
+            results = list(executor.map(walk_target_interfaces, targets))
+            for interfaces in results:
+                all_interfaces.extend(interfaces)
         
         return {
             'success': True,
@@ -975,7 +984,7 @@ class SNMPWalkerExecutor:
         }
     
     def _walk_neighbors(self, params: Dict, context: Dict) -> Dict:
-        """Walk for LLDP/CDP neighbors only."""
+        """Walk for LLDP/CDP neighbors only - parallel execution."""
         targets = self._get_targets(params, context)
         if not targets:
             return {'error': 'No targets', 'success': False}
@@ -984,19 +993,30 @@ class SNMPWalkerExecutor:
         version = params.get('snmp_version', '2c')
         timeout = params.get('timeout_seconds', 30)
         
+        def walk_target_neighbors(target):
+            ip = target['ip_address']
+            community = target.get('community', 'public')
+            neighbors = []
+            
+            if 'lldp' in protocols:
+                neighbors.extend(self._walk_lldp(ip, community, version, timeout, 500))
+            
+            if 'cdp' in protocols:
+                neighbors.extend(self._walk_cdp(ip, community, version, timeout, 500))
+            
+            return neighbors
+        
+        # Execute in parallel
+        import os
+        cpu_count = os.cpu_count() or 4
+        parallel = min(cpu_count * 10, len(targets), 200)
+        
         all_neighbors = []
         topology = {'nodes': [], 'links': []}
         
-        for target in targets:
-            ip = target['ip_address']
-            community = target.get('community', 'public')
-            
-            if 'lldp' in protocols:
-                neighbors = self._walk_lldp(ip, community, version, timeout, 500)
-                all_neighbors.extend(neighbors)
-            
-            if 'cdp' in protocols:
-                neighbors = self._walk_cdp(ip, community, version, timeout, 500)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=parallel) as executor:
+            results = list(executor.map(walk_target_neighbors, targets))
+            for neighbors in results:
                 all_neighbors.extend(neighbors)
         
         # Build topology if requested

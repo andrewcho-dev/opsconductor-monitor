@@ -59,34 +59,46 @@ class SNMPGetExecutor:
             return self._snmp_get_command(target, community, oids, version)
     
     def _snmp_get_pysnmp(self, target: str, community: str, oids: str, version: str) -> Dict:
-        """Use pysnmp library for SNMP GET."""
+        """Use pysnmp library for SNMP GET - parallel OID queries."""
         try:
             from pysnmp.hlapi import (
                 getCmd, SnmpEngine, CommunityData, UdpTransportTarget,
                 ContextData, ObjectType, ObjectIdentity
             )
+            from concurrent.futures import ThreadPoolExecutor
             
             oid_list = [oid.strip() for oid in oids.split(',')]
-            values = {}
             
-            for oid in oid_list:
-                iterator = getCmd(
-                    SnmpEngine(),
-                    CommunityData(community, mpModel=1 if version == '2c' else 0),
-                    UdpTransportTarget((target, 161), timeout=2, retries=1),
-                    ContextData(),
-                    ObjectType(ObjectIdentity(oid))
-                )
-                
-                errorIndication, errorStatus, errorIndex, varBinds = next(iterator)
-                
-                if errorIndication:
-                    values[oid] = {'error': str(errorIndication)}
-                elif errorStatus:
-                    values[oid] = {'error': str(errorStatus)}
-                else:
-                    for varBind in varBinds:
-                        values[str(varBind[0])] = str(varBind[1])
+            def query_oid(oid):
+                try:
+                    iterator = getCmd(
+                        SnmpEngine(),
+                        CommunityData(community, mpModel=1 if version == '2c' else 0),
+                        UdpTransportTarget((target, 161), timeout=2, retries=1),
+                        ContextData(),
+                        ObjectType(ObjectIdentity(oid))
+                    )
+                    
+                    errorIndication, errorStatus, errorIndex, varBinds = next(iterator)
+                    
+                    if errorIndication:
+                        return (oid, {'error': str(errorIndication)})
+                    elif errorStatus:
+                        return (oid, {'error': str(errorStatus)})
+                    else:
+                        for varBind in varBinds:
+                            return (str(varBind[0]), str(varBind[1]))
+                    return (oid, None)
+                except Exception as e:
+                    return (oid, {'error': str(e)})
+            
+            # Query all OIDs in parallel
+            values = {}
+            with ThreadPoolExecutor(max_workers=len(oid_list)) as executor:
+                results = list(executor.map(query_oid, oid_list))
+                for oid_key, value in results:
+                    if value is not None:
+                        values[oid_key] = value
             
             return {
                 'target': target,
@@ -103,15 +115,14 @@ class SNMPGetExecutor:
             }
     
     def _snmp_get_command(self, target: str, community: str, oids: str, version: str) -> Dict:
-        """Use snmpget command for SNMP GET."""
+        """Use snmpget command for SNMP GET - parallel OID queries."""
         import subprocess
+        from concurrent.futures import ThreadPoolExecutor
         
         oid_list = [oid.strip() for oid in oids.split(',')]
-        values = {}
-        
         version_flag = '-v2c' if version == '2c' else '-v1'
         
-        for oid in oid_list:
+        def query_oid(oid):
             try:
                 result = subprocess.run(
                     ['snmpget', version_flag, '-c', community, target, oid],
@@ -129,13 +140,20 @@ class SNMPGetExecutor:
                         # Remove type prefix if present
                         if ':' in value:
                             value = value.split(':', 1)[1].strip()
-                        values[oid] = value
+                        return (oid, value)
                     else:
-                        values[oid] = output
+                        return (oid, output)
                 else:
-                    values[oid] = {'error': result.stderr.strip()}
+                    return (oid, {'error': result.stderr.strip()})
             except Exception as e:
-                values[oid] = {'error': str(e)}
+                return (oid, {'error': str(e)})
+        
+        # Query all OIDs in parallel
+        values = {}
+        with ThreadPoolExecutor(max_workers=len(oid_list)) as executor:
+            results = list(executor.map(query_oid, oid_list))
+            for oid_key, value in results:
+                values[oid_key] = value
         
         return {
             'target': target,
