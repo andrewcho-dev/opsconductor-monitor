@@ -252,7 +252,7 @@ class SNMPWalkerExecutor:
             }
         
         walk_tables = params.get('walk_tables', ['system', 'interfaces', 'ip_addresses', 'arp'])
-        timeout = params.get('timeout_seconds', 30)
+        timeout = params.get('timeout_seconds', 5)
         max_results = params.get('max_results_per_table', 500)
         version = params.get('snmp_version', '2c')
         sync_to_netbox = params.get('sync_to_netbox', True)  # Default to syncing
@@ -955,7 +955,7 @@ class SNMPWalkerExecutor:
             return {'error': 'No targets', 'success': False}
         
         version = params.get('snmp_version', '2c')
-        timeout = params.get('timeout_seconds', 30)
+        timeout = params.get('timeout_seconds', 5)
         
         def walk_target_interfaces(target):
             return self._walk_interfaces_table(
@@ -991,7 +991,7 @@ class SNMPWalkerExecutor:
         
         protocols = params.get('protocols', ['lldp', 'cdp'])
         version = params.get('snmp_version', '2c')
-        timeout = params.get('timeout_seconds', 30)
+        timeout = params.get('timeout_seconds', 5)
         
         def walk_target_neighbors(target):
             ip = target['ip_address']
