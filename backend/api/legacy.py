@@ -320,25 +320,37 @@ def get_topology_data():
             'status': device.get('ping_status', 'unknown'),
         })
     
-    # Get LLDP neighbor data for links
+    # Get LLDP neighbor data for links - parallel queries
     from ..repositories.scan_repo import ScanRepository
-    scan_repo = ScanRepository(db)
+    from concurrent.futures import ThreadPoolExecutor
+    import os
     
-    for device in devices:
+    scan_repo = ScanRepository(db)
+    device_ips = {d.get('ip_address') for d in devices}
+    
+    def get_device_links(device):
         ip = device.get('ip_address')
+        device_links = []
         scans = scan_repo.get_latest_scans_for_device(ip)
         
         for scan in scans:
             remote_ip = scan.get('lldp_remote_mgmt_addr')
-            if remote_ip and remote_ip != ip:
-                # Check if remote device is in our list
-                if any(d.get('ip_address') == remote_ip for d in devices):
-                    links.append({
-                        'source': ip,
-                        'target': remote_ip,
-                        'local_port': scan.get('interface_name'),
-                        'remote_port': scan.get('lldp_remote_port'),
-                    })
+            if remote_ip and remote_ip != ip and remote_ip in device_ips:
+                device_links.append({
+                    'source': ip,
+                    'target': remote_ip,
+                    'local_port': scan.get('interface_name'),
+                    'remote_port': scan.get('lldp_remote_port'),
+                })
+        return device_links
+    
+    cpu_count = os.cpu_count() or 4
+    max_workers = min(cpu_count * 5, len(devices), 100)
+    
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        all_links = list(executor.map(get_device_links, devices))
+        for device_links in all_links:
+            links.extend(device_links)
     
     return jsonify({
         'nodes': nodes,

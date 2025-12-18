@@ -189,13 +189,26 @@ class ScanService(BaseService):
         Returns:
             Dictionary mapping IP to power readings
         """
-        result = {}
-        for ip in ip_addresses:
+        from concurrent.futures import ThreadPoolExecutor
+        import os
+        
+        def get_history(ip):
             try:
                 validate_ip_address(ip)
-                result[ip] = self.optical_repo.get_power_history(ip, interface_index, hours)
+                return (ip, self.optical_repo.get_power_history(ip, interface_index, hours))
             except Exception:
-                result[ip] = []
+                return (ip, [])
+        
+        # Query in parallel for better performance
+        cpu_count = os.cpu_count() or 4
+        max_workers = min(cpu_count * 5, len(ip_addresses), 100)
+        
+        result = {}
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            results = list(executor.map(get_history, ip_addresses))
+            for ip, history in results:
+                result[ip] = history
+        
         return result
     
     def cleanup_old_data(self, optical_days: int = 90) -> Dict:

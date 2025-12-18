@@ -761,7 +761,7 @@ class WorkflowEngine:
         online = []
         offline = []
         
-        for target in targets[:10]:  # Limit to 10 for safety
+        def ping_target(target):
             try:
                 result = subprocess.run(
                     ['ping', '-c', str(count), '-W', str(timeout), target],
@@ -771,26 +771,26 @@ class WorkflowEngine:
                 )
                 
                 if result.returncode == 0:
-                    online.append(target)
-                    results.append({
-                        'target': target,
-                        'status': 'online',
-                        'output': result.stdout
-                    })
+                    return {'target': target, 'status': 'online', 'output': result.stdout}
                 else:
-                    offline.append(target)
-                    results.append({
-                        'target': target,
-                        'status': 'offline',
-                        'output': result.stderr
-                    })
+                    return {'target': target, 'status': 'offline', 'output': result.stderr}
             except Exception as e:
-                offline.append(target)
-                results.append({
-                    'target': target,
-                    'status': 'error',
-                    'error': str(e)
-                })
+                return {'target': target, 'status': 'error', 'error': str(e)}
+        
+        # Execute pings in parallel
+        from concurrent.futures import ThreadPoolExecutor
+        import os
+        cpu_count = os.cpu_count() or 4
+        max_workers = min(cpu_count * 10, len(targets[:10]), 200)
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            results = list(executor.map(ping_target, targets[:10]))
+        
+        for r in results:
+            if r['status'] == 'online':
+                online.append(r['target'])
+            else:
+                offline.append(r['target'])
         
         return {
             'results': results,

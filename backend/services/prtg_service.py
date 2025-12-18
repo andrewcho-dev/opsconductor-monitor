@@ -472,9 +472,8 @@ class PRTGService:
             'details': []
         }
         
-        for device in prtg_devices:
-            results['processed'] += 1
-            
+        def sync_single_device(device):
+            detail = {'processed': 1, 'created': 0, 'updated': 0, 'skipped': 0, 'error': None, 'detail': None}
             try:
                 host = device.get('host', '')
                 name = device.get('device', '')
@@ -485,57 +484,54 @@ class PRTGService:
                 
                 if existing:
                     if update_existing and not dry_run:
-                        # Update existing device
                         netbox_service.update_device(existing['id'], {
                             'comments': f"Synced from PRTG. Group: {device.get('group')}"
                         })
-                        results['updated'] += 1
-                        results['details'].append({
-                            'action': 'updated',
-                            'name': name,
-                            'host': host,
-                            'netbox_id': existing['id']
-                        })
+                        detail['updated'] = 1
+                        detail['detail'] = {'action': 'updated', 'name': name, 'host': host, 'netbox_id': existing['id']}
                     else:
-                        results['skipped'] += 1
-                        results['details'].append({
-                            'action': 'skipped',
-                            'name': name,
-                            'host': host,
-                            'reason': 'exists_in_netbox'
-                        })
+                        detail['skipped'] = 1
+                        detail['detail'] = {'action': 'skipped', 'name': name, 'host': host, 'reason': 'exists_in_netbox'}
                 elif create_missing:
                     if not dry_run:
-                        # Create new device in NetBox
                         new_device = netbox_service.create_device({
                             'name': name,
                             'site': default_site,
                             'device_role': default_role,
-                            'device_type': 1,  # Will need mapping
+                            'device_type': 1,
                             'status': 'active',
                             'primary_ip4': host,
                             'comments': f"Imported from PRTG. Group: {device.get('group')}, Tags: {device.get('tags')}"
                         })
-                        results['created'] += 1
-                        results['details'].append({
-                            'action': 'created',
-                            'name': name,
-                            'host': host,
-                            'netbox_id': new_device.get('id')
-                        })
+                        detail['created'] = 1
+                        detail['detail'] = {'action': 'created', 'name': name, 'host': host, 'netbox_id': new_device.get('id')}
                     else:
-                        results['created'] += 1
-                        results['details'].append({
-                            'action': 'would_create',
-                            'name': name,
-                            'host': host
-                        })
+                        detail['created'] = 1
+                        detail['detail'] = {'action': 'would_create', 'name': name, 'host': host}
                         
             except Exception as e:
                 logger.error(f"Error syncing device {device.get('device')}: {e}")
-                results['errors'].append({
-                    'device': device.get('device'),
-                    'error': str(e)
-                })
+                detail['error'] = {'device': device.get('device'), 'error': str(e)}
+            
+            return detail
+        
+        # Process devices in parallel
+        from concurrent.futures import ThreadPoolExecutor
+        import os
+        cpu_count = os.cpu_count() or 4
+        max_workers = min(cpu_count * 5, len(prtg_devices), 100)
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            sync_results = list(executor.map(sync_single_device, prtg_devices))
+        
+        for detail in sync_results:
+            results['processed'] += detail['processed']
+            results['created'] += detail['created']
+            results['updated'] += detail['updated']
+            results['skipped'] += detail['skipped']
+            if detail['detail']:
+                results['details'].append(detail['detail'])
+            if detail['error']:
+                results['errors'].append(detail['error'])
         
         return results
