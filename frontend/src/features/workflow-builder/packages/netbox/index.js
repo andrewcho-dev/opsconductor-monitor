@@ -10,6 +10,7 @@
  * - Bulk operations
  * - Lookup/reference data
  * - Autodiscovery
+ * - SNMP Walker Discovery
  */
 
 import { deviceNodes } from './device';
@@ -20,6 +21,7 @@ import { discoveryNodes } from './discovery';
 import { bulkNodes } from './bulk';
 import { lookupNodes } from './lookup';
 import { autodiscoveryNodes } from './autodiscovery';
+import { snmpWalkerNodes } from './snmp-walker';
 
 export default {
   id: 'netbox',
@@ -38,5 +40,6 @@ export default {
     ...bulkNodes,
     ...lookupNodes,
     ...autodiscoveryNodes,
+    ...snmpWalkerNodes,
   },
 };

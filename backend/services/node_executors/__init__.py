@@ -6,6 +6,7 @@ Contains executor implementations for each node type in the workflow builder.
 
 from .network import PingExecutor, TracerouteExecutor, PortScanExecutor
 from .snmp import SNMPGetExecutor, SNMPWalkExecutor
+from .snmp_walker import SNMPWalkerExecutor
 from .ssh import SSHCommandExecutor
 from .database import DBQueryExecutor, DBUpsertExecutor
 from .notifications import SlackExecutor, EmailExecutor, WebhookExecutor
@@ -16,6 +17,7 @@ __all__ = [
     'PortScanExecutor',
     'SNMPGetExecutor',
     'SNMPWalkExecutor',
+    'SNMPWalkerExecutor',
     'SSHCommandExecutor',
     'DBQueryExecutor',
     'DBUpsertExecutor',

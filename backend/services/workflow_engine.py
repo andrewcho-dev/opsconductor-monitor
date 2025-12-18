@@ -73,6 +73,7 @@ class WorkflowEngine:
         """Register default node executors."""
         from .node_executors.network import PingExecutor, TracerouteExecutor, PortScanExecutor
         from .node_executors.snmp import SNMPGetExecutor, SNMPWalkExecutor
+        from .node_executors.snmp_walker import SNMPWalkerExecutor
         from .node_executors.ssh import SSHCommandExecutor
         from .node_executors.database import DBQueryExecutor, DBUpsertExecutor
         from .node_executors.notifications import SlackExecutor, EmailExecutor, WebhookExecutor, TemplatedNotificationExecutor
@@ -85,6 +86,7 @@ class WorkflowEngine:
         port_scan_exec = PortScanExecutor()
         snmp_get_exec = SNMPGetExecutor()
         snmp_walk_exec = SNMPWalkExecutor()
+        snmp_walker_exec = SNMPWalkerExecutor()
         ssh_exec = SSHCommandExecutor()
         db_query_exec = DBQueryExecutor(self.db)
         db_upsert_exec = DBUpsertExecutor(self.db)
@@ -113,6 +115,12 @@ class WorkflowEngine:
             'snmp:get': lambda n, c: snmp_get_exec.execute(n, c),
             'snmp:walk': lambda n, c: snmp_walk_exec.execute(n, c),
             'snmp:set': self._execute_placeholder,
+            
+            # SNMP Walker (comprehensive discovery)
+            'snmp_walker': lambda n, c: snmp_walker_exec.execute(n, c),
+            'netbox:snmp-walker': lambda n, c: snmp_walker_exec.execute(n, c),
+            'netbox:snmp-interface-sync': lambda n, c: snmp_walker_exec.execute(n, c),
+            'netbox:snmp-neighbor-discovery': lambda n, c: snmp_walker_exec.execute(n, c),
             
             # SSH
             'ssh:command': lambda n, c: ssh_exec.execute(n, c),
