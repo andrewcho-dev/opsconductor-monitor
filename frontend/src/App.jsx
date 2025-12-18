@@ -16,7 +16,6 @@ import { DashboardPage, TopologyPage, PowerTrendsPage, AlertsPage, ActiveJobsPag
 // System Module
 import { 
   SystemOverviewPage, 
-  WorkersPage, 
   AlertsPage as SystemAlertsPage,
   SettingsPage as SystemSettingsPage,
   NotificationsPage,
@@ -81,7 +80,6 @@ function App() {
         {/* SYSTEM MODULE */}
         <Route path="/system" element={<ProtectedRoute><Navigate to="/system/overview" replace /></ProtectedRoute>} />
         <Route path="/system/overview" element={<ProtectedRoute permission="system.settings.view"><SystemOverviewPage /></ProtectedRoute>} />
-        <Route path="/system/workers" element={<ProtectedRoute permission="system.settings.view"><WorkersPage /></ProtectedRoute>} />
         <Route path="/system/alerts" element={<ProtectedRoute><SystemAlertsPage /></ProtectedRoute>} />
         <Route path="/system/settings" element={<ProtectedRoute permission="system.settings.view"><SystemSettingsPage /></ProtectedRoute>}>
           <Route index element={<Navigate to="general" replace />} />

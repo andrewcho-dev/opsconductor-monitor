@@ -99,7 +99,6 @@ const moduleNavigation = {
         title: 'Infrastructure',
         items: [
           { id: 'overview', label: 'System Overview', icon: Activity, path: '/system/overview' },
-          { id: 'workers', label: 'Workers & Queues', icon: Users, path: '/system/workers' },
           { id: 'alerts', label: 'Alerts', icon: Bell, path: '/system/alerts' },
         ]
       },
