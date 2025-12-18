@@ -120,7 +120,7 @@ export function useWorkflow(initialWorkflow = null) {
 
   // Node changes (move, select, etc.)
   const onNodesChange = useCallback((changes) => {
-    // Check if this is a position change (drag)
+    // Check if this is a position change (drag completed)
     const hasPositionChange = changes.some(
       change => change.type === 'position' && change.dragging === false
     );
@@ -153,7 +153,14 @@ export function useWorkflow(initialWorkflow = null) {
       });
     }
     
-    setIsDirty(true);
+    // Only mark dirty for actual content changes (position, remove, add)
+    // Not for selection or dimension changes from React Flow initialization
+    const hasContentChange = changes.some(
+      change => change.type === 'position' || change.type === 'remove' || change.type === 'add'
+    );
+    if (hasContentChange) {
+      setIsDirty(true);
+    }
   }, [saveToHistory]);
 
   // Edge changes
@@ -187,7 +194,14 @@ export function useWorkflow(initialWorkflow = null) {
       });
     }
     
-    setIsDirty(true);
+    // Only mark dirty for actual content changes (remove, add)
+    // Not for selection changes
+    const hasContentChange = changes.some(
+      change => change.type === 'remove' || change.type === 'add'
+    );
+    if (hasContentChange) {
+      setIsDirty(true);
+    }
   }, [saveToHistory]);
 
   // Connect nodes
