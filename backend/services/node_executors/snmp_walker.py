@@ -202,15 +202,26 @@ class SNMPWalkerExecutor:
                         all_created.extend(created_list)
             
             # Priority: discovered_devices (has SNMP data) > skipped > created
+            # Deduplicate by IP address since same devices may appear in multiple variable keys
+            def deduplicate_by_ip(devices):
+                seen_ips = set()
+                unique = []
+                for d in devices:
+                    ip = d.get('ip_address') if isinstance(d, dict) else None
+                    if ip and ip not in seen_ips:
+                        seen_ips.add(ip)
+                        unique.append(d)
+                return unique
+            
             if all_discovered:
-                created = all_discovered
-                logger.warning(f"SNMP Walker: Using {len(created)} discovered_devices as targets")
+                created = deduplicate_by_ip(all_discovered)
+                logger.warning(f"SNMP Walker: Using {len(created)} discovered_devices as targets (deduped from {len(all_discovered)})")
             elif all_skipped:
-                created = all_skipped
-                logger.warning(f"SNMP Walker: Using {len(created)} skipped_devices as targets")
+                created = deduplicate_by_ip(all_skipped)
+                logger.warning(f"SNMP Walker: Using {len(created)} skipped_devices as targets (deduped from {len(all_skipped)})")
             elif all_created:
-                created = all_created
-                logger.warning(f"SNMP Walker: Using {len(created)} created_devices as targets")
+                created = deduplicate_by_ip(all_created)
+                logger.warning(f"SNMP Walker: Using {len(created)} created_devices as targets (deduped from {len(all_created)})")
             else:
                 # Fallback to direct variable access
                 created = variables.get('discovered_devices', [])
@@ -225,8 +236,15 @@ class SNMPWalkerExecutor:
             if created:
                 logger.warning(f"SNMP Walker: First target sample: {created[0] if created else 'none'}")
             
+            # Filter to only SNMP-capable devices (snmp_success=True from autodiscovery)
+            snmp_only = params.get('snmp_only', True)  # Default to only SNMP devices
+            
             for device in created:
                 if isinstance(device, dict):
+                    # Skip devices that don't support SNMP (unless snmp_only is False)
+                    if snmp_only and not device.get('snmp_success', False):
+                        continue
+                    
                     # Extract IP address - check ip_address first, then primary_ip
                     ip = device.get('ip_address')
                     if not ip:
@@ -240,14 +258,16 @@ class SNMPWalkerExecutor:
                         targets.append({
                             'ip_address': ip,
                             'community': device.get('snmp_community') or params.get('snmp_community', 'public'),
-                            'device_id': device.get('id') or device.get('netbox_id'),
-                            'device_name': device.get('name'),
+                            'device_id': device.get('id') or device.get('netbox_id') or device.get('netbox_device_id'),
+                            'device_name': device.get('name') or device.get('hostname'),
                         })
                 elif isinstance(device, str):
                     targets.append({
                         'ip_address': device,
                         'community': params.get('snmp_community', 'public'),
                     })
+            
+            logger.warning(f"SNMP Walker: After SNMP filtering, {len(targets)} targets remain")
         
         return targets
     
