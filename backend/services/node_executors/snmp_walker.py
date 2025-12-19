@@ -260,6 +260,8 @@ class SNMPWalkerExecutor:
                             'community': device.get('snmp_community') or params.get('snmp_community', 'public'),
                             'device_id': device.get('id') or device.get('netbox_id') or device.get('netbox_device_id'),
                             'device_name': device.get('name') or device.get('hostname'),
+                            'open_ports': device.get('open_ports', []),
+                            'services': device.get('services', []),
                         })
                 elif isinstance(device, str):
                     targets.append({
