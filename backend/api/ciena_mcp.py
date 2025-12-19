@@ -327,3 +327,19 @@ def sync_to_netbox():
     )
     
     return jsonify(success_response(stats))
+
+
+@mcp_bp.route('/sync/equipment', methods=['POST'])
+def sync_equipment_to_netbox():
+    """Sync MCP equipment (SFPs, cards) to NetBox as inventory items."""
+    mcp_service = get_mcp_service()
+    
+    from .netbox import get_netbox_service
+    netbox_service = get_netbox_service()
+    
+    if not netbox_service.is_configured:
+        return jsonify(error_response('NETBOX_ERROR', 'NetBox is not configured')), 400
+    
+    stats = mcp_service.sync_equipment_to_netbox(netbox_service)
+    
+    return jsonify(success_response(stats))

@@ -117,15 +117,17 @@ class MCPEquipmentSyncExecutor(BaseNodeExecutor):
     
     def execute(self, node: Dict, context: Dict) -> Dict:
         """
-        Get equipment inventory from MCP.
+        Get equipment inventory from MCP and optionally sync to NetBox.
         
         Parameters:
             - device_id: Optional MCP device ID to filter equipment
+            - sync_to_netbox: Whether to sync to NetBox as inventory items (default False)
         """
         from ..ciena_mcp_service import get_mcp_service, CienaMCPError
         
         params = node.get('parameters', {})
         device_id = params.get('device_id')
+        sync_to_netbox = params.get('sync_to_netbox', False)
         
         try:
             mcp = get_mcp_service()
@@ -164,12 +166,25 @@ class MCPEquipmentSyncExecutor(BaseNodeExecutor):
                     'category': attrs.get('category'),
                 })
             
-            logger.info(f"MCP equipment sync complete: {len(equipment_list)} items")
-            return {
+            result = {
                 'success': True,
                 'equipment': equipment_list,
                 'equipment_count': len(equipment_list),
             }
+            
+            # Sync to NetBox if enabled
+            if sync_to_netbox:
+                from ...api.netbox import get_netbox_service
+                netbox = get_netbox_service()
+                
+                if netbox.is_configured:
+                    sync_stats = mcp.sync_equipment_to_netbox(netbox)
+                    result['netbox_sync'] = sync_stats
+                else:
+                    result['netbox_sync'] = {'error': 'NetBox not configured'}
+            
+            logger.info(f"MCP equipment sync complete: {len(equipment_list)} items")
+            return result
             
         except CienaMCPError as e:
             logger.error(f"MCP equipment sync failed: {e}")

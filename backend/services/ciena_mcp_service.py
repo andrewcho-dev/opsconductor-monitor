@@ -393,6 +393,121 @@ class CienaMCPService:
                    f"{stats['skipped']} skipped, {len(stats['errors'])} errors")
         return stats
     
+    def sync_equipment_to_netbox(self, netbox_service) -> Dict:
+        """
+        Sync MCP equipment (SFPs, cards) to NetBox as inventory items.
+        
+        Args:
+            netbox_service: NetBox service instance
+        
+        Returns:
+            Dict with sync statistics
+        """
+        stats = {
+            'total': 0,
+            'created': 0,
+            'updated': 0,
+            'skipped': 0,
+            'errors': []
+        }
+        
+        # Get all equipment from MCP
+        equipment_list = self.get_all_equipment()
+        stats['total'] = len(equipment_list)
+        
+        # Build device name to ID mapping from NetBox
+        device_map = {}
+        try:
+            nb_devices = netbox_service._request('GET', 'dcim/devices/?limit=1000')
+            for dev in nb_devices.get('results', []):
+                device_map[dev['name'].lower()] = dev['id']
+        except Exception as e:
+            logger.warning(f"Failed to get NetBox devices for mapping: {e}")
+        
+        # Get or create manufacturer
+        manufacturer_id = None
+        try:
+            mfr_search = netbox_service._request('GET', 'dcim/manufacturers/?name=Ciena')
+            if mfr_search.get('results'):
+                manufacturer_id = mfr_search['results'][0]['id']
+            else:
+                # Try common SFP manufacturers
+                for mfr_name in ['FS', 'Finisar', 'Generic']:
+                    mfr_search = netbox_service._request('GET', f'dcim/manufacturers/?name__ic={mfr_name}')
+                    if mfr_search.get('results'):
+                        manufacturer_id = mfr_search['results'][0]['id']
+                        break
+        except:
+            pass
+        
+        for item in equipment_list:
+            try:
+                attrs = item.get('attributes', {})
+                display = attrs.get('displayData', {})
+                installed = attrs.get('installedSpec', {})
+                locations = attrs.get('locations', [{}])
+                location = locations[0] if locations else {}
+                
+                serial = installed.get('serialNumber', '')
+                part_number = installed.get('partNumber', '').strip()
+                item_type = installed.get('type') or attrs.get('cardType', '')
+                device_name = location.get('neName', '')
+                slot = location.get('subslot', '')
+                manufacturer = installed.get('manufacturer', '')
+                
+                if not serial or not device_name:
+                    stats['skipped'] += 1
+                    continue
+                
+                # Find device ID in NetBox
+                device_id = device_map.get(device_name.lower())
+                if not device_id:
+                    stats['skipped'] += 1
+                    continue
+                
+                # Check if inventory item exists
+                existing = None
+                try:
+                    search = netbox_service._request('GET', f'dcim/inventory-items/?serial={serial}')
+                    if search.get('results'):
+                        existing = search['results'][0]
+                except:
+                    pass
+                
+                # Build inventory item data
+                item_data = {
+                    'device': device_id,
+                    'name': f"{item_type}-{slot}" if slot else item_type,
+                    'serial': serial,
+                    'part_id': part_number,
+                    'description': f"MCP Equipment: {manufacturer} {item_type}",
+                }
+                
+                if manufacturer_id:
+                    item_data['manufacturer'] = manufacturer_id
+                
+                if existing:
+                    # Update existing
+                    try:
+                        netbox_service._request('PATCH', f'dcim/inventory-items/{existing["id"]}/', json=item_data)
+                        stats['updated'] += 1
+                    except Exception as e:
+                        stats['errors'].append({'serial': serial, 'error': str(e)})
+                else:
+                    # Create new
+                    try:
+                        netbox_service._request('POST', 'dcim/inventory-items/', json=item_data)
+                        stats['created'] += 1
+                    except Exception as e:
+                        stats['errors'].append({'serial': serial, 'error': str(e)})
+                        
+            except Exception as e:
+                stats['errors'].append({'item': item.get('id', 'unknown'), 'error': str(e)})
+        
+        logger.info(f"MCP equipment to NetBox sync: {stats['created']} created, {stats['updated']} updated, "
+                   f"{stats['skipped']} skipped, {len(stats['errors'])} errors")
+        return stats
+    
     def get_device_summary(self) -> Dict:
         """Get summary of MCP inventory."""
         try:
