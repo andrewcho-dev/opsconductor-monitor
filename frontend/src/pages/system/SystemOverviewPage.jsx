@@ -15,7 +15,8 @@ import {
   Check,
   Link,
   ExternalLink,
-  Plug
+  Plug,
+  Network
 } from 'lucide-react';
 import { fetchApi, formatTimeOnly, formatShortTime, formatDuration } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
@@ -206,6 +207,7 @@ export function SystemOverviewPage() {
   const [integrations, setIntegrations] = useState({
     netbox: { status: 'not_configured' },
     prtg: { status: 'not_configured' },
+    mcp: { status: 'not_configured' },
   });
 
   const handleAcknowledgeAlert = async (alertId) => {
@@ -340,6 +342,43 @@ export function SystemOverviewPage() {
         newIntegrations.prtg = { status: 'not_configured' };
       }
       
+      // Check Ciena MCP
+      try {
+        const mcpRes = await fetchApi('/api/mcp/settings', { headers: getAuthHeader() });
+        if (mcpRes.success && mcpRes.data?.url) {
+          // Test MCP connection
+          try {
+            const testRes = await fetchApi('/api/mcp/test', {
+              method: 'POST',
+              headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
+              body: JSON.stringify({})
+            });
+            if (testRes.success && testRes.data?.success) {
+              newIntegrations.mcp = {
+                status: 'connected',
+                url: mcpRes.data.url,
+                version: `${testRes.data.summary?.devices || 0} devices`,
+              };
+            } else {
+              newIntegrations.mcp = {
+                status: 'error',
+                url: mcpRes.data.url,
+                error: testRes.data?.message || 'Connection failed',
+              };
+            }
+          } catch {
+            newIntegrations.mcp = {
+              status: 'disconnected',
+              url: mcpRes.data.url,
+            };
+          }
+        } else {
+          newIntegrations.mcp = { status: 'not_configured' };
+        }
+      } catch {
+        newIntegrations.mcp = { status: 'not_configured' };
+      }
+      
       setIntegrations(newIntegrations);
     } catch (err) {
       setError(err.message);
@@ -462,12 +501,15 @@ export function SystemOverviewPage() {
               error={integrations.prtg.error}
               onConfigure={() => window.location.href = '/system/settings/prtg'}
             />
-            {/* Placeholder for future integrations */}
-            <div className="bg-gray-50 rounded-lg border border-dashed border-gray-300 p-4 flex flex-col items-center justify-center text-center">
-              <Plug className="w-8 h-8 text-gray-300 mb-2" />
-              <span className="text-sm text-gray-500">More integrations coming soon</span>
-              <span className="text-xs text-gray-400 mt-1">Ciena MCP, LibreNMS, etc.</span>
-            </div>
+            <IntegrationCard
+              name="Ciena MCP"
+              icon={Network}
+              status={integrations.mcp.status}
+              url={integrations.mcp.url}
+              version={integrations.mcp.version}
+              error={integrations.mcp.error}
+              onConfigure={() => window.location.href = '/system/settings/mcp'}
+            />
           </div>
         </div>
 
