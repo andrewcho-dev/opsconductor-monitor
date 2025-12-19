@@ -360,11 +360,38 @@ def get_device_by_ip(ip):
             'category': attrs.get('category'),
         })
     
+    # Get ports for this device
+    device_id = device_data['id']
+    all_ports = service.get_all_ports(device_id)
+    
+    port_list = []
+    for port in all_ports:
+        attrs = port.get('attributes', {})
+        display = attrs.get('displayData', {})
+        state_data = attrs.get('stateData', {})
+        planned_spec = attrs.get('plannedSpec', {})
+        
+        port_list.append({
+            'id': port.get('id'),
+            'name': display.get('displayName') or attrs.get('name'),
+            'type': attrs.get('type'),
+            'layer_rate': attrs.get('layerRate'),
+            'admin_state': state_data.get('adminState'),
+            'operational_state': state_data.get('operationalState'),
+            'speed': planned_spec.get('rate') or attrs.get('rate'),
+            'mtu': planned_spec.get('mtu'),
+            'mac_address': attrs.get('macAddress'),
+            'description': attrs.get('description'),
+            'direction': attrs.get('direction'),
+        })
+    
     return jsonify(success_response({
         'found': True,
         'device': device_data,
         'equipment': equipment_list,
         'equipment_count': len(equipment_list),
+        'ports': port_list,
+        'port_count': len(port_list),
     }))
 
 

@@ -206,6 +206,46 @@ class CienaMCPService:
         devices = result.get('data', [])
         return devices[0] if devices else None
     
+    # ==================== PORTS/TPs (Termination Points) ====================
+    
+    def get_ports(self, device_id: str, limit: int = 200, offset: int = 0) -> Dict:
+        """
+        Get ports (termination points) for a device from MCP.
+        
+        Args:
+            device_id: Network construct ID
+            limit: Maximum results per page
+            offset: Offset for pagination
+        
+        Returns:
+            Dict with 'data' list and 'meta' pagination info
+        """
+        params = f"?limit={limit}&offset={offset}"
+        return self._request('GET', f'/nsi/api/networkConstructs/{device_id}/tps{params}')
+    
+    def get_all_ports(self, device_id: str) -> List[Dict]:
+        """Get all ports for a device with pagination handling."""
+        all_ports = []
+        offset = 0
+        limit = 200
+        
+        while True:
+            try:
+                result = self.get_ports(device_id, limit=limit, offset=offset)
+                ports = result.get('data', [])
+                all_ports.extend(ports)
+                
+                total = result.get('meta', {}).get('total', 0)
+                if offset + limit >= total or not ports:
+                    break
+                offset += limit
+            except CienaMCPError as e:
+                logger.warning(f"Failed to get ports for device {device_id}: {e}")
+                break
+        
+        logger.info(f"Retrieved {len(all_ports)} ports for device {device_id}")
+        return all_ports
+    
     # ==================== EQUIPMENT (SFPs, Cards) ====================
     
     def get_equipment(self, limit: int = 100, offset: int = 0, device_id: str = None) -> Dict:

@@ -762,102 +762,140 @@ export function DeviceDetail() {
           </div>
         </div>
 
-        {interfaces.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-xs">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-2 py-2 text-left font-medium text-gray-700">Port</th>
-                  <th className="px-2 py-2 text-left font-medium text-gray-700">Name</th>
-                  <th className="px-2 py-2 text-left font-medium text-gray-700">Type</th>
-                  <th className="px-2 py-2 text-right font-medium text-gray-700">Speed</th>
-                  <th className="px-2 py-2 text-left font-medium text-gray-700">Status</th>
-                  <th className="px-2 py-2 text-left font-medium text-gray-700">MAC Address</th>
-                  <th className="px-2 py-2 text-right font-medium text-gray-700">RX Bytes</th>
-                  <th className="px-2 py-2 text-right font-medium text-gray-700">TX Bytes</th>
-                  <th className="px-2 py-2 text-left font-medium text-gray-700">Medium</th>
-                  <th className="px-2 py-2 text-left font-medium text-gray-700">Connector</th>
-                  <th className="px-2 py-2 text-right font-medium text-gray-700">TX Power</th>
-                  <th className="px-2 py-2 text-right font-medium text-gray-700">RX Power</th>
-                  <th className="px-2 py-2 text-right font-medium text-gray-700">Temperature</th>
-                  <th className="px-2 py-2 text-left font-medium text-gray-700">LLDP Neighbor</th>
-                  <th className="px-2 py-2 text-left font-medium text-gray-700">LLDP Remote Port</th>
-                  <th className="px-2 py-2 text-center font-medium text-gray-700">Optical History</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {interfaces.map((iface, index) => (
-                  <tr
-                    key={index}
-                    className={cn(
-                      "hover:bg-gray-50",
-                      iface.is_optical && "bg-blue-50"
+        {(() => {
+          // Build MCP SFP lookup by slot number
+          const mcpSfpBySlot = {};
+          if (mcpData?.equipment) {
+            mcpData.equipment.forEach(eq => {
+              if (eq.type === 'SFP' && eq.slot) {
+                mcpSfpBySlot[eq.slot] = eq;
+              }
+            });
+          }
+          
+          return interfaces.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-xs">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-2 py-2 text-left font-medium text-gray-700">Port</th>
+                    <th className="px-2 py-2 text-left font-medium text-gray-700">Name</th>
+                    <th className="px-2 py-2 text-left font-medium text-gray-700">Type</th>
+                    <th className="px-2 py-2 text-right font-medium text-gray-700">Speed</th>
+                    <th className="px-2 py-2 text-left font-medium text-gray-700">Status</th>
+                    <th className="px-2 py-2 text-left font-medium text-gray-700">MAC Address</th>
+                    <th className="px-2 py-2 text-right font-medium text-gray-700">RX Bytes</th>
+                    <th className="px-2 py-2 text-right font-medium text-gray-700">TX Bytes</th>
+                    <th className="px-2 py-2 text-left font-medium text-gray-700">Medium</th>
+                    <th className="px-2 py-2 text-left font-medium text-gray-700">Connector</th>
+                    <th className="px-2 py-2 text-right font-medium text-gray-700">TX Power</th>
+                    <th className="px-2 py-2 text-right font-medium text-gray-700">RX Power</th>
+                    <th className="px-2 py-2 text-right font-medium text-gray-700">Temperature</th>
+                    {mcpData && (
+                      <>
+                        <th className="px-2 py-2 text-left font-medium text-indigo-700 bg-indigo-50">SFP Part#</th>
+                        <th className="px-2 py-2 text-left font-medium text-indigo-700 bg-indigo-50">SFP Vendor</th>
+                        <th className="px-2 py-2 text-left font-medium text-indigo-700 bg-indigo-50">SFP Serial</th>
+                      </>
                     )}
-                  >
-                    <td className="px-2 py-2">{iface.interface_index}</td>
-                    <td className="px-2 py-2">{iface.interface_name}</td>
-                    <td className="px-2 py-2">{iface.interface_type_name || "SSH/CLI"}</td>
-                    <td className="px-2 py-2 text-right font-mono">
-                      {formatSpeed(iface.interface_speed)}
-                    </td>
-                    <td className="px-2 py-2">
-                      <span className={getStatusClass(iface.status)}>
-                        {iface.status || "Unknown"}
-                      </span>
-                    </td>
-                    <td className="px-2 py-2 font-mono">{iface.physical_address || "N/A"}</td>
-                    <td className="px-2 py-2 text-right font-mono">
-                      {formatBytes(iface.rx_bytes)}
-                    </td>
-                    <td className="px-2 py-2 text-right font-mono">
-                      {formatBytes(iface.tx_bytes)}
-                    </td>
-                    <td className="px-2 py-2">
-                      <span className={cn(
-                        iface.is_optical ? "text-green-600" : "text-gray-600"
-                      )}>
-                        {iface.is_optical ? "Optical" : "Electrical"}
-                      </span>
-                    </td>
-                    <td className="px-2 py-2">{iface.connector || "-"}</td>
-                    <td className="px-2 py-2 text-right font-mono text-green-600">
-                      {iface.is_optical ? (iface.tx_power || "N/A") : "-"}
-                    </td>
-                    <td className="px-2 py-2 text-right font-mono text-green-600">
-                      {iface.is_optical ? (iface.rx_power || "N/A") : "-"}
-                    </td>
-                    <td className="px-2 py-2 text-right font-mono text-orange-600">
-                      {iface.is_optical ? (iface.temperature || "N/A") : "-"}
-                    </td>
-                    <td className="px-2 py-2">
-                      {iface.lldp_remote_system_name || 
-                       iface.lldp_remote_mgmt_addr || 
-                       iface.lldp_remote_chassis_id || "-"}
-                    </td>
-                    <td className="px-2 py-2">{iface.lldp_remote_port || "-"}</td>
-                    <td className="px-2 py-2 text-center">
-                      {iface.is_optical ? (
-                        <button
-                          onClick={() => showOpticalHistory(iface.interface_index, iface.interface_name)}
-                          className="text-blue-600 hover:text-blue-800 cursor-pointer"
-                          title="View optical power history"
-                        >
-                          <TrendingUp className="w-4 h-4 mx-auto" />
-                        </button>
-                      ) : (
-                        "-"
-                      )}
-                    </td>
+                    <th className="px-2 py-2 text-left font-medium text-gray-700">LLDP Neighbor</th>
+                    <th className="px-2 py-2 text-left font-medium text-gray-700">LLDP Remote Port</th>
+                    <th className="px-2 py-2 text-center font-medium text-gray-700">Optical History</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="text-center py-8 text-gray-500">
-            No interface data available. Please run an interface scan.
-          </div>
-        )}
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {interfaces.map((iface, index) => {
+                    // Match MCP SFP by interface index
+                    const mcpSfp = mcpSfpBySlot[String(iface.interface_index)];
+                    
+                    return (
+                      <tr
+                        key={index}
+                        className={cn(
+                          "hover:bg-gray-50",
+                          iface.is_optical && "bg-blue-50",
+                          mcpSfp && "border-l-2 border-indigo-400"
+                        )}
+                      >
+                        <td className="px-2 py-2">{iface.interface_index}</td>
+                        <td className="px-2 py-2">{iface.interface_name}</td>
+                        <td className="px-2 py-2">{iface.interface_type_name || "SSH/CLI"}</td>
+                        <td className="px-2 py-2 text-right font-mono">
+                          {formatSpeed(iface.interface_speed)}
+                        </td>
+                        <td className="px-2 py-2">
+                          <span className={getStatusClass(iface.status)}>
+                            {iface.status || "Unknown"}
+                          </span>
+                        </td>
+                        <td className="px-2 py-2 font-mono">{iface.physical_address || "N/A"}</td>
+                        <td className="px-2 py-2 text-right font-mono">
+                          {formatBytes(iface.rx_bytes)}
+                        </td>
+                        <td className="px-2 py-2 text-right font-mono">
+                          {formatBytes(iface.tx_bytes)}
+                        </td>
+                        <td className="px-2 py-2">
+                          <span className={cn(
+                            iface.is_optical ? "text-green-600" : "text-gray-600"
+                          )}>
+                            {iface.is_optical ? "Optical" : "Electrical"}
+                          </span>
+                        </td>
+                        <td className="px-2 py-2">{iface.connector || "-"}</td>
+                        <td className="px-2 py-2 text-right font-mono text-green-600">
+                          {iface.is_optical ? (iface.tx_power || "N/A") : "-"}
+                        </td>
+                        <td className="px-2 py-2 text-right font-mono text-green-600">
+                          {iface.is_optical ? (iface.rx_power || "N/A") : "-"}
+                        </td>
+                        <td className="px-2 py-2 text-right font-mono text-orange-600">
+                          {iface.is_optical ? (iface.temperature || "N/A") : "-"}
+                        </td>
+                        {mcpData && (
+                          <>
+                            <td className="px-2 py-2 font-mono text-[10px] bg-indigo-50/50 text-indigo-700">
+                              {mcpSfp?.part_number?.trim() || "-"}
+                            </td>
+                            <td className="px-2 py-2 text-[10px] bg-indigo-50/50 text-indigo-700">
+                              {mcpSfp?.manufacturer || "-"}
+                            </td>
+                            <td className="px-2 py-2 font-mono text-[10px] bg-indigo-50/50 text-indigo-700">
+                              {mcpSfp?.serial_number || "-"}
+                            </td>
+                          </>
+                        )}
+                        <td className="px-2 py-2">
+                          {iface.lldp_remote_system_name || 
+                           iface.lldp_remote_mgmt_addr || 
+                           iface.lldp_remote_chassis_id || "-"}
+                        </td>
+                        <td className="px-2 py-2">{iface.lldp_remote_port || "-"}</td>
+                        <td className="px-2 py-2 text-center">
+                          {iface.is_optical ? (
+                            <button
+                              onClick={() => showOpticalHistory(iface.interface_index, iface.interface_name)}
+                              className="text-blue-600 hover:text-blue-800 cursor-pointer"
+                              title="View optical power history"
+                            >
+                              <TrendingUp className="w-4 h-4 mx-auto" />
+                            </button>
+                          ) : (
+                            "-"
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              No interface data available. Please run an interface scan.
+            </div>
+          );
+        })()}
       </div>
 
       {/* Optical Power History Modal */}
