@@ -31,7 +31,8 @@ import {
   History,
   ShieldCheck,
   AlertTriangle,
-  FileKey
+  FileKey,
+  Circle
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -88,6 +89,12 @@ const moduleNavigation = {
         title: 'Alerts',
         items: [
           { id: 'alerts', label: 'Alert History', icon: Bell, path: '/monitor/alerts' },
+        ]
+      },
+      {
+        title: 'MCP',
+        items: [
+          { id: 'mcp-services', label: 'Services & Rings', icon: Circle, path: '/monitor/mcp-services' },
         ]
       }
     ]
