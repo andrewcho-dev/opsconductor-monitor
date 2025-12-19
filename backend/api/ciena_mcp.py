@@ -289,6 +289,82 @@ def get_links():
     }))
 
 
+# ==================== DEVICE BY IP ====================
+
+@mcp_bp.route('/device/<ip>', methods=['GET'])
+def get_device_by_ip(ip):
+    """Get MCP device info by IP address, including equipment."""
+    service = get_mcp_service()
+    
+    if not service.is_configured:
+        return jsonify(error_response('NOT_CONFIGURED', 'MCP is not configured')), 400
+    
+    # Get all devices and find by IP
+    all_devices = service.get_all_devices()
+    
+    device_data = None
+    for device in all_devices:
+        attrs = device.get('attributes', {})
+        device_ip = attrs.get('ipAddress') or attrs.get('displayData', {}).get('displayIpAddress')
+        if device_ip == ip:
+            display = attrs.get('displayData', {})
+            device_data = {
+                'id': device.get('id'),
+                'name': attrs.get('name') or display.get('displayName'),
+                'ip_address': device_ip,
+                'mac_address': attrs.get('macAddress') or display.get('displayMACAddress'),
+                'serial_number': attrs.get('serialNumber'),
+                'device_type': attrs.get('deviceType'),
+                'software_version': attrs.get('softwareVersion'),
+                'vendor': attrs.get('vendor', 'Ciena'),
+                'sync_state': display.get('displaySyncState'),
+                'association_state': display.get('displayAssociationState'),
+                'model': attrs.get('model'),
+                'hardware_version': attrs.get('hardwareVersion'),
+                'network_construct_type': attrs.get('networkConstructType'),
+            }
+            break
+    
+    if not device_data:
+        return jsonify(success_response({
+            'found': False,
+            'device': None,
+            'equipment': []
+        }))
+    
+    # Get equipment for this device
+    device_id = device_data['id']
+    all_equipment = service.get_all_equipment(device_id=device_id)
+    
+    equipment_list = []
+    for item in all_equipment:
+        attrs = item.get('attributes', {})
+        display = attrs.get('displayData', {})
+        installed = attrs.get('installedSpec', {})
+        locations = attrs.get('locations', [{}])
+        location = locations[0] if locations else {}
+        
+        equipment_list.append({
+            'id': item.get('id'),
+            'name': display.get('displayName'),
+            'type': installed.get('type') or attrs.get('cardType'),
+            'serial_number': installed.get('serialNumber'),
+            'part_number': installed.get('partNumber'),
+            'manufacturer': installed.get('manufacturer'),
+            'hardware_version': installed.get('hardwareVersion'),
+            'slot': location.get('subslot'),
+            'state': attrs.get('state'),
+            'category': attrs.get('category'),
+        })
+    
+    return jsonify(success_response({
+        'found': True,
+        'device': device_data,
+        'equipment': equipment_list,
+        'equipment_count': len(equipment_list),
+    }))
+
+
 # ==================== SUMMARY ====================
 
 @mcp_bp.route('/summary', methods=['GET'])

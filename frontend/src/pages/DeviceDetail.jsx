@@ -11,6 +11,10 @@ import {
   TrendingUp,
   ArrowLeft,
   Database,
+  Network,
+  Cpu,
+  HardDrive,
+  Package,
 } from "lucide-react";
 import { PageHeader } from "../components/layout";
 import { Line } from "react-chartjs-2";
@@ -53,11 +57,16 @@ export function DeviceDetail() {
   const [selectedTimeRange, setSelectedTimeRange] = useState(720); // Time range in hours (default 30 days)
   const [selectedTimescale, setSelectedTimescale] = useState('hour'); // Aggregation: 'minute', 'hour', 'day'
   const chartRef = useRef(null);
+  
+  // MCP Data
+  const [mcpData, setMcpData] = useState(null);
+  const [mcpLoading, setMcpLoading] = useState(false);
 
   useEffect(() => {
     if (ip) {
       loadDeviceData();
       loadStoredInterfaceData();
+      loadMcpData();
     }
   }, [ip]);
 
@@ -128,6 +137,25 @@ export function DeviceDetail() {
       }
     } catch (err) {
       console.error("Error loading SSH/CLI data:", err);
+    }
+  };
+
+  const loadMcpData = async () => {
+    if (!ip) return;
+    
+    setMcpLoading(true);
+    try {
+      const data = await fetchApi(`/api/mcp/device/${ip}`);
+      if (data.success && data.data?.found) {
+        setMcpData(data.data);
+      } else {
+        setMcpData(null);
+      }
+    } catch (err) {
+      console.log("MCP data not available for this device");
+      setMcpData(null);
+    } finally {
+      setMcpLoading(false);
     }
   };
 
@@ -619,6 +647,100 @@ export function DeviceDetail() {
           </div>
         </div>
       </div>
+
+      {/* MCP Information (if available) */}
+      {mcpData && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+          {/* MCP Device Info */}
+          <div className="bg-white p-4 rounded-lg shadow border-l-4 border-indigo-500">
+            <div className="flex items-center gap-2 mb-3">
+              <Network className="w-5 h-5 text-indigo-600" />
+              <h3 className="text-lg font-semibold text-gray-800">Ciena MCP Information</h3>
+            </div>
+            <div className="space-y-2 text-sm">
+              <div className="grid grid-cols-2 gap-2">
+                <span className="font-medium text-gray-600">Device Type:</span>
+                <span className="text-gray-800">{mcpData.device?.device_type || "Unknown"}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <span className="font-medium text-gray-600">Software Version:</span>
+                <span className="text-gray-800 font-mono text-xs">{mcpData.device?.software_version || "Unknown"}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <span className="font-medium text-gray-600">Serial Number:</span>
+                <span className="text-gray-800 font-mono">{mcpData.device?.serial_number || "Unknown"}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <span className="font-medium text-gray-600">MAC Address:</span>
+                <span className="text-gray-800 font-mono">{mcpData.device?.mac_address || "Unknown"}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <span className="font-medium text-gray-600">Sync State:</span>
+                <span className={cn(
+                  "font-medium",
+                  mcpData.device?.sync_state?.toLowerCase().includes('synch') ? "text-green-600" : "text-yellow-600"
+                )}>
+                  {mcpData.device?.sync_state || "Unknown"}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <span className="font-medium text-gray-600">Association:</span>
+                <span className={cn(
+                  "font-medium",
+                  mcpData.device?.association_state?.toLowerCase().includes('connect') ? "text-green-600" : "text-yellow-600"
+                )}>
+                  {mcpData.device?.association_state || "Unknown"}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <span className="font-medium text-gray-600">Vendor:</span>
+                <span className="text-gray-800">{mcpData.device?.vendor || "Ciena"}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* MCP Equipment Summary */}
+          <div className="bg-white p-4 rounded-lg shadow border-l-4 border-purple-500">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Cpu className="w-5 h-5 text-purple-600" />
+                <h3 className="text-lg font-semibold text-gray-800">MCP Equipment</h3>
+              </div>
+              <span className="text-sm text-gray-500">{mcpData.equipment_count || 0} items</span>
+            </div>
+            {mcpData.equipment && mcpData.equipment.length > 0 ? (
+              <div className="max-h-48 overflow-y-auto">
+                <table className="min-w-full text-xs">
+                  <thead className="bg-gray-50 sticky top-0">
+                    <tr>
+                      <th className="px-2 py-1 text-left font-medium text-gray-600">Type</th>
+                      <th className="px-2 py-1 text-left font-medium text-gray-600">Slot</th>
+                      <th className="px-2 py-1 text-left font-medium text-gray-600">Part Number</th>
+                      <th className="px-2 py-1 text-left font-medium text-gray-600">Serial</th>
+                      <th className="px-2 py-1 text-left font-medium text-gray-600">Manufacturer</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {mcpData.equipment.map((eq, idx) => (
+                      <tr key={idx} className="hover:bg-gray-50">
+                        <td className="px-2 py-1 font-medium">{eq.type || '-'}</td>
+                        <td className="px-2 py-1">{eq.slot || '-'}</td>
+                        <td className="px-2 py-1 font-mono text-[10px]">{eq.part_number || '-'}</td>
+                        <td className="px-2 py-1 font-mono text-[10px]">{eq.serial_number || '-'}</td>
+                        <td className="px-2 py-1">{eq.manufacturer || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-4 text-gray-500 text-sm">
+                No equipment data available
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Interface Information */}
       <div className="bg-white p-4 rounded-lg shadow mb-4">
