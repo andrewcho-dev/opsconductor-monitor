@@ -493,12 +493,26 @@ class SNMPWalkerExecutor:
                 existing_type = existing_iface.get('type', {})
                 existing_type_value = existing_type.get('value', '') if isinstance(existing_type, dict) else str(existing_type)
                 
-                # Delete if it's a virtual type or not in our physical interface list
+                # Delete if it's a virtual type
                 is_virtual_type = existing_type_value in ['virtual', 'lag', 'bridge']
-                is_non_physical_name = any(p in existing_name.lower() for p in ['vlan', 'lo', 'loopback', 'null', 'tunnel', 'bridge', 'lag', 'cpu', 'internal', 'stack', 'oob', 'eobc', 'bdi', 'nvi', 'unrouted', 'vrf', 'control', 'span'])
                 
-                if is_virtual_type or is_non_physical_name:
+                # Non-physical interface name patterns (case-insensitive)
+                name_lower = existing_name.lower()
+                non_physical_patterns = [
+                    'vlan', 'lo', 'loopback', 'null', 'tunnel', 'bridge', 'lag', 'cpu', 
+                    'internal', 'stack', 'oob', 'eobc', 'bdi', 'nvi', 'unrouted', 'vrf', 
+                    'control', 'span', 'mgmt', 'management', 'local', 'remote', 'mpls',
+                    'titan', 'saos', 'ipompls', 'eth'  # Ciena-specific non-physical
+                ]
+                is_non_physical_name = any(p in name_lower for p in non_physical_patterns)
+                
+                # Also delete if interface is NOT in our discovered physical interfaces
+                # This ensures we clean up any interfaces not found during SNMP walk
+                is_not_discovered = existing_name not in physical_iface_names
+                
+                if is_virtual_type or is_non_physical_name or (is_not_discovered and not existing_name.isdigit()):
                     to_delete.append(existing_iface['id'])
+                    logger.debug(f"Marking for deletion: {existing_name} (virtual={is_virtual_type}, non_phys={is_non_physical_name}, not_disc={is_not_discovered})")
             
             # Delete non-physical interfaces
             for iface_id in to_delete:
