@@ -311,6 +311,8 @@ class SNMPWalkerExecutor:
             'interfaces_created': 0,
             'interfaces_updated': 0,
             'interfaces_skipped': 0,
+            'interfaces_deleted': 0,
+            'services_created': 0,
             'sync_errors': [],
         }
         
@@ -377,6 +379,8 @@ class SNMPWalkerExecutor:
                     netbox_stats['interfaces_created'] += sync_result.get('created', 0)
                     netbox_stats['interfaces_updated'] += sync_result.get('updated', 0)
                     netbox_stats['interfaces_skipped'] += sync_result.get('skipped', 0)
+                    netbox_stats['interfaces_deleted'] += sync_result.get('deleted', 0)
+                    netbox_stats['services_created'] += sync_result.get('services_created', 0)
                     if sync_result.get('errors'):
                         netbox_stats['sync_errors'].extend(sync_result['errors'])
             
@@ -433,10 +437,20 @@ class SNMPWalkerExecutor:
             to_create = []
             to_update = []
             
+            # Track physical interface names for cleanup
+            physical_iface_names = set()
+            
             for iface in walk_result.get('interfaces', []):
                 iface_name = iface.get('name', '')
                 if not iface_name:
                     continue
+                
+                # Only sync physical interfaces
+                if not self._is_physical_interface(iface):
+                    skipped += 1
+                    continue
+                
+                physical_iface_names.add(iface_name)
                 
                 # Map SNMP interface type to NetBox type
                 netbox_type = self._map_interface_type(iface)
@@ -468,6 +482,29 @@ class SNMPWalkerExecutor:
                     # Queue for batch create
                     iface_data['device'] = device_id
                     to_create.append(iface_data)
+            
+            # Delete non-physical interfaces from NetBox
+            deleted = 0
+            to_delete = []
+            for existing_name, existing_iface in existing_names.items():
+                # Check if this existing interface is non-physical (virtual type in NetBox)
+                existing_type = existing_iface.get('type', {})
+                existing_type_value = existing_type.get('value', '') if isinstance(existing_type, dict) else str(existing_type)
+                
+                # Delete if it's a virtual type or not in our physical interface list
+                is_virtual_type = existing_type_value in ['virtual', 'lag', 'bridge']
+                is_non_physical_name = any(p in existing_name.lower() for p in ['vlan', 'lo', 'loopback', 'null', 'tunnel', 'bridge', 'lag', 'cpu', 'internal', 'stack', 'oob', 'eobc', 'bdi', 'nvi', 'unrouted', 'vrf', 'control', 'span'])
+                
+                if is_virtual_type or is_non_physical_name:
+                    to_delete.append(existing_iface['id'])
+            
+            # Delete non-physical interfaces
+            for iface_id in to_delete:
+                try:
+                    netbox_service._request('DELETE', f'dcim/interfaces/{iface_id}/')
+                    deleted += 1
+                except Exception as e:
+                    logger.warning(f"Failed to delete interface {iface_id}: {e}")
             
             # Batch create new interfaces (single API call)
             if to_create:
@@ -516,7 +553,10 @@ class SNMPWalkerExecutor:
                     except Exception as e:
                         logger.warning(f"Failed to update device {device_name}: {e}")
             
-            logger.info(f"NetBox sync for {device_name}: created={created}, updated={updated}, skipped={skipped}")
+            logger.info(f"NetBox sync for {device_name}: created={created}, updated={updated}, skipped={skipped}, deleted={deleted}")
+            
+            # Sync services (from discovered open ports)
+            services_created = self._sync_services_to_netbox(netbox_service, device_id, target)
             
         except Exception as e:
             logger.error(f"Failed to sync device {device_name} to NetBox: {e}")
@@ -526,8 +566,124 @@ class SNMPWalkerExecutor:
             'created': created,
             'updated': updated,
             'skipped': skipped,
+            'deleted': deleted,
+            'services_created': services_created if 'services_created' in dir() else 0,
             'errors': errors,
         }
+    
+    def _sync_services_to_netbox(self, netbox_service, device_id: int, target: Dict) -> int:
+        """Sync discovered services (open ports) to NetBox."""
+        services_created = 0
+        
+        # Service name mapping for common ports
+        PORT_SERVICE_MAP = {
+            22: ('SSH', 'tcp'),
+            23: ('Telnet', 'tcp'),
+            80: ('HTTP', 'tcp'),
+            443: ('HTTPS', 'tcp'),
+            161: ('SNMP', 'udp'),
+            162: ('SNMP-Trap', 'udp'),
+            3389: ('RDP', 'tcp'),
+            5985: ('WinRM-HTTP', 'tcp'),
+            5986: ('WinRM-HTTPS', 'tcp'),
+            8080: ('HTTP-Alt', 'tcp'),
+            8443: ('HTTPS-Alt', 'tcp'),
+            135: ('RPC', 'tcp'),
+            139: ('NetBIOS', 'tcp'),
+            445: ('SMB', 'tcp'),
+            53: ('DNS', 'udp'),
+            25: ('SMTP', 'tcp'),
+            110: ('POP3', 'tcp'),
+            143: ('IMAP', 'tcp'),
+            21: ('FTP', 'tcp'),
+            69: ('TFTP', 'udp'),
+            123: ('NTP', 'udp'),
+            514: ('Syslog', 'udp'),
+        }
+        
+        open_ports = target.get('open_ports', [])
+        if not open_ports:
+            return 0
+        
+        try:
+            # Get existing services for this device
+            existing = netbox_service._request('GET', f'ipam/services/?device_id={device_id}&limit=100')
+            existing_ports = {s.get('ports', [None])[0]: s for s in existing.get('results', []) if s.get('ports')}
+            
+            for port in open_ports:
+                if port in existing_ports:
+                    continue  # Service already exists
+                
+                service_name, protocol = PORT_SERVICE_MAP.get(port, (f'port-{port}', 'tcp'))
+                
+                service_data = {
+                    'device': device_id,
+                    'name': service_name,
+                    'ports': [port],
+                    'protocol': protocol,
+                    'description': f'Discovered via port scan',
+                }
+                
+                try:
+                    netbox_service._request('POST', 'ipam/services/', json=service_data)
+                    services_created += 1
+                except Exception as e:
+                    logger.warning(f"Failed to create service {service_name} on port {port}: {e}")
+            
+        except Exception as e:
+            logger.warning(f"Failed to sync services for device {device_id}: {e}")
+        
+        return services_created
+    
+    def _is_physical_interface(self, iface: Dict) -> bool:
+        """Check if interface is a physical interface (not virtual, loopback, VLAN, etc.)."""
+        name = iface.get('name', '').lower()
+        snmp_type = iface.get('type')
+        
+        # Non-physical interface patterns to exclude
+        non_physical_patterns = [
+            'vlan', 'vl', 'lo', 'loopback', 'null', 'tunnel', 'tun',
+            'bridge', 'br', 'bond', 'lag', 'po', 'port-channel',
+            'virtual', 'veth', 'docker', 'virbr', 'vnet', 'tap',
+            'cpu', 'internal', 'stack', 'oob', 'eobc', 'bdi', 'nvi',
+            'async', 'dialer', 'cellular', 'embedded', 'service',
+            'unrouted', 'vrf', 'mgmt', 'control', 'span',
+        ]
+        
+        for pattern in non_physical_patterns:
+            if pattern in name:
+                return False
+        
+        # Check SNMP interface type (ifType)
+        # Type 6 = ethernetCsmacd (physical Ethernet)
+        # Type 24 = softwareLoopback
+        # Type 53 = propVirtual
+        # Type 131 = tunnel
+        # Type 135 = l2vlan
+        # Type 136 = l3ipvlan
+        # Type 161 = ieee8023adLag
+        non_physical_types = ['24', '53', '131', '135', '136', '161', 24, 53, 131, 135, 136, 161]
+        if snmp_type in non_physical_types:
+            return False
+        
+        # Physical types: ethernetCsmacd (6), gigabitEthernet (117), fastEther (62)
+        physical_types = ['6', '62', '117', 6, 62, 117]
+        if snmp_type in physical_types:
+            return True
+        
+        # Check for typical physical interface naming patterns
+        physical_patterns = [
+            'eth', 'ens', 'enp', 'em', 'eno',  # Linux
+            'gi', 'ge', 'fa', 'fe', 'te', 'xe', 'et',  # Cisco/network
+            'port', 'swp', 'fp',  # Generic
+        ]
+        
+        for pattern in physical_patterns:
+            if name.startswith(pattern):
+                return True
+        
+        # Default: assume physical if not explicitly virtual
+        return True
     
     def _map_interface_type(self, iface: Dict) -> str:
         """Map SNMP interface type to NetBox interface type."""
