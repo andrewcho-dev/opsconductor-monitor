@@ -712,7 +712,6 @@ export function DeviceDetail() {
                     <th className="px-3 py-2 text-left font-semibold text-gray-700">Status</th>
                     <th className="px-3 py-2 text-left font-semibold text-gray-700">SFP Vendor</th>
                     <th className="px-3 py-2 text-left font-semibold text-gray-700">SFP Part#</th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-700">SFP Serial</th>
                     <th className="px-3 py-2 text-left font-semibold text-gray-700">SFP State</th>
                     <th className="px-3 py-2 text-right font-semibold text-gray-700">TX/RX Power</th>
                     <th className="px-3 py-2 text-right font-semibold text-gray-700">Temp</th>
@@ -759,9 +758,6 @@ export function DeviceDetail() {
                         </td>
                         <td className="px-3 py-2 font-mono text-gray-700">
                           {mcpSfp?.part_number?.trim() || '—'}
-                        </td>
-                        <td className="px-3 py-2 font-mono text-gray-700">
-                          {mcpSfp?.serial_number || '—'}
                         </td>
                         <td className="px-3 py-2">
                           {mcpSfp ? (
