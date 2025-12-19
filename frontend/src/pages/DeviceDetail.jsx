@@ -551,196 +551,124 @@ export function DeviceDetail() {
       
       <div className="flex-1 overflow-auto p-4 bg-gray-50">
 
-      {/* Device Info and SNMP Info */}
+      {/* Device Information - Integrated MCP + SNMP */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
         {/* Device Info */}
-        <div className="bg-white p-4 rounded-lg shadow">
-          <h2 className="text-lg font-semibold text-gray-800 mb-3">Device Information</h2>
+        <div className={cn(
+          "bg-white p-4 rounded-lg shadow",
+          mcpData && "border-l-4 border-indigo-500"
+        )}>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              {mcpData ? <Network className="w-5 h-5 text-indigo-600" /> : <Server className="w-5 h-5 text-gray-600" />}
+              <h2 className="text-lg font-semibold text-gray-800">Device Information</h2>
+            </div>
+            {mcpData && (
+              <span className="text-xs px-2 py-1 bg-indigo-100 text-indigo-700 rounded-full font-medium">
+                MCP Managed
+              </span>
+            )}
+          </div>
           <div className="space-y-2 text-sm">
             <div className="grid grid-cols-2 gap-2">
               <span className="font-medium text-gray-600">IP Address:</span>
-              <span className="text-gray-800">{ip}</span>
+              <span className="text-gray-800 font-mono">{ip}</span>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <span className="font-medium text-gray-600">Hostname:</span>
-              <span className="text-gray-800">{device?.snmp_hostname || "No hostname available"}</span>
+              <span className="text-gray-800">{mcpData?.device?.name || device?.snmp_hostname || "Unknown"}</span>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <span className="font-medium text-gray-600">Ping Status:</span>
-              <span className={getStatusClass(device?.ping_status)}>
-                {device?.ping_status?.includes("online") ? (
-                  <span className="flex items-center gap-1">
-                    <CheckCircle className="w-4 h-4" />
-                    Online
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1">
-                    <XCircle className="w-4 h-4" />
-                    Offline
-                  </span>
-                )}
-              </span>
+              <span className="font-medium text-gray-600">Device Type:</span>
+              <span className="text-gray-800">{mcpData?.device?.device_type || device?.snmp_model || "Unknown"}</span>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <span className="font-medium text-gray-600">SNMP Status:</span>
-              <span className={getStatusClass(device?.snmp_status)}>
-                {device?.snmp_status?.includes("YES") ? (
-                  <span className="flex items-center gap-1">
-                    <CheckCircle className="w-4 h-4" />
-                    SNMP Available
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1">
-                    <XCircle className="w-4 h-4" />
-                    SNMP Not Available
-                  </span>
-                )}
+              <span className="font-medium text-gray-600">Vendor:</span>
+              <span className="text-gray-800">{mcpData?.device?.vendor || device?.snmp_vendor_name || "Unknown"}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <span className="font-medium text-gray-600">Serial Number:</span>
+              <span className="text-gray-800 font-mono">{mcpData?.device?.serial_number || device?.snmp_serial || "Unknown"}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <span className="font-medium text-gray-600">MAC Address:</span>
+              <span className="text-gray-800 font-mono">{mcpData?.device?.mac_address || device?.snmp_chassis_mac || "Unknown"}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <span className="font-medium text-gray-600">Status:</span>
+              <span className={cn(
+                "font-medium flex items-center gap-1",
+                (mcpData?.device?.association_state?.toLowerCase().includes('connect') || device?.ping_status?.includes('online')) 
+                  ? "text-green-600" : "text-red-600"
+              )}>
+                {(mcpData?.device?.association_state?.toLowerCase().includes('connect') || device?.ping_status?.includes('online')) 
+                  ? <><CheckCircle className="w-4 h-4" /> Online</> 
+                  : <><XCircle className="w-4 h-4" /> Offline</>}
               </span>
             </div>
+          </div>
+        </div>
+
+        {/* System Details */}
+        <div className={cn(
+          "bg-white p-4 rounded-lg shadow",
+          mcpData && "border-l-4 border-indigo-500"
+        )}>
+          <h3 className="text-lg font-semibold text-gray-800 mb-3">System Details</h3>
+          <div className="space-y-2 text-sm">
+            <div className="grid grid-cols-2 gap-2">
+              <span className="font-medium text-gray-600">Software Version:</span>
+              <span className="text-gray-800 font-mono text-xs">{mcpData?.device?.software_version || device?.snmp_description || "Unknown"}</span>
+            </div>
+            {mcpData && (
+              <>
+                <div className="grid grid-cols-2 gap-2">
+                  <span className="font-medium text-gray-600">Sync State:</span>
+                  <span className={cn(
+                    "font-medium",
+                    mcpData.device?.sync_state?.toLowerCase().includes('synch') ? "text-green-600" : "text-yellow-600"
+                  )}>
+                    {mcpData.device?.sync_state || "Unknown"}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <span className="font-medium text-gray-600">Association:</span>
+                  <span className={cn(
+                    "font-medium",
+                    mcpData.device?.association_state?.toLowerCase().includes('connect') ? "text-green-600" : "text-yellow-600"
+                  )}>
+                    {mcpData.device?.association_state || "Unknown"}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <span className="font-medium text-gray-600">Equipment Count:</span>
+                  <span className="text-gray-800">{mcpData.equipment_count || 0} items</span>
+                </div>
+              </>
+            )}
+            {!mcpData && (
+              <>
+                <div className="grid grid-cols-2 gap-2">
+                  <span className="font-medium text-gray-600">Location:</span>
+                  <span className="text-gray-800">{device?.snmp_location || "Unknown"}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <span className="font-medium text-gray-600">Contact:</span>
+                  <span className="text-gray-800">{device?.snmp_contact || "Unknown"}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <span className="font-medium text-gray-600">Uptime:</span>
+                  <span className="text-gray-800">{device?.snmp_uptime || "Unknown"}</span>
+                </div>
+              </>
+            )}
             <div className="grid grid-cols-2 gap-2">
               <span className="font-medium text-gray-600">Last Scan:</span>
               <span className="text-gray-800">{device?.scan_timestamp || "Never scanned"}</span>
             </div>
           </div>
         </div>
-
-        {/* SNMP System Information */}
-        <div className="bg-white p-4 rounded-lg shadow">
-          <h3 className="text-lg font-semibold text-gray-800 mb-3">SNMP System Information</h3>
-          <div className="space-y-2 text-sm">
-            <div className="grid grid-cols-2 gap-2">
-              <span className="font-medium text-gray-600">Vendor:</span>
-              <span className="text-gray-800">{device?.snmp_vendor_name || "Unknown"}</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <span className="font-medium text-gray-600">Model:</span>
-              <span className="text-gray-800">{device?.snmp_model || "Unknown"}</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <span className="font-medium text-gray-600">Description:</span>
-              <span className="text-gray-800">{device?.snmp_description || "No description available"}</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <span className="font-medium text-gray-600">Contact:</span>
-              <span className="text-gray-800">{device?.snmp_contact || "No contact information"}</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <span className="font-medium text-gray-600">Location:</span>
-              <span className="text-gray-800">{device?.snmp_location || "No location information"}</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <span className="font-medium text-gray-600">Uptime:</span>
-              <span className="text-gray-800">{device?.snmp_uptime || "No uptime information"}</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <span className="font-medium text-gray-600">Chassis MAC:</span>
-              <span className="text-gray-800">{device?.snmp_chassis_mac || "No MAC address available"}</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <span className="font-medium text-gray-600">Vendor OID:</span>
-              <span className="text-gray-800">{device?.snmp_vendor_oid || "No vendor OID available"}</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <span className="font-medium text-gray-600">Serial Number:</span>
-              <span className="text-gray-800">{device?.snmp_serial || "No serial number available"}</span>
-            </div>
-          </div>
-        </div>
       </div>
-
-      {/* MCP Information (if available) */}
-      {mcpData && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-          {/* MCP Device Info */}
-          <div className="bg-white p-4 rounded-lg shadow border-l-4 border-indigo-500">
-            <div className="flex items-center gap-2 mb-3">
-              <Network className="w-5 h-5 text-indigo-600" />
-              <h3 className="text-lg font-semibold text-gray-800">Ciena MCP Information</h3>
-            </div>
-            <div className="space-y-2 text-sm">
-              <div className="grid grid-cols-2 gap-2">
-                <span className="font-medium text-gray-600">Device Type:</span>
-                <span className="text-gray-800">{mcpData.device?.device_type || "Unknown"}</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <span className="font-medium text-gray-600">Software Version:</span>
-                <span className="text-gray-800 font-mono text-xs">{mcpData.device?.software_version || "Unknown"}</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <span className="font-medium text-gray-600">Serial Number:</span>
-                <span className="text-gray-800 font-mono">{mcpData.device?.serial_number || "Unknown"}</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <span className="font-medium text-gray-600">MAC Address:</span>
-                <span className="text-gray-800 font-mono">{mcpData.device?.mac_address || "Unknown"}</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <span className="font-medium text-gray-600">Sync State:</span>
-                <span className={cn(
-                  "font-medium",
-                  mcpData.device?.sync_state?.toLowerCase().includes('synch') ? "text-green-600" : "text-yellow-600"
-                )}>
-                  {mcpData.device?.sync_state || "Unknown"}
-                </span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <span className="font-medium text-gray-600">Association:</span>
-                <span className={cn(
-                  "font-medium",
-                  mcpData.device?.association_state?.toLowerCase().includes('connect') ? "text-green-600" : "text-yellow-600"
-                )}>
-                  {mcpData.device?.association_state || "Unknown"}
-                </span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <span className="font-medium text-gray-600">Vendor:</span>
-                <span className="text-gray-800">{mcpData.device?.vendor || "Ciena"}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* MCP Equipment Summary */}
-          <div className="bg-white p-4 rounded-lg shadow border-l-4 border-purple-500">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <Cpu className="w-5 h-5 text-purple-600" />
-                <h3 className="text-lg font-semibold text-gray-800">MCP Equipment</h3>
-              </div>
-              <span className="text-sm text-gray-500">{mcpData.equipment_count || 0} items</span>
-            </div>
-            {mcpData.equipment && mcpData.equipment.length > 0 ? (
-              <div className="max-h-48 overflow-y-auto">
-                <table className="min-w-full text-xs">
-                  <thead className="bg-gray-50 sticky top-0">
-                    <tr>
-                      <th className="px-2 py-1 text-left font-medium text-gray-600">Type</th>
-                      <th className="px-2 py-1 text-left font-medium text-gray-600">Slot</th>
-                      <th className="px-2 py-1 text-left font-medium text-gray-600">Part Number</th>
-                      <th className="px-2 py-1 text-left font-medium text-gray-600">Serial</th>
-                      <th className="px-2 py-1 text-left font-medium text-gray-600">Manufacturer</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {mcpData.equipment.map((eq, idx) => (
-                      <tr key={idx} className="hover:bg-gray-50">
-                        <td className="px-2 py-1 font-medium">{eq.type || '-'}</td>
-                        <td className="px-2 py-1">{eq.slot || '-'}</td>
-                        <td className="px-2 py-1 font-mono text-[10px]">{eq.part_number || '-'}</td>
-                        <td className="px-2 py-1 font-mono text-[10px]">{eq.serial_number || '-'}</td>
-                        <td className="px-2 py-1">{eq.manufacturer || '-'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="text-center py-4 text-gray-500 text-sm">
-                No equipment data available
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Interface Information */}
       <div className="bg-white p-4 rounded-lg shadow mb-4">
@@ -778,29 +706,15 @@ export function DeviceDetail() {
               <table className="min-w-full text-xs">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-2 py-2 text-left font-medium text-gray-700">Port</th>
-                    <th className="px-2 py-2 text-left font-medium text-gray-700">Name</th>
-                    <th className="px-2 py-2 text-left font-medium text-gray-700">Type</th>
-                    <th className="px-2 py-2 text-right font-medium text-gray-700">Speed</th>
-                    <th className="px-2 py-2 text-left font-medium text-gray-700">Status</th>
-                    <th className="px-2 py-2 text-left font-medium text-gray-700">MAC Address</th>
-                    <th className="px-2 py-2 text-right font-medium text-gray-700">RX Bytes</th>
-                    <th className="px-2 py-2 text-right font-medium text-gray-700">TX Bytes</th>
-                    <th className="px-2 py-2 text-left font-medium text-gray-700">Medium</th>
-                    <th className="px-2 py-2 text-left font-medium text-gray-700">Connector</th>
-                    <th className="px-2 py-2 text-right font-medium text-gray-700">TX Power</th>
-                    <th className="px-2 py-2 text-right font-medium text-gray-700">RX Power</th>
-                    <th className="px-2 py-2 text-right font-medium text-gray-700">Temperature</th>
-                    {mcpData && (
-                      <>
-                        <th className="px-2 py-2 text-left font-medium text-indigo-700 bg-indigo-50">SFP Part#</th>
-                        <th className="px-2 py-2 text-left font-medium text-indigo-700 bg-indigo-50">SFP Vendor</th>
-                        <th className="px-2 py-2 text-left font-medium text-indigo-700 bg-indigo-50">SFP Serial</th>
-                      </>
-                    )}
-                    <th className="px-2 py-2 text-left font-medium text-gray-700">LLDP Neighbor</th>
-                    <th className="px-2 py-2 text-left font-medium text-gray-700">LLDP Remote Port</th>
-                    <th className="px-2 py-2 text-center font-medium text-gray-700">Optical History</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-700">Port</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-700">Name</th>
+                    <th className="px-3 py-2 text-right font-medium text-gray-700">Speed</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-700">Status</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-700">SFP</th>
+                    <th className="px-3 py-2 text-right font-medium text-gray-700">TX/RX Power</th>
+                    <th className="px-3 py-2 text-right font-medium text-gray-700">Temp</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-700">Neighbor</th>
+                    <th className="px-3 py-2 text-center font-medium text-gray-700">⟳</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -808,81 +722,65 @@ export function DeviceDetail() {
                     // Match MCP SFP by interface index
                     const mcpSfp = mcpSfpBySlot[String(iface.interface_index)];
                     
+                    // Build SFP info string
+                    const sfpInfo = mcpSfp 
+                      ? `${mcpSfp.manufacturer || ''} ${mcpSfp.part_number?.trim() || ''}`.trim()
+                      : (iface.connector || (iface.is_optical ? 'Optical' : ''));
+                    
+                    // Build neighbor string
+                    const neighbor = iface.lldp_remote_system_name || iface.lldp_remote_mgmt_addr || '';
+                    const remotePort = iface.lldp_remote_port || '';
+                    const neighborInfo = neighbor ? (remotePort ? `${neighbor}:${remotePort}` : neighbor) : '-';
+                    
                     return (
                       <tr
                         key={index}
                         className={cn(
                           "hover:bg-gray-50",
-                          iface.is_optical && "bg-blue-50",
-                          mcpSfp && "border-l-2 border-indigo-400"
+                          iface.is_optical && "bg-blue-50/50"
                         )}
                       >
-                        <td className="px-2 py-2">{iface.interface_index}</td>
-                        <td className="px-2 py-2">{iface.interface_name}</td>
-                        <td className="px-2 py-2">{iface.interface_type_name || "SSH/CLI"}</td>
-                        <td className="px-2 py-2 text-right font-mono">
+                        <td className="px-3 py-2 font-medium">{iface.interface_index}</td>
+                        <td className="px-3 py-2">{iface.interface_name}</td>
+                        <td className="px-3 py-2 text-right font-mono">
                           {formatSpeed(iface.interface_speed)}
                         </td>
-                        <td className="px-2 py-2">
-                          <span className={getStatusClass(iface.status)}>
-                            {iface.status || "Unknown"}
-                          </span>
-                        </td>
-                        <td className="px-2 py-2 font-mono">{iface.physical_address || "N/A"}</td>
-                        <td className="px-2 py-2 text-right font-mono">
-                          {formatBytes(iface.rx_bytes)}
-                        </td>
-                        <td className="px-2 py-2 text-right font-mono">
-                          {formatBytes(iface.tx_bytes)}
-                        </td>
-                        <td className="px-2 py-2">
+                        <td className="px-3 py-2">
                           <span className={cn(
-                            iface.is_optical ? "text-green-600" : "text-gray-600"
+                            "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium",
+                            iface.status?.toLowerCase() === 'up' 
+                              ? "bg-green-100 text-green-700" 
+                              : "bg-red-100 text-red-700"
                           )}>
-                            {iface.is_optical ? "Optical" : "Electrical"}
+                            {iface.status || "—"}
                           </span>
                         </td>
-                        <td className="px-2 py-2">{iface.connector || "-"}</td>
-                        <td className="px-2 py-2 text-right font-mono text-green-600">
-                          {iface.is_optical ? (iface.tx_power || "N/A") : "-"}
+                        <td className="px-3 py-2 text-[10px] font-mono max-w-[120px] truncate" title={sfpInfo}>
+                          {sfpInfo || '-'}
                         </td>
-                        <td className="px-2 py-2 text-right font-mono text-green-600">
-                          {iface.is_optical ? (iface.rx_power || "N/A") : "-"}
+                        <td className="px-3 py-2 text-right font-mono">
+                          {iface.is_optical ? (
+                            <span className="text-green-600">
+                              {iface.tx_power || '—'} / {iface.rx_power || '—'}
+                            </span>
+                          ) : '-'}
                         </td>
-                        <td className="px-2 py-2 text-right font-mono text-orange-600">
-                          {iface.is_optical ? (iface.temperature || "N/A") : "-"}
+                        <td className="px-3 py-2 text-right font-mono text-orange-600">
+                          {iface.is_optical && iface.temperature ? `${iface.temperature}°` : '-'}
                         </td>
-                        {mcpData && (
-                          <>
-                            <td className="px-2 py-2 font-mono text-[10px] bg-indigo-50/50 text-indigo-700">
-                              {mcpSfp?.part_number?.trim() || "-"}
-                            </td>
-                            <td className="px-2 py-2 text-[10px] bg-indigo-50/50 text-indigo-700">
-                              {mcpSfp?.manufacturer || "-"}
-                            </td>
-                            <td className="px-2 py-2 font-mono text-[10px] bg-indigo-50/50 text-indigo-700">
-                              {mcpSfp?.serial_number || "-"}
-                            </td>
-                          </>
-                        )}
-                        <td className="px-2 py-2">
-                          {iface.lldp_remote_system_name || 
-                           iface.lldp_remote_mgmt_addr || 
-                           iface.lldp_remote_chassis_id || "-"}
+                        <td className="px-3 py-2 text-[10px] max-w-[150px] truncate" title={neighborInfo}>
+                          {neighborInfo}
                         </td>
-                        <td className="px-2 py-2">{iface.lldp_remote_port || "-"}</td>
-                        <td className="px-2 py-2 text-center">
+                        <td className="px-3 py-2 text-center">
                           {iface.is_optical ? (
                             <button
                               onClick={() => showOpticalHistory(iface.interface_index, iface.interface_name)}
-                              className="text-blue-600 hover:text-blue-800 cursor-pointer"
+                              className="text-blue-600 hover:text-blue-800"
                               title="View optical power history"
                             >
-                              <TrendingUp className="w-4 h-4 mx-auto" />
+                              <TrendingUp className="w-4 h-4" />
                             </button>
-                          ) : (
-                            "-"
-                          )}
+                          ) : null}
                         </td>
                       </tr>
                     );
