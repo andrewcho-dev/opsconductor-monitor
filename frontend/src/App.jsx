@@ -34,7 +34,8 @@ import {
   LoggingSettings,
   NetBoxSettings,
   BackupSettings,
-  PRTGSettings
+  PRTGSettings,
+  MCPSettings
 } from "./pages/system/settings";
 
 function App() {
@@ -89,6 +90,7 @@ function App() {
           <Route path="logging" element={<LoggingSettings />} />
           <Route path="netbox" element={<NetBoxSettings />} />
           <Route path="prtg" element={<PRTGSettings />} />
+          <Route path="mcp" element={<MCPSettings />} />
           <Route path="backup" element={<BackupSettings />} />
         </Route>
         <Route path="/system/notifications" element={<ProtectedRoute permission="system.settings.view"><NotificationsPage /></ProtectedRoute>} />

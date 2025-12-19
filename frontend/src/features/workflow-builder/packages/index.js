@@ -23,6 +23,7 @@ import axisCamerasPackage from './axis-cameras';
 import windowsSystemsPackage from './windows-systems';
 import netboxPackage from './netbox';
 import prtgPackage from './prtg';
+import mcpPackage from './mcp';
 
 // All available packages
 export const PACKAGES = {
@@ -44,6 +45,7 @@ export const PACKAGES = {
   'windows-systems': windowsSystemsPackage,
   'netbox': netboxPackage,
   'prtg': prtgPackage,
+  'mcp': mcpPackage,
 };
 
 // Default enabled packages - export this so other components can use it
@@ -66,6 +68,7 @@ export const DEFAULT_ENABLED_PACKAGES = [
   'windows-systems',
   'netbox',
   'prtg',
+  'mcp',
 ];
 
 /**
