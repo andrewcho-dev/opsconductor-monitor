@@ -332,9 +332,12 @@ def get_device_by_ip(ip):
             'equipment': []
         }))
     
-    # Get equipment for this device
-    device_id = device_data['id']
-    all_equipment = service.get_all_equipment(device_id=device_id)
+    # Get equipment for this device by filtering by device name
+    device_name = device_data['name']
+    all_equipment = service.get_all_equipment()
+    
+    # Filter equipment to only this device
+    all_equipment = [e for e in all_equipment if e.get('attributes', {}).get('locations', [{}])[0].get('neName') == device_name]
     
     equipment_list = []
     for item in all_equipment:
