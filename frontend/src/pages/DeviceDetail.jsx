@@ -710,7 +710,10 @@ export function DeviceDetail() {
                     <th className="px-3 py-2 text-left font-semibold text-gray-700">Name</th>
                     <th className="px-3 py-2 text-right font-semibold text-gray-700">Speed</th>
                     <th className="px-3 py-2 text-left font-semibold text-gray-700">Status</th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-700">SFP</th>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-700">SFP Vendor</th>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-700">SFP Part#</th>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-700">SFP Serial</th>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-700">SFP State</th>
                     <th className="px-3 py-2 text-right font-semibold text-gray-700">TX/RX Power</th>
                     <th className="px-3 py-2 text-right font-semibold text-gray-700">Temp</th>
                     <th className="px-3 py-2 text-left font-semibold text-gray-700">Neighbor</th>
@@ -722,11 +725,6 @@ export function DeviceDetail() {
                     // Match MCP SFP by interface index
                     const mcpSfp = mcpSfpBySlot[String(iface.interface_index)];
                     
-                    // Build SFP info string - prefer MCP data
-                    const sfpInfo = mcpSfp 
-                      ? `${mcpSfp.manufacturer || ''} ${mcpSfp.part_number?.trim() || ''}`.trim()
-                      : (iface.connector || (iface.is_optical ? 'Optical' : '—'));
-                    
                     // Build neighbor string
                     const neighbor = iface.lldp_remote_system_name || iface.lldp_remote_mgmt_addr || '';
                     const remotePort = iface.lldp_remote_port || '';
@@ -737,7 +735,8 @@ export function DeviceDetail() {
                         key={index}
                         className={cn(
                           "hover:bg-gray-50",
-                          iface.is_optical && "bg-blue-50/50"
+                          mcpSfp && "bg-indigo-50/30",
+                          iface.is_optical && !mcpSfp && "bg-blue-50/50"
                         )}
                       >
                         <td className="px-3 py-2 font-medium text-gray-900">{iface.interface_index}</td>
@@ -748,15 +747,31 @@ export function DeviceDetail() {
                         <td className="px-3 py-2">
                           <span className={cn(
                             "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
-                            iface.status?.toLowerCase() === 'up' 
+                            (mcpSfp?.state === 'IS' || iface.status?.toLowerCase() === 'up')
                               ? "bg-green-100 text-green-700" 
                               : "bg-red-100 text-red-700"
                           )}>
-                            {iface.status || "—"}
+                            {mcpSfp?.state || iface.status || "—"}
                           </span>
                         </td>
-                        <td className="px-3 py-2 font-mono text-gray-700 max-w-[180px] truncate" title={sfpInfo}>
-                          {sfpInfo}
+                        <td className="px-3 py-2 text-gray-700">
+                          {mcpSfp?.manufacturer || '—'}
+                        </td>
+                        <td className="px-3 py-2 font-mono text-gray-700">
+                          {mcpSfp?.part_number?.trim() || '—'}
+                        </td>
+                        <td className="px-3 py-2 font-mono text-gray-700">
+                          {mcpSfp?.serial_number || '—'}
+                        </td>
+                        <td className="px-3 py-2">
+                          {mcpSfp ? (
+                            <span className={cn(
+                              "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
+                              mcpSfp.state === 'IS' ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
+                            )}>
+                              {mcpSfp.state === 'IS' ? 'In Service' : mcpSfp.state || '—'}
+                            </span>
+                          ) : '—'}
                         </td>
                         <td className="px-3 py-2 text-right font-mono">
                           {iface.is_optical ? (
