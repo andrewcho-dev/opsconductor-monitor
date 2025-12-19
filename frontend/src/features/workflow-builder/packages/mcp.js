@@ -238,6 +238,135 @@ const mcpPackage = {
       ],
       
       executor: 'mcp_full_discovery'
+    },
+    
+    // ========================================================================
+    // Service Monitoring Nodes
+    // ========================================================================
+    
+    'mcp:get-services': {
+      id: 'mcp:get-services',
+      name: 'Get MCP Services',
+      description: 'Retrieve services/circuits (EVCs, Ethernet, Rings) from MCP',
+      category: 'monitor',
+      icon: 'Activity',
+      color: '#f59e0b',
+      
+      parameters: [
+        {
+          id: 'service_class',
+          label: 'Service Class',
+          type: 'select',
+          required: false,
+          options: [
+            { value: '', label: 'All Services' },
+            { value: 'Ring', label: 'G.8032 Rings' },
+            { value: 'EVC', label: 'EVC' },
+            { value: 'Ethernet', label: 'Ethernet' },
+            { value: 'VLAN', label: 'VLAN' },
+            { value: 'EAccess', label: 'E-Access' },
+            { value: 'ETransit', label: 'E-Transit' }
+          ],
+          description: 'Filter by service class'
+        }
+      ],
+      
+      outputs: [
+        { id: 'services', label: 'Services', type: 'array' },
+        { id: 'service_count', label: 'Service Count', type: 'number' },
+        { id: 'up_count', label: 'Up Count', type: 'number' },
+        { id: 'down_count', label: 'Down Count', type: 'number' }
+      ],
+      
+      executor: 'mcp_get_services'
+    },
+    
+    'mcp:get-rings': {
+      id: 'mcp:get-rings',
+      name: 'Get G.8032 Rings',
+      description: 'Retrieve G.8032 ring protection services from MCP',
+      category: 'monitor',
+      icon: 'Circle',
+      color: '#ef4444',
+      
+      parameters: [],
+      
+      outputs: [
+        { id: 'rings', label: 'Rings', type: 'array' },
+        { id: 'ring_count', label: 'Ring Count', type: 'number' },
+        { id: 'ok_count', label: 'OK Count', type: 'number' },
+        { id: 'failed_count', label: 'Failed Count', type: 'number' }
+      ],
+      
+      executor: 'mcp_get_rings'
+    },
+    
+    'mcp:service-summary': {
+      id: 'mcp:service-summary',
+      name: 'Service Summary',
+      description: 'Get summary of all MCP services with state counts',
+      category: 'monitor',
+      icon: 'PieChart',
+      color: '#8b5cf6',
+      
+      parameters: [],
+      
+      outputs: [
+        { id: 'total', label: 'Total Services', type: 'number' },
+        { id: 'by_class', label: 'By Class', type: 'object' },
+        { id: 'by_state', label: 'By State', type: 'object' },
+        { id: 'rings', label: 'Rings', type: 'array' },
+        { id: 'down_services', label: 'Down Services', type: 'array' }
+      ],
+      
+      executor: 'mcp_service_summary'
+    },
+    
+    'mcp:monitor-services': {
+      id: 'mcp:monitor-services',
+      name: 'Monitor Service States',
+      description: 'Poll MCP services and detect state changes (Up/Down)',
+      category: 'monitor',
+      icon: 'AlertTriangle',
+      color: '#ef4444',
+      
+      parameters: [
+        {
+          id: 'alert_on_down',
+          label: 'Alert on Down',
+          type: 'boolean',
+          default: true,
+          description: 'Generate alert when service goes down'
+        },
+        {
+          id: 'alert_on_ring_failure',
+          label: 'Alert on Ring Failure',
+          type: 'boolean',
+          default: true,
+          description: 'Generate alert when G.8032 ring state is not OK'
+        },
+        {
+          id: 'service_classes',
+          label: 'Service Classes to Monitor',
+          type: 'multiselect',
+          required: false,
+          options: [
+            { value: 'Ring', label: 'G.8032 Rings' },
+            { value: 'EVC', label: 'EVC' },
+            { value: 'Ethernet', label: 'Ethernet' }
+          ],
+          description: 'Which service classes to monitor (empty = all)'
+        }
+      ],
+      
+      outputs: [
+        { id: 'services_checked', label: 'Services Checked', type: 'number' },
+        { id: 'down_services', label: 'Down Services', type: 'array' },
+        { id: 'ring_failures', label: 'Ring Failures', type: 'array' },
+        { id: 'alerts', label: 'Alerts Generated', type: 'array' }
+      ],
+      
+      executor: 'mcp_monitor_services'
     }
   },
   
@@ -252,10 +381,15 @@ const mcpPackage = {
       icon: 'RefreshCw',
       order: 2
     },
+    monitor: {
+      label: 'Monitoring',
+      icon: 'Activity',
+      order: 3
+    },
     workflow: {
       label: 'Workflows',
       icon: 'Workflow',
-      order: 3
+      order: 4
     }
   }
 };

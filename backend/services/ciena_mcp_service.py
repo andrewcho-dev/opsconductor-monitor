@@ -285,20 +285,20 @@ class CienaMCPService:
         logger.info(f"Retrieved {len(all_equipment)} equipment items from MCP")
         return all_equipment
     
-    # ==================== LINKS (FREs - Forwarding Resource Elements) ====================
+    # ==================== LINKS (Physical connections) ====================
     
     def get_links(self, limit: int = 100, offset: int = 0) -> Dict:
         """
-        Get network links (FREs) from MCP.
+        Get physical network links from MCP.
         
         Returns:
             Dict with 'data' list and 'meta' pagination info
         """
         params = f"?limit={limit}&offset={offset}"
-        return self._request('GET', f'/nsi/api/search/fres{params}')
+        return self._request('GET', f'/nsi/api/search/links{params}')
     
     def get_all_links(self) -> List[Dict]:
-        """Get all links with pagination handling."""
+        """Get all physical links with pagination handling."""
         all_links = []
         offset = 0
         limit = 100
@@ -313,8 +313,119 @@ class CienaMCPService:
                 break
             offset += limit
         
-        logger.info(f"Retrieved {len(all_links)} links from MCP")
+        logger.info(f"Retrieved {len(all_links)} physical links from MCP")
         return all_links
+    
+    # ==================== SERVICES (FREs - Forwarding Resource Elements) ====================
+    
+    def get_services(self, limit: int = 100, offset: int = 0) -> Dict:
+        """
+        Get services/circuits (FREs) from MCP.
+        
+        Args:
+            limit: Maximum results per page
+            offset: Offset for pagination
+        
+        Returns:
+            Dict with 'data' list and 'meta' pagination info
+        """
+        params = f"?limit={limit}&offset={offset}"
+        return self._request('GET', f'/nsi/api/search/fres{params}')
+    
+    def get_all_services(self, service_class: str = None) -> List[Dict]:
+        """Get all services with pagination handling and optional client-side filtering."""
+        all_services = []
+        offset = 0
+        limit = 200
+        
+        while True:
+            result = self.get_services(limit=limit, offset=offset)
+            services = result.get('data', [])
+            all_services.extend(services)
+            
+            total = result.get('meta', {}).get('total', 0)
+            if offset + limit >= total or not services:
+                break
+            offset += limit
+        
+        # Apply client-side filter if specified
+        if service_class:
+            all_services = [s for s in all_services if s.get('attributes', {}).get('serviceClass') == service_class]
+        
+        filter_msg = f" (class={service_class})" if service_class else ""
+        logger.info(f"Retrieved {len(all_services)} services{filter_msg} from MCP")
+        return all_services
+    
+    def get_service(self, service_id: str) -> Dict:
+        """Get a single service by ID."""
+        result = self._request('GET', f'/nsi/api/search/fres?filter=id=={service_id}')
+        services = result.get('data', [])
+        return services[0] if services else None
+    
+    def get_rings(self) -> List[Dict]:
+        """Get all G.8032 ring services."""
+        # Filter client-side since API filter doesn't work for serviceClass
+        all_services = self.get_all_services()
+        return [s for s in all_services if s.get('attributes', {}).get('serviceClass') == 'Ring']
+    
+    def get_evcs(self) -> List[Dict]:
+        """Get all EVC services."""
+        # Filter client-side since API filter doesn't work for serviceClass
+        all_services = self.get_all_services()
+        return [s for s in all_services if s.get('attributes', {}).get('serviceClass') == 'EVC']
+    
+    def get_service_summary(self) -> Dict:
+        """Get summary of all services by class."""
+        all_services = self.get_all_services()
+        
+        summary = {
+            'total': len(all_services),
+            'by_class': {},
+            'by_state': {'up': 0, 'down': 0, 'unknown': 0},
+            'rings': [],
+            'down_services': []
+        }
+        
+        for svc in all_services:
+            attrs = svc.get('attributes', {})
+            display = attrs.get('displayData', {})
+            
+            # Count by class
+            svc_class = attrs.get('serviceClass', 'Unknown')
+            summary['by_class'][svc_class] = summary['by_class'].get(svc_class, 0) + 1
+            
+            # Count by state
+            op_state = (display.get('operationState') or attrs.get('operationState') or '').lower()
+            if op_state == 'up':
+                summary['by_state']['up'] += 1
+            elif op_state == 'down':
+                summary['by_state']['down'] += 1
+                # Track down services
+                summary['down_services'].append({
+                    'id': svc.get('id'),
+                    'name': attrs.get('userLabel') or attrs.get('mgmtName') or svc.get('id'),
+                    'class': svc_class,
+                    'state': op_state
+                })
+            else:
+                summary['by_state']['unknown'] += 1
+            
+            # Track rings with their status
+            if svc_class == 'Ring':
+                add_attrs = attrs.get('additionalAttributes', {})
+                summary['rings'].append({
+                    'id': svc.get('id'),
+                    'name': attrs.get('mgmtName') or attrs.get('userLabel') or svc.get('id'),
+                    'ring_id': add_attrs.get('ringId'),
+                    'ring_state': add_attrs.get('ringState'),
+                    'ring_status': add_attrs.get('ringStatus'),
+                    'ring_type': add_attrs.get('ringType'),
+                    'members': add_attrs.get('ringMembers'),
+                    'logical_ring': add_attrs.get('logicalRingName'),
+                    'virtual_ring': add_attrs.get('virtualRingName'),
+                })
+        
+        return summary
     
     # ==================== WATCHERS (Monitoring) ====================
     

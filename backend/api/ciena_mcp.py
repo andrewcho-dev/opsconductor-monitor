@@ -395,6 +395,101 @@ def get_device_by_ip(ip):
     }))
 
 
+# ==================== SERVICES (FREs) ====================
+
+@mcp_bp.route('/services', methods=['GET'])
+def get_services():
+    """Get services/circuits from MCP."""
+    limit = request.args.get('limit', 100, type=int)
+    offset = request.args.get('offset', 0, type=int)
+    service_class = request.args.get('class')
+    
+    service = get_mcp_service()
+    result = service.get_services(limit=limit, offset=offset, service_class=service_class)
+    
+    # Transform to simpler format
+    services = []
+    for svc in result.get('data', []):
+        attrs = svc.get('attributes', {})
+        display = attrs.get('displayData', {})
+        utilization = attrs.get('utilizationData', {})
+        add_attrs = attrs.get('additionalAttributes', {})
+        
+        services.append({
+            'id': svc.get('id'),
+            'name': attrs.get('userLabel') or attrs.get('mgmtName') or svc.get('id'),
+            'service_class': attrs.get('serviceClass'),
+            'layer_rate': attrs.get('layerRate'),
+            'admin_state': display.get('adminState') or attrs.get('adminState'),
+            'operation_state': display.get('operationState') or attrs.get('operationState'),
+            'deployment_state': display.get('displayDeploymentState') or attrs.get('deploymentState'),
+            'total_capacity': utilization.get('totalCapacity'),
+            'used_capacity': utilization.get('usedCapacity'),
+            'utilization_percent': utilization.get('utilizationPercent'),
+            'capacity_units': utilization.get('capacityUnits'),
+            # Ring-specific fields
+            'ring_id': add_attrs.get('ringId'),
+            'ring_state': add_attrs.get('ringState'),
+            'ring_status': add_attrs.get('ringStatus'),
+            'ring_type': add_attrs.get('ringType'),
+            'ring_members': add_attrs.get('ringMembers'),
+            'logical_ring': add_attrs.get('logicalRingName'),
+            'virtual_ring': add_attrs.get('virtualRingName'),
+        })
+    
+    return jsonify(success_response({
+        'services': services,
+        'total': result.get('meta', {}).get('total', len(services)),
+        'limit': limit,
+        'offset': offset,
+    }))
+
+
+@mcp_bp.route('/services/rings', methods=['GET'])
+def get_rings():
+    """Get G.8032 ring services from MCP."""
+    service = get_mcp_service()
+    rings_raw = service.get_rings()
+    
+    rings = []
+    for ring in rings_raw:
+        attrs = ring.get('attributes', {})
+        display = attrs.get('displayData', {})
+        add_attrs = attrs.get('additionalAttributes', {})
+        
+        rings.append({
+            'id': ring.get('id'),
+            'name': attrs.get('mgmtName') or attrs.get('userLabel') or ring.get('id'),
+            'ring_id': add_attrs.get('ringId'),
+            'ring_state': add_attrs.get('ringState'),
+            'ring_status': add_attrs.get('ringStatus'),
+            'ring_type': add_attrs.get('ringType'),
+            'ring_members': add_attrs.get('ringMembers'),
+            'logical_ring': add_attrs.get('logicalRingName'),
+            'virtual_ring': add_attrs.get('virtualRingName'),
+            'rpl_owner': add_attrs.get('rplOwnerCtpId'),
+            'revertive': add_attrs.get('revertive'),
+            'wait_to_restore': add_attrs.get('waitToRestore'),
+            'guard_time': add_attrs.get('guardTime'),
+            'hold_off_time': add_attrs.get('holdOffTime'),
+            'raps_vid': add_attrs.get('rapsVid'),
+        })
+    
+    return jsonify(success_response({
+        'rings': rings,
+        'total': len(rings),
+    }))
+
+
+@mcp_bp.route('/services/summary', methods=['GET'])
+def get_services_summary():
+    """Get summary of all MCP services."""
+    service = get_mcp_service()
+    summary = service.get_service_summary()
+    
+    return jsonify(success_response(summary))
+
+
 # ==================== SUMMARY ====================
 
 @mcp_bp.route('/summary', methods=['GET'])
