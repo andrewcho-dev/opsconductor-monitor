@@ -168,6 +168,36 @@ class SNMPWalkerExecutor:
                         'device_id': t.get('id'),
                         'device_name': t.get('name'),
                     })
+        elif target_source == 'from_mcp':
+            # Get targets from MCP devices (from previous mcp_device_sync node)
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info("SNMP Walker: Looking for MCP devices in variables")
+            
+            mcp_devices = []
+            for key, value in variables.items():
+                if isinstance(value, dict):
+                    devices = value.get('devices', [])
+                    if devices and isinstance(devices, list):
+                        for d in devices:
+                            if isinstance(d, dict) and d.get('ip_address'):
+                                mcp_devices.append(d)
+            
+            # Deduplicate by IP
+            seen_ips = set()
+            for device in mcp_devices:
+                ip = device.get('ip_address')
+                if ip and ip not in seen_ips:
+                    seen_ips.add(ip)
+                    targets.append({
+                        'ip_address': ip,
+                        'community': params.get('snmp_community', 'public'),
+                        'device_id': device.get('id'),
+                        'device_name': device.get('name'),
+                    })
+            
+            logger.info(f"SNMP Walker: Found {len(targets)} MCP devices as targets")
+        
         else:  # from_autodiscovery
             # Try to get from autodiscovery outputs stored in variables
             # Look for skipped_devices or created_devices in any dict variable

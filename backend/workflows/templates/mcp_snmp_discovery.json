@@ -1,0 +1,72 @@
+{
+  "name": "MCP + SNMP Full Discovery",
+  "description": "Combined Ciena MCP and SNMP discovery workflow - syncs devices, equipment, and interfaces to NetBox",
+  "version": "1.0.0",
+  "nodes": [
+    {
+      "id": "mcp-devices",
+      "type": "mcp_device_sync",
+      "name": "MCP Device Sync",
+      "description": "Sync devices from Ciena MCP to NetBox",
+      "parameters": {
+        "sync_to_netbox": true,
+        "create_missing": false
+      },
+      "position": {"x": 100, "y": 100}
+    },
+    {
+      "id": "mcp-equipment",
+      "type": "mcp_equipment_sync",
+      "name": "MCP Equipment Sync",
+      "description": "Sync SFPs and cards from MCP to NetBox inventory",
+      "parameters": {
+        "sync_to_netbox": true
+      },
+      "position": {"x": 100, "y": 250}
+    },
+    {
+      "id": "mcp-topology",
+      "type": "mcp_topology_sync",
+      "name": "MCP Topology",
+      "description": "Get network links from MCP",
+      "parameters": {},
+      "position": {"x": 100, "y": 400}
+    },
+    {
+      "id": "snmp-walk",
+      "type": "snmp_walker",
+      "name": "SNMP Interface Walk",
+      "description": "Walk MCP devices via SNMP for interface details",
+      "parameters": {
+        "target_source": "from_mcp",
+        "sync_to_netbox": true,
+        "snmp_community": "public",
+        "timeout": 10,
+        "retries": 2,
+        "snmp_only": false
+      },
+      "position": {"x": 400, "y": 100}
+    },
+    {
+      "id": "summary",
+      "type": "log",
+      "name": "Discovery Summary",
+      "description": "Log discovery results",
+      "parameters": {
+        "message": "Discovery complete: MCP devices synced, equipment inventory updated, interfaces discovered via SNMP"
+      },
+      "position": {"x": 400, "y": 400}
+    }
+  ],
+  "edges": [
+    {"source": "mcp-devices", "target": "mcp-equipment"},
+    {"source": "mcp-devices", "target": "snmp-walk"},
+    {"source": "mcp-equipment", "target": "mcp-topology"},
+    {"source": "mcp-topology", "target": "summary"},
+    {"source": "snmp-walk", "target": "summary"}
+  ],
+  "variables": {
+    "snmp_community": "public",
+    "sync_to_netbox": true
+  }
+}
