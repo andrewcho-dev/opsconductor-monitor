@@ -618,7 +618,7 @@ export function DeviceDetail() {
           <div className="space-y-2 text-sm">
             <div className="grid grid-cols-2 gap-2">
               <span className="font-medium text-gray-600">Software Version:</span>
-              <span className="text-gray-800 font-mono text-xs">{mcpData?.device?.software_version || device?.snmp_description || "Unknown"}</span>
+              <span className="text-gray-800 font-mono">{mcpData?.device?.software_version || device?.snmp_description || "Unknown"}</span>
             </div>
             {mcpData && (
               <>
@@ -703,18 +703,18 @@ export function DeviceDetail() {
           
           return interfaces.length > 0 ? (
             <div className="overflow-x-auto">
-              <table className="min-w-full text-xs">
+              <table className="min-w-full text-sm">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-3 py-2 text-left font-medium text-gray-700">Port</th>
-                    <th className="px-3 py-2 text-left font-medium text-gray-700">Name</th>
-                    <th className="px-3 py-2 text-right font-medium text-gray-700">Speed</th>
-                    <th className="px-3 py-2 text-left font-medium text-gray-700">Status</th>
-                    <th className="px-3 py-2 text-left font-medium text-gray-700">SFP</th>
-                    <th className="px-3 py-2 text-right font-medium text-gray-700">TX/RX Power</th>
-                    <th className="px-3 py-2 text-right font-medium text-gray-700">Temp</th>
-                    <th className="px-3 py-2 text-left font-medium text-gray-700">Neighbor</th>
-                    <th className="px-3 py-2 text-center font-medium text-gray-700">⟳</th>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-700">Port</th>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-700">Name</th>
+                    <th className="px-3 py-2 text-right font-semibold text-gray-700">Speed</th>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-700">Status</th>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-700">SFP</th>
+                    <th className="px-3 py-2 text-right font-semibold text-gray-700">TX/RX Power</th>
+                    <th className="px-3 py-2 text-right font-semibold text-gray-700">Temp</th>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-700">Neighbor</th>
+                    <th className="px-3 py-2 text-center font-semibold text-gray-700"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -722,15 +722,15 @@ export function DeviceDetail() {
                     // Match MCP SFP by interface index
                     const mcpSfp = mcpSfpBySlot[String(iface.interface_index)];
                     
-                    // Build SFP info string
+                    // Build SFP info string - prefer MCP data
                     const sfpInfo = mcpSfp 
                       ? `${mcpSfp.manufacturer || ''} ${mcpSfp.part_number?.trim() || ''}`.trim()
-                      : (iface.connector || (iface.is_optical ? 'Optical' : ''));
+                      : (iface.connector || (iface.is_optical ? 'Optical' : '—'));
                     
                     // Build neighbor string
                     const neighbor = iface.lldp_remote_system_name || iface.lldp_remote_mgmt_addr || '';
                     const remotePort = iface.lldp_remote_port || '';
-                    const neighborInfo = neighbor ? (remotePort ? `${neighbor}:${remotePort}` : neighbor) : '-';
+                    const neighborInfo = neighbor ? (remotePort ? `${neighbor}:${remotePort}` : neighbor) : '—';
                     
                     return (
                       <tr
@@ -740,14 +740,14 @@ export function DeviceDetail() {
                           iface.is_optical && "bg-blue-50/50"
                         )}
                       >
-                        <td className="px-3 py-2 font-medium">{iface.interface_index}</td>
-                        <td className="px-3 py-2">{iface.interface_name}</td>
-                        <td className="px-3 py-2 text-right font-mono">
+                        <td className="px-3 py-2 font-medium text-gray-900">{iface.interface_index}</td>
+                        <td className="px-3 py-2 text-gray-700">{iface.interface_name}</td>
+                        <td className="px-3 py-2 text-right font-mono text-gray-700">
                           {formatSpeed(iface.interface_speed)}
                         </td>
                         <td className="px-3 py-2">
                           <span className={cn(
-                            "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium",
+                            "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
                             iface.status?.toLowerCase() === 'up' 
                               ? "bg-green-100 text-green-700" 
                               : "bg-red-100 text-red-700"
@@ -755,20 +755,20 @@ export function DeviceDetail() {
                             {iface.status || "—"}
                           </span>
                         </td>
-                        <td className="px-3 py-2 text-[10px] font-mono max-w-[120px] truncate" title={sfpInfo}>
-                          {sfpInfo || '-'}
+                        <td className="px-3 py-2 font-mono text-gray-700 max-w-[180px] truncate" title={sfpInfo}>
+                          {sfpInfo}
                         </td>
                         <td className="px-3 py-2 text-right font-mono">
                           {iface.is_optical ? (
                             <span className="text-green-600">
                               {iface.tx_power || '—'} / {iface.rx_power || '—'}
                             </span>
-                          ) : '-'}
+                          ) : '—'}
                         </td>
                         <td className="px-3 py-2 text-right font-mono text-orange-600">
-                          {iface.is_optical && iface.temperature ? `${iface.temperature}°` : '-'}
+                          {iface.is_optical && iface.temperature ? `${iface.temperature}°C` : '—'}
                         </td>
-                        <td className="px-3 py-2 text-[10px] max-w-[150px] truncate" title={neighborInfo}>
+                        <td className="px-3 py-2 text-gray-700 max-w-[180px] truncate" title={neighborInfo}>
                           {neighborInfo}
                         </td>
                         <td className="px-3 py-2 text-center">
@@ -789,7 +789,7 @@ export function DeviceDetail() {
               </table>
             </div>
           ) : (
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-gray-500 text-sm">
               No interface data available. Please run an interface scan.
             </div>
           );
