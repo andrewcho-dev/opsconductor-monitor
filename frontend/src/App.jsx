@@ -11,8 +11,7 @@ import { DevicesPage, DeviceDetailPage, GroupsPage } from "./pages/inventory";
 import { WorkflowsListPage, WorkflowBuilderPage } from "./pages/workflows";
 
 // Monitor Module
-import { DashboardPage, TopologyPage, PowerTrendsPage, AlertsPage, ActiveJobsPage, JobHistoryPage } from "./pages/monitor";
-import { MCPServices } from "./pages/MCPServices";
+import { DashboardPage, TopologyPage, PowerTrendsPage, AlertsPage, ActiveJobsPage, JobHistoryPage, MCPServicesPage } from "./pages/monitor";
 
 // System Module
 import { 
@@ -70,7 +69,7 @@ function App() {
         <Route path="/monitor/alerts" element={<ProtectedRoute><AlertsPage /></ProtectedRoute>} />
         <Route path="/monitor/active-jobs" element={<ProtectedRoute permission="jobs.job.view"><ActiveJobsPage /></ProtectedRoute>} />
         <Route path="/monitor/job-history" element={<ProtectedRoute permission="jobs.job.view"><JobHistoryPage /></ProtectedRoute>} />
-        <Route path="/monitor/mcp-services" element={<ProtectedRoute><MCPServices /></ProtectedRoute>} />
+        <Route path="/monitor/mcp-services" element={<ProtectedRoute><MCPServicesPage /></ProtectedRoute>} />
 
         {/* CREDENTIALS MODULE */}
         <Route path="/credentials" element={<ProtectedRoute permission="credentials.credential.view"><CredentialVaultPage /></ProtectedRoute>} />

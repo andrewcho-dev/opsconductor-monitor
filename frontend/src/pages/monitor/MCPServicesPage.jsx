@@ -16,11 +16,11 @@ import {
   Cable,
   Radio
 } from 'lucide-react';
-import { PageHeader } from '../components/layout';
-import { cn, fetchApi } from '../lib/utils';
-import { useAuth } from '../contexts/AuthContext';
+import { PageLayout, PageHeader } from '../../components/layout';
+import { cn, fetchApi } from '../../lib/utils';
+import { useAuth } from '../../contexts/AuthContext';
 
-export function MCPServices() {
+export function MCPServicesPage() {
   const { getAuthHeader } = useAuth();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -106,15 +106,17 @@ export function MCPServices() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw className="h-8 w-8 animate-spin text-blue-500" />
-      </div>
+      <PageLayout module="monitor">
+        <div className="flex items-center justify-center h-64">
+          <RefreshCw className="h-8 w-8 animate-spin text-blue-500" />
+        </div>
+      </PageLayout>
     );
   }
 
   if (error) {
     return (
-      <div className="p-6">
+      <PageLayout module="monitor">
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-3">
           <XCircle className="h-5 w-5 text-red-500" />
           <div>
@@ -122,22 +124,23 @@ export function MCPServices() {
             <p className="text-sm text-red-600">{error}</p>
           </div>
         </div>
-      </div>
+      </PageLayout>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <PageLayout module="monitor">
       <PageHeader
         title="MCP Services"
         description="Monitor Ciena MCP services, circuits, and G.8032 rings"
+        icon={Circle}
         actions={
           <button
             onClick={handleRefresh}
             disabled={refreshing}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
           >
-            <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
+            <RefreshCw className={cn("w-4 h-4", refreshing && "animate-spin")} />
             Refresh
           </button>
         }
@@ -226,7 +229,7 @@ export function MCPServices() {
           toggleRingExpanded={toggleRingExpanded}
         />
       )}
-    </div>
+    </PageLayout>
   );
 }
 
@@ -593,4 +596,4 @@ function ServiceClassIcon({ serviceClass }) {
   return <Activity className="h-4 w-4 text-gray-400" />;
 }
 
-export default MCPServices;
+export default MCPServicesPage;

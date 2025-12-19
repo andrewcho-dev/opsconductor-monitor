@@ -46,8 +46,8 @@ def create_app(config=None):
     logger = get_logger(__name__, LogSource.SYSTEM)
     logger.info("OpsConductor backend starting up", category='startup')
     
-    # Enable CORS
-    CORS(app)
+    # Enable CORS for all origins
+    CORS(app, resources={r"/api/*": {"origins": "*"}})
     
     # Initialize request logging middleware
     init_request_logging(app)

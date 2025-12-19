@@ -405,7 +405,7 @@ def get_services():
     service_class = request.args.get('class')
     
     service = get_mcp_service()
-    result = service.get_services(limit=limit, offset=offset, service_class=service_class)
+    result = service.get_services(limit=limit, offset=offset)
     
     # Transform to simpler format
     services = []
