@@ -390,8 +390,19 @@ class CienaMCPService:
             attrs = svc.get('attributes', {})
             display = attrs.get('displayData', {})
             
-            # Count by class
-            svc_class = attrs.get('serviceClass', 'Unknown')
+            # Count by class - use layerRate as fallback when serviceClass is missing
+            svc_class = attrs.get('serviceClass')
+            if not svc_class:
+                # Derive class from layerRate
+                layer_rate = (attrs.get('layerRate') or '').upper()
+                if layer_rate == 'G8032':
+                    svc_class = 'Ring'
+                elif layer_rate == 'ETHERNET':
+                    svc_class = 'Ethernet'
+                elif layer_rate:
+                    svc_class = layer_rate.title()
+                else:
+                    svc_class = 'Unknown'
             summary['by_class'][svc_class] = summary['by_class'].get(svc_class, 0) + 1
             
             # Count by state

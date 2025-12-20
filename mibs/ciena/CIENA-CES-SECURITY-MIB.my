@@ -1,0 +1,503 @@
+-- This file was included in WWP MIB release 04-21-05-0007
+ --
+ -- CIENA-CES-SECURITY-MIB.my
+ --
+
+ CIENA-CES-SECURITY-MIB DEFINITIONS ::= BEGIN
+
+ IMPORTS
+   Integer32, NOTIFICATION-TYPE, OBJECT-TYPE, MODULE-IDENTITY
+       FROM SNMPv2-SMI
+   DisplayString
+       FROM SNMPv2-TC
+   OBJECT-GROUP, NOTIFICATION-GROUP
+       FROM SNMPv2-CONF
+   cienaGlobalSeverity, cienaGlobalMacAddress
+       FROM CIENA-GLOBAL-MIB
+   cienaCesNotifications, cienaCesConfig
+       FROM CIENA-SMI;
+
+ cienaCesSecurityMIB MODULE-IDENTITY
+                        LAST-UPDATED "201801250000Z"
+                        ORGANIZATION "Ciena Corp."
+                        CONTACT-INFO
+                            "   Mib Meister
+                                7035 Ridge Road
+                                Hanover, Maryland 21076
+                                USA
+                                Phone:  +1 800 921 1144
+                                Email:  support@ciena.com"
+              DESCRIPTION
+                       "This module defines the security configuration objects and also the objects required for
+                       any security related notifications."
+
+              REVISION "201801250000Z"
+              DESCRIPTION
+                       "Added all the objects to support gets of the list of CA, CRLs, device-certificates
+                       and the lists of certificates for each device-certificate."
+              REVISION "201709270000Z"
+              DESCRIPTION
+                       "Initial creation."
+          ::= { cienaCesConfig 44 }
+
+ --
+ -- Node definitions
+ --
+
+ cienaCesSecurityMIBObjects OBJECT IDENTIFIER ::= { cienaCesSecurityMIB 1 }
+
+ cienaCesSecurityCertExpiry OBJECT IDENTIFIER ::= { cienaCesSecurityMIBObjects 1 }
+ cienaCesSecurityCertCrl    OBJECT IDENTIFIER ::= { cienaCesSecurityMIBObjects 2 }
+
+ cienaCesSecurityMIBNotificationPrefix  OBJECT IDENTIFIER ::= { cienaCesNotifications 43 }
+ cienaCesSecurityMIBNotifications       OBJECT IDENTIFIER ::= { cienaCesSecurityMIBNotificationPrefix 0 }
+
+ -- Conformance information
+
+ cienaCesSecurityMIBConformance OBJECT IDENTIFIER ::= { cienaCesSecurityMIB 2 }
+ cienaCesSecurityMIBCompliances OBJECT IDENTIFIER ::= { cienaCesSecurityMIBConformance 1 }
+ cienaCesSecurityMIBGroups      OBJECT IDENTIFIER ::= { cienaCesSecurityMIBConformance 2 }
+
+ --
+ -- Global stuff
+ --
+
+ cienaCesSecurityCertType OBJECT-TYPE
+     SYNTAX      INTEGER {
+                                ca(1),
+                                devCert(2),
+                                sshClient(3),
+                                sshServer(4)
+                         }
+     MAX-ACCESS  accessible-for-notify
+     STATUS      current
+     DESCRIPTION
+             "This object indicates the type of the certificate."
+    ::= { cienaCesSecurityCertExpiry 1 }
+
+ cienaCesSecurityCertName    OBJECT-TYPE
+     SYNTAX           DisplayString
+     MAX-ACCESS       accessible-for-notify
+     STATUS           current
+     DESCRIPTION
+             "This object indicates the name of the certificate."
+     ::= { cienaCesSecurityCertExpiry 2 }
+
+ cienaCesSecurityCertValidTo    OBJECT-TYPE
+     SYNTAX           DisplayString
+     MAX-ACCESS       accessible-for-notify
+     STATUS           current
+     DESCRIPTION
+             "This object indicates the validTo date of the certificate."
+     ::= { cienaCesSecurityCertExpiry 3 }
+
+ cienaCesSecurityCaCrlType OBJECT-TYPE
+     SYNTAX           DisplayString
+     MAX-ACCESS       accessible-for-notify
+     STATUS           current
+     DESCRIPTION
+             "This object indicates the type of object, CA or CRL."
+    ::= { cienaCesSecurityCertCrl 1 }
+
+ cienaCesSecurityCertCrlOperation OBJECT-TYPE
+     SYNTAX           DisplayString
+     MAX-ACCESS       accessible-for-notify
+     STATUS           current
+     DESCRIPTION
+             "This object indicates the type of operation on the cert or CRL."
+    ::= { cienaCesSecurityCertCrl 2 }
+
+ cienaCesSecurityCaCrlInvalidCaReason OBJECT-TYPE
+     SYNTAX           DisplayString
+     MAX-ACCESS       accessible-for-notify
+     STATUS           current
+     DESCRIPTION
+             "This object indicates the reason the CA is invalid."
+    ::= { cienaCesSecurityCertCrl 3 }
+
+ cienaCesSecurityCertKeyOperation OBJECT-TYPE
+     SYNTAX           DisplayString
+     MAX-ACCESS       accessible-for-notify
+     STATUS           current
+     DESCRIPTION
+             "This object indicates the type of operation on the cert key."
+    ::= { cienaCesSecurityCertCrl 4 }
+
+ cienaCesSecurityCaTable OBJECT-TYPE
+     SYNTAX SEQUENCE OF CienaCesSecurityCaEntry
+     MAX-ACCESS not-accessible
+     STATUS current
+     DESCRIPTION
+         "Table with an entry for every certificate authority"
+     ::= { cienaCesSecurityCertCrl 5 }
+
+ cienaCesSecurityCaEntry OBJECT-TYPE
+     SYNTAX CienaCesSecurityCaEntry
+     MAX-ACCESS not-accessible
+     STATUS current
+     DESCRIPTION
+         "An entry (conceptual row) in the cienaCesSecurityCaTable."
+     INDEX { cienaCesSecurityCaCertHash }
+     ::= { cienaCesSecurityCaTable 1 }
+
+ CienaCesSecurityCaEntry ::= SEQUENCE {
+        cienaCesSecurityCaCertHash              DisplayString,
+        cienaCesSecurityCaCertSubjectCommonName DisplayString,
+        cienaCesSecurityCaCertIssuerCommonName  DisplayString,
+        cienaCesSecurityCaCertValidTo           DisplayString
+     }
+
+ cienaCesSecurityCaCertHash    OBJECT-TYPE
+     SYNTAX           DisplayString
+     MAX-ACCESS       not-accessible
+     STATUS           current
+     DESCRIPTION
+             "Certificate hash."
+     ::= { cienaCesSecurityCaEntry 1 }
+
+ cienaCesSecurityCaCertSubjectCommonName    OBJECT-TYPE
+     SYNTAX           DisplayString
+     MAX-ACCESS       read-only
+     STATUS           current
+     DESCRIPTION
+             "Subject common name of the certificate."
+     ::= { cienaCesSecurityCaEntry 2 }
+
+ cienaCesSecurityCaCertIssuerCommonName    OBJECT-TYPE
+     SYNTAX           DisplayString
+     MAX-ACCESS       read-only
+     STATUS           current
+     DESCRIPTION
+             "Issuer common name of the certificate."
+     ::= { cienaCesSecurityCaEntry 3 }
+
+ cienaCesSecurityCaCertValidTo    OBJECT-TYPE
+     SYNTAX           DisplayString
+     MAX-ACCESS       read-only
+     STATUS           current
+     DESCRIPTION
+             "Valid to date of the certificate."
+     ::= { cienaCesSecurityCaEntry 4 }
+
+ cienaCesSecurityCrlTable OBJECT-TYPE
+     SYNTAX SEQUENCE OF CienaCesSecurityCrlEntry
+     MAX-ACCESS not-accessible
+     STATUS current
+     DESCRIPTION
+         "Table with an entry for every certificate relocation list."
+     ::= { cienaCesSecurityCertCrl 6 }
+
+ cienaCesSecurityCrlEntry OBJECT-TYPE
+     SYNTAX CienaCesSecurityCrlEntry
+     MAX-ACCESS not-accessible
+     STATUS current
+     DESCRIPTION
+         "An entry (conceptual row) in the cienaCesSecurityCrlTable."
+     INDEX { cienaCesSecurityCrlHash }
+     ::= { cienaCesSecurityCrlTable 1 }
+
+ CienaCesSecurityCrlEntry ::= SEQUENCE {
+        cienaCesSecurityCrlHash              DisplayString,
+        cienaCesSecurityCrlIssuerCommonName  DisplayString,
+        cienaCesSecurityCrlLastUpdate        DisplayString,
+        cienaCesSecurityCrlNextUpdate        DisplayString,
+        cienaCesSecurityCrlRevokedCertCount  Integer32
+     }
+
+ cienaCesSecurityCrlHash         OBJECT-TYPE
+     SYNTAX           DisplayString
+     MAX-ACCESS       not-accessible
+     STATUS           current
+     DESCRIPTION
+             "Hash of the certificate revocation list."
+     ::= { cienaCesSecurityCrlEntry 1 }
+
+ cienaCesSecurityCrlIssuerCommonName    OBJECT-TYPE
+     SYNTAX           DisplayString
+     MAX-ACCESS       read-only
+     STATUS           current
+     DESCRIPTION
+             "Issuer common name of the certificate revocation list."
+     ::= { cienaCesSecurityCrlEntry 2 }
+
+ cienaCesSecurityCrlLastUpdate    OBJECT-TYPE
+     SYNTAX           DisplayString
+     MAX-ACCESS       read-only
+     STATUS           current
+     DESCRIPTION
+             "Date of the last update of the certificate revocation list."
+     ::= { cienaCesSecurityCrlEntry 3 }
+
+ cienaCesSecurityCrlNextUpdate    OBJECT-TYPE
+     SYNTAX           DisplayString
+     MAX-ACCESS       read-only
+     STATUS           current
+     DESCRIPTION
+             "Date of the next update of the certificate revocation list."
+     ::= { cienaCesSecurityCrlEntry 4 }
+
+ cienaCesSecurityCrlRevokedCertCount    OBJECT-TYPE
+     SYNTAX           Integer32
+     MAX-ACCESS       read-only
+     STATUS           current
+     DESCRIPTION
+             "Number of revoked certificates in the revoked cert list."
+     ::= { cienaCesSecurityCrlEntry 5 }
+
+ cienaCesSecurityDevCertTable OBJECT-TYPE
+     SYNTAX SEQUENCE OF CienaCesSecurityDevCertEntry
+     MAX-ACCESS not-accessible
+     STATUS current
+     DESCRIPTION
+         "Table with an entry for every device certificate."
+     ::= { cienaCesSecurityCertCrl 7 }
+
+ cienaCesSecurityDevCertEntry OBJECT-TYPE
+     SYNTAX CienaCesSecurityDevCertEntry
+     MAX-ACCESS not-accessible
+     STATUS current
+     DESCRIPTION
+         "An entry (conceptual row) in the cienaCesSecurityDevCertTable."
+     INDEX { cienaCesSecurityDevCertNameIndex }
+     ::= { cienaCesSecurityDevCertTable 1 }
+
+ CienaCesSecurityDevCertEntry ::= SEQUENCE {
+        cienaCesSecurityDevCertNameIndex         DisplayString,
+        cienaCesSecurityDevCertPrivateKeyPresent INTEGER,
+        cienaCesSecurityDevCertKeyType           DisplayString,
+        cienaCesSecurityDevCertCount             Integer32
+     }
+
+ cienaCesSecurityDevCertNameIndex    OBJECT-TYPE
+     SYNTAX           DisplayString
+     MAX-ACCESS       not-accessible
+     STATUS           current
+     DESCRIPTION
+             "Name of the device certificate."
+     ::= { cienaCesSecurityDevCertEntry 1 }
+
+ cienaCesSecurityDevCertPrivateKeyPresent    OBJECT-TYPE
+     SYNTAX      INTEGER {
+                                yes(1),
+                                no(2)
+                         }
+     MAX-ACCESS       read-only
+     STATUS           current
+     DESCRIPTION
+             "Device certificate's private key present."
+     ::= { cienaCesSecurityDevCertEntry 2 }
+
+ cienaCesSecurityDevCertKeyType    OBJECT-TYPE
+     SYNTAX           DisplayString
+     MAX-ACCESS       read-only
+     STATUS           current
+     DESCRIPTION
+             "Device certificate's private key type."
+     ::= { cienaCesSecurityDevCertEntry 3 }
+
+ cienaCesSecurityDevCertCount    OBJECT-TYPE
+     SYNTAX           Integer32 (1..16)
+     MAX-ACCESS       read-only
+     STATUS           current
+     DESCRIPTION
+             "Device certificate's number of certificates."
+     ::= { cienaCesSecurityDevCertEntry 4 }
+
+ cienaCesSecurityCertTable OBJECT-TYPE
+     SYNTAX SEQUENCE OF CienaCesSecurityCertEntry
+     MAX-ACCESS not-accessible
+     STATUS current
+     DESCRIPTION
+         "Table with an entry for every certificate in a device certificate file."
+     ::= { cienaCesSecurityCertCrl 8 }
+
+ cienaCesSecurityCertEntry OBJECT-TYPE
+     SYNTAX CienaCesSecurityCertEntry
+     MAX-ACCESS not-accessible
+     STATUS current
+     DESCRIPTION
+         "An entry (conceptual row) in the cienaCesSecurityCertTable."
+     INDEX { cienaCesSecurityCertDevCertNameIndex, cienaCesSecurityCertIndex }
+     ::= { cienaCesSecurityCertTable 1 }
+
+ CienaCesSecurityCertEntry ::= SEQUENCE {
+        cienaCesSecurityCertDevCertNameIndex  DisplayString,
+        cienaCesSecurityCertIndex             Integer32,
+        cienaCesSecurityCertHash              DisplayString,
+        cienaCesSecurityCertSubjectCommonName DisplayString,
+        cienaCesSecurityCertIssuerCommonName  DisplayString,
+        cienaCesSecurityCertValidToX          DisplayString
+     }
+
+ cienaCesSecurityCertDevCertNameIndex    OBJECT-TYPE
+     SYNTAX           DisplayString
+     MAX-ACCESS       not-accessible
+     STATUS           current
+     DESCRIPTION
+             "Name of the device certificate."
+     ::= { cienaCesSecurityCertEntry 1 }
+
+ cienaCesSecurityCertIndex    OBJECT-TYPE
+     SYNTAX           Integer32 (1..16)
+     MAX-ACCESS       not-accessible
+     STATUS           current
+     DESCRIPTION
+             "Cert's index."
+     ::= { cienaCesSecurityCertEntry 2 }
+
+ cienaCesSecurityCertHash    OBJECT-TYPE
+     SYNTAX           DisplayString
+     MAX-ACCESS       read-only
+     STATUS           current
+     DESCRIPTION
+             "Cert's hash."
+     ::= { cienaCesSecurityCertEntry 3 }
+
+ cienaCesSecurityCertSubjectCommonName    OBJECT-TYPE
+     SYNTAX           DisplayString
+     MAX-ACCESS       read-only
+     STATUS           current
+     DESCRIPTION
+             "Cert's subject common name."
+     ::= { cienaCesSecurityCertEntry 4 }
+
+ cienaCesSecurityCertIssuerCommonName    OBJECT-TYPE
+     SYNTAX           DisplayString
+     MAX-ACCESS       read-only
+     STATUS           current
+     DESCRIPTION
+             "Cert's issuer command name."
+     ::= { cienaCesSecurityCertEntry 5 }
+
+ cienaCesSecurityCertValidToX    OBJECT-TYPE
+     SYNTAX           DisplayString
+     MAX-ACCESS       read-only
+     STATUS           current
+     DESCRIPTION
+             "Cert's valid to date."
+     ::= { cienaCesSecurityCertEntry 6 }
+
+-- Notifications
+
+ cienaCesSecurityCertExpiryWarningNotification NOTIFICATION-TYPE
+      OBJECTS {
+                        cienaGlobalSeverity,
+                        cienaGlobalMacAddress,
+                        cienaCesSecurityCertType,
+                        cienaCesSecurityCertName,
+                        cienaCesSecurityCertValidTo
+              }
+      STATUS            current
+      DESCRIPTION
+          "A cienaCesSecurityCertExpiryWarningNotification is sent if
+           the current time is greater than or equal to (the expiry time
+            minus the initial warning interval), but less than the expiry
+            time. They are sent at configured intervals.
+           To enable the device to send this trap:
+             cienaCesSecurityCertExpiryWarningTrapState needs to be set to enabled."
+      ::= { cienaCesSecurityMIBNotifications 1 }
+
+ cienaCesSecurityCertExpiryExpiredNotification NOTIFICATION-TYPE
+      OBJECTS {
+                        cienaGlobalSeverity,
+                        cienaGlobalMacAddress,
+                        cienaCesSecurityCertType,
+                        cienaCesSecurityCertName,
+                        cienaCesSecurityCertValidTo
+              }
+      STATUS            current
+      DESCRIPTION
+          "A cienaCesSecurityCertExpiryExpiredNotification is sent if
+           the current time is greater than or equal to the expiry time.
+           They are sent at configured intervals.
+           To enable the device to send this trap:
+             cienaCesSecurityCertExpiryExpiredTrapState needs to be set to enabled."
+      ::= { cienaCesSecurityMIBNotifications 2 }
+
+ cienaCesSecurityCaCrlInstallNotification NOTIFICATION-TYPE
+      OBJECTS {
+                        cienaGlobalSeverity,
+                        cienaGlobalMacAddress,
+                        cienaCesSecurityCaCrlType,
+                        cienaCesSecurityCertName,
+                        cienaCesSecurityCertCrlOperation
+              }
+      STATUS            current
+      DESCRIPTION
+          "A cienaCesSecurityCaCrlInstallNotification is sent if
+           a CA certificate has been successfully installed.
+           To enable the device to send this trap:
+             cienaCesSecurityCaCrlInstallTrapState needs to be set to enabled."
+      ::= { cienaCesSecurityMIBNotifications 3 }
+
+ cienaCesSecurityCaCrlInvalidCaNotification NOTIFICATION-TYPE
+      OBJECTS {
+                        cienaGlobalSeverity,
+                        cienaGlobalMacAddress,
+                        cienaCesSecurityCaCrlInvalidCaReason
+              }
+      STATUS            current
+      DESCRIPTION
+          "A cienaCesSecurityCaCrlInvalidCaNotification is sent if
+           during an attempted installation, the CA certificate
+           is found to be invalid.
+           To enable the device to send this trap:
+             cienaCesSecurityCaCrlInvalidCaTrapState needs to be set to enabled."
+      ::= { cienaCesSecurityMIBNotifications 4 }
+
+ cienaCesSecurityDevCertInstallNotification NOTIFICATION-TYPE
+      OBJECTS {
+                        cienaGlobalSeverity,
+                        cienaGlobalMacAddress,
+                        cienaCesSecurityCertName,
+                        cienaCesSecurityCertCrlOperation
+              }
+      STATUS            current
+      DESCRIPTION
+          "A cienaCesSecurityDevCertInstallNotification is sent if
+           a device certificate has been successfully installed or uninstalled.
+           To enable the device to send this trap:
+             cienaCesSecurityDevCertInstallTrapState needs to be set to enabled."
+      ::= { cienaCesSecurityMIBNotifications 5 }
+
+ cienaCesSecurityDevCertKeyCreateNotification NOTIFICATION-TYPE
+      OBJECTS {
+                        cienaGlobalSeverity,
+                        cienaGlobalMacAddress,
+                        cienaCesSecurityCertName,
+                        cienaCesSecurityCertKeyOperation
+              }
+      STATUS            current
+      DESCRIPTION
+          "A cienaCesSecurityDevCertKeyCreateNotification is sent if
+           a device certificate key has been successfully created.
+           To enable the device to send this trap:
+             cienaCesSecurityDevCertKeyCreateTrapState needs to be set to enabled."
+      ::= { cienaCesSecurityMIBNotifications 6 }
+
+ cienaCesSecurityCertExpiryGroup NOTIFICATION-GROUP
+       NOTIFICATIONS {
+                       cienaCesSecurityCertExpiryWarningNotification,
+                       cienaCesSecurityCertExpiryExpiredNotification
+                     }
+       STATUS  current
+       DESCRIPTION
+               "A collection of objects providing information
+               about security certificate expiry notifications."
+       ::= { cienaCesSecurityMIBGroups 1 }
+
+ cienaCesSecurityCertCrlGroup NOTIFICATION-GROUP
+       NOTIFICATIONS {
+                       cienaCesSecurityCaCrlInstallNotification,
+                       cienaCesSecurityCaCrlInvalidCaNotification,
+                       cienaCesSecurityDevCertInstallNotification,
+                       cienaCesSecurityDevCertKeyCreateNotification
+                     }
+       STATUS  current
+       DESCRIPTION
+               "A collection of objects providing information
+               about certificate and certificate revocation
+               list notifications."
+       ::= { cienaCesSecurityMIBGroups 2 }
+
+END

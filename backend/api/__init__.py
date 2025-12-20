@@ -19,6 +19,7 @@ from .auth import auth_bp
 from .netbox import netbox_bp
 from .prtg import prtg_bp
 from .ciena_mcp import mcp_bp
+from .ciena_snmp import snmp_bp
 
 __all__ = [
     'devices_bp',
@@ -80,3 +81,4 @@ def register_blueprints(app):
     app.register_blueprint(netbox_bp)
     app.register_blueprint(prtg_bp)
     app.register_blueprint(mcp_bp)
+    app.register_blueprint(snmp_bp)

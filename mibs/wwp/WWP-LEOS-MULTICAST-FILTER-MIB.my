@@ -1,0 +1,1218 @@
+-- This file was included in WWP MIB release 04-21-05-0007
+ --
+ -- WWP-LEOS-MULTICAST-FILTER-MIB.my
+ --
+ --
+
+ WWP-LEOS-MULTICAST-FILTER-MIB DEFINITIONS ::= BEGIN
+
+ IMPORTS
+   IpAddress, Integer32, Counter32, OBJECT-TYPE, MODULE-IDENTITY, NOTIFICATION-TYPE
+       FROM SNMPv2-SMI
+   MacAddress, RowStatus, TruthValue, TEXTUAL-CONVENTION
+       FROM SNMPv2-TC
+   wwpModulesLeos
+       FROM WWP-SMI;
+
+
+ wwpLeosMcastFilterMIB MODULE-IDENTITY
+            LAST-UPDATED "201711150000Z"
+            ORGANIZATION "Ciena Corp."
+            CONTACT-INFO
+               "   Mib Meister
+                   7035 Ridge Road
+                   Hanover, Maryland 21076
+                   USA
+                   Phone:  +1 800 921 1144
+                   Email:  support@ciena.com"
+            DESCRIPTION
+               "This MIB specifies the managed objects for Multicast filter
+                specific to the WWP Products."
+            REVISION     "201711150000Z"
+            DESCRIPTION
+               "Updated contact info."
+            REVISION    "20150320000Z"
+            DESCRIPTION
+               "Deprecated all the OIDs in this since the Multicast support MIB has been replaced by CIENA-CES-MCAST-FILTER-MIB."
+            REVISION    "201312040000Z"
+            DESCRIPTION
+               "Fixed capitalization vlan -> VLAN"
+            REVISION    "201311270000Z"
+            DESCRIPTION
+               "Added a following object to view actual operational snooping state for a VLAN
+                   - wwpLeosMcastIgmpSnoopEnableOperState"
+            REVISION    "201311120000Z"
+            DESCRIPTION
+               "Added following missing statistics objects:
+                   - wwpLeosMcastReplyTimeouts to count query reply timeouts
+                   - wwpLeosMcastResourceExceed to count resource exceeded errors"
+            REVISION    "201305100000Z"
+            DESCRIPTION
+               "Added following objects to support Google Fiber:
+                   - wwpLeosMcastIgmpSnoopCompatibilityMode to control protocol compatiblility
+                   - wwpLeosMcastIgmpSnoopForkMode to control PDU forking
+                   - wwpLeosMcastCompatibilityModeDiscards to return the number of PDU's that
+                   have been discarded because they were the wrong protocol version"
+            REVISION    "201304230000Z"
+       DESCRIPTION
+          "Miscellaneous spelling and description corrections."
+            REVISION   "200810021900Z"
+            DESCRIPTION
+                   "Added the following objects to support rapid-recovery:
+                    - wwpLeosMcastIgmpSnoopRapidRecoveryMode to set rapid recovery mode on or off
+                    - wwpLeosMcastStatsQuerySrcIpZeroDiscard to get number of zero IP GQ discards"
+            REVISION   "200806190000Z"
+            DESCRIPTION
+                   "Added the objects to clear the statistics for the Mcast-Services:
+                    - wwpLeosMcastGlobalStatsClear clears the statistics for all the services
+                    - wwpLeosMcastStatsClear clears the statistics for the associated VLAN ID only"
+            REVISION    "200302101700Z"
+            DESCRIPTION
+                   "Initial creation."
+       ::= { wwpModulesLeos 7 }
+
+
+ --
+ -- Textual conventions
+ --
+
+ VlanId ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d"
+    STATUS      deprecated
+    DESCRIPTION
+        "A Vlan Id represents a Broadcast Domain."
+    SYNTAX      Integer32 (1..24576)
+
+ 
+ --
+ -- Node definitions
+ --
+	
+ wwpLeosMcastFilterMIBObjects OBJECT IDENTIFIER ::= { wwpLeosMcastFilterMIB 1 }
+ 
+ --
+ -- multicast filter group
+ --
+ wwpLeosMcastFilterConfig OBJECT IDENTIFIER ::= { wwpLeosMcastFilterMIBObjects 1 }
+ 
+ --
+ -- multicast filter status
+ --
+ wwpLeosMcastFilterStatus OBJECT IDENTIFIER ::= { wwpLeosMcastFilterMIBObjects 2 }
+
+ --
+ -- multicast filter statistics
+ --
+ wwpLeosMcastFilterStats OBJECT IDENTIFIER ::= { wwpLeosMcastFilterMIBObjects 3 }
+   
+
+ -- Notifications 
+  
+ wwpLeosMcastFilterMIBNotificationPrefix  OBJECT IDENTIFIER ::= { wwpLeosMcastFilterMIB 2 } 
+ wwpLeosMcastFilterMIBNotifications       OBJECT IDENTIFIER ::=  
+                       { wwpLeosMcastFilterMIBNotificationPrefix 0 }
+
+ -- Conformance information 
+ 
+ wwpLeosMcastFilterMIBConformance OBJECT IDENTIFIER ::= { wwpLeosMcastFilterMIB 3 } 
+ wwpLeosMcastFilterMIBCompliances OBJECT IDENTIFIER ::= { wwpLeosMcastFilterMIBConformance 1 } 		
+ wwpLeosMcastFilterMIBGroups      OBJECT IDENTIFIER ::= { wwpLeosMcastFilterMIBConformance 2 }
+
+ wwpLeosMcastConfigState OBJECT-TYPE
+     SYNTAX     INTEGER {
+			enabled(1),
+			disabled(2)
+                }
+     MAX-ACCESS read-write
+     STATUS     deprecated
+     DESCRIPTION
+            "Setting this object enables or disables multicast globally."
+     ::= { wwpLeosMcastFilterConfig 1 } 
+    
+  wwpLeosMcastSnoopState OBJECT-TYPE
+     SYNTAX     TruthValue
+     MAX-ACCESS read-write
+     STATUS     deprecated  
+     DESCRIPTION
+            "Setting this object enables or disables IGMP Snooping
+	     globally on SAOS (39xx/51xx). LEOS (4.x) does not support setting IGMP
+             snooping at a global level. It should be enabled on a per VLAN
+             bases using the wwpLeosMcastIgmpSnoopEnable MIB object."
+     DEFVAL { false }
+     ::= { wwpLeosMcastFilterConfig 8 }  
+     
+  wwpLeosMcastGlobalStatsClear OBJECT-TYPE
+     SYNTAX     INTEGER {
+			clear(1),
+			none(2)
+                }
+     MAX-ACCESS read-write
+     STATUS     deprecated
+     DESCRIPTION
+            "Setting this object to clear(1) clears the statistics for all the multicast service 
+            filter entries. This object cannot be set to none. It is for display purposes only."
+     ::= { wwpLeosMcastFilterConfig 10 } 
+
+
+ --
+ --  The Multicast filter Activation Table
+ --
+
+ wwpLeosMcastFilterActivationTable OBJECT-TYPE
+     SYNTAX     SEQUENCE OF WwpLeosMcastFilterActivationEntry
+     MAX-ACCESS not-accessible
+     STATUS     deprecated
+     DESCRIPTION
+            "The (conceptual) table listing the VLANs on which the
+             multicast filter can be applied. This table is used to create
+	     and delete entries in the multicast table and also to administratively
+	     enable/disable. To configure the IGMP Snooping on this VLAN
+	     use table wwpLeosMcastIgmpSnoopTable after creating entry in
+	     this (wwpLeosMcastFilterActivationTable) table."
+    ::= { wwpLeosMcastFilterConfig 2 }
+
+ wwpLeosMcastFilterActivationEntry OBJECT-TYPE
+     SYNTAX     WwpLeosMcastFilterActivationEntry
+     MAX-ACCESS not-accessible
+     STATUS     deprecated
+     DESCRIPTION
+            "An entry (conceptual row) in the wwpLeosMcastFilterActivationTable."
+     INDEX      { wwpLeosMcastVlanId }
+     ::= { wwpLeosMcastFilterActivationTable 1 }
+
+ WwpLeosMcastFilterActivationEntry ::= SEQUENCE {   
+     wwpLeosMcastVlanId			VlanId,
+     wwpLeosMcastFilterAdminState	INTEGER,
+     wwpLeosMcastFilterOperState	INTEGER,
+     wwpLeosMcastFilterState		RowStatus
+ }
+
+ wwpLeosMcastVlanId OBJECT-TYPE
+     SYNTAX     VlanId
+     MAX-ACCESS read-only
+     STATUS     deprecated
+     DESCRIPTION
+            "The VLAN for which this multicast filter can be 
+	     enabled/disabled."
+     ::= { wwpLeosMcastFilterActivationEntry 1 }
+ 
+ wwpLeosMcastFilterAdminState OBJECT-TYPE
+     SYNTAX     INTEGER {
+		enabled(1),
+		disabled(2)   
+		}
+     MAX-ACCESS read-write
+     STATUS     deprecated
+     DESCRIPTION
+            "Setting this object to enable(1) enables multicast on 
+	     the given VLAN."
+     ::= { wwpLeosMcastFilterActivationEntry 2 }
+
+ wwpLeosMcastFilterOperState OBJECT-TYPE
+     SYNTAX     INTEGER {
+		enabled(1),
+		disabled(2)
+		}
+     MAX-ACCESS read-only
+     STATUS     deprecated
+     DESCRIPTION
+            "This object represents the operational state of multicast
+	     on the given VLAN."
+     ::= { wwpLeosMcastFilterActivationEntry 3 }
+
+ wwpLeosMcastFilterState  OBJECT-TYPE
+     SYNTAX          RowStatus
+     MAX-ACCESS      read-create
+     STATUS          deprecated
+     DESCRIPTION
+    	    "Setting this object to createandgo(4) creates
+	     an entry in the multicast table for the given VLAN and enables
+	     multicast on that VLAN.
+	     Setting this object to destroy deletes the entry from
+	     the multicast table."
+     ::= { wwpLeosMcastFilterActivationEntry 4 }
+  
+ --
+ --  The Multicast filter Server Port Table
+ --
+
+ wwpLeosMcastFilterServerPortTable OBJECT-TYPE
+     SYNTAX     SEQUENCE OF WwpLeosMcastFilterServerPortEntry
+     MAX-ACCESS not-accessible
+     STATUS     deprecated
+     DESCRIPTION
+            "The (conceptual) table listing the 
+	    authorized server ports."
+    ::= { wwpLeosMcastFilterConfig 3 }
+
+ wwpLeosMcastFilterServerPortEntry OBJECT-TYPE
+     SYNTAX     WwpLeosMcastFilterServerPortEntry
+     MAX-ACCESS not-accessible
+     STATUS     deprecated
+     DESCRIPTION
+            "An entry (conceptual row) in the wwpLeosMcastFilterServerPortTable."
+     INDEX      { wwpLeosMcastVlanId, wwpLeosMcastServerPortId }
+     ::= { wwpLeosMcastFilterServerPortTable 1 }
+
+ WwpLeosMcastFilterServerPortEntry ::= SEQUENCE {
+     wwpLeosMcastServerPortId         Integer32,
+     wwpLeosMcastServerPortStatus     RowStatus
+ }
+
+ wwpLeosMcastServerPortId OBJECT-TYPE
+     SYNTAX      Integer32 (0..65535)
+     MAX-ACCESS  read-only
+     STATUS      deprecated
+     DESCRIPTION
+	    "The server port from which the IGMP 
+	     query messages can be received, and joins/leaves 
+	     messages can be sent."  
+     ::= { wwpLeosMcastFilterServerPortEntry 1 }
+     
+ wwpLeosMcastServerPortStatus OBJECT-TYPE
+     SYNTAX      RowStatus
+     MAX-ACCESS  read-create
+     STATUS      deprecated
+     DESCRIPTION
+	    "This object is used to add/delete server ports from
+	    the list of authorized server ports. To add a port to 
+	    the authorized server port list, a user must set this
+	    object to 'createAndGo'."  
+     ::= { wwpLeosMcastFilterServerPortEntry 2 }
+
+ --
+ --  The Mcast IGMP Snoop Config Table
+ --
+
+ wwpLeosMcastIgmpSnoopTable OBJECT-TYPE
+     SYNTAX     SEQUENCE OF WwpLeosMcastIgmpSnoopEntry
+     MAX-ACCESS not-accessible
+     STATUS     deprecated
+     DESCRIPTION
+            "The (conceptual) table listing the configuration parameters
+            for the IGMP snooping."
+    ::= { wwpLeosMcastFilterConfig 4 }
+
+ wwpLeosMcastIgmpSnoopEntry OBJECT-TYPE
+    SYNTAX     WwpLeosMcastIgmpSnoopEntry
+    MAX-ACCESS not-accessible
+    STATUS     deprecated
+    DESCRIPTION
+            "An entry (conceptual row) in the wwpLeosMcastIgmpSnoopTable."
+    INDEX      { wwpLeosMcastVlanId }
+    ::= { wwpLeosMcastIgmpSnoopTable 1 }
+
+
+ WwpLeosMcastIgmpSnoopEntry ::= SEQUENCE {   
+    wwpLeosMcastIgmpSnoopEnable                  TruthValue,
+    wwpLeosMcastIgmpSnoopRobustness              Integer32,
+    wwpLeosMcastIgmpSnoopProxyQueryInterval      Integer32,
+    wwpLeosMcastIgmpSnoopProxyQueryReplyTmo      Integer32,
+    wwpLeosMcastIgmpSnoopProxyQueryDelay         Integer32,
+    wwpLeosMcastIgmpSnoopLingerTmo               Integer32,
+    wwpLeosMcastIgmpQueryEngineState             INTEGER,
+    wwpLeosMcastIgmpProxyQuerySrcIp              IpAddress,
+    wwpLeosMcastIgmpRouterQueryInterval	         Integer32,
+    wwpLeosMcastIgmpMinResponseTime              Integer32,
+    wwpLeosMcastIgmpDefaultRouterPort            Integer32,
+    wwpLeosMcastIgmpInquisitiveLeaveState        INTEGER,	
+    wwpLeosMcastIgmpLastMemberQueryInterval      Integer32,
+    wwpLeosMcastIgmpPriority                     Integer32,
+    wwpLeosMcastIgmpSnoopRouterRangeStartIpAddr  IpAddress,
+    wwpLeosMcastIgmpSnoopRouterRangeEndIpAddr    IpAddress,
+    wwpLeosMcastIgmpSnoopActiveLingerTimeout     Integer32,
+    wwpLeosMcastIgmpSnoopServerTopology          INTEGER,
+    wwpLeosMcastIgmpSnoopRapidRecoveryMode       INTEGER,
+    wwpLeosMcastIgmpSnoopCompatibilityMode       INTEGER,
+    wwpLeosMcastIgmpSnoopForkMode                INTEGER,
+    wwpLeosMcastIgmpSnoopEnableOperState         TruthValue    
+ }
+
+  
+ wwpLeosMcastIgmpSnoopEnable  OBJECT-TYPE
+     SYNTAX          TruthValue
+     MAX-ACCESS      read-write
+     STATUS          deprecated
+     DESCRIPTION
+            "For LEOS (4.x) and SAOS (6.x), IGMP snooping can be enabled on this
+             VLAN by setting this object to 'true'. This object represents admin 
+             state of IGMP snooping for any VLAN."
+     DEFVAL { true }                
+     ::= { wwpLeosMcastIgmpSnoopEntry 1 } 
+          
+ wwpLeosMcastIgmpSnoopRobustness  OBJECT-TYPE
+     SYNTAX          Integer32(1..2)
+     MAX-ACCESS      read-write
+     STATUS          deprecated
+     DESCRIPTION
+    	    "The number of replies to send for 
+	    each multicast group."
+     DEFVAL { 1 }              
+     ::= { wwpLeosMcastIgmpSnoopEntry 2 }
+ 
+ wwpLeosMcastIgmpSnoopProxyQueryInterval  OBJECT-TYPE
+     SYNTAX          Integer32(10..999999)
+     UNITS           "seconds"
+     MAX-ACCESS      read-write
+     STATUS          deprecated
+     DESCRIPTION
+    	    "The interval period between each general query
+	     sent to the router. This parameter specifies how 
+	     often to repeat the group specific query.  
+	     Default value is 125 seconds.  Note that the actual 
+	     rate may be slower when the switch becomes busy, 
+	     so this parameter should be thought of as a 
+	     minimum time interval."
+     DEFVAL { 125 }              
+     ::= { wwpLeosMcastIgmpSnoopEntry 3 }
+     
+ wwpLeosMcastIgmpSnoopProxyQueryReplyTmo  OBJECT-TYPE
+     SYNTAX          Integer32(10..255)     
+     UNITS           "seconds"
+     MAX-ACCESS      read-write
+     STATUS          deprecated
+     DESCRIPTION
+    	    "The amount of time to receive a membership 
+	     report after a query message is sent.
+	     This value goes directly into the query packet."     
+     ::= { wwpLeosMcastIgmpSnoopEntry 4 }
+     
+ wwpLeosMcastIgmpSnoopProxyQueryDelay  OBJECT-TYPE
+     SYNTAX          Integer32(1..100)
+     UNITS           "seconds"
+     MAX-ACCESS      read-write
+     STATUS          deprecated
+     DESCRIPTION
+    	    "The amount of time to wait before sending the next 
+	     group specific query downstream.  
+	     General queries are sent one port at a time." 
+     DEFVAL { 50 }              
+     ::= { wwpLeosMcastIgmpSnoopEntry 5 }
+        
+ wwpLeosMcastIgmpSnoopLingerTmo  OBJECT-TYPE
+     SYNTAX          Integer32(10..300)
+     UNITS           "seconds"
+     MAX-ACCESS      read-write
+     STATUS          deprecated
+     DESCRIPTION
+    	    "This value specifies the amount of time that a 
+	     multicast filter is in place after the last 
+	     host has left. In essence it configures how long 
+	     to filter the stream after all the hosts have left 
+             the group. This can tune the system as to how long 
+	     the router has to remove the stream from the subnet. 
+	     The minimum value is 1 second, with no maximum value."
+       DEFVAL { 125 }                
+       ::= { wwpLeosMcastIgmpSnoopEntry 6 }
+ 
+  wwpLeosMcastIgmpQueryEngineState  OBJECT-TYPE
+     SYNTAX          INTEGER {
+			disable(1),
+			enable(2)
+                     }     
+     MAX-ACCESS      read-write
+     STATUS          deprecated
+     DESCRIPTION
+    	    "Setting this object to disable(1) disables query engine on 
+	     a given VLAN. Setting it to enable(2) enables it."       
+       ::= { wwpLeosMcastIgmpSnoopEntry 7 }
+
+ wwpLeosMcastIgmpProxyQuerySrcIp  OBJECT-TYPE
+     SYNTAX          IpAddress 
+     MAX-ACCESS      read-write
+     STATUS          deprecated
+     DESCRIPTION
+    	    "Setting this object sets the source IP address for the VLAN."       
+       ::= { wwpLeosMcastIgmpSnoopEntry 8 }
+
+ wwpLeosMcastIgmpRouterQueryInterval  OBJECT-TYPE
+     SYNTAX          Integer32 (10..999999)
+     MAX-ACCESS      read-write
+     STATUS          deprecated
+     DESCRIPTION
+    	    "Setting this object sets the router query interval for the given VLAN."       
+       ::= { wwpLeosMcastIgmpSnoopEntry 9 }
+
+ wwpLeosMcastIgmpMinResponseTime  OBJECT-TYPE
+     SYNTAX          Integer32 (50..600)
+     MAX-ACCESS      read-write
+     STATUS          deprecated
+     DESCRIPTION
+    	    "Setting this object sets the minimum response time for the given VLAN."       
+       ::= { wwpLeosMcastIgmpSnoopEntry 10 }
+
+ wwpLeosMcastIgmpDefaultRouterPort  OBJECT-TYPE
+     SYNTAX          Integer32 (0..65535)
+     MAX-ACCESS      read-write
+     STATUS          deprecated
+     DESCRIPTION
+    	    "Setting this object sets the default router port for the given VLAN."
+       ::= { wwpLeosMcastIgmpSnoopEntry 11 }
+
+ wwpLeosMcastIgmpInquisitiveLeaveState  OBJECT-TYPE
+     SYNTAX          INTEGER {
+			disable(1),
+			enable(2)
+		     }
+     MAX-ACCESS      read-write
+     STATUS          deprecated
+     DESCRIPTION
+    	    "Setting this object sets the IGMP inquisitive leave state for the given VLAN."       
+       ::= { wwpLeosMcastIgmpSnoopEntry 12 }
+  
+  wwpLeosMcastIgmpLastMemberQueryInterval  OBJECT-TYPE
+     SYNTAX          Integer32 (10..100)
+     MAX-ACCESS      read-write
+     STATUS          deprecated
+     DESCRIPTION
+    	    "Setting this object sets the last membership query interval for the given VLAN."       
+       ::= { wwpLeosMcastIgmpSnoopEntry 13 }
+
+   wwpLeosMcastIgmpPriority  OBJECT-TYPE
+     SYNTAX          Integer32 (0..7)
+     MAX-ACCESS      read-write
+     STATUS          deprecated
+     DESCRIPTION
+    	    "Setting this object sets the priority if IGMP packets  
+	     for this VLAN."                
+     ::= { wwpLeosMcastIgmpSnoopEntry 14 }
+
+   wwpLeosMcastIgmpSnoopRouterRangeStartIpAddr  OBJECT-TYPE
+     SYNTAX          IpAddress
+     MAX-ACCESS      read-write
+     STATUS          deprecated
+     DESCRIPTION
+    	    "The first IP Address of the router IP Address range."                
+     ::= { wwpLeosMcastIgmpSnoopEntry 15 }  
+     
+  wwpLeosMcastIgmpSnoopRouterRangeEndIpAddr  OBJECT-TYPE
+     SYNTAX          IpAddress
+     MAX-ACCESS      read-write
+     STATUS          deprecated
+     DESCRIPTION
+    	    "The last IP Address of the router IP Address range.
+	     When range is undefined, all leave/join 
+	     messages are forwarded to the router even when the 
+	     multicast stream does not originate from the router.  
+	     If the range is defined, leave/join messages are filtered.
+	     The default value for this object should be equal 
+	     to the value of wwpLeosMcastIgmpSnoopRouterRangeStartIpAddr."                
+     ::= { wwpLeosMcastIgmpSnoopEntry 16 }   
+  
+  wwpLeosMcastIgmpSnoopActiveLingerTimeout  OBJECT-TYPE     
+     SYNTAX          Integer32 (0..300)
+     UNITS           "seconds"
+     MAX-ACCESS      read-write
+     STATUS          deprecated
+     DESCRIPTION
+    	    "This object specifies the active linger timeout in seconds."                
+     ::= { wwpLeosMcastIgmpSnoopEntry 17 } 
+ 
+ wwpLeosMcastIgmpSnoopServerTopology  OBJECT-TYPE     
+     SYNTAX          INTEGER {
+			centralized(1),
+			distributed(2)
+			}
+     MAX-ACCESS      read-write
+     STATUS          deprecated
+     DESCRIPTION
+    	    "This object specifies the server topology."                
+     ::= { wwpLeosMcastIgmpSnoopEntry 18 }
+     
+  wwpLeosMcastIgmpSnoopRapidRecoveryMode	OBJECT-TYPE
+     SYNTAX          INTEGER {
+			on(1),
+			off(2)
+		     } 
+     MAX-ACCESS      read-write
+     STATUS          deprecated
+     DESCRIPTION
+             "Specifies whether the rapid recovery mode is set to on or off.
+             If this object is set to ON then the device generates and
+             accepts query packets with source IP = 0 else in the OFF state, it does not." 
+     DEFVAL { on }
+	 ::= { wwpLeosMcastIgmpSnoopEntry 19 }
+    
+  wwpLeosMcastIgmpSnoopCompatibilityMode	OBJECT-TYPE
+     SYNTAX          INTEGER {
+			v2(1),
+			v3(2)
+		     } 
+     MAX-ACCESS      read-write
+     STATUS          deprecated
+     DESCRIPTION
+             "For products that support IGMPv3, this object specifies the protocol
+              compatibility mode.  v2 will allow processing of v1 and v2 PDU's and
+              discard v3.  v3 will discard any non-v3 PDU.  Products that do not
+              support IGMPv3 will not return this object."
+     DEFVAL { v2 }
+	 ::= { wwpLeosMcastIgmpSnoopEntry 20 } 
+
+
+  wwpLeosMcastIgmpSnoopForkMode	OBJECT-TYPE
+     SYNTAX          INTEGER {
+			on(1),
+			off(2)
+		     } 
+     MAX-ACCESS      read-write
+     STATUS          deprecated
+     DESCRIPTION
+             "For products that support IGMPv3, this object specifies whether IGMP
+             Forking mode is set to on or off.  Products that do not support IGMPv3
+             will not return this object."
+     DEFVAL { off }
+	 ::= { wwpLeosMcastIgmpSnoopEntry 21 }
+	 
+  wwpLeosMcastIgmpSnoopEnableOperState  OBJECT-TYPE
+     SYNTAX          TruthValue
+     MAX-ACCESS      read-only
+     STATUS          deprecated
+     DESCRIPTION
+            "This object represents the operational state of IGMP snooping
+	         on the given VLAN"
+     DEFVAL { false }                
+     ::= { wwpLeosMcastIgmpSnoopEntry 22 }     
+
+ 
+     
+ --
+ --  The Mcast Channel Stream Config Table
+ --
+
+ wwpLeosMcastChannelStreamTable OBJECT-TYPE
+     SYNTAX     SEQUENCE OF WwpLeosMcastChannelStreamEntry
+     MAX-ACCESS not-accessible
+     STATUS     deprecated
+     DESCRIPTION
+            "The (conceptual) table listing the configuration parameters
+            for the multicast channel stream."
+    ::= { wwpLeosMcastFilterConfig 5 }
+
+ wwpLeosMcastChannelStreamEntry OBJECT-TYPE
+    SYNTAX     WwpLeosMcastChannelStreamEntry
+    MAX-ACCESS not-accessible
+    STATUS     deprecated
+    DESCRIPTION
+            "An entry (conceptual row) in the wwpLeosMcastChannelStreamTable."
+    INDEX      { wwpLeosMcastVlanId, wwpLeosMcastChanelStreamStartGroupAddr }
+    ::= { wwpLeosMcastChannelStreamTable 1 }
+
+ WwpLeosMcastChannelStreamEntry ::= SEQUENCE { 
+    wwpLeosMcastChanelStreamStartGroupAddr       IpAddress,
+    wwpLeosMcastChanelStreamEndGroupAddr         IpAddress,
+    wwpLeosMcastChannelStreamStatus              RowStatus
+ }
+ 
+ wwpLeosMcastChanelStreamStartGroupAddr  OBJECT-TYPE
+     SYNTAX          IpAddress
+     MAX-ACCESS      read-only
+     STATUS          deprecated
+     DESCRIPTION
+    	    "The first IP Address of the multicast IP Address range. "                
+     ::= { wwpLeosMcastChannelStreamEntry 1 }  
+     
+ wwpLeosMcastChanelStreamEndGroupAddr  OBJECT-TYPE
+     SYNTAX          IpAddress
+     MAX-ACCESS      read-write
+     STATUS          deprecated
+     DESCRIPTION
+    	    "The last IP Address of the multicast IP address range.
+	     If range does not need to be specified then do not set 
+	     this value." 
+     ::= { wwpLeosMcastChannelStreamEntry 2 }  
+       
+ wwpLeosMcastChannelStreamStatus OBJECT-TYPE
+     SYNTAX      RowStatus
+     MAX-ACCESS  read-create
+     STATUS      deprecated
+     DESCRIPTION
+	    "This object is used to add/delete multicast
+	     groups to the channel stream. To add a multicast group to 
+	     the channel stream, a user must set this object to 'createAndGo'.
+	    
+	    The device does not allow the user to create the entry unless 'wwpLeosMcastChanelStreamStartGroupAddr'
+	    is specified. If range needs to be specified then set 'wwpLeosMcastChanelStreamEndGroupAddr'
+	    to the desired group address. If the device cannot create the entry for any of the IP addresses
+	    within the range then no entry is created and an error is returned."  
+     ::= { wwpLeosMcastChannelStreamEntry 3 }   
+  
+ --
+ --  The Multicast Group Table
+ --
+
+ wwpLeosMcastGroupTable OBJECT-TYPE
+     SYNTAX     SEQUENCE OF WwpLeosMcastGroupEntry
+     MAX-ACCESS not-accessible
+     STATUS     deprecated
+     DESCRIPTION
+            "The (conceptual) table listing all the 
+	     multicast groups."
+     ::= { wwpLeosMcastFilterStatus 1 }
+
+ wwpLeosMcastGroupEntry OBJECT-TYPE
+     SYNTAX     WwpLeosMcastGroupEntry
+     MAX-ACCESS not-accessible
+     STATUS     deprecated
+     DESCRIPTION
+            "An entry (conceptual row) in the wwpLeosMcastGroupTable."
+     INDEX      { wwpLeosMcastVlanId, wwpLeosMcastGroupAddr }
+     ::= { wwpLeosMcastGroupTable 1 }
+
+ WwpLeosMcastGroupEntry ::= SEQUENCE {   
+     wwpLeosMcastGroupAddr            IpAddress,
+     wwpLeosMcastState                INTEGER,
+     wwpLeosMcastType                 INTEGER,
+     wwpLeosMcastSource               INTEGER,
+     wwpLeosMcastMemberCount          Counter32                              
+ }
+
+ wwpLeosMcastGroupAddr   OBJECT-TYPE
+     SYNTAX          IpAddress
+     MAX-ACCESS      read-only
+     STATUS          deprecated
+     DESCRIPTION
+    	    "The multicast group IP address."                
+     ::= { wwpLeosMcastGroupEntry 1 } 
+     
+ wwpLeosMcastState   OBJECT-TYPE
+     SYNTAX          INTEGER {                        
+			active(1),
+			query(2),
+			linger(3)
+		     } 
+     MAX-ACCESS      read-only
+     STATUS          deprecated
+     DESCRIPTION
+    	    "The deprecated state of the multicast stream."                
+     ::= { wwpLeosMcastGroupEntry 2 } 
+
+ wwpLeosMcastType   OBJECT-TYPE
+     SYNTAX          INTEGER {
+                        static(1),
+			dynamic(2)      
+		     } 
+     MAX-ACCESS      read-only
+     STATUS          deprecated
+     DESCRIPTION
+    	    "The type of the multicast stream."                
+     ::= { wwpLeosMcastGroupEntry 3 } 
+     
+ wwpLeosMcastSource   OBJECT-TYPE
+     SYNTAX          INTEGER {
+                        router(1),
+			server(2)      
+		     } 
+     MAX-ACCESS      read-only
+     STATUS          deprecated
+     DESCRIPTION
+    	    "The source for this multicast stream."                
+     ::= { wwpLeosMcastGroupEntry 4 }
+     
+ wwpLeosMcastMemberCount  OBJECT-TYPE
+     SYNTAX          Counter32
+     MAX-ACCESS      read-only
+     STATUS          deprecated
+     DESCRIPTION
+    	    "The number of ports that joined the group." 
+     ::= { wwpLeosMcastGroupEntry 5 } 
+ 
+ --
+ --  The Multicast Group Port Membership Table
+ --
+
+ wwpLeosMcastGroupMemberTable OBJECT-TYPE
+     SYNTAX     SEQUENCE OF WwpLeosMcastGroupMemberEntry
+     MAX-ACCESS not-accessible
+     STATUS     deprecated
+     DESCRIPTION
+            "The (conceptual) table listing all the 
+	     port members of the multicast groups."
+     ::= { wwpLeosMcastFilterStatus 2 }
+
+ wwpLeosMcastGroupMemberEntry OBJECT-TYPE
+     SYNTAX     WwpLeosMcastGroupMemberEntry
+     MAX-ACCESS not-accessible
+     STATUS     deprecated
+     DESCRIPTION
+            "An entry (conceptual row) in the wwpLeosMcastGroupMemberTable."
+     INDEX      { wwpLeosMcastVlanId, wwpLeosMcastGroupAddr, wwpLeosMcastPortId }
+     ::= { wwpLeosMcastGroupMemberTable 1 }
+ 
+ WwpLeosMcastGroupMemberEntry ::= SEQUENCE {
+     wwpLeosMcastPortId               Integer32,
+     wwpLeosMcastPortTagId            Integer32
+ }
+     
+ wwpLeosMcastPortId OBJECT-TYPE
+     SYNTAX      Integer32 (1..65535)
+     MAX-ACCESS  read-only
+     STATUS      deprecated
+     DESCRIPTION
+	    "The router port from which the IGMP 
+	     query messages are received, and joins/leaves 
+	     messages are sent."  
+     ::= { wwpLeosMcastGroupMemberEntry 1 }
+ 
+ wwpLeosMcastPortTagId   OBJECT-TYPE
+     SYNTAX      Integer32(1..4094)
+     MAX-ACCESS  read-only
+     STATUS      deprecated
+     DESCRIPTION
+	    "The Virtual Lan Tag Id used by the port on this
+             Virtual Lan. If the switch is being used as a traditional 
+	     Layer 2 device, then the value of this object
+	     should be same as wwpLeosMcastVlanId."
+     ::= { wwpLeosMcastGroupMemberEntry 2 }
+     
+     
+ --
+ --  statistics group 
+ --
+ 
+ --
+ --  The Multicast filter Stats Table
+ --
+
+ wwpLeosMcastFilterStatsTable OBJECT-TYPE
+     SYNTAX     SEQUENCE OF WwpLeosMcastFilterStatsEntry
+     MAX-ACCESS not-accessible
+     STATUS     deprecated
+     DESCRIPTION
+            "The (conceptual) table listing the multicast statistics."
+     ::= { wwpLeosMcastFilterStats 1 }
+
+ wwpLeosMcastFilterStatsEntry OBJECT-TYPE
+     SYNTAX     WwpLeosMcastFilterStatsEntry
+     MAX-ACCESS not-accessible
+     STATUS     deprecated
+     DESCRIPTION
+            "An entry (conceptual row) in the wwpLeosMcastFilterServerTable."
+     INDEX      { wwpLeosMcastVlanId }
+     ::= { wwpLeosMcastFilterStatsTable 1 }
+
+ WwpLeosMcastFilterStatsEntry ::= SEQUENCE {   
+    wwpLeosMcastStaticGrpCount        Integer32,
+    wwpLeosMcastDynamicGrpCount       Integer32,
+    wwpLeosMcastJoinMessages          Counter32,
+    wwpLeosMcastLeaveMessages         Counter32,
+    wwpLeosMcastQueryMessages         Counter32,
+    wwpLeosMcastQueryDiscards         Counter32,
+    wwpLeosMcastQueryTimeouts         Counter32,
+    wwpLeosMcastUnknownPktType        Counter32,
+    wwpLeosMcastRouterDiscards        Counter32,
+    wwpLeosMcastHostDiscards          Counter32,
+    wwpLeosMcastBadChecksum           Counter32,
+    wwpLeosMcastL2L3Mismatch          Counter32,
+    wwpLeosMcastTotalMembers          Counter32,
+    wwpLeosMcastLingerCount           Counter32,
+    wwpLeosMcastRouterSrcMacAddr      MacAddress,
+    wwpLeosMcastRouterSrcIpAddr       IpAddress,
+    wwpLeosMcastRouterPortId          Integer32,
+    wwpLeosMcastReportSendPortId      Integer32,
+    wwpLeosMcastStatsClear            INTEGER,
+    wwpLeosMcastStatsQuerySrcIpZeroDiscard    Counter32,
+    wwpLeosMcastCompatibilityModeDiscards     Counter32,
+    wwpLeosMcastReplyTimeouts          Counter32,
+    wwpLeosMcastResourceExceed         Counter32
+ }
+
+ wwpLeosMcastStaticGrpCount  OBJECT-TYPE
+     SYNTAX          Integer32 (0..65535)
+     MAX-ACCESS      read-only
+     STATUS          deprecated
+     DESCRIPTION
+    	     "The total number of static multicast groups."                              
+       ::= { wwpLeosMcastFilterStatsEntry 1 } 
+
+ wwpLeosMcastDynamicGrpCount  OBJECT-TYPE
+     SYNTAX          Integer32 (0..65535)
+     MAX-ACCESS      read-only
+     STATUS          deprecated
+     DESCRIPTION
+    	     "The total number of dynamic mcast groups."                              
+       ::= { wwpLeosMcastFilterStatsEntry 2 } 
+
+ wwpLeosMcastJoinMessages  OBJECT-TYPE
+     SYNTAX          Counter32
+     MAX-ACCESS      read-only
+     STATUS          deprecated
+     DESCRIPTION
+    	     "The total number of join messages received."                              
+       ::= { wwpLeosMcastFilterStatsEntry 3 }
+       
+ wwpLeosMcastLeaveMessages  OBJECT-TYPE
+     SYNTAX          Counter32
+     MAX-ACCESS      read-only
+     STATUS          deprecated
+     DESCRIPTION
+    	     "The total number of leave messages received."                              
+       ::= { wwpLeosMcastFilterStatsEntry 4 }
+       
+ wwpLeosMcastQueryMessages  OBJECT-TYPE
+     SYNTAX          Counter32
+     MAX-ACCESS      read-only
+     STATUS          deprecated
+     DESCRIPTION
+    	     "The total number of queries received."                              
+       ::= { wwpLeosMcastFilterStatsEntry 5 }
+       
+ wwpLeosMcastQueryDiscards  OBJECT-TYPE
+     SYNTAX          Counter32
+     MAX-ACCESS      read-only
+     STATUS          deprecated
+     DESCRIPTION
+    	     "The total number of queries discarded."                              
+       ::= { wwpLeosMcastFilterStatsEntry 6 }
+       
+ wwpLeosMcastQueryTimeouts  OBJECT-TYPE
+     SYNTAX          Counter32
+     MAX-ACCESS      read-only
+     STATUS          deprecated
+     DESCRIPTION
+    	     "The total number of timeouts waiting for the
+	      router to send query."                              
+       ::= { wwpLeosMcastFilterStatsEntry 7 }
+       
+ wwpLeosMcastUnknownPktType  OBJECT-TYPE
+     SYNTAX          Counter32
+     MAX-ACCESS      read-only
+     STATUS          deprecated
+     DESCRIPTION
+    	     "The total number of unknown (unknown type ) IGMP 
+	      packets received."                              
+       ::= { wwpLeosMcastFilterStatsEntry 8 }
+       
+ wwpLeosMcastRouterDiscards  OBJECT-TYPE
+     SYNTAX          Counter32
+     MAX-ACCESS      read-only
+     STATUS          deprecated
+     DESCRIPTION
+    	     "The total number of messages discarded by the
+	      router. This happens when join comes in from
+	      a router port."                              
+       ::= { wwpLeosMcastFilterStatsEntry 9 }
+       
+ wwpLeosMcastHostDiscards  OBJECT-TYPE
+     SYNTAX          Counter32
+     MAX-ACCESS      read-only
+     STATUS          deprecated
+     DESCRIPTION
+    	     "The total number of messages discarded by the
+	      host. This happens when a join/leave comes
+	      in from a port, but no router port is established."                              
+       ::= { wwpLeosMcastFilterStatsEntry 10 }
+       
+ wwpLeosMcastBadChecksum  OBJECT-TYPE
+     SYNTAX          Counter32
+     MAX-ACCESS      read-only
+     STATUS          deprecated
+     DESCRIPTION
+    	     "The total number of packets received with bad
+	      IP checksum."                              
+       ::= { wwpLeosMcastFilterStatsEntry 11 }  
+       
+ wwpLeosMcastL2L3Mismatch  OBJECT-TYPE
+     SYNTAX          Counter32
+     MAX-ACCESS      read-only
+     STATUS          deprecated
+     DESCRIPTION
+    	     "The total number of IGMP Layer2 / Layer 3 mismatch packets
+	      received."                              
+       ::= { wwpLeosMcastFilterStatsEntry 12 }
+
+ wwpLeosMcastTotalMembers OBJECT-TYPE
+     SYNTAX          Counter32
+     MAX-ACCESS      read-only
+     STATUS          deprecated
+     DESCRIPTION
+    	     "The total number of group members for all groups in the given VLAN."                              
+       ::= { wwpLeosMcastFilterStatsEntry 13 }
+
+ wwpLeosMcastLingerCount OBJECT-TYPE
+     SYNTAX          Counter32
+     MAX-ACCESS      read-only
+     STATUS          deprecated
+     DESCRIPTION
+    	     "The total number of groups in linger state."                              
+       ::= { wwpLeosMcastFilterStatsEntry 14 }
+
+ wwpLeosMcastRouterSrcMacAddr  OBJECT-TYPE
+     SYNTAX          MacAddress
+     MAX-ACCESS      read-only
+     STATUS          deprecated
+     DESCRIPTION
+    	     "Specifies the router's MAC address."                              
+       ::= { wwpLeosMcastFilterStatsEntry 15 }
+
+ wwpLeosMcastRouterSrcIpAddr  OBJECT-TYPE
+     SYNTAX          IpAddress
+     MAX-ACCESS      read-only
+     STATUS          deprecated
+     DESCRIPTION
+    	     "Specifies the router's IP address."                              
+       ::= { wwpLeosMcastFilterStatsEntry 16 }
+
+ wwpLeosMcastRouterPortId  OBJECT-TYPE
+     SYNTAX          Integer32 (0..65535)
+     MAX-ACCESS      read-only
+     STATUS          deprecated
+     DESCRIPTION
+    	     "Specifies the port from where router queries are coming."
+       ::= { wwpLeosMcastFilterStatsEntry 17 }
+       
+ wwpLeosMcastReportSendPortId  OBJECT-TYPE
+     SYNTAX          Integer32 (0..65535)
+     MAX-ACCESS      read-only
+     STATUS          deprecated
+     DESCRIPTION
+    	     "The obejct specifies the port number of the port where IGMP 
+	      reports are sent.  Not always the same as the router port."
+       ::= { wwpLeosMcastFilterStatsEntry 18 } 
+       
+  wwpLeosMcastStatsClear OBJECT-TYPE
+     SYNTAX          INTEGER {
+                        clear(1),
+                        none(2)
+		     }
+     MAX-ACCESS      read-write
+     STATUS          deprecated
+     DESCRIPTION
+            "Setting this object to clear(1) clears the statistics for only the associated
+             VLAN ID. This object cannot be set to none, it is for display purposes only."
+       ::= { wwpLeosMcastFilterStatsEntry 19 }
+
+  wwpLeosMcastStatsQuerySrcIpZeroDiscard	OBJECT-TYPE
+     SYNTAX          Counter32
+     MAX-ACCESS      read-only
+     STATUS          deprecated
+     DESCRIPTION
+            "Specifies the number of queries discarded with a zero source IP."
+       ::= { wwpLeosMcastFilterStatsEntry 20 }
+
+ wwpLeosMcastCompatibilityModeDiscards OBJECT-TYPE
+     SYNTAX          Counter32
+     MAX-ACCESS      read-only
+     STATUS          deprecated
+     DESCRIPTION
+    	     "For products that support IGMPv3, this object specifies the total number
+            of frames discarded because of compatibility mode mismatches.  Products
+            that do not support IGMPv3 will not return this object."                              
+       ::= { wwpLeosMcastFilterStatsEntry 21 }
+
+  wwpLeosMcastReplyTimeouts OBJECT-TYPE
+     SYNTAX          Counter32
+     MAX-ACCESS      read-only
+     STATUS          deprecated
+     DESCRIPTION
+            "Specifies the number of query reply timeouts."
+       ::= { wwpLeosMcastFilterStatsEntry 22 }
+
+  wwpLeosMcastResourceExceed OBJECT-TYPE
+     SYNTAX          Counter32
+     MAX-ACCESS      read-only
+     STATUS          deprecated
+     DESCRIPTION
+            "Specifies the number of resource exceeded errors."
+       ::= { wwpLeosMcastFilterStatsEntry 23 }
+
+ --
+ --  The Multicast UPF filter Activation Table
+ --
+
+ wwpLeosMcastFilterConfigTable OBJECT-TYPE
+     SYNTAX     SEQUENCE OF WwpLeosMcastFilterConfigEntry
+     MAX-ACCESS not-accessible
+     STATUS     deprecated
+     DESCRIPTION
+            "The (conceptual) table listing the VLANs on which the
+             UPF can be applied."
+    ::= { wwpLeosMcastFilterConfig 6 }
+
+ wwpLeosMcastFilterConfigEntry OBJECT-TYPE
+     SYNTAX     WwpLeosMcastFilterConfigEntry
+     MAX-ACCESS not-accessible
+     STATUS     deprecated
+     DESCRIPTION
+            "An entry (conceptual row) in the wwpLeosMcastFilterConfigTable."
+     INDEX      { wwpLeosMcastVlanId }
+     ::= { wwpLeosMcastFilterConfigTable 1 }
+
+ WwpLeosMcastFilterConfigEntry ::= SEQUENCE {     
+     wwpLeosMcastFilterUPFActivate       TruthValue,     
+     wwpLeosMcastUnresolvedAction        INTEGER,
+     wwpLeosMcastFilterWKMFLocalActivate INTEGER,
+     wwpLeosMcastFilterWKMFInternetActivate INTEGER,
+     wwpLeosMcastFilterWKMFAdhocActivate INTEGER,
+     wwpLeosMcastFilterWKMFStMulticastActivate INTEGER,
+     wwpLeosMcastFilterWKMFSdpSapActivate INTEGER
+ }
+      
+ wwpLeosMcastFilterUPFActivate  OBJECT-TYPE
+     SYNTAX          TruthValue
+     MAX-ACCESS      read-write
+     STATUS          deprecated
+     DESCRIPTION
+    	    "UPF can be enabled on this VLAN
+	     by setting this object to 'true'."
+     DEFVAL { false }      
+     ::= { wwpLeosMcastFilterConfigEntry 1 } 
+
+ wwpLeosMcastUnresolvedAction  OBJECT-TYPE
+     SYNTAX          INTEGER {
+                        flood(1),
+			drop(2)
+		     }
+     MAX-ACCESS      read-write
+     STATUS          deprecated
+     DESCRIPTION
+    	    "Setting this object to 'flood' causes the 
+	     device to flood all the unresolved messages to 
+	     all the ports in the VLAN.
+	     
+	     Setting this object to 'drop' causes the 
+	     device to drop all the unresolved messages. 
+	     If an IGMP join is received with a matching multicast 
+	     group address, the multicast stream forwards to the 
+	     corresponding port."                
+     ::= { wwpLeosMcastFilterConfigEntry 2 }  
+
+ wwpLeosMcastFilterWKMFLocalActivate  OBJECT-TYPE
+     SYNTAX          INTEGER {
+                        flood(1),
+			drop(2)
+		     }
+     MAX-ACCESS      read-write
+     STATUS          deprecated
+     DESCRIPTION
+    	    "Setting the object to 'flood' enables flooding of local WKMF 
+	     on a VLAN. 
+	     Setting the object to 'drop' enables dropping of local WKMF 
+	     on a VLAN.
+	     Multicast address belonging to this object is 224.0.0.x."     
+     ::= { wwpLeosMcastFilterConfigEntry 3 }
+
+ wwpLeosMcastFilterWKMFInternetActivate  OBJECT-TYPE
+     SYNTAX          INTEGER {
+                        flood(1),
+			drop(2)
+		     }
+     MAX-ACCESS      read-write
+     STATUS          deprecated
+     DESCRIPTION
+    	    "Setting the object to 'flood' enables flooding of internet WKMF 
+	     on a VLAN. 
+	     Setting the object to 'drop' enables dropping of internet WKMF 
+	     on a VLAN.
+	     Multicast address belonging to this object is 224.0.1.x."     
+     ::= { wwpLeosMcastFilterConfigEntry 4 }
+ 
+ wwpLeosMcastFilterWKMFAdhocActivate  OBJECT-TYPE
+     SYNTAX          INTEGER {
+                        flood(1),
+			drop(2)
+		     }
+     MAX-ACCESS      read-write
+     STATUS          deprecated
+     DESCRIPTION
+    	    "Setting the object to 'flood' enables flooding of adhoc WKMF 
+	     on a VLAN.
+	     Setting the object to 'drop' enables dropping of adhoc WKMF 
+	     on a VLAN.
+	     Multicast address belonging to this object is 
+	     224.0.2.x to 224.0.255.x."     
+     ::= { wwpLeosMcastFilterConfigEntry 5 }
+ 
+ wwpLeosMcastFilterWKMFStMulticastActivate  OBJECT-TYPE
+     SYNTAX          INTEGER {
+                        flood(1),
+			drop(2)
+		     }
+     MAX-ACCESS      read-write
+     STATUS          deprecated
+     DESCRIPTION
+    	    "Setting the object to 'flood' enables flooding of st-multicast
+	     WKMF on a VLAN. 
+	     Setting the object to 'drop' enables dropping of st-multicast WKMF 
+	     on a VLAN.
+	     Multicast address belonging to this object is 224.1.x.x."     
+     ::= { wwpLeosMcastFilterConfigEntry 6 }
+
+ wwpLeosMcastFilterWKMFSdpSapActivate  OBJECT-TYPE
+     SYNTAX          INTEGER {
+                        flood(1),
+			drop(2)
+		     }
+     MAX-ACCESS      read-write
+     STATUS          deprecated
+     DESCRIPTION
+    	    "Setting the object to 'flood' enables flooding of sdp-sap WKMF 
+	     on a VLAN. 
+	     Setting the object to 'drop' enables dropping of sdp-sap WKMF 
+	     on a VLAN.
+	     Multicast address belonging to this object is 224.2.x.x."     
+     ::= { wwpLeosMcastFilterConfigEntry 7 }
+
+ --
+ --  The Multicast Channel Stream Exclude Port List
+ --
+
+ wwpLeosMcastChannelStreamExPortMemTable OBJECT-TYPE
+     SYNTAX     SEQUENCE OF WwpLeosMcastChannelStreamExPortMemEntry
+     MAX-ACCESS not-accessible
+     STATUS     deprecated
+     DESCRIPTION
+            "The (conceptual) table listing the excluded port list
+             per VLAN for channel stream."
+    ::= { wwpLeosMcastFilterConfig 7 }
+
+ wwpLeosMcastChannelStreamExPortMemEntry OBJECT-TYPE
+     SYNTAX     WwpLeosMcastChannelStreamExPortMemEntry
+     MAX-ACCESS not-accessible
+     STATUS     deprecated
+     DESCRIPTION
+            "An entry (conceptual row) in the wwpLeosMcastChannelStreamExPortMemTable."
+     INDEX      { wwpLeosMcastVlanId, wwpLeosMcastChannelStreamExPortId}
+     ::= { wwpLeosMcastChannelStreamExPortMemTable 1 }
+
+ WwpLeosMcastChannelStreamExPortMemEntry ::= SEQUENCE {     
+     wwpLeosMcastChannelStreamExPortId		Integer32,
+     wwpLeosMcastChannelStreamExPortMemStatus	RowStatus
+ }
+ 
+ wwpLeosMcastChannelStreamExPortId  OBJECT-TYPE
+     SYNTAX          Integer32 (1..65535)
+     MAX-ACCESS      read-only
+     STATUS          deprecated
+     DESCRIPTION
+    	    "The port num to be excluded from channel stream."     
+     ::= { wwpLeosMcastChannelStreamExPortMemEntry 1 }
+
+ wwpLeosMcastChannelStreamExPortMemStatus  OBJECT-TYPE
+     SYNTAX          RowStatus
+     MAX-ACCESS      read-create
+     STATUS          deprecated
+     DESCRIPTION
+    	    "Setting this object to createAndGo adds wwpLeosMcastVlanId and 
+	     wwpLeosMcastChannelStreamExPortId to the excluded port list of 
+	     channel stream. Setting this to destroy removes the 
+	     wwpLeosMcastVlanId, wwpLeosMcastChannelStreamExPortId membership
+	     from excluded port list."
+     ::= { wwpLeosMcastChannelStreamExPortMemEntry 2 }  
+
+ -- 
+ -- Notifications
+ --
+ wwpLeosMcastAddrOverlapNotification NOTIFICATION-TYPE	
+	STATUS	deprecated
+	DESCRIPTION
+		"A wwpLeosMcastAddrOverlapNotification is sent whenever 
+		 several multicast IP addresses overlap (matches the 
+		 same L2 address)."
+	::= { wwpLeosMcastFilterMIBNotifications 1 }
+ END
+ 
+ -- 
+ -- WWP-MULTICAST-FILTER-MIB
+ -- 
+
+ 

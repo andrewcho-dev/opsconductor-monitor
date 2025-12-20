@@ -1,0 +1,165 @@
+-- This file was included in WWP MIB release 04-21-05-0007
+--
+-- CIENA-CES-FILE-EXPORT-MIB.my
+--
+--
+
+CIENA-CES-FILE-EXPORT-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS        
+    Unsigned32, OBJECT-TYPE, MODULE-IDENTITY
+        FROM SNMPv2-SMI         
+    DisplayString
+        FROM SNMPv2-TC
+    CienaGlobalState
+        FROM CIENA-TC
+    cienaCesConfig
+        FROM CIENA-SMI;                      
+
+cienaCesFileExportMIB MODULE-IDENTITY
+    LAST-UPDATED "201912240000Z"
+    ORGANIZATION "Ciena Corp"
+    CONTACT-INFO
+        "   Mib Meister
+            7035 Ridge Road
+            Hanover, Maryland 21076
+            USA             
+            Phone:  +1 800 921 1144
+            Email:  support@ciena.com"                              
+    DESCRIPTION
+        "This MIB module defines the FileExport configuration details."
+
+    REVISION  "201912240000Z"
+    DESCRIPTION
+        "Initial Creation."
+    
+    ::= { cienaCesConfig 53 }
+
+--
+-- Node definitions
+--
+
+cienaCesFileExportMIBObjects     OBJECT IDENTIFIER ::= { cienaCesFileExportMIB 1 }
+
+--
+-- File Export Node
+--
+cienaCesFileExportGlobal         OBJECT IDENTIFIER ::= { cienaCesFileExportMIBObjects 1 }
+cienaCesFileExportCollector      OBJECT IDENTIFIER ::= { cienaCesFileExportMIBObjects 2 }
+
+-- Conformance information 
+
+cienaCesFileExportMIBConformance OBJECT IDENTIFIER ::= { cienaCesFileExportMIB 3 } 
+cienaCesFileExportMIBCompliances OBJECT IDENTIFIER ::= { cienaCesFileExportMIBConformance 1 }     
+cienaCesFileExportMIBGroups      OBJECT IDENTIFIER ::= { cienaCesFileExportMIBConformance 2 }
+
+-- File Export Global Table
+cienaCesFileExportDeviceCertName   OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object specifies configured Node Certificate Name."
+    ::= { cienaCesFileExportGlobal 1 }
+
+cienaCesFileExportOcspState   OBJECT-TYPE
+    SYNTAX      CienaGlobalState
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object specifies OCSP Admin State."
+    ::= { cienaCesFileExportGlobal 2 }
+
+-- File Export Collector Table
+
+cienaCesFileExportCollectorInstanceTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF CienaCesFileExportCollectorInstanceEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "List of File Export Collector details."  
+    ::= { cienaCesFileExportCollector 1 }
+
+cienaCesFileExportCollectorInstanceEntry OBJECT-TYPE
+    SYNTAX      CienaCesFileExportCollectorInstanceEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the File export table which provides objects to confiure File export table."
+    INDEX {cienaCesFileExportCollectorInstanceIndex}
+    ::= { cienaCesFileExportCollectorInstanceTable 1 }
+
+CienaCesFileExportCollectorInstanceEntry ::=  
+    SEQUENCE {
+        cienaCesFileExportCollectorInstanceIndex                 Unsigned32,
+        cienaCesFileExportCollectorIP                            DisplayString,
+        cienaCesFileExportCollectorTransferMode                  INTEGER,
+        cienaCesFileExportCollectorFileType                      INTEGER,
+        cienaCesFileExportCollectorAdminState                    CienaGlobalState,
+        cienaCesFileExportCollectorUrl                           DisplayString,
+        cienaCesFileExportCollectorLoginId                       DisplayString
+        }
+
+cienaCesFileExportCollectorInstanceIndex  OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..4)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "An Index to File export collector table which represents a collector instance.Currently maxium 4 collector instances can be created."
+    ::= { cienaCesFileExportCollectorInstanceEntry 1 }
+
+cienaCesFileExportCollectorIP OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "File export collector IP or HostName.Collector IP would be either Ipv4 or Ipv6"
+    ::= { cienaCesFileExportCollectorInstanceEntry 2 }
+
+cienaCesFileExportCollectorTransferMode OBJECT-TYPE
+    SYNTAX      INTEGER {
+                sftp(1),
+                https(2)
+                } 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Curreltly supported File Transfer Modes are SFTP and HTTPS."
+    ::= { cienaCesFileExportCollectorInstanceEntry 3 }
+
+cienaCesFileExportCollectorFileType OBJECT-TYPE
+    SYNTAX      INTEGER {
+                mac(1),
+                pcap(2),
+                all(3) 
+                } 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Supported File type.It could be MAC, PCAP or both."
+    ::= { cienaCesFileExportCollectorInstanceEntry 4 }
+
+cienaCesFileExportCollectorAdminState OBJECT-TYPE
+    SYNTAX      CienaGlobalState
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "File Export Collector Admin State."
+    ::= { cienaCesFileExportCollectorInstanceEntry 5 }
+
+cienaCesFileExportCollectorUrl OBJECT-TYPE
+    SYNTAX      DisplayString 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "URL for Https file transfer. This Object would not set in case of SFTP Transfer Mode."
+    ::= { cienaCesFileExportCollectorInstanceEntry 6 }
+
+cienaCesFileExportCollectorLoginId OBJECT-TYPE
+    SYNTAX      DisplayString 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Login-Id for SFTP file transfer.This Onject would not set in case of Https Transfer Mode"
+    ::= { cienaCesFileExportCollectorInstanceEntry 7 }
+
+
+END
+
+--
+-- CIENA_CES_FILE_EXPORT-MIB.my
+--
+

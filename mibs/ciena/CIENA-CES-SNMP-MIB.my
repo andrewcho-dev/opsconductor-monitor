@@ -1,0 +1,104 @@
+-- This file was included in WWP MIB release 04-21-05-0007
+--
+ -- CIENA-CES-SNMP-MIB.my
+ --
+
+ CIENA-CES-SNMP-MIB DEFINITIONS ::= BEGIN
+
+ IMPORTS                
+   OBJECT-TYPE, MODULE-IDENTITY                  
+    FROM SNMPv2-SMI
+   TruthValue
+    FROM SNMPv2-TC                                                     
+   cienaCommon, cienaCesConfig
+    FROM CIENA-SMI
+   CienaGlobalState
+    FROM CIENA-TC
+   PreferredSourceAddress
+    FROM CIENA-CES-MGMT-INTERFACE-MIB;
+
+ cienaCesSnmpMIB MODULE-IDENTITY
+            LAST-UPDATED "201701250000Z"
+            ORGANIZATION "Ciena, Inc"
+            CONTACT-INFO
+                    "   Mib Meister
+                        12730 East Mirabeau Parkway
+                        Suite 100
+                        Spokane Valley, WA 99216
+                        USA                             
+                        Phone:  +1 509 242 9000
+                        Email:  support@ciena.com"
+	    DESCRIPTION
+	            "The MIB module for proprietary Ciena SNMP configuration."
+            
+            REVISION    "201701250000Z"        
+            DESCRIPTION
+                    "Initial creation."
+            
+            ::= { cienaCesConfig 43 }
+                                                
+ --
+ -- Node definitions
+ --
+        
+ cienaCesSnmpMIBObjects OBJECT IDENTIFIER ::= { cienaCesSnmpMIB 1 }
+ 
+
+ -- Ciena Snmp Config
+ --
+ cienaCesSnmp OBJECT IDENTIFIER ::= { cienaCesSnmpMIBObjects 1 }
+
+ -- Notifications 
+  
+ cienaCesSnmpMIBNotificationPrefix OBJECT IDENTIFIER ::= { cienaCesSnmpMIB 2 }
+ cienaCesSnmpMIBNotifications       OBJECT IDENTIFIER ::=  
+                       { cienaCesSnmpMIBNotificationPrefix 0 }
+ -- Conformance information 
+ 
+ -- -------------------------------------------------------------
+ -- Textual Conventions
+ -- -------------------------------------------------------------
+
+--
+-- Ciena SNMP configuration
+--
+
+ cienaCesSnmpAdminState OBJECT-TYPE
+     SYNTAX      CienaGlobalState
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+             "Specify whether SNMP is enabled or disabled."
+     ::= { cienaCesSnmp 1 }  
+
+ cienaCesSnmpPreferredSourceAddress OBJECT-TYPE
+     SYNTAX      PreferredSourceAddress
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+             "Changes the source of snmp traps to be from the default
+             address or the loopback address."
+     ::= { cienaCesSnmp 2 }
+
+cienaCesSnmpPDUSize OBJECT-TYPE
+     SYNTAX      INTEGER (0..9216)
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+             "Changes the max PDU (payload) size allowed on bulk get
+              responses."
+     ::= { cienaCesSnmp 3 }
+
+cienaCesSnmpBulkRepetitions OBJECT-TYPE
+     SYNTAX      INTEGER (0..1024)
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+             "Changes the max repetitions allowed on bulk get
+              responses."
+     ::= { cienaCesSnmp 4 }
+
+END     
+
+ 
+

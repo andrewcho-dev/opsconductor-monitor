@@ -1,0 +1,645 @@
+-- This file was included in WWP MIB release 04-21-05-0007
+
+ --
+ -- CIENA-CES-BGP-LSP.my
+ --
+ --
+
+ CIENA-CES-BGP-LSP-MIB DEFINITIONS ::= BEGIN
+
+--
+-- Below is variable used according to need 
+--
+
+ IMPORTS       
+   Integer32, IpAddress, Unsigned32, OBJECT-TYPE, MODULE-IDENTITY        
+       FROM SNMPv2-SMI        
+   MacAddress, DisplayString
+       FROM SNMPv2-TC
+    CienaGlobalState
+        FROM CIENA-TC
+   cienaCesConfig, cienaCesNotifications
+       FROM CIENA-SMI
+   cienaGlobalSeverity, cienaGlobalMacAddress
+       FROM CIENA-GLOBAL-MIB
+   bgpPeerLastError, bgpPeerState, bgpPeerRemoteAddr
+       FROM BGP4-MIB;
+    
+ cienaCesBgpLspMIB MODULE-IDENTITY
+             LAST-UPDATED "201904290000Z"
+             ORGANIZATION "Ciena Corp."
+             CONTACT-INFO
+                 "   Mib Meister
+                     7035 Ridge Road
+                     Hanover, Maryland 21076
+                     USA
+                     Phone:  +1 800 921 1144
+                     Email:  support@ciena.com" 
+             DESCRIPTION
+                 "This module defines the BGP LSP related Information."
+             
+             REVISION
+             "201904290000Z"
+             DESCRIPTION
+             "Added cienaCesBgpLspIngressTunnelNHLFEInterfaceName under cienaCesBgpLspIngressTunnelTable 
+              and cienaCesBgpLspTransitTunnelPriNHLFEInterfaceName,cienaCesBgpLspTransitTunnelBkpNHLFEInterfaceName
+              under cienaCesBgpLspTransitTunnelTable."
+
+             REVISION
+             "201901140000Z"
+             DESCRIPTION
+             "Added two new traps cienaCesBgpPeerInEstState,cienaCesBgpPeerOutEstState 
+              in cienaCesBgpLspMIBNotifications."
+
+             REVISION
+             "201809190000Z"
+             DESCRIPTION
+             "Initial version."
+                    ::= { cienaCesConfig 51 }
+--
+ -- Textual convention
+ --
+ NHLFEType ::= TEXTUAL-CONVENTION
+     STATUS       current
+     DESCRIPTION  "NHLFE Type"
+     SYNTAX       INTEGER {
+                    ipv4AdjType(1),
+                    rsvpTunlType(2),
+                    none(3),
+                    ipv6Adj(4),
+                    unnumbered(5)
+                   }
+
+ TunnelType ::= TEXTUAL-CONVENTION
+     STATUS       current
+     DESCRIPTION  "Tunnel Type"
+     SYNTAX       INTEGER {
+                    ingress(1),
+                    egress(2),
+                    transit(3)
+                   }
+
+            
+ --
+ -- Node definitions
+ --
+   
+ cienaCesBgpLspMIBObjects OBJECT IDENTIFIER ::= { cienaCesBgpLspMIB 1 }
+ 
+ -- Notifications   
+ cienaCesBgpLspMIBNotificationPrefix  OBJECT IDENTIFIER ::=  { cienaCesNotifications 103 } 
+ cienaCesBgpLspMIBNotifications       OBJECT IDENTIFIER ::=  { cienaCesBgpLspMIBNotificationPrefix 0 } 
+ --
+ -- BGP LSP Node
+ --
+ cienaCesBgpLsp OBJECT IDENTIFIER ::= { cienaCesBgpLspMIBObjects 1 }
+      
+
+ --
+ -- BGP LSP Information Base MIB definitions 
+ --      
+ cienaCesBgpLspIngressTunnelTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF CienaCesBgpLspIngressTunnelEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "Table of Bgp Lsp and their associated attributes."
+    ::= { cienaCesBgpLsp 1 }
+      
+ cienaCesBgpLspIngressTunnelEntry OBJECT-TYPE
+    SYNTAX     CienaCesBgpLspIngressTunnelEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "Each entry represents a Bgp Tunnel."
+    INDEX { cienaCesBgpLspIngressTunnelIndex}
+    ::= { cienaCesBgpLspIngressTunnelTable 1 }
+      
+ CienaCesBgpLspIngressTunnelEntry ::=  SEQUENCE { 
+    cienaCesBgpLspIngressTunnelIndex               Unsigned32,
+    cienaCesBgpLspIngressTunnelType                TunnelType,
+    cienaCesBgpLspIngressTunnelName                DisplayString,
+    cienaCesBgpLspIngressTunnelRole                INTEGER,
+    cienaCesBgpLspIngressTunnelOutLabel            Unsigned32,
+    cienaCesBgpLspIngressTunnelNHLFEType           NHLFEType,
+    cienaCesBgpLspIngressTunnelNHLFEIp             IpAddress,
+    cienaCesBgpLspIngressTunnelNHLFEIndex          Unsigned32,
+    cienaCesBgpLspIngressTunnelNHLFEDmac           MacAddress,
+    cienaCesBgpLspIngressTunnelNHLFERsvpTunlGrp    Unsigned32,
+    cienaCesBgpLspIngressTunnelOperState           CienaGlobalState,
+    cienaCesBgpLspIngressTunnelBgpTunlGrp          Unsigned32,
+    cienaCesBgpLspIngressTunnelBgpPeer             IpAddress,
+    cienaCesBgpLspIngressTunnelBgpNextHop          IpAddress,
+    cienaCesBgpLspIngressTunnelBgpFEC              DisplayString,
+    cienaCesBgpLspIngressTunnelNHLFEInterfaceName  DisplayString
+ }
+
+ cienaCesBgpLspIngressTunnelIndex OBJECT-TYPE
+     SYNTAX      Unsigned32   (1..65535)
+     MAX-ACCESS  not-accessible
+     STATUS      current
+     DESCRIPTION
+        "Unique index in the table."
+     ::= { cienaCesBgpLspIngressTunnelEntry 1 }
+
+ cienaCesBgpLspIngressTunnelType OBJECT-TYPE
+     SYNTAX      TunnelType
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "This represents the Bgp Tunnel Type."
+     ::= { cienaCesBgpLspIngressTunnelEntry 2 }
+
+ cienaCesBgpLspIngressTunnelName OBJECT-TYPE
+     SYNTAX      DisplayString 
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "This represents the Bgp encap tunnel name."
+     ::= { cienaCesBgpLspIngressTunnelEntry 3 }
+
+  cienaCesBgpLspIngressTunnelRole OBJECT-TYPE
+     SYNTAX         INTEGER {
+                            primary(1),
+                            backup(2),
+                            none(3)
+         }
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "specifies the protection role of the BGP encap tunnel "
+     ::= { cienaCesBgpLspIngressTunnelEntry 4 } 
+
+
+ cienaCesBgpLspIngressTunnelOutLabel OBJECT-TYPE
+     SYNTAX         Unsigned32   ( 0..1048575 )
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "The  out label for the primary/backup BGP  encap tunnel."
+     ::= {cienaCesBgpLspIngressTunnelEntry 5 }
+ 
+ 
+ cienaCesBgpLspIngressTunnelNHLFEType OBJECT-TYPE
+     SYNTAX         NHLFEType
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "specifies the NHLFEType for primary/backup BGP encap Tunnel "
+     ::= { cienaCesBgpLspIngressTunnelEntry 6 }
+
+ cienaCesBgpLspIngressTunnelNHLFEIp OBJECT-TYPE        
+     SYNTAX         IpAddress
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "specifies the NHLFE Ip for Primary/Backup BGP encap Tunnel "
+     ::= { cienaCesBgpLspIngressTunnelEntry 7 }
+
+ cienaCesBgpLspIngressTunnelNHLFEIndex OBJECT-TYPE
+     SYNTAX         Unsigned32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "specifies the NHLFE Index for Primary/Backup BGP encap Tunnel "
+     ::= { cienaCesBgpLspIngressTunnelEntry 8 }
+
+ cienaCesBgpLspIngressTunnelNHLFEDmac OBJECT-TYPE
+     SYNTAX         MacAddress
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "specifies the NHLFE destination mac for primary/backup BGP encap Tunnel "
+     ::= { cienaCesBgpLspIngressTunnelEntry 9 }
+     
+ cienaCesBgpLspIngressTunnelNHLFERsvpTunlGrp OBJECT-TYPE
+     SYNTAX         Unsigned32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "specifies the NHLFE rsvp tunl grp for primary/backup BGP encap Tunnel "
+     ::= { cienaCesBgpLspIngressTunnelEntry 10 }
+
+ cienaCesBgpLspIngressTunnelOperState OBJECT-TYPE
+     SYNTAX         CienaGlobalState
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "This represents the oper state of bgp lsp encap tunnel "
+     ::= { cienaCesBgpLspIngressTunnelEntry 11 }
+
+ cienaCesBgpLspIngressTunnelBgpTunlGrp OBJECT-TYPE
+     SYNTAX         Unsigned32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "This represents the tunnel group of bgp lsp encap tunnel "
+     ::= { cienaCesBgpLspIngressTunnelEntry 12 }
+
+ cienaCesBgpLspIngressTunnelBgpPeer OBJECT-TYPE
+     SYNTAX         IpAddress
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "This represents bgp lsp encap tunnel Peer ip"
+     ::= { cienaCesBgpLspIngressTunnelEntry 13 }
+
+ cienaCesBgpLspIngressTunnelBgpNextHop OBJECT-TYPE
+     SYNTAX         IpAddress
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "This represents bgp lsp encap tunnel NextHop ip"
+     ::= { cienaCesBgpLspIngressTunnelEntry 14 }
+    
+ cienaCesBgpLspIngressTunnelBgpFEC OBJECT-TYPE
+     SYNTAX         DisplayString
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "This represents bgp lsp encap tunnel FEC"
+     ::= { cienaCesBgpLspIngressTunnelEntry 15 }
+
+ cienaCesBgpLspIngressTunnelNHLFEInterfaceName OBJECT-TYPE
+     SYNTAX      DisplayString (SIZE (0..31))
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "Specifies the NHLFE interface name for primary/backup BGP encap tunnel."
+     ::= { cienaCesBgpLspIngressTunnelEntry 16 }
+
+ cienaCesBgpLspEgressTunnelTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF CienaCesBgpLspEgressTunnelEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "Table of Bgp Lsp and their associated attributes."
+    ::= { cienaCesBgpLsp 2 }
+      
+ cienaCesBgpLspEgressTunnelEntry OBJECT-TYPE
+    SYNTAX     CienaCesBgpLspEgressTunnelEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "Each entry represents a Bgp Tunnel."
+    INDEX { cienaCesBgpLspEgressTunnelIndex}
+    ::= { cienaCesBgpLspEgressTunnelTable 1 }
+      
+ CienaCesBgpLspEgressTunnelEntry ::=  SEQUENCE { 
+    cienaCesBgpLspEgressTunnelIndex          Unsigned32,
+    cienaCesBgpLspEgressTunnelType           TunnelType,
+    cienaCesBgpLspEgressTunnelName           DisplayString,
+    cienaCesBgpLspEgressTunnelInLabel        Unsigned32,
+    cienaCesBgpLspEgressTunnelOperState      CienaGlobalState,
+    cienaCesBgpLspEgressTunnelBgpTunlGrp     Unsigned32,
+    cienaCesBgpLspEgressTunnelBgpPeer        IpAddress,
+    cienaCesBgpLspEgressTunnelBgpNextHop     IpAddress,
+    cienaCesBgpLspEgressTunnelBgpFEC         DisplayString
+ }
+
+ cienaCesBgpLspEgressTunnelIndex OBJECT-TYPE
+     SYNTAX      Unsigned32   (1..65535)
+     MAX-ACCESS  not-accessible
+     STATUS      current
+     DESCRIPTION
+        "Unique index in the table."
+     ::= { cienaCesBgpLspEgressTunnelEntry 1 }
+
+ cienaCesBgpLspEgressTunnelType OBJECT-TYPE
+     SYNTAX      TunnelType
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "This represents the Bgp Tunnel Type."
+     ::= { cienaCesBgpLspEgressTunnelEntry 2 }
+
+ cienaCesBgpLspEgressTunnelName OBJECT-TYPE
+     SYNTAX      DisplayString
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "This represents the Bgp Egress tunnel name."
+     ::= { cienaCesBgpLspEgressTunnelEntry 3 }
+
+ cienaCesBgpLspEgressTunnelInLabel OBJECT-TYPE
+     SYNTAX         Unsigned32   ( 0..1048575 )
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "The in label for the BGP  Egress tunnel."
+     ::= {cienaCesBgpLspEgressTunnelEntry 4 }
+ 
+ cienaCesBgpLspEgressTunnelOperState OBJECT-TYPE
+     SYNTAX         CienaGlobalState
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "This represents the oper state of bgp lsp Egress tunnel "
+     ::= { cienaCesBgpLspEgressTunnelEntry 5 }
+
+ cienaCesBgpLspEgressTunnelBgpTunlGrp OBJECT-TYPE
+     SYNTAX         Unsigned32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "This represents the tunnel group of bgp lsp Egress tunnel "
+     ::= { cienaCesBgpLspEgressTunnelEntry 6 }
+
+ cienaCesBgpLspEgressTunnelBgpPeer OBJECT-TYPE
+     SYNTAX         IpAddress
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "This represents bgp lsp Egress tunnel Peer ip"
+     ::= { cienaCesBgpLspEgressTunnelEntry 7 }
+ cienaCesBgpLspEgressTunnelBgpNextHop OBJECT-TYPE
+     SYNTAX         IpAddress
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "This represents bgp lsp Egress tunnel NextHop ip"
+     ::= { cienaCesBgpLspEgressTunnelEntry 8 }
+
+ cienaCesBgpLspEgressTunnelBgpFEC OBJECT-TYPE
+     SYNTAX         DisplayString
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "This represents bgp lsp Egress tunnel FEC"
+     ::= { cienaCesBgpLspEgressTunnelEntry 9 }
+ 
+ cienaCesBgpLspTransitTunnelTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF CienaCesBgpLspTransitTunnelEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "Table of Bgp Lsp and their associated attributes."
+    ::= { cienaCesBgpLsp 3 }
+      
+ cienaCesBgpLspTransitTunnelEntry OBJECT-TYPE
+    SYNTAX     CienaCesBgpLspTransitTunnelEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "Each entry represents a Bgp Tunnel."
+    INDEX { cienaCesBgpLspTransitTunnelIndex}
+    ::= { cienaCesBgpLspTransitTunnelTable 1 }
+
+ CienaCesBgpLspTransitTunnelEntry ::=  SEQUENCE { 
+    cienaCesBgpLspTransitTunnelIndex                  Unsigned32,
+    cienaCesBgpLspTransitTunnelType                   TunnelType,
+    cienaCesBgpLspTransitTunnelName                   DisplayString,
+    cienaCesBgpLspTransitTunnelInLabel                Unsigned32,
+    cienaCesBgpLspTransitTunnelRole                   INTEGER,
+    cienaCesBgpLspTransitTunnelPriOutLabel            Unsigned32,
+    cienaCesBgpLspTransitTunnelPriNHLFEType           NHLFEType,
+    cienaCesBgpLspTransitTunnelPriNHLFEIp             IpAddress,
+    cienaCesBgpLspTransitTunnelPriNHLFEIndex          Unsigned32,
+    cienaCesBgpLspTransitTunnelPriNHLFEDmac           MacAddress,
+    cienaCesBgpLspTransitTunnelPriNHLFERsvpTunlGrp    Unsigned32,
+    cienaCesBgpLspTransitTunnelBkpOutLabel            Unsigned32,
+    cienaCesBgpLspTransitTunnelBkpNHLFEType           NHLFEType,
+    cienaCesBgpLspTransitTunnelBkpNHLFEIp             IpAddress,
+    cienaCesBgpLspTransitTunnelBkpNHLFEIndex          Unsigned32,
+    cienaCesBgpLspTransitTunnelBkpNHLFEDmac           MacAddress,
+    cienaCesBgpLspTransitTunnelBkpNHLFERsvpTunlGrp    Unsigned32,
+    cienaCesBgpLspTransitTunnelOperState              CienaGlobalState,
+    cienaCesBgpLspTransitTunnelBgpTunlGrp             Unsigned32,
+    cienaCesBgpLspTransitTunnelBgpPeer                IpAddress,
+    cienaCesBgpLspTransitTunnelBgpNextHop             IpAddress,
+    cienaCesBgpLspTransitTunnelBgpFEC                 DisplayString,
+    cienaCesBgpLspTransitTunnelPriNHLFEInterfaceName  DisplayString,
+    cienaCesBgpLspTransitTunnelBkpNHLFEInterfaceName  DisplayString
+ }
+
+ cienaCesBgpLspTransitTunnelIndex OBJECT-TYPE
+     SYNTAX      Unsigned32   (1..65535)
+     MAX-ACCESS  not-accessible
+     STATUS      current
+     DESCRIPTION
+        "Unique index in the table."
+     ::= { cienaCesBgpLspTransitTunnelEntry 1 }
+
+ cienaCesBgpLspTransitTunnelType OBJECT-TYPE
+     SYNTAX      TunnelType
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "This represents the Bgp Tunnel Type."
+     ::= { cienaCesBgpLspTransitTunnelEntry 2 }
+
+ cienaCesBgpLspTransitTunnelName OBJECT-TYPE
+     SYNTAX      DisplayString
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "This represents the Bgp Transit tunnel name."
+     ::= { cienaCesBgpLspTransitTunnelEntry 3 }
+
+ cienaCesBgpLspTransitTunnelInLabel OBJECT-TYPE
+     SYNTAX         Unsigned32   ( 0..1048575 )
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "The in label for the BGP  Transit tunnel."
+     ::= {cienaCesBgpLspTransitTunnelEntry 4 }
+
+ cienaCesBgpLspTransitTunnelRole OBJECT-TYPE
+     SYNTAX         INTEGER {
+                            primary(1),
+                            backup(2),
+                            none(3)
+         }
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "specifies the protection role of the BGP Transit tunnel "
+     ::= { cienaCesBgpLspTransitTunnelEntry 5 }
+
+ cienaCesBgpLspTransitTunnelPriOutLabel OBJECT-TYPE
+     SYNTAX         Unsigned32   ( 0..1048575 )
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "specifies primary out label for the BGP  Transit tunnel."
+     ::= {cienaCesBgpLspTransitTunnelEntry 6 }
+
+
+ cienaCesBgpLspTransitTunnelPriNHLFEType OBJECT-TYPE
+     SYNTAX         NHLFEType
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "specifies the Primary NHLFEType for BGP transit Tunnel "
+     ::= { cienaCesBgpLspTransitTunnelEntry 7 }
+
+ cienaCesBgpLspTransitTunnelPriNHLFEIp OBJECT-TYPE
+     SYNTAX         IpAddress
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "specifies the Primary NHLFE Ip for BGP Transit Tunnel "
+     ::= { cienaCesBgpLspTransitTunnelEntry 8 }
+ 
+ cienaCesBgpLspTransitTunnelPriNHLFEIndex OBJECT-TYPE
+     SYNTAX         Unsigned32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "specifies the Primary NHLFE Index for BGP Transit Tunnel "
+     ::= { cienaCesBgpLspTransitTunnelEntry 9 }
+
+ cienaCesBgpLspTransitTunnelPriNHLFEDmac OBJECT-TYPE
+     SYNTAX         MacAddress
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "specifies the Primary NHLFE destination mac for BGP Transit Tunnel "
+     ::= { cienaCesBgpLspTransitTunnelEntry 10 }
+
+ cienaCesBgpLspTransitTunnelPriNHLFERsvpTunlGrp OBJECT-TYPE
+     SYNTAX         Unsigned32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "specifies the NHLFE rsvp tunl grp for Primary BGP encap Tunnel "
+     ::= { cienaCesBgpLspTransitTunnelEntry 11 }
+
+ cienaCesBgpLspTransitTunnelBkpOutLabel OBJECT-TYPE
+     SYNTAX         Unsigned32   ( 0..1048575 )
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "specifies backup out label for the BGP  Transit tunnel."
+     ::= {cienaCesBgpLspTransitTunnelEntry 12 }
+
+ cienaCesBgpLspTransitTunnelBkpNHLFEType OBJECT-TYPE
+     SYNTAX         NHLFEType
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "specifies the backup NHLFEType for BGP transit Tunnel "
+     ::= { cienaCesBgpLspTransitTunnelEntry 13 }
+
+ cienaCesBgpLspTransitTunnelBkpNHLFEIp OBJECT-TYPE
+     SYNTAX         IpAddress
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "specifies the Backup NHLFE Ip for BGP Transit Tunnel "
+     ::= { cienaCesBgpLspTransitTunnelEntry 14 }
+
+ cienaCesBgpLspTransitTunnelBkpNHLFEIndex OBJECT-TYPE
+     SYNTAX         Unsigned32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "specifies the Backup NHLFE Index for BGP Transit Tunnel "
+     ::= { cienaCesBgpLspTransitTunnelEntry 15 }
+
+ cienaCesBgpLspTransitTunnelBkpNHLFEDmac OBJECT-TYPE
+     SYNTAX         MacAddress
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "specifies the Backup NHLFE destination mac for BGP Transit Tunnel "
+     ::= { cienaCesBgpLspTransitTunnelEntry 16 }
+
+ cienaCesBgpLspTransitTunnelBkpNHLFERsvpTunlGrp OBJECT-TYPE
+     SYNTAX         Unsigned32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "specifies the NHLFE rsvp tunl grp for Backup BGP encap Tunnel "
+     ::= { cienaCesBgpLspTransitTunnelEntry 17 }
+ 
+
+ cienaCesBgpLspTransitTunnelOperState OBJECT-TYPE
+     SYNTAX         CienaGlobalState
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "This represents the oper state of bgp lsp Transit tunnel "
+     ::= { cienaCesBgpLspTransitTunnelEntry 18 }
+
+ cienaCesBgpLspTransitTunnelBgpTunlGrp OBJECT-TYPE
+     SYNTAX         Unsigned32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "This represents the tunnel group of bgp lsp Transit tunnel "
+     ::= { cienaCesBgpLspTransitTunnelEntry 19 }
+
+ cienaCesBgpLspTransitTunnelBgpPeer OBJECT-TYPE
+     SYNTAX         IpAddress
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "This represents bgp lsp Transit tunnel Peer ip"
+     ::= { cienaCesBgpLspTransitTunnelEntry 20 }
+
+ cienaCesBgpLspTransitTunnelBgpNextHop OBJECT-TYPE
+     SYNTAX         IpAddress
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "This represents bgp lsp Transit tunnel NextHop ip"
+     ::= { cienaCesBgpLspTransitTunnelEntry 21 }
+
+ cienaCesBgpLspTransitTunnelBgpFEC OBJECT-TYPE
+     SYNTAX         DisplayString
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "This represents bgp lsp Transit tunnel FEC"
+     ::= { cienaCesBgpLspTransitTunnelEntry 22 }
+
+ cienaCesBgpLspTransitTunnelPriNHLFEInterfaceName OBJECT-TYPE
+     SYNTAX      DisplayString (SIZE (0..31))
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "Specifies the primary NHLFE interface name for BGP transit tunnel."
+     ::= { cienaCesBgpLspTransitTunnelEntry 23 }
+
+ cienaCesBgpLspTransitTunnelBkpNHLFEInterfaceName OBJECT-TYPE
+     SYNTAX      DisplayString (SIZE (0..31))
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "Specifies the backup NHLFE interface name for BGP transit tunnel."
+     ::= { cienaCesBgpLspTransitTunnelEntry 24 } 
+
+ --
+ -- BGP Peer State change Traps
+ --
+
+ cienaCesBgpPeerInEstState NOTIFICATION-TYPE
+    OBJECTS {
+        cienaGlobalSeverity,  
+        cienaGlobalMacAddress,
+        bgpPeerLastError,
+        bgpPeerRemoteAddr,
+        bgpPeerState
+    }
+    STATUS  current
+    DESCRIPTION
+         "This notification is generated when BGP peer enters into Established State."
+    ::= { cienaCesBgpLspMIBNotifications  1 }
+
+
+ cienaCesBgpPeerOutEstState NOTIFICATION-TYPE
+    OBJECTS {
+        cienaGlobalSeverity,  
+        cienaGlobalMacAddress,
+        bgpPeerLastError,
+        bgpPeerRemoteAddr,
+        bgpPeerState
+    }
+    STATUS  current
+    DESCRIPTION
+         "This notification is generated when BGP peer moves out of Established State."
+
+    ::= { cienaCesBgpLspMIBNotifications 2 }
+
+END 

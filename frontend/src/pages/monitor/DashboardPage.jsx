@@ -12,7 +12,8 @@ import {
   CheckCircle,
   Clock,
   Zap,
-  RefreshCw
+  RefreshCw,
+  Radio
 } from "lucide-react";
 
 function StatCard({ title, value, icon: Icon, color, subtitle }) {
@@ -189,25 +190,42 @@ export function DashboardPage() {
           </div>
 
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-            <div className="px-4 py-3 border-b border-gray-200">
+            <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
-                Recent Alerts
+                SNMP Live Monitoring
               </h2>
+              <button
+                onClick={() => navigate('/monitor/snmp-live')}
+                className="text-xs text-blue-600 hover:text-blue-700"
+              >
+                View Details →
+              </button>
             </div>
-            <div className="p-4">
-              {stats.recentAlerts === 0 ? (
-                <div className="flex items-center gap-3 p-4 bg-green-50 rounded-lg">
-                  <CheckCircle className="w-6 h-6 text-green-600" />
-                  <div>
-                    <div className="font-medium text-green-900">All Systems Normal</div>
-                    <div className="text-sm text-green-700">No active alerts</div>
-                  </div>
+            <div className="p-4 space-y-3">
+              <button
+                onClick={() => navigate('/monitor/snmp-live')}
+                className="w-full flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-left"
+              >
+                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <Activity className="w-5 h-5 text-blue-600" />
                 </div>
-              ) : (
-                <div className="space-y-2">
-                  {/* Alert items would go here */}
+                <div>
+                  <div className="font-medium text-gray-900">Device Monitor</div>
+                  <div className="text-xs text-gray-500">Real-time SNMP polling</div>
                 </div>
-              )}
+              </button>
+              <button
+                onClick={() => navigate('/monitor/snmp-alarms')}
+                className="w-full flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-left"
+              >
+                <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                  <AlertTriangle className="w-5 h-5 text-red-600" />
+                </div>
+                <div>
+                  <div className="font-medium text-gray-900">Active Alarms</div>
+                  <div className="text-xs text-gray-500">View all device alarms</div>
+                </div>
+              </button>
             </div>
           </div>
         </div>

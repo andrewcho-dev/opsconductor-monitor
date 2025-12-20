@@ -1,0 +1,740 @@
+-- This file was included in WWP MIB release 04-21-05-0007
+ --
+ -- WWP-LEOS-EXT-LAG-MIB.my
+ --
+ --
+ WWP-LEOS-EXT-LAG-MIB DEFINITIONS ::= BEGIN
+
+ IMPORTS
+    Integer32, Unsigned32, Counter32, TimeTicks, MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE
+        FROM SNMPv2-SMI
+    DisplayString, RowStatus, MacAddress
+        FROM SNMPv2-TC
+    wwpModulesLeos
+    FROM WWP-SMI;
+
+
+ wwpLeosExtLagMIB MODULE-IDENTITY
+       LAST-UPDATED "202003160000Z"
+       ORGANIZATION "Ciena Corp."
+       CONTACT-INFO
+            "   Mib Meister
+                7035 Ridge Road
+                Hanover, Maryland 21076
+                USA
+                Phone:  +1 800 921 1144
+                Email:  support@ciena.com"
+        DESCRIPTION
+            "This MIB module is an extension to the IEEE8023-LAG-mib.
+             This MIB defines the managed objects for the creation and
+             deletion of Aggregators."
+
+        REVISION     "202003160000Z"
+        DESCRIPTION
+          "Added three new MIB objects to wwpLeosExtLagPhyPortTable table to read enhanced hash parameters
+           configured on a given physical port. The new objects are wwpLeosExtLagPhyPortEnhancedHashConfig,
+           wwpLeosExtLagPhyPortEnhancedHashFunction and wwpLeosExtLagPhyPortEnhancedHashOffset."
+        REVISION     "201810030000Z"
+        DESCRIPTION
+          "Added new Table wwpLeosExtLagPhyPortTable to support configuration of CFM service on LAG member port.
+           Two objects wwpLeosExtLagPhyPortId and wwpLeosExtLagPhyPortCfmServiceIdx are added in this table ."
+        REVISION     "201711150000Z"
+        DESCRIPTION
+          "Updated contact info."
+        REVISION    "201608030000Z"
+        DESCRIPTION
+          "Added total number of member ports related MIB Objects to wwpExtLagEntry table.
+            The new objects are wwpLeosExtAggTotalAddedPorts and wwpLeosExtAggTotalProtectionPorts."
+        REVISION    "201607080000Z"
+       DESCRIPTION
+          "Added Minimum Link Aggregation related MIB Objects to wwpExtLagEntry table.
+            The new objects are wwpLeosExtAggMinimumLinkAggregation and wwpLeosExtAggMinimumLinkThreshold."
+        REVISION    "201311070000Z"
+       DESCRIPTION
+           "Added MC-LAG related MIB objects to wwpExtLagEntry table. 
+            The new objects are wwpLeosExtAggICL, wwpLeosExtAggRole, wwpLeosExtAggConnectState,
+            wwpLeosExtAggRedundancyState,wwpLeosExtAggPeerSystemMac
+            wwpLeosExtAggPeerSystemPriority, wwpLeosExtAggPeerAdminKey, wwpLeosExtAggDisconnectRx,
+            wwpLeosExtAggDisconnectTx,wwpLeosExtAggConfigMismatchRx,wwpLeosExtAggKeyMismatchCount,
+            wwpLeosExtAggPeerUnreachableCount, wwpLeosExtAggUnknownRx, wwpLeosExtAggTotalRx,
+            wwpLeosExtAggTotalTx,wwpLeosExtAggTotalDownTime, wwpLeosExtAggUpTime"
+       REVISION    "201304230000Z"
+       DESCRIPTION
+          "Miscellaneous spelling and description corrections."
+       REVISION    "200301151700Z"
+       DESCRIPTION
+          "Initial creation."
+       ::= { wwpModulesLeos 14 }
+
+ --
+ -- Node definitions
+ --	
+ 
+ wwpLeosExtLagMIBObjects OBJECT IDENTIFIER ::= { wwpLeosExtLagMIB 1 }
+ 
+ wwpLeosExtLag  OBJECT IDENTIFIER ::= { wwpLeosExtLagMIBObjects 1 } 
+ 
+ -- Notifications 
+
+ wwpLeosExtLagMIBNotificationPrefix  OBJECT IDENTIFIER ::= { wwpLeosExtLagMIB 2 } 
+ wwpLeosExtLagMIBNotifications       OBJECT IDENTIFIER ::=  
+                       { wwpLeosExtLagMIBNotificationPrefix 0 }
+
+ -- Conformance information 
+ 
+ wwpLeosExtLagMIBConformance OBJECT IDENTIFIER ::= { wwpLeosExtLagMIB 3 } 
+ wwpLeosExtLagMIBCompliances OBJECT IDENTIFIER ::= { wwpLeosExtLagMIBConformance 1 } 		
+ wwpLeosExtLagMIBGroups      OBJECT IDENTIFIER ::= { wwpLeosExtLagMIBConformance 2 }
+   
+ wwpLeosMaxLags OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The maximum number of aggregators that this device
+        supports."
+    ::= { wwpLeosExtLag 1 }
+    
+ wwpLeosNumLags OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The current number of LAGs that are
+        configured in this device."
+    ::= { wwpLeosExtLag 2 }
+    
+ wwpLeosExtLagTable OBJECT-TYPE
+     SYNTAX     SEQUENCE OF WwpLeosExtLagEntry
+     MAX-ACCESS not-accessible
+     STATUS     current
+     DESCRIPTION
+            "The (conceptual) table listing all the  
+	    aggregators."  
+     ::= { wwpLeosExtLag 3 }
+		
+ wwpLeosExtLagEntry OBJECT-TYPE
+     SYNTAX      WwpLeosExtLagEntry
+     MAX-ACCESS  not-accessible
+     STATUS      current
+     DESCRIPTION
+           "An entry (conceptual row) in the wwpLeosExtLagTable."
+     INDEX { wwpLeosExtAggId }
+     ::= { wwpLeosExtLagTable 1 }
+		
+ WwpLeosExtLagEntry ::=  SEQUENCE { 
+     wwpLeosExtAggId                         Integer32,
+     wwpLeosExtAggName                       DisplayString,
+     wwpLeosExtAggIndex                      Integer32,     
+     wwpLeosExtAggStatus                     RowStatus,
+     wwpLeosExtAggMode                       INTEGER,
+     wwpLeosExtLagProtectionRevertState      INTEGER,
+     wwpLeosExtLagProtectionRevertTimer      INTEGER,
+     wwpLeosExtAggHashMode                   INTEGER,
+     wwpLeosExtLagProtectionMode             INTEGER,
+     wwpLeosExtAggICL                        DisplayString,
+     wwpLeosExtAggRole                       INTEGER,  
+     wwpLeosExtAggRgNodeId                   Unsigned32,
+     wwpLeosExtAggRgDynamicPriority          Unsigned32,
+     wwpLeosExtAggRgOperKey                  Unsigned32,
+     wwpLeosExtAggConnectState               INTEGER,    
+     wwpLeosExtAggRedundancyState            INTEGER,
+     wwpLeosExtAggPeerSystemMac              MacAddress,
+     wwpLeosExtAggPeerRgNodeId               Unsigned32,
+     wwpLeosExtAggPeerRgDynamicPriority      Unsigned32,
+     wwpLeosExtAggPeerRgOperKey              Unsigned32,
+     wwpLeosExtAggDisconnectRx               Counter32,
+     wwpLeosExtAggDisconnectTx               Counter32,
+     wwpLeosExtAggConfigMismatchRx           Counter32,
+     wwpLeosExtAggKeyMismatchCount           Counter32,
+     wwpLeosExtAggOutOfSequenceRx            Counter32,
+     wwpLeosExtAggPeerUnreachableCount       Counter32,
+     wwpLeosExtAggUnknownRx                  Counter32,    
+     wwpLeosExtAggTotalRx                    Counter32,
+     wwpLeosExtAggTotalTx                    Counter32, 
+     wwpLeosExtAggTotalDownTime              Unsigned32,     
+     wwpLeosExtAggUpTime                     Unsigned32,
+     wwpLeosExtAggTimeInProtectState         Unsigned32,
+     wwpLeosExtAggLastTimeProtected          Unsigned32,
+     wwpLeosExtAggNumberOfSwitchovers        Counter32,
+     wwpLeosExtAggMultiChassis               INTEGER,
+     wwpLeosExtAggMinimumLinkAggregation     INTEGER,
+     wwpLeosExtAggMinimumLinkThreshold       Integer32,
+     wwpLeosExtAggTotalAddedPorts            Unsigned32,
+     wwpLeosExtAggTotalProtectionPorts       Unsigned32
+ }
+
+ wwpLeosExtAggId OBJECT-TYPE
+     SYNTAX     Integer32 (1..2147483647)
+     MAX-ACCESS read-only
+     STATUS     current
+     DESCRIPTION
+           "Object which specifies a unique entry in the
+           wwpLeosExtLagTable.  A management station wishing
+           to create a LAG should use a pseudo-random value
+	   for this object when creating an instance of a wwpLeosExtLagEntry."
+     ::= { wwpLeosExtLagEntry 1 }
+
+ wwpLeosExtAggName OBJECT-TYPE
+     SYNTAX      DisplayString (SIZE(1..32))
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION
+           "The name assigned to this Lag by the Management
+	   station. This object can only be set while creating LAG.
+	   It is not allowed to rename the LAG name once it is created."
+     ::= { wwpLeosExtLagEntry 2 }
+
+ wwpLeosExtAggIndex OBJECT-TYPE
+    SYNTAX       Integer32 (1..2147483647)
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+        "The unique identifier allocated to this Aggregator by
+        the local System.  This attribute identifies an
+        Aggregator instance among the subordinate managed
+        objects of the containing object.
+        This value is read-only. This object refer to the
+	dot3adAggIndex in the IEEE-8023-LAG-MIB."
+    REFERENCE
+        "IEEE 802.3 Subclause 30.7.1.1.1"
+    ::= { wwpLeosExtLagEntry 3 }		
+	
+ wwpLeosExtAggStatus OBJECT-TYPE
+     SYNTAX       RowStatus
+     MAX-ACCESS   read-create
+     STATUS       current
+     DESCRIPTION
+       "Used to manage the creation and deletion of the conceptual rows in this table.
+       To create a row in this table, set this object to 'createAndGo'. 
+       To disable the aggregator, set this object to 'notInService'."
+     ::= { wwpLeosExtLagEntry 4 } 
+     
+ wwpLeosExtAggMode OBJECT-TYPE
+     SYNTAX      INTEGER {
+			lacp(1),
+			manual(2)
+		 }
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+           "This object specifies the mode in which the given aggregation is operating." 
+     ::= { wwpLeosExtLagEntry 5 } 
+ 
+ wwpLeosExtLagProtectionRevertState OBJECT-TYPE
+     SYNTAX      INTEGER {
+     				on(1),
+     				off(2)
+     				}     				
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+           "This object specifies that if the primary port goes from operationally disabled to operationally enabled it
+	   shall become active, and one of the secondary ports shall become backup if this MIB object is set to 'on' and
+	   the wwpLeosLagProtectionRevertTimer timer expires." 
+     ::= { wwpLeosExtLagEntry 6 }
+ 
+ wwpLeosExtLagProtectionRevertTimer OBJECT-TYPE
+     SYNTAX      INTEGER (0..720000)     				
+     UNITS		 "msec"
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+           "This object specifies the revert protection timer value. The default for  multi-chassis LAG is 300000 ms
+           and for regular LAG is 5000 ms"
+     DEFVAL		{5000}
+     ::= { wwpLeosExtLagEntry 7 }     
+     
+ wwpLeosExtAggHashMode OBJECT-TYPE
+     SYNTAX      INTEGER {
+			mac-based(1),
+			ip-based(2),
+			enhanced(3)
+		 }
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+           "This object specifies the hash mode used by the aggregation for known unicast frames." 
+     ::= { wwpLeosExtLagEntry 8 } 
+
+ wwpLeosExtLagProtectionMode OBJECT-TYPE
+     SYNTAX      INTEGER {
+                        proprietary(1),
+                        standard(2)
+                 }
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+           "This object specifies the LACP protection-mode in which the given aggregation is operating." 
+     ::= { wwpLeosExtLagEntry 9 }     
+     
+ wwpLeosExtAggICL OBJECT-TYPE 
+     SYNTAX         DisplayString
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object specifies the inter-chassis link name that the multi-chassis LAG is using."
+     ::= { wwpLeosExtLagEntry 10 }
+
+ wwpLeosExtAggRole OBJECT-TYPE
+     SYNTAX      INTEGER {
+                        primary(1),
+                        backup(2),
+                        none(3)
+                 }
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+           "This object specifies if the MC-LAG node is primary or backup"
+     ::= { wwpLeosExtLagEntry 11}  
+     
+ wwpLeosExtAggRgNodeId OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+           "This object specifies the MC-LAG RG node ID."
+     ::= { wwpLeosExtLagEntry 12} 
+
+ wwpLeosExtAggRgDynamicPriority OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+           "This object specifies the MC-LAG RG node dynamically assigned priority."
+     ::= { wwpLeosExtLagEntry 13} 
+
+ wwpLeosExtAggRgOperKey OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+           "This object specifies the MC-LAG RG node operational key."
+     ::= { wwpLeosExtLagEntry 14} 
+     
+ wwpLeosExtAggConnectState OBJECT-TYPE
+     SYNTAX      INTEGER  {
+                         init(1),
+                         disconnected(2),
+                         connected(3),
+                         mismatch(4),
+                         none(5)
+                 }                                                             
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+           "This object specifies the Connect State of the MC-LAG node."
+     ::= { wwpLeosExtLagEntry 15}
+
+wwpLeosExtAggRedundancyState OBJECT-TYPE
+     SYNTAX      INTEGER  {
+                          down(1),
+                          unavailable(2),                          
+                          active(3),
+                          standby(4),
+                          standalone(5),
+                          none(6)                          
+                  }
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+           "This object specifies the oper state of the MC-LAG node"
+     ::= { wwpLeosExtLagEntry 16}
+      
+ wwpLeosExtAggPeerSystemMac OBJECT-TYPE
+     SYNTAX         MacAddress
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object specifies the MC-LAG peer node system MAC address."
+    ::= { wwpLeosExtLagEntry 17}
+   
+ wwpLeosExtAggPeerRgNodeId  OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+           "This object specifies the MC-LAG peer RG node ID."
+     ::= { wwpLeosExtLagEntry 18} 
+
+ wwpLeosExtAggPeerRgDynamicPriority OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+           "This object specifies the MC-LAG peer RG node dynamically assigned priority."
+     ::= { wwpLeosExtLagEntry 19} 
+     
+ wwpLeosExtAggPeerRgOperKey OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+           "This object specifies the MC-LAG peer RG node operational key."
+     ::= { wwpLeosExtLagEntry 20}
+
+ wwpLeosExtAggDisconnectRx OBJECT-TYPE
+     SYNTAX      Counter32                                                                   
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+           "This object specifies the number of Disconnect messages received by the MC-LAG node."
+     ::= { wwpLeosExtLagEntry 21}
+
+ wwpLeosExtAggDisconnectTx OBJECT-TYPE
+     SYNTAX      Counter32                                                                   
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+           "This object specifies the number of Disconnect messages transmitted by the MC-LAG node."
+     ::= { wwpLeosExtLagEntry 22}
+
+ wwpLeosExtAggConfigMismatchRx OBJECT-TYPE
+     SYNTAX      Counter32                                                                   
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+           "This object specifies the number of mismatch config messages received by the MC-LAG node."
+     ::= { wwpLeosExtLagEntry 23}
+
+ wwpLeosExtAggKeyMismatchCount OBJECT-TYPE
+     SYNTAX      Counter32                                                                   
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+           "This object specifies the number of messages received with mismatching key by the MC-LAG node."
+     ::= { wwpLeosExtLagEntry 24} 
+     
+ wwpLeosExtAggOutOfSequenceRx OBJECT-TYPE
+     SYNTAX      Counter32                                                                   
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+           "This object specifies the number of out of sequence messages received by the MC-LAG node."
+     ::= { wwpLeosExtLagEntry 25} 
+     
+ wwpLeosExtAggPeerUnreachableCount OBJECT-TYPE
+     SYNTAX      Counter32                                                                   
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+           "This object specifies the number of times peer was unreachable."
+     ::= { wwpLeosExtLagEntry 26}   
+ 
+ wwpLeosExtAggUnknownRx OBJECT-TYPE
+     SYNTAX      Counter32                                                                   
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+           "This object specifies the number unknown messages received by the MC-LAG node."
+     ::= { wwpLeosExtLagEntry 27} 
+     
+ wwpLeosExtAggTotalRx OBJECT-TYPE
+     SYNTAX      Counter32                                                                   
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+           "This object specifies the total number of messages received by the MC-LAG node."
+     ::= { wwpLeosExtLagEntry 28}
+     
+ wwpLeosExtAggTotalTx OBJECT-TYPE
+     SYNTAX      Counter32                                                                   
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+           "This object specifies the total number of messages transmitted by MC-LAG node."
+     ::= { wwpLeosExtLagEntry 29} 
+     
+ wwpLeosExtAggTotalDownTime OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+           "This object specifies total time for which the MC-LAG node has been operationally down."
+     ::= { wwpLeosExtLagEntry 30}
+ 
+ wwpLeosExtAggUpTime OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+           "This object specifies time for which the MC-LAG node has been operationally up."
+     ::= { wwpLeosExtLagEntry 31}
+
+ wwpLeosExtAggTimeInProtectState OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+           "This object specifies time for which the MC-LAG node has been in protection state."
+     ::= { wwpLeosExtLagEntry 32}
+
+ wwpLeosExtAggLastTimeProtected OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+           "This object specifies time of day of the last MC-LAG protection switching."
+     ::= { wwpLeosExtLagEntry 33}
+
+ wwpLeosExtAggNumberOfSwitchovers OBJECT-TYPE
+     SYNTAX      Counter32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+           "This object specifies the number of MC-LAG protection switching."
+     ::= { wwpLeosExtLagEntry 34}
+
+ wwpLeosExtAggMultiChassis OBJECT-TYPE
+     SYNTAX      INTEGER {
+                        yes(1),
+                        no(2)                        
+                 }
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+           "This object specifies if the LAG is an MC-LAG"
+     ::= { wwpLeosExtLagEntry 35}  
+
+ wwpLeosExtAggMinimumLinkAggregation OBJECT-TYPE
+     SYNTAX      INTEGER {
+                        on(1),
+                        off(2)
+                 }
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+           "This object enables minimum link aggregation mode for the LAG group"
+     DEFVAL      {off}
+     ::= { wwpLeosExtLagEntry 36 }
+
+ wwpLeosExtAggMinimumLinkThreshold OBJECT-TYPE
+     SYNTAX      Integer32 (1..8)
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+           "This object specifies minimum link threshold value for minimum link aggregation mode."
+     DEFVAL      {1}
+     ::= { wwpLeosExtLagEntry 37 }
+
+ wwpLeosExtAggTotalAddedPorts OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+           "This object specifies the total number of member ports present in the LAG group."
+     ::= { wwpLeosExtLagEntry 38 }
+
+ wwpLeosExtAggTotalProtectionPorts OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+           "This object specifies the total number of protection member ports present in the LAG group."
+     ::= { wwpLeosExtLagEntry 39 }
+
+--
+-- lag Mode Table
+-- 
+ wwpLeosLagModeTable OBJECT-TYPE
+     SYNTAX     SEQUENCE OF WwpLeosLagModeEntry
+     MAX-ACCESS not-accessible
+     STATUS     current
+     DESCRIPTION
+            "The (conceptual) table listing the modes of aggregation on each port."  
+     ::= { wwpLeosExtLag 4 }
+		
+ wwpLeosLagModeEntry OBJECT-TYPE
+     SYNTAX      WwpLeosLagModeEntry
+     MAX-ACCESS  not-accessible
+     STATUS      current
+     DESCRIPTION
+           "An entry (conceptual row) in the wwpLeosLagModeTable."
+     INDEX { wwpLeosLagPhyPortId  }
+     ::= { wwpLeosLagModeTable 1 }
+		
+ WwpLeosLagModeEntry ::=  SEQUENCE {      
+     wwpLeosLagPhyPortId	INTEGER,
+     wwpLeosLagAdminMode	INTEGER,
+     wwpLeosLagOperMode		INTEGER
+ }
+
+ wwpLeosLagPhyPortId OBJECT-TYPE
+     SYNTAX      INTEGER (0..65535)
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+           "This object specifies the physical port number.
+	   It is also used as index in the table." 
+     ::= { wwpLeosLagModeEntry 1 }
+
+ wwpLeosLagAdminMode OBJECT-TYPE
+     SYNTAX      INTEGER {
+			lacp(1),
+			manual(2)
+		 }
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+           "This object specifies the administrative mode in which a given port is operating." 
+     ::= { wwpLeosLagModeEntry 2 }
+ 
+ wwpLeosLagOperMode OBJECT-TYPE
+     SYNTAX      INTEGER {
+			lacp(1),
+			manual(2)
+		 }
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+           "This object specifies the operation mode in which a given port is operating." 
+     ::= { wwpLeosLagModeEntry 3 }
+
+--
+-- lag Protection Table
+-- 
+ wwpLeosLagProtectionTable OBJECT-TYPE
+     SYNTAX     SEQUENCE OF WwpLeosLagProtectionEntry
+     MAX-ACCESS not-accessible
+     STATUS     current
+     DESCRIPTION
+            "The (conceptual) table listing the protection ports for each aggregation."  
+     ::= { wwpLeosExtLag 5 }
+		
+ wwpLeosLagProtectionEntry OBJECT-TYPE
+     SYNTAX      WwpLeosLagProtectionEntry
+     MAX-ACCESS  not-accessible
+     STATUS      current
+     DESCRIPTION
+           "An entry (conceptual row) in the wwpLeosLagProtectionTable."
+     INDEX { wwpLeosExtAggId, wwpLeosLagProtectionPort  }
+     ::= { wwpLeosLagProtectionTable 1 }
+		
+ WwpLeosLagProtectionEntry ::=  SEQUENCE {      
+     wwpLeosLagProtectionPort				INTEGER,
+     wwpLeosLagProtectionRowStatus          RowStatus
+ }
+ 
+ wwpLeosLagProtectionPort OBJECT-TYPE
+     SYNTAX      INTEGER (1..65535)
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+           "This object specifies the protection port number. It is also used as index in the table." 
+     ::= { wwpLeosLagProtectionEntry 1 }
+ 
+ wwpLeosLagProtectionRowStatus OBJECT-TYPE
+     SYNTAX       RowStatus
+     MAX-ACCESS   read-create
+     STATUS       current
+     DESCRIPTION
+	     "Used to manage the creation and deletion of the conceptual rows in this table.
+	     To create a row in this table, set this object to 'createAndGo'. 
+	     To delete entry set this object to 'destroy'."
+     ::= { wwpLeosLagProtectionEntry 2 }   
+ 
+-- 
+-- lag system attributes
+--
+ wwpLeosExtAggFloodHashMode OBJECT-TYPE
+     SYNTAX      INTEGER {
+			simplified(1),
+			enhanced(2)
+		 }
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+           "This object specifies the aggregation hash mode used by unknown
+	   unicast, multicast and broadcast frames for all aggregation ports
+	   in the system." 
+     ::= { wwpLeosExtLag 6 }          
+
+-- 
+-- Table for per physical port lag attributes 
+--
+ wwpLeosExtLagPhyPortTable OBJECT-TYPE
+     SYNTAX     SEQUENCE OF WwpLeosExtLagPhyPortEntry
+     MAX-ACCESS not-accessible
+     STATUS     current
+     DESCRIPTION
+            "The (conceptual) table listing the lag attributes on physical ports."  
+     ::= { wwpLeosExtLag 7 }
+
+ wwpLeosExtLagPhyPortEntry OBJECT-TYPE
+     SYNTAX      WwpLeosExtLagPhyPortEntry
+     MAX-ACCESS  not-accessible
+     STATUS      current
+     DESCRIPTION
+           "An entry (conceptual row) in the wwpLeosExtLagPhyPortTable."
+     INDEX { wwpLeosExtLagPhyPortId  }
+     ::= { wwpLeosExtLagPhyPortTable 1 }
+
+ WwpLeosExtLagPhyPortEntry ::=  SEQUENCE {      
+     wwpLeosExtLagPhyPortId                     Unsigned32,
+     wwpLeosExtLagPhyPortCfmServiceIdx          Unsigned32,
+     wwpLeosExtLagPhyPortEnhancedHashConfig     Unsigned32,
+     wwpLeosExtLagPhyPortEnhancedHashFunction   Unsigned32,
+     wwpLeosExtLagPhyPortEnhancedHashOffset     Unsigned32
+ }
+
+ wwpLeosExtLagPhyPortId OBJECT-TYPE
+     SYNTAX      Unsigned32 (1..65535)
+     MAX-ACCESS  not-accessible
+     STATUS      current
+     DESCRIPTION
+            "This object specifies the port number. It is also used as index in the table."
+     ::= { wwpLeosExtLagPhyPortEntry 1 }
+
+ wwpLeosExtLagPhyPortCfmServiceIdx OBJECT-TYPE
+     SYNTAX      Unsigned32 (0..65535)
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+           "This object specifies the CFM service associated with a given port.
+            If value of this object is 0 for a given port, then it means no CFM service is associated with that port."
+     ::= { wwpLeosExtLagPhyPortEntry 2 }
+
+ wwpLeosExtLagPhyPortEnhancedHashConfig OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+           "This object specifies the enhanced hash config used by the incoming physical port for hash key computation.
+            When wwpLeosExtAggFloodHashMode is set to enhanced."
+     ::= { wwpLeosExtLagPhyPortEntry 3 }
+
+ wwpLeosExtLagPhyPortEnhancedHashFunction OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+           "This object specifies the enhanced hash function used by the incoming physical port for hash key computation.
+            When wwpLeosExtAggFloodHashMode is set to enhanced."
+     ::= { wwpLeosExtLagPhyPortEntry 4 }
+
+ wwpLeosExtLagPhyPortEnhancedHashOffset OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+           "This object specifies the enhanced hash offset used by the incoming physical port for hash key computation.
+            When object wwpLeosExtAggFloodHashMode is set to enhanced."
+     ::= { wwpLeosExtLagPhyPortEntry 5 }
+
+  --
+  -- Notification
+  --     
+  wwpLeosExtLagMclagStateChange NOTIFICATION-TYPE
+	OBJECTS	{
+				wwpLeosExtAggIndex,
+				wwpLeosExtAggRedundancyState				
+            }
+	STATUS	current
+	DESCRIPTION
+		"This notification is sent when MC-LAG oper state changes.
+		 Var binding wwpLeosExtAggId represents the MC-LAG PGID." 
+	::= { wwpLeosExtLagMIBNotifications 1 }  
+  END
+ 
+
+

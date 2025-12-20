@@ -1,0 +1,3803 @@
+-- This file was included in WWP MIB release 04-21-05-0007
+ --
+ -- WWP-LEOS-DATAPLANE-MIB.my
+ --
+ --
+
+ WWP-LEOS-DATAPLANE-MIB DEFINITIONS ::= BEGIN
+
+ IMPORTS
+   Unsigned32, Counter64, Integer32, OBJECT-TYPE, MODULE-IDENTITY
+        FROM SNMPv2-SMI
+   TruthValue, DisplayString, MacAddress, TEXTUAL-CONVENTION, RowStatus
+        FROM SNMPv2-TC
+   wwpModulesLeos
+        FROM WWP-SMI;
+
+ wwpLeosDataplaneMIB MODULE-IDENTITY
+         LAST-UPDATED "202105210000Z"
+         ORGANIZATION "Ciena Corp."
+         CONTACT-INFO
+               "   Mib Meister
+                   7035 Ridge Road
+                   Hanover, Maryland 21076
+                   USA
+                   Phone:  +1 800 921 1144
+                   Email:  support@ciena.com"
+         DESCRIPTION
+               "This MIB defines the managed objects for 
+                Dataplane Management including:
+                - Traffic Services Queuing
+                - Class-of-Service (COS)
+                - Private Forwarding Groups (L2-based and Port-based)
+                - Sub-ports
+                - Frame Integrity checking
+                - Layer 2 Control Frame Tunneling (L2CFT)
+                - Packet Capture"
+                
+
+-- revision history
+         REVISION    "202105210000Z"
+         DESCRIPTION 
+               "Updated DisplayString of wwpLeosDpPfgVsName in WwpLeosDpPfgVsEntry table
+                to allow VS name length up to 47 characters."
+
+         REVISION    "201912030000Z"
+         DESCRIPTION 
+               "Added new object wwpLeosDpPacketCaptureProfileFileExport under packet capture MIB.
+                It represents the option to export the PCAP file to configured file export servers." 
+
+         REVISION    "201809190000Z"
+         DESCRIPTION 
+               "Added support for packet capture. 
+                It includes get/set support for capture profiles and capture global."
+         REVISION    "201806070000Z"
+         DESCRIPTION 
+               "Added below table and its entries for MIBS for feature Configurable Fcos and Queue for CPU control traffic
+                Added support of wwpLeosDpTsProtocolCosMapProfileTable under wwpLeosDpTs.
+
+                Added wwpLeosDpTsCosCpuL3PcpControlDscpMapped object to provide configurable 
+                option to control PCP of CPU generated L3 protocols frames."
+
+         REVISION    "201803090000Z"
+         DESCRIPTION 
+               "Added wwpLeosDpTsQEgressPortQueueGroupSchedulerPriority object for scheduler priority of default
+                egress queue group."
+ 
+         REVISION     "201711150000Z"
+         DESCRIPTION
+               "Updated contact info."
+         REVISION    "201711010000Z"
+         DESCRIPTION 
+               "Added wwpLeosDpTsCosCpuCosRemarkL2 object to provide configurable 
+                option to control PCP/DEI remarking of CPU generated frames."
+
+         REVISION    "201707190000Z"
+         DESCRIPTION 
+               "Added wwpLeosDpTsFrameCosMapType object to set type of resolved CoS to dot1d CoS map.
+                Updated Range of wwpLeosDpTsFrameCosMapMplsTcValue."
+         REVISION    "201706010000Z"
+         DESCRIPTION
+               "Added wwpLeosDpTsQEgressPortQueueGroupCount object to wwpLeosDpTsQEgressPortEntry
+                to set the maximum number of queue groups that can be attached to the port."
+         REVISION    "201609120000Z"
+         DESCRIPTION 
+               "Added wwpLeosDpL2CftResources to display L2CFT Resources Usage."
+         REVISION    "201605160000Z"
+         DESCRIPTION 
+               "Added wwpLeosDpL2CftProfileCosPolicy object to set CoS Policy on L2CFT Profiles."
+         REVISION    "201602220000Z"
+         DESCRIPTION
+               "Added dynamic egress queue group profile support for MPLS CAC and BWM feature.
+                Updated egress queue group to support both dynamic and static profile."
+         REVISION    "201512310000Z"
+         DESCRIPTION 
+               "Updated wwpLeosDpPfgVsName to allow the VS name length up to 31 characters."
+         REVISION    "201511180000Z"
+         DESCRIPTION 
+               "Added support for L2 control frame tunneling. 
+                It includes get/set support for L2CFT global attributes and create/modify/delete support for L2CFT profiles."
+         REVISION    "201509150000Z"
+         DESCRIPTION 
+               "Changed max burst size limits for egress port burst size, 
+                custom queue group port CBS and EBS, and queue group profile queue CBS and EBS."
+         REVISION    "201407220000Z"
+         DESCRIPTION 
+               "Added support for frame integrity checking under 
+                wwpLeosDpTs."
+         REVISION    "201406240000Z"
+         DESCRIPTION 
+               "Added support for hierarchical egress queuing."
+         REVISION    "201403130000Z"
+         DESCRIPTION 
+               "Added support for enabling and disabling the shaper on a per
+                egress port queue group."
+         REVISION    "201402030000Z"
+         DESCRIPTION 
+               "Added Port-based PFG configuration support.
+                Reordered REVISION and DESCRIPTION clauses in
+                revision history to conform to standard."
+         REVISION    "201311070000Z"
+         DESCRIPTION 
+               "Added Sub-Port configuration support."
+         REVISION    "201304230000Z"
+         DESCRIPTION
+               "Added PFG configuration support. This includes four new tables: wwpLeosDpPfgMembTable, wwpLeosDpPfgPolicyTable,
+                wwpLeosDpPfgVlanTable, wwpLeosDpPfgVsTable, and one node: wwpLeosDpPfgGlobalAdminState"
+         REVISION 	"201210280050Z"
+         DESCRIPTION
+               "Miscellaneous spelling and description corrections."
+         REVISION 	"201206080050Z"
+         DESCRIPTION
+               "Changed port shaper burst size limits and per COS cbs and ebs limits "
+         REVISION 	"201106130050Z"
+         DESCRIPTION
+               "Added Mpls Tc via wwpLeosDpTsMplsTcCosMapTable and wwpLeosDpTsFrameCosMap"
+         REVISION 	"201105100050Z"
+         DESCRIPTION
+               "Added Egress Queue stats via wwpLeosDpTsQEgressPortQueueGroupQStatsTable "
+         REVISION 	"201007280000Z"
+         DESCRIPTION
+               "Added Egress Frame Cos Map OBJECTS like wwpLeosDpTsFrameCosMapProfileTable wwpLeosDpTsFrameCosMapEntry to MIB"
+         REVISION 	"201002120000Z"
+         DESCRIPTION
+               "Added green and yellow simple WRED curves for 5150"
+         REVISION    "200811111700Z"
+         DESCRIPTION
+               "Initial creation."
+            ::= { wwpModulesLeos 500 }
+ 
+ --
+ -- Textual convention
+ --
+ DpCosMapTypes ::= TEXTUAL-CONVENTION
+     STATUS       current
+     DESCRIPTION  "Attributes that indicate type of Cos Map.
+                   Global type of map can be used for Ethernet as well as MPLS network.
+                   L2Only type of maps can be used only for Ethernet network."
+     SYNTAX       INTEGER {
+                    global(1),
+                    l2Only(2)
+                  }
+
+ DpTsQSredDropProbability ::= TEXTUAL-CONVENTION
+     STATUS       current
+     DESCRIPTION  "Drop Probability for Raven SRED platform. Numbers below indicate % value "
+     SYNTAX       INTEGER {
+                    drop-100-percent(1),
+                    drop-6-25-percent(2),
+                    drop-3-125-percent(3),
+                    drop-1-5625-percent(4),
+                    drop-0-78125-percent(5),
+                    drop-0-390625-percent(6),
+                    drop-0-1953125-percent(7),
+                    drop-0-0976562-percent(8)
+                 }                  
+  
+  DpTsQWredSimpleMaxDropProbability ::= TEXTUAL-CONVENTION
+  	STATUS			current
+  	DESCRIPTION		"Max Drop probability for Triumph Weighted RED platform. Numbers below indicate
+  					percentage value."
+  	SYNTAX			INTEGER {
+  					drop-100-percent(1),
+  					drop-75-percent(2),
+  					drop-50-percent(3),
+  					drop-25-percent(4),
+  					drop-10-percent(5),
+  					drop-9-percent(6),
+  					drop-8-percent(7),
+  					drop-7-percent(8),
+  					drop-6-percent(9),
+  					drop-5-percent(10),
+  					drop-4-percent(11),
+  					drop-3-percent(12),
+  					drop-2-percent(13),
+  					drop-1-percent(14),
+  					drop-0-percent(15)
+  				}
+  
+  DpTsRCosMappingColor ::= TEXTUAL-CONVENTION
+  	STATUS			current
+  	DESCRIPTION		"Resolved Color for use in ingress and egress table settings
+  					percentage value."
+  	SYNTAX			INTEGER {
+  					green (1),
+  					yellow (2)
+  				}
+  				
+  DpSubPortIndex ::= TEXTUAL-CONVENTION
+  	STATUS			current
+  	DESCRIPTION		"Represents a sub-port index."
+  	SYNTAX			Unsigned32
+  
+ DpOnOffSwitch ::= TEXTUAL-CONVENTION
+        STATUS                current 
+        DESCRIPTION           "Attributes that take On/Off values"
+        SYNTAX                INTEGER {  on(1), off(2) } 
+
+  DpPfgPortFwdPortList ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+            "Each octet within this value specifies a set of eight ports,
+            with the first octet specifying 1st through 8th ports, the second
+            octet specifying ports 9th through 16th, etc.  Within each octet,
+            the most significant bit represents the lowest numbered port,
+            and the least significant bit represents the highest numbered
+            port.  Thus, each port of the system is represented by a
+            single bit within the value of this object.  If that bit has
+            a value of '1' then that port is included in the set of ports;
+            the port is not included if its bit has a value of '0'."
+    REFERENCE 
+            "IETF RFC 2674 section 5"
+    SYNTAX  OCTET STRING
+
+  DpProtocolCosMapDscpMode ::= TEXTUAL-CONVENTION
+        STATUS                  current
+        DESCRIPTION             "DSCP mode for protocol-cos-map table."
+        SYNTAX                  INTEGER {
+                                        none (1),
+                                        preserve (2),
+                                        map (3)
+                                }
+
+ --
+ -- Node definitions
+ --
+
+ wwpLeosDpMIBObjects                     OBJECT IDENTIFIER ::= { wwpLeosDataplaneMIB 1 }
+ wwpLeosDpTs                             OBJECT IDENTIFIER ::= { wwpLeosDpMIBObjects 1 }
+ wwpLeosDpTsQueuing                      OBJECT IDENTIFIER ::= { wwpLeosDpTs 1 }    
+ wwpLeosDpTsQCongestionAvoidanceProfile  OBJECT IDENTIFIER ::= { wwpLeosDpTsQueuing 1 }
+ wwpLeosDpTsQEgressPortQueueGroup        OBJECT IDENTIFIER ::= { wwpLeosDpTsQueuing 2 }
+ wwpLeosDpTsQRcosToCosQueueMap           OBJECT IDENTIFIER ::= { wwpLeosDpTsQueuing 3 }
+ wwpLeosDpTsQEgressPort                  OBJECT IDENTIFIER ::= { wwpLeosDpTsQueuing 4 }
+ wwpLeosDpTsQEgressQueueGroupProfile     OBJECT IDENTIFIER ::= { wwpLeosDpTsQueuing 5 }
+ wwpLeosDpTsQEgressQueueGroup            OBJECT IDENTIFIER ::= { wwpLeosDpTsQueuing 6 }
+ wwpLeosDpTsQDynEgressQueueGroupProfile  OBJECT IDENTIFIER ::= { wwpLeosDpTsQueuing 7 }
+ wwpLeosDpTsCosMapping                   OBJECT IDENTIFIER ::= { wwpLeosDpTs 2 }
+ wwpLeosDpTsFrameCosMapping              OBJECT IDENTIFIER ::= { wwpLeosDpTs 3 }
+ wwpLeosDpTsFrameIntegrity               OBJECT IDENTIFIER ::= { wwpLeosDpTs 4 }
+ wwpLeosDpTsCos                          OBJECT IDENTIFIER ::= { wwpLeosDpTs 5 }
+ wwpLeosDpTsProtocolCosMapping           OBJECT IDENTIFIER ::= { wwpLeosDpTs 6 }
+ wwpLeosDpPfg                            OBJECT IDENTIFIER ::= { wwpLeosDataplaneMIB 2 }
+ wwpLeosDpSubPort                        OBJECT IDENTIFIER ::= { wwpLeosDataplaneMIB 3 }
+ wwpLeosDpL2Cft                          OBJECT IDENTIFIER ::= { wwpLeosDataplaneMIB 4 }
+ wwpLeosDpPacketCapture                  OBJECT IDENTIFIER ::= { wwpLeosDataplaneMIB 5 }
+ 
+  
+ --
+ -- Traffic Services Queuing Congestion Avoidance Profile Table  
+ -- for Raven 
+ --
+ wwpLeosDpTsQCAProfileSREDTable OBJECT-TYPE
+     SYNTAX     SEQUENCE OF WwpLeosDpTsQCAProfileSREDEntry
+     MAX-ACCESS not-accessible
+     STATUS     current
+     DESCRIPTION
+            " The (conceptual) table listing configuration parameters of congestion Avoidance profile
+             for SRED type of congestion Avoidance Profile type."
+     ::= { wwpLeosDpTsQCongestionAvoidanceProfile 1 }
+
+ wwpLeosDpTsQCAProfileSREDEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosDpTsQCAProfileSREDEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "An entry (conceptual row) in the wwpLeosDpTsQCAProfileSREDTable."
+     INDEX { wwpLeosDpTsQCAProfileSREDId }
+     ::= { wwpLeosDpTsQCAProfileSREDTable 1 }
+                                                    
+ WwpLeosDpTsQCAProfileSREDEntry ::=  SEQUENCE {
+     wwpLeosDpTsQCAProfileSREDId                          INTEGER, 
+     wwpLeosDpTsQCAProfileSREDName						   DisplayString,
+     wwpLeosDpTsQCAProfileSREDGreenThreshold              INTEGER,
+     wwpLeosDpTsQCAProfileSREDGreenDropProbability        DpTsQSredDropProbability,
+     wwpLeosDpTsQCAProfileSREDYellowThreshold			   INTEGER,
+     wwpLeosDpTsQCAProfileSREDYellowDropProbability       DpTsQSredDropProbability,
+     wwpLeosDpTsQCAProfileSREDRowStatus				   RowStatus			   
+ }
+
+ wwpLeosDpTsQCAProfileSREDId OBJECT-TYPE
+     SYNTAX      INTEGER (1..65535)
+     MAX-ACCESS  not-accessible
+     STATUS      current
+     DESCRIPTION
+        "The Profile Id"
+     ::= { wwpLeosDpTsQCAProfileSREDEntry 1 } 
+     
+ wwpLeosDpTsQCAProfileSREDName OBJECT-TYPE
+     SYNTAX      DisplayString (SIZE (1..15))
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION
+        "The congestion Avoidance Profile name."
+     ::= { wwpLeosDpTsQCAProfileSREDEntry 2 } 
+     
+ wwpLeosDpTsQCAProfileSREDGreenThreshold OBJECT-TYPE
+     SYNTAX      INTEGER 
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION
+        "The green threshold value for this profile above which all green frames are dropped."
+     ::= { wwpLeosDpTsQCAProfileSREDEntry 4 } 
+ 
+ wwpLeosDpTsQCAProfileSREDGreenDropProbability OBJECT-TYPE
+     SYNTAX      DpTsQSredDropProbability 
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION
+        "The drop probability value indicating the percentage of green frames to be dropped."
+     ::= { wwpLeosDpTsQCAProfileSREDEntry 5 } 
+ 
+ wwpLeosDpTsQCAProfileSREDYellowThreshold OBJECT-TYPE
+     SYNTAX      INTEGER 
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION
+        "The yellow threshold value for this profile above which all green frames are dropped."
+     ::= { wwpLeosDpTsQCAProfileSREDEntry 6 } 
+ 
+ wwpLeosDpTsQCAProfileSREDYellowDropProbability OBJECT-TYPE
+     SYNTAX      DpTsQSredDropProbability 
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION
+        "The drop probability value indicating the percentage of yellow frames to be dropped."
+     ::= { wwpLeosDpTsQCAProfileSREDEntry 7 } 
+ 
+ wwpLeosDpTsQCAProfileSREDRowStatus OBJECT-TYPE
+     SYNTAX      RowStatus 
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION
+        "Used to manage the creation and deletion of the
+             conceptual rows in this table.
+
+             To create a row in this table, a manager must
+             set this object to 'createAndGo'. To delete a row in this
+             table, set this object to 'destroy'."
+     ::= { wwpLeosDpTsQCAProfileSREDEntry 9 } 
+ 
+ 
+ --
+ -- Traffic Services Queuing Congestion Avoidance Profile Table  
+ -- for Triumph WRED  - SWRED stands for Simple WRED 
+ --
+
+ wwpLeosDpTsQCAProfileWREDSimpleTable OBJECT-TYPE
+     SYNTAX     SEQUENCE OF WwpLeosDpTsQCAProfileWREDSimpleEntry
+     MAX-ACCESS not-accessible
+     STATUS     current
+     DESCRIPTION
+            " The (conceptual) table listing configuration parameters of congestion Avoidance profile
+             for Simple WRED type of congestion Avoidance Profile type."
+     ::= { wwpLeosDpTsQCongestionAvoidanceProfile 2 }
+
+ wwpLeosDpTsQCAProfileWREDSimpleEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosDpTsQCAProfileWREDSimpleEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "An entry (conceptual row in the wwpLeosDpTsQCAProfileWREDSimpleEntry."
+     INDEX { wwpLeosDpTsQCAProfileWREDSimpleId }
+     ::= { wwpLeosDpTsQCAProfileWREDSimpleTable 1 }
+
+ 
+ WwpLeosDpTsQCAProfileWREDSimpleEntry ::=  SEQUENCE {
+     wwpLeosDpTsQCAProfileWREDSimpleId                            INTEGER, 
+     wwpLeosDpTsQCAProfileWREDSimpleName						         DisplayString,
+     wwpLeosDpTsQCAProfileWREDSimpleTCPGreenThreshold			      INTEGER,
+     wwpLeosDpTsQCAProfileWREDSimpleTCPGreenUpperThreshold		   INTEGER,
+     wwpLeosDpTsQCAProfileWREDSimpleTCPGreenMaxDropProbability	   DpTsQWredSimpleMaxDropProbability,
+     wwpLeosDpTsQCAProfileWREDSimpleTCPYellowThreshold			   INTEGER,
+     wwpLeosDpTsQCAProfileWREDSimpleTCPYellowUpperThreshold		   INTEGER,
+     wwpLeosDpTsQCAProfileWREDSimpleTCPYellowMaxDropProbability	DpTsQWredSimpleMaxDropProbability,
+     wwpLeosDpTsQCAProfileWREDSimpleRowStatus				         RowStatus,
+     wwpLeosDpTsQCAProfileWREDSimpleNonTCPThreshold				   INTEGER,
+     wwpLeosDpTsQCAProfileWREDSimpleNonTCPUpperThreshold		      INTEGER,				   
+     wwpLeosDpTsQCAProfileWREDSimpleNonTCPMaxDropProbability	   DpTsQWredSimpleMaxDropProbability,
+     wwpLeosDpTsQCAProfileWREDSimpleGreenLowerThreshold		      INTEGER,
+     wwpLeosDpTsQCAProfileWREDSimpleGreenUpperThreshold  		   INTEGER,
+     wwpLeosDpTsQCAProfileWREDSimpleGreenMaxDropProbability	      DpTsQWredSimpleMaxDropProbability,
+     wwpLeosDpTsQCAProfileWREDSimpleYellowLowerThreshold		      INTEGER,
+     wwpLeosDpTsQCAProfileWREDSimpleYellowUpperThreshold  		   INTEGER,
+     wwpLeosDpTsQCAProfileWREDSimpleYellowMaxDropProbability      DpTsQWredSimpleMaxDropProbability,
+     wwpLeosDpTsQCAProfileWREDSimpleYellowAdmitLimit              INTEGER
+ }
+
+ wwpLeosDpTsQCAProfileWREDSimpleId OBJECT-TYPE
+     SYNTAX      INTEGER (1..65535)
+     MAX-ACCESS  not-accessible
+     STATUS      current
+     DESCRIPTION
+        "Unique identifier for the WREDSimple profile entry. "
+     ::= { wwpLeosDpTsQCAProfileWREDSimpleEntry 1 } 
+     
+ wwpLeosDpTsQCAProfileWREDSimpleName OBJECT-TYPE
+     SYNTAX      DisplayString (SIZE (1..16))
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION
+        "Profile name associated with this index."
+     ::= { wwpLeosDpTsQCAProfileWREDSimpleEntry 2 } 
+     
+ wwpLeosDpTsQCAProfileWREDSimpleTCPGreenThreshold	OBJECT-TYPE
+ 	 SYNTAX		INTEGER
+ 	 MAX-ACCESS	read-create
+ 	 STATUS		current
+ 	 DESCRIPTION
+ 	 		"Specifies the threshold to begin dropping TCP green frames. "
+ 	 ::= { wwpLeosDpTsQCAProfileWREDSimpleEntry 3}
+ 
+ wwpLeosDpTsQCAProfileWREDSimpleTCPGreenUpperThreshold		OBJECT-TYPE
+ 	 SYNTAX		INTEGER
+ 	 MAX-ACCESS read-create
+ 	 STATUS		current
+ 	 DESCRIPTION
+ 	 		"Specifies the threshold above which all the TCP green frames are dropped."
+ 	 ::= { wwpLeosDpTsQCAProfileWREDSimpleEntry 4 }
+
+ wwpLeosDpTsQCAProfileWREDSimpleTCPGreenMaxDropProbability	OBJECT-TYPE
+ 	SYNTAX		DpTsQWredSimpleMaxDropProbability
+ 	MAX-ACCESS	read-create
+ 	STATUS		current
+ 	DESCRIPTION
+ 		" Specifies the maximum drop probability for TCP green frames before hitting the 
+ 			TCP green upper threshold."
+ 	::= { wwpLeosDpTsQCAProfileWREDSimpleEntry 5 }
+ 	
+ wwpLeosDpTsQCAProfileWREDSimpleTCPYellowThreshold	OBJECT-TYPE
+ 	SYNTAX		INTEGER
+ 	MAX-ACCESS	read-create
+ 	STATUS		current
+ 	DESCRIPTION
+ 		"Specifies the threshold to begin dropping the TCP yellow frames."
+ 	::= { wwpLeosDpTsQCAProfileWREDSimpleEntry	6 }
+ 
+ wwpLeosDpTsQCAProfileWREDSimpleTCPYellowUpperThreshold		OBJECT-TYPE
+ 	 SYNTAX		INTEGER
+ 	 MAX-ACCESS read-create
+ 	 STATUS		current
+ 	 DESCRIPTION
+ 	 		"Specifies the threshold above which all the TCP yellow frames are dropped."
+ 	 ::= { wwpLeosDpTsQCAProfileWREDSimpleEntry 7 }
+
+ wwpLeosDpTsQCAProfileWREDSimpleTCPYellowMaxDropProbability	OBJECT-TYPE
+ 	SYNTAX		DpTsQWredSimpleMaxDropProbability
+ 	MAX-ACCESS	read-create
+ 	STATUS		current
+ 	DESCRIPTION
+ 		"Specifies the max drop probability for TCP yellow frames before hitting the
+		TCP yellow upper threshold."
+ 	::= { wwpLeosDpTsQCAProfileWREDSimpleEntry	8 }
+ 
+ wwpLeosDpTsQCAProfileWREDSimpleRowStatus OBJECT-TYPE
+     SYNTAX      RowStatus
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION
+        "Used to manage the creation and deletion of the
+             conceptual rows in this table.
+
+             To create a row in this table, a manager must
+             set this object to 'createAndGo'. To delete a row in this
+             table, set this object to 'destroy'."
+     ::= { wwpLeosDpTsQCAProfileWREDSimpleEntry 9 } 
+ 
+ wwpLeosDpTsQCAProfileWREDSimpleNonTCPThreshold	OBJECT-TYPE
+ 	 SYNTAX		INTEGER
+ 	 MAX-ACCESS	read-create
+ 	 STATUS		current
+ 	 DESCRIPTION
+ 	 		"Specifies the threshold to begin dropping non-TCP frames."
+ 	 ::= { wwpLeosDpTsQCAProfileWREDSimpleEntry 10}
+
+ wwpLeosDpTsQCAProfileWREDSimpleNonTCPUpperThreshold		OBJECT-TYPE
+ 	 SYNTAX		INTEGER
+ 	 MAX-ACCESS read-create
+ 	 STATUS		current
+ 	 DESCRIPTION
+ 	 		"Specifies the threshold above which all the non-TCP frames are dropped."
+ 	 ::= { wwpLeosDpTsQCAProfileWREDSimpleEntry 11 }
+
+ wwpLeosDpTsQCAProfileWREDSimpleNonTCPMaxDropProbability	OBJECT-TYPE
+ 	SYNTAX		DpTsQWredSimpleMaxDropProbability
+ 	MAX-ACCESS	read-create
+ 	STATUS		current
+ 	DESCRIPTION
+ 		" Specifies the maximum drop probability for non-TCP frames before hitting the
+		non-TCP upper threshold."
+ 	::= { wwpLeosDpTsQCAProfileWREDSimpleEntry 12 }      
+
+ wwpLeosDpTsQCAProfileWREDSimpleGreenLowerThreshold	OBJECT-TYPE
+ 	 SYNTAX		INTEGER
+ 	 MAX-ACCESS	read-create
+ 	 STATUS		current
+ 	 DESCRIPTION
+ 	 		"Specifies the threshold to begin dropping green frames. "
+ 	 ::= { wwpLeosDpTsQCAProfileWREDSimpleEntry 13}
+ 
+ wwpLeosDpTsQCAProfileWREDSimpleGreenUpperThreshold		OBJECT-TYPE
+ 	 SYNTAX		INTEGER
+ 	 MAX-ACCESS read-create
+ 	 STATUS		current
+ 	 DESCRIPTION
+ 	 		"Specifies the threshold above which all the green frames are dropped."
+ 	 ::= { wwpLeosDpTsQCAProfileWREDSimpleEntry 14 }
+
+ wwpLeosDpTsQCAProfileWREDSimpleGreenMaxDropProbability	OBJECT-TYPE
+ 	SYNTAX		DpTsQWredSimpleMaxDropProbability
+ 	MAX-ACCESS	read-create
+ 	STATUS		current
+ 	DESCRIPTION
+ 		" Specifies the maximum drop probability for green frames before hitting the
+		green upper threshold."
+ 	::= { wwpLeosDpTsQCAProfileWREDSimpleEntry 15 }
+
+ wwpLeosDpTsQCAProfileWREDSimpleYellowLowerThreshold	OBJECT-TYPE
+ 	 SYNTAX		INTEGER
+ 	 MAX-ACCESS	read-create
+ 	 STATUS		current
+ 	 DESCRIPTION
+ 	 		"Specifies the threshold to begin dropping yellow frames. "
+ 	 ::= { wwpLeosDpTsQCAProfileWREDSimpleEntry 16}
+ 
+ wwpLeosDpTsQCAProfileWREDSimpleYellowUpperThreshold		OBJECT-TYPE
+ 	 SYNTAX		INTEGER
+ 	 MAX-ACCESS read-create
+ 	 STATUS		current
+ 	 DESCRIPTION
+ 	 		"Specifies the threshold above which all the yellow frames are dropped."
+ 	 ::= { wwpLeosDpTsQCAProfileWREDSimpleEntry 17 }
+
+ wwpLeosDpTsQCAProfileWREDSimpleYellowMaxDropProbability	OBJECT-TYPE
+ 	SYNTAX		DpTsQWredSimpleMaxDropProbability
+ 	MAX-ACCESS	read-create
+ 	STATUS		current
+ 	DESCRIPTION
+ 		" Specifies the maximum drop probability for yellow frames before hitting the
+		yellow upper threshold."
+ 	::= { wwpLeosDpTsQCAProfileWREDSimpleEntry 18 }
+ 	
+ wwpLeosDpTsQCAProfileWREDSimpleYellowAdmitLimit	OBJECT-TYPE
+ 	SYNTAX		INTEGER
+ 	MAX-ACCESS	read-create
+ 	STATUS		current
+ 	DESCRIPTION
+ 		"Specifies queue limit above which yellow frames are dropped and below which
+		they are not dropped. This should not be confused with the yellow curve."
+ 	::= { wwpLeosDpTsQCAProfileWREDSimpleEntry 19 }
+   
+ --
+ -- Egress Port Table
+ --
+ 
+ wwpLeosDpTsQEgressPortTable OBJECT-TYPE
+     SYNTAX     SEQUENCE OF WwpLeosDpTsQEgressPortEntry
+     MAX-ACCESS not-accessible
+     STATUS     current
+     DESCRIPTION
+            "The (conceptual) table listing configuration parameters of Egress Port."
+     ::= { wwpLeosDpTsQEgressPort 1 }
+
+ wwpLeosDpTsQEgressPortEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosDpTsQEgressPortEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "An entry (conceptual row) in the wwpLeosDpTsQEgressPortTable."
+     INDEX { wwpLeosDpTsQEgressPortId }
+     ::= { wwpLeosDpTsQEgressPortTable 1 }
+
+                   
+ WwpLeosDpTsQEgressPortEntry ::=  SEQUENCE {
+     wwpLeosDpTsQEgressPortId                       Integer32,      
+     wwpLeosDpTsQEgressPortSchedulerAlgorithm       INTEGER,
+     wwpLeosDpTsQEgressPortShaperBandwidth          Unsigned32,
+     wwpLeosDpTsQEgressPortBurstSize                Unsigned32,
+     wwpLeosDpTsQEgressPortTrafficShaping           INTEGER,
+     wwpLeosDpTsQEgressPortDynMaxQueueDepth         INTEGER,
+     wwpLeosDpTsQEgressPortQueueGroupCount          Unsigned32
+ }
+
+  wwpLeosDpTsQEgressPortId OBJECT-TYPE
+     SYNTAX      Integer32 (1..65535)
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "Pgid of egress port."
+     ::= { wwpLeosDpTsQEgressPortEntry 1 }
+
+ wwpLeosDpTsQEgressPortSchedulerAlgorithm OBJECT-TYPE
+     SYNTAX      INTEGER		{
+     							strictpriority(1),
+     							roundrobin(2),
+     							weighteddeficitroundrobin(3),
+     							weightedroundrobin(4)
+     					} 
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "Scheduler Algorithm for the egress port."
+     ::= { wwpLeosDpTsQEgressPortEntry 2 }
+
+ wwpLeosDpTsQEgressPortShaperBandwidth OBJECT-TYPE
+     SYNTAX      Unsigned32 
+     UNITS		 "kbps"
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "Shaper Bandwidth associated with the egress port."
+     ::= { wwpLeosDpTsQEgressPortEntry 3 }  
+     
+ wwpLeosDpTsQEgressPortBurstSize 		OBJECT-TYPE
+     SYNTAX		 Unsigned32 (4..131040)
+     UNITS		 "kb"
+     MAX-ACCESS	 read-write
+     STATUS		 current
+     DESCRIPTION
+            "The burst size associated with the egress port."
+     ::= { wwpLeosDpTsQEgressPortEntry 4 }
+     
+  
+wwpLeosDpTsQEgressPortTrafficShaping OBJECT-TYPE
+     SYNTAX      INTEGER {
+                    on(1),
+                    off(2)
+                }
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+            "The status of the shaper associated with the egress port"
+     ::= { wwpLeosDpTsQEgressPortEntry 5 }
+
+
+ wwpLeosDpTsQEgressPortDynMaxQueueDepth OBJECT-TYPE
+     SYNTAX      INTEGER		{
+     							low(1),
+     							medium(2),
+     							medium-high(3),
+     							high(4)
+     					} 
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "Egress queue depth for the egress port."
+     ::= { wwpLeosDpTsQEgressPortEntry 6 }
+
+ wwpLeosDpTsQEgressPortQueueGroupCount OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "Maximum number of queue groups that can be configured on port"
+     ::= { wwpLeosDpTsQEgressPortEntry 7 }
+   
+ --
+ -- Egress Port Queue Group Table
+ --
+ 
+ wwpLeosDpTsQEgressPortQueueGroupTable OBJECT-TYPE
+     SYNTAX     SEQUENCE OF WwpLeosDpTsQEgressPortQueueGroupEntry
+     MAX-ACCESS not-accessible
+     STATUS     current
+     DESCRIPTION
+            "The (conceptual) table listing configuration parameters of Egress Port Queue."
+     ::= { wwpLeosDpTsQEgressPortQueueGroup 1 }
+
+ wwpLeosDpTsQEgressPortQueueGroupEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosDpTsQEgressPortQueueGroupEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "An entry (conceptual row) in the wwpLeosDpTsQEgressPortQueueGroupTable."
+     INDEX { wwpLeosDpTsQEgressPortQueueGroupId }
+     ::= { wwpLeosDpTsQEgressPortQueueGroupTable 1 }
+
+                   
+ WwpLeosDpTsQEgressPortQueueGroupEntry ::=  SEQUENCE {
+     wwpLeosDpTsQEgressPortQueueGroupId                       INTEGER, 
+     wwpLeosDpTsQEgressPortQueueGroupQCount                   INTEGER,
+     wwpLeosDpTsQEgressPortQueueGroupSchedulerAlgorithm       INTEGER,
+     wwpLeosDpTsQEgressPortQueueGroupShaperBandwidth          Unsigned32,
+     wwpLeosDpTsQEgressPortQueueGroupBurstSize                Unsigned32,
+     wwpLeosDpTsQEgressPortQueueGroupWdrrSchedulerGranularity Unsigned32,
+     wwpLeosDpTsQEgressPortQueueGroupTrafficShaping           INTEGER,
+     wwpLeosDpTsQEgressPortQueueGroupSchedulerWeight          Unsigned32,
+     wwpLeosDpTsQEgressPortQueueGroupEIRPolicy                INTEGER,
+     wwpLeosDpTsQEgressPortQueueGroupCIR                      Unsigned32,
+     wwpLeosDpTsQEgressPortQueueGroupCBS                      Unsigned32,
+     wwpLeosDpTsQEgressPortQueueGroupEIR                      Unsigned32,
+     wwpLeosDpTsQEgressPortQueueGroupEBS                      Unsigned32,
+     wwpLeosDpTsQEgressPortQueueGroupSchedulerPriority        Unsigned32
+ }
+ 
+ wwpLeosDpTsQEgressPortQueueGroupId OBJECT-TYPE
+     SYNTAX      INTEGER (1..65535)
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "Group Id of the egress port queue group. This is the same as the pgid of the port."
+     ::= { wwpLeosDpTsQEgressPortQueueGroupEntry 1 }
+ 
+ wwpLeosDpTsQEgressPortQueueGroupQCount OBJECT-TYPE
+     SYNTAX      INTEGER (1..8)
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "Number of queues in the egress port group."
+     ::= { wwpLeosDpTsQEgressPortQueueGroupEntry 2 }
+
+ 
+ wwpLeosDpTsQEgressPortQueueGroupSchedulerAlgorithm OBJECT-TYPE
+     SYNTAX      INTEGER		{
+     							strictpriority(1),
+     							weightedfairqueuing(2),
+     							roundrobin(3),
+     							weighteddeficitroundrobin(4),
+     							weightedroundrobin(5),
+     							unknown(99)
+     					} 
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "Scheduler Algorithm for the egress port queue."
+     ::= { wwpLeosDpTsQEgressPortQueueGroupEntry 3 }
+
+ wwpLeosDpTsQEgressPortQueueGroupShaperBandwidth OBJECT-TYPE
+     SYNTAX      Unsigned32 
+     UNITS		 "kbps"
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "Shaper Bandwidth associated with the egress port group."
+     ::= { wwpLeosDpTsQEgressPortQueueGroupEntry 4 }  
+     
+ wwpLeosDpTsQEgressPortQueueGroupBurstSize 		OBJECT-TYPE
+ 	 SYNTAX		 Unsigned32 (4..262144)
+ 	 UNITS		 "kb"
+ 	 MAX-ACCESS	 read-write
+ 	 STATUS		 current
+ 	 DESCRIPTION
+ 	 	"The burst size associated with the egress port group."
+ 	 ::= { wwpLeosDpTsQEgressPortQueueGroupEntry 5 }
+     
+wwpLeosDpTsQEgressPortQueueGroupWdrrSchedulerGranularity 		OBJECT-TYPE
+ 	 SYNTAX		 Unsigned32 (50..1600)
+ 	 UNITS		 "kb"
+ 	 MAX-ACCESS	 read-write
+ 	 STATUS		 current
+ 	 DESCRIPTION
+ 	 	"The WDRR scheduling granularity in K Bytes"
+ 	 ::= { wwpLeosDpTsQEgressPortQueueGroupEntry 6 }
+  
+wwpLeosDpTsQEgressPortQueueGroupTrafficShaping OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    on(1),
+                    off(2)
+                }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "The status of the shaper associated with the egress port group"
+    ::= { wwpLeosDpTsQEgressPortQueueGroupEntry 7 }
+
+ wwpLeosDpTsQEgressPortQueueGroupSchedulerWeight OBJECT-TYPE
+     SYNTAX      Unsigned32 (0..127)
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "Scheduler weight of the default queue group."
+     ::= { wwpLeosDpTsQEgressPortQueueGroupEntry 8 }
+
+ wwpLeosDpTsQEgressPortQueueGroupEIRPolicy OBJECT-TYPE
+     SYNTAX      INTEGER {
+                   configure(1),
+                   inherit(2)
+               } 
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "Where EIR value is chosen for the egress queue."
+     ::= { wwpLeosDpTsQEgressPortQueueGroupEntry 9 }
+
+ wwpLeosDpTsQEgressPortQueueGroupCIR OBJECT-TYPE
+     SYNTAX      Unsigned32 (1024..80000000)
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "CIR for the default queue group."
+     ::= { wwpLeosDpTsQEgressPortQueueGroupEntry 10 }
+ 
+ wwpLeosDpTsQEgressPortQueueGroupCBS OBJECT-TYPE
+     SYNTAX      Unsigned32 (0..262144)
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "CBS for the default queue group."
+     ::= { wwpLeosDpTsQEgressPortQueueGroupEntry 11 }
+ 
+ wwpLeosDpTsQEgressPortQueueGroupEIR OBJECT-TYPE
+     SYNTAX      Unsigned32 
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "EIR for the default queue group."
+     ::= { wwpLeosDpTsQEgressPortQueueGroupEntry 12 }
+ 
+ wwpLeosDpTsQEgressPortQueueGroupEBS OBJECT-TYPE
+     SYNTAX      Unsigned32 (0..262144)
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "EBS for the default queue group."
+     ::= { wwpLeosDpTsQEgressPortQueueGroupEntry 13 }
+
+ wwpLeosDpTsQEgressPortQueueGroupSchedulerPriority OBJECT-TYPE
+     SYNTAX      Unsigned32 (0..63)
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "Scheduler priority for the default queue group."
+     ::= { wwpLeosDpTsQEgressPortQueueGroupEntry 14 }
+
+ 
+ --
+ -- Egress Port Queue Group Queue Configuration Table
+ --
+ 
+ wwpLeosDpTsQEgressPortQueueGroupQConfigTable OBJECT-TYPE
+     SYNTAX     SEQUENCE OF WwpLeosDpTsQEgressPortQueueGroupQConfigEntry
+     MAX-ACCESS not-accessible
+     STATUS     current
+     DESCRIPTION
+            "The (conceptual) table listing configuration parameters of an egress Queue."
+     ::= { wwpLeosDpTsQEgressPortQueueGroup 2 }
+
+ wwpLeosDpTsQEgressPortQueueGroupQConfigEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosDpTsQEgressPortQueueGroupQConfigEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "An entry (conceptual row) in the wwpLeosDpTsQEgressPortQueueGroupQConfigTable."
+     INDEX { wwpLeosDpTsQEgressPortQueueGroupId,
+             wwpLeosDpTsQEgressPortQueueGroupQueueId }
+     ::= { wwpLeosDpTsQEgressPortQueueGroupQConfigTable 1 }
+
+ 
+ WwpLeosDpTsQEgressPortQueueGroupQConfigEntry ::=  SEQUENCE {
+     wwpLeosDpTsQEgressPortQueueGroupQueueId                 INTEGER, 
+     wwpLeosDpTsQEgressPortQueueGroupQueueCAPId  	     INTEGER,
+     wwpLeosDpTsQEgressPortQueueGroupQueuePriorityId	     Unsigned32,	
+     wwpLeosDpTsQEgressPortQueueGroupQueueSchedulerWeight    Unsigned32,
+     wwpLeosDpTsQEgressPortQueueGroupQueueSize		     Unsigned32,
+     wwpLeosDpTsQEgressPortQueueGroupQueueCIR		     Unsigned32,
+     wwpLeosDpTsQEgressPortQueueGroupQueueCBS		     Unsigned32,
+     wwpLeosDpTsQEgressPortQueueGroupQueueEIR		     Unsigned32,
+     wwpLeosDpTsQEgressPortQueueGroupQueueEBS		     Unsigned32,
+     wwpLeosDpTsQEgressPortQueueGroupQueueEirPolicy          INTEGER
+ }
+ 
+ wwpLeosDpTsQEgressPortQueueGroupQueueId OBJECT-TYPE
+     SYNTAX      INTEGER (0..7)
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "The per port per group queue Id."
+     ::= { wwpLeosDpTsQEgressPortQueueGroupQConfigEntry 1 }
+
+ wwpLeosDpTsQEgressPortQueueGroupQueueCAPId OBJECT-TYPE
+     SYNTAX      INTEGER 
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "The Congestion Avoidance Profile Id associated with the queue."
+     ::= { wwpLeosDpTsQEgressPortQueueGroupQConfigEntry 2 }
+
+ wwpLeosDpTsQEgressPortQueueGroupQueuePriorityId OBJECT-TYPE
+     SYNTAX      Unsigned32 
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "Relative priority id of the queue."
+     ::= { wwpLeosDpTsQEgressPortQueueGroupQConfigEntry 3 }
+ 
+ wwpLeosDpTsQEgressPortQueueGroupQueueSchedulerWeight OBJECT-TYPE
+     SYNTAX      Unsigned32 (0..1000)
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "Scheduler weight of the queue."
+     ::= { wwpLeosDpTsQEgressPortQueueGroupQConfigEntry 4 }
+
+ wwpLeosDpTsQEgressPortQueueGroupQueueSize OBJECT-TYPE
+     SYNTAX      Unsigned32 
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "Queue size of the queue."
+     ::= { wwpLeosDpTsQEgressPortQueueGroupQConfigEntry 5 }
+
+ wwpLeosDpTsQEgressPortQueueGroupQueueCIR OBJECT-TYPE
+     SYNTAX      Unsigned32 (0..80000000) 
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "CIR for the queue."
+     ::= { wwpLeosDpTsQEgressPortQueueGroupQConfigEntry 6 }
+ 
+ wwpLeosDpTsQEgressPortQueueGroupQueueCBS OBJECT-TYPE
+     SYNTAX      Unsigned32 (0..262144)
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "CBS for the queue."
+     ::= { wwpLeosDpTsQEgressPortQueueGroupQConfigEntry 7 }
+ 
+ wwpLeosDpTsQEgressPortQueueGroupQueueEIR OBJECT-TYPE
+     SYNTAX      Unsigned32 (0..80000000) 
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "EIR for the queue."
+     ::= { wwpLeosDpTsQEgressPortQueueGroupQConfigEntry 8 }
+ 
+ wwpLeosDpTsQEgressPortQueueGroupQueueEBS OBJECT-TYPE
+     SYNTAX      Unsigned32 (0..262144)
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "EBS for the queue."
+     ::= { wwpLeosDpTsQEgressPortQueueGroupQConfigEntry 9 }
+
+ wwpLeosDpTsQEgressPortQueueGroupQueueEirPolicy OBJECT-TYPE
+     SYNTAX      INTEGER {
+                   configure(1),
+                   inherit(2)
+               } 
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "Where EIR policy for the egress queue."
+     ::= { wwpLeosDpTsQEgressPortQueueGroupQConfigEntry 10 }
+
+
+--
+-- Egress Port Queue Group Queue Stats Table
+--
+
+wwpLeosDpTsQEgressPortQueueGroupQStatsTable OBJECT-TYPE
+     SYNTAX     SEQUENCE OF WwpLeosDpTsQEgressPortQueueGroupQStatsEntry
+     MAX-ACCESS not-accessible
+     STATUS     current
+     DESCRIPTION
+            "The (conceptual) table listing statistics for an egress Queue."
+     ::= { wwpLeosDpTsQEgressPortQueueGroup 3 }
+
+ wwpLeosDpTsQEgressPortQueueGroupQStatsEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosDpTsQEgressPortQueueGroupQStatsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "An entry (conceptual row) in the wwpLeosDpTsQEgressPortQueueGroupQStatsTable."
+     INDEX { wwpLeosDpTsQEgressPortQueueGroupId,
+             wwpLeosDpTsQEgressPortQueueGroupStatsQueueId }
+     ::= { wwpLeosDpTsQEgressPortQueueGroupQStatsTable 1 }
+
+
+ WwpLeosDpTsQEgressPortQueueGroupQStatsEntry ::=  SEQUENCE {
+     wwpLeosDpTsQEgressPortQueueGroupStatsQueueId                 INTEGER, 
+     wwpLeosDpTsQEgressPortQueueGroupQueueStatsTxBytes            Counter64,
+     wwpLeosDpTsQEgressPortQueueGroupQueueStatsTxPkts             Counter64,
+     wwpLeosDpTsQEgressPortQueueGroupQueueStatsDroppedBytes       Counter64,
+     wwpLeosDpTsQEgressPortQueueGroupQueueStatsDroppedPkts        Counter64,
+     wwpLeosDpTsQEgressPortQueueGroupQueueStatsClear              TruthValue
+ }
+
+ wwpLeosDpTsQEgressPortQueueGroupStatsQueueId OBJECT-TYPE
+     SYNTAX      INTEGER (0..7)
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "The per port per group queue Id."
+     ::= { wwpLeosDpTsQEgressPortQueueGroupQStatsEntry 1 }
+
+ wwpLeosDpTsQEgressPortQueueGroupQueueStatsTxBytes OBJECT-TYPE
+     SYNTAX      Counter64
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "Tx bytes for this queue"
+     ::= { wwpLeosDpTsQEgressPortQueueGroupQStatsEntry 2 }
+
+ wwpLeosDpTsQEgressPortQueueGroupQueueStatsTxPkts OBJECT-TYPE
+     SYNTAX      Counter64
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "Tx packets for this queue."
+     ::= { wwpLeosDpTsQEgressPortQueueGroupQStatsEntry 3 }
+
+ wwpLeosDpTsQEgressPortQueueGroupQueueStatsDroppedBytes OBJECT-TYPE
+     SYNTAX      Counter64
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "Dropped bytes for this queue."
+     ::= { wwpLeosDpTsQEgressPortQueueGroupQStatsEntry 4 }
+
+ wwpLeosDpTsQEgressPortQueueGroupQueueStatsDroppedPkts OBJECT-TYPE
+     SYNTAX      Counter64
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "Dropped packets for this queue."
+     ::= { wwpLeosDpTsQEgressPortQueueGroupQStatsEntry 5 }
+
+ wwpLeosDpTsQEgressPortQueueGroupQueueStatsClear OBJECT-TYPE
+     SYNTAX      TruthValue
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "When this value is set to true, this queue's statistics is reset to 0. When
+	 read, this always returns false "
+     ::= { wwpLeosDpTsQEgressPortQueueGroupQStatsEntry 6 }
+
+ --
+ -- Egress Queue Group Profile Table
+ --
+
+ wwpLeosDpTsQEgressQueueGroupProfileTable OBJECT-TYPE
+     SYNTAX     SEQUENCE OF WwpLeosDpTsQEgressQueueGroupProfileEntry
+     MAX-ACCESS not-accessible
+     STATUS     current
+     DESCRIPTION
+            "The (conceptual) table listing configuration parameters of an Egress Queue Group Profile."
+     ::= { wwpLeosDpTsQEgressQueueGroupProfile 1 }
+
+ wwpLeosDpTsQEgressQueueGroupProfileEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosDpTsQEgressQueueGroupProfileEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "An entry (conceptual row) in the wwpLeosDpTsQEgressQueueGroupProfileTable."
+     INDEX { wwpLeosDpTsQEgressQueueGroupProfileId }
+     ::= { wwpLeosDpTsQEgressQueueGroupProfileTable 1 }
+
+
+ WwpLeosDpTsQEgressQueueGroupProfileEntry ::=  SEQUENCE {
+     wwpLeosDpTsQEgressQueueGroupProfileId                       Integer32,
+     wwpLeosDpTsQEgressQueueGroupProfileName                     DisplayString,
+     wwpLeosDpTsQEgressQueueGroupProfileRowStatus                RowStatus
+ }
+
+ wwpLeosDpTsQEgressQueueGroupProfileId OBJECT-TYPE
+     SYNTAX      Integer32 (0..127)
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "The Egress Queue Group Profile Id."
+     ::= { wwpLeosDpTsQEgressQueueGroupProfileEntry 1 }
+
+ wwpLeosDpTsQEgressQueueGroupProfileName OBJECT-TYPE
+     SYNTAX      DisplayString (SIZE (1..16))
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION
+        "Profile name associated with this index."
+     ::= { wwpLeosDpTsQEgressQueueGroupProfileEntry 2 } 
+ 
+ wwpLeosDpTsQEgressQueueGroupProfileRowStatus OBJECT-TYPE
+     SYNTAX      RowStatus
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION
+        "Used to manage the creation and deletion of the
+             conceptual rows in this table.
+
+             To create a row in this table, a manager must
+             set this object to 'createAndGo'. To delete a row in this
+             table, set this object to 'destroy'."
+     ::= { wwpLeosDpTsQEgressQueueGroupProfileEntry 3 }
+
+ --
+ -- Egress Queue Group Profile Queue Configuration Table
+ --
+ 
+ wwpLeosDpTsQEgressQueueGroupProfileQConfigTable OBJECT-TYPE
+     SYNTAX     SEQUENCE OF WwpLeosDpTsQEgressQueueGroupProfileQConfigEntry
+     MAX-ACCESS not-accessible
+     STATUS     current
+     DESCRIPTION
+            "The (conceptual) table listing configuration parameters of an egress queue of egress queue group profile."
+     ::= { wwpLeosDpTsQEgressQueueGroupProfile 2 }
+
+ wwpLeosDpTsQEgressQueueGroupProfileQConfigEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosDpTsQEgressQueueGroupProfileQConfigEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "An entry (conceptual row) in the wwpLeosDpTsQEgressQueueGroupProfileQConfigTable."
+     INDEX { wwpLeosDpTsQEgressQueueGroupProfileId,
+             wwpLeosDpTsQEgressQueueGroupProfileQueueId }
+     ::= { wwpLeosDpTsQEgressQueueGroupProfileQConfigTable 1 }
+
+ 
+ WwpLeosDpTsQEgressQueueGroupProfileQConfigEntry ::=  SEQUENCE {
+     wwpLeosDpTsQEgressQueueGroupProfileQueueId          INTEGER,
+     wwpLeosDpTsQEgressQueueGroupProfileQCAPId           Integer32,
+     wwpLeosDpTsQEgressQueueGroupProfileQPriorityId	     Unsigned32,	
+     wwpLeosDpTsQEgressQueueGroupProfileQSchedulerWeight Unsigned32,
+     wwpLeosDpTsQEgressQueueGroupProfileQEIRPolicy       INTEGER,     
+     wwpLeosDpTsQEgressQueueGroupProfileQCIR             Unsigned32,
+     wwpLeosDpTsQEgressQueueGroupProfileQCBS             Unsigned32,
+     wwpLeosDpTsQEgressQueueGroupProfileQEIR             Unsigned32,
+     wwpLeosDpTsQEgressQueueGroupProfileQEBS             Unsigned32
+ }
+ 
+ wwpLeosDpTsQEgressQueueGroupProfileQueueId OBJECT-TYPE
+     SYNTAX      INTEGER (0..7)
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "The egress queue group profile queue Id."
+     ::= { wwpLeosDpTsQEgressQueueGroupProfileQConfigEntry 1 }
+
+ wwpLeosDpTsQEgressQueueGroupProfileQCAPId OBJECT-TYPE
+     SYNTAX      Integer32 
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "The Congestion Avoidance Profile Id associated with the queue."
+     ::= { wwpLeosDpTsQEgressQueueGroupProfileQConfigEntry 2 }
+
+ wwpLeosDpTsQEgressQueueGroupProfileQPriorityId OBJECT-TYPE
+     SYNTAX      Unsigned32 
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "Relative priority id of the queue."
+     ::= { wwpLeosDpTsQEgressQueueGroupProfileQConfigEntry 3 }
+     
+ wwpLeosDpTsQEgressQueueGroupProfileQSchedulerWeight OBJECT-TYPE
+     SYNTAX      Unsigned32 (0..127)
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "Scheduler weight of the queue."
+     ::= { wwpLeosDpTsQEgressQueueGroupProfileQConfigEntry 4 }
+
+ wwpLeosDpTsQEgressQueueGroupProfileQEIRPolicy OBJECT-TYPE
+     SYNTAX      INTEGER {
+                   configure(1),
+                   inherit(2)
+               } 
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "Where EIR value is chosen for the egress queue."
+     ::= { wwpLeosDpTsQEgressQueueGroupProfileQConfigEntry 5 }
+
+ wwpLeosDpTsQEgressQueueGroupProfileQCIR OBJECT-TYPE
+     SYNTAX      Unsigned32 (0..80000000) 
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "CIR for the queue."
+     ::= { wwpLeosDpTsQEgressQueueGroupProfileQConfigEntry 6 }
+ 
+ wwpLeosDpTsQEgressQueueGroupProfileQCBS OBJECT-TYPE
+     SYNTAX      Unsigned32 (0..131040)
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "CBS for the queue."
+     ::= { wwpLeosDpTsQEgressQueueGroupProfileQConfigEntry 7 }
+ 
+ wwpLeosDpTsQEgressQueueGroupProfileQEIR OBJECT-TYPE
+     SYNTAX      Unsigned32 (0..80000000) 
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "EIR for the queue."
+     ::= { wwpLeosDpTsQEgressQueueGroupProfileQConfigEntry 8 }
+ 
+ wwpLeosDpTsQEgressQueueGroupProfileQEBS OBJECT-TYPE
+     SYNTAX      Unsigned32 (0..131040)
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "EBS for the queue."
+     ::= { wwpLeosDpTsQEgressQueueGroupProfileQConfigEntry 9 }
+
+ --
+ -- Egress Queue Group Table
+ --
+
+wwpLeosDpTsQEgressQueueGroupTotalAvailQueues OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The total number of custom queues available."
+    ::= { wwpLeosDpTsQEgressQueueGroup 1 }
+    
+ wwpLeosDpTsQEgressQueueGroupTotalUsedQueues OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The total number of custom queues used."
+    ::= { wwpLeosDpTsQEgressQueueGroup 2 }
+
+ wwpLeosDpTsQEgressQueueGroupTable OBJECT-TYPE
+     SYNTAX     SEQUENCE OF WwpLeosDpTsQEgressQueueGroupEntry
+     MAX-ACCESS not-accessible
+     STATUS     current
+     DESCRIPTION
+            "The (conceptual) table listing configuration parameters of an Egress Queue Group."
+     ::= { wwpLeosDpTsQEgressQueueGroup 3 }
+
+ wwpLeosDpTsQEgressQueueGroupEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosDpTsQEgressQueueGroupEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "An entry (conceptual row) in the wwpLeosDpTsQEgressQueueGroupTable."
+     INDEX { wwpLeosDpTsQEgressQueueGroupId }
+     ::= { wwpLeosDpTsQEgressQueueGroupTable 1 }
+
+
+ WwpLeosDpTsQEgressQueueGroupEntry ::=  SEQUENCE {
+     wwpLeosDpTsQEgressQueueGroupId                Integer32,
+     wwpLeosDpTsQEgressQueueGroupName              DisplayString,
+     wwpLeosDpTsQEgressQueueGroupAssocProfileId    Integer32,
+     wwpLeosDpTsQEgressQueueGroupRowStatus         RowStatus,
+     wwpLeosDpTsQEgressQueueGroupDynamic           TruthValue
+ }
+
+ wwpLeosDpTsQEgressQueueGroupId OBJECT-TYPE
+     SYNTAX      Integer32 (0..127)
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "The Egress Queue Group Id."
+     ::= { wwpLeosDpTsQEgressQueueGroupEntry 1 }
+
+ wwpLeosDpTsQEgressQueueGroupName OBJECT-TYPE
+     SYNTAX      DisplayString (SIZE (1..16))
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION
+        "Queue Group name associated with this index."
+     ::= { wwpLeosDpTsQEgressQueueGroupEntry 2 }
+
+  wwpLeosDpTsQEgressQueueGroupAssocProfileId OBJECT-TYPE
+     SYNTAX      Integer32
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION
+        "Egress queue group profile id associated with this ueue group."
+     ::= { wwpLeosDpTsQEgressQueueGroupEntry 3 }
+
+ wwpLeosDpTsQEgressQueueGroupRowStatus OBJECT-TYPE
+     SYNTAX      RowStatus
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION
+        "Used to manage the creation and deletion of the
+             conceptual rows in this table.
+
+             To create a row in this table, a manager must
+             set this object to 'createAndGo'. To delete a row in this
+             table, set this object to 'destroy'."
+     ::= { wwpLeosDpTsQEgressQueueGroupEntry 4 }
+
+ wwpLeosDpTsQEgressQueueGroupDynamic OBJECT-TYPE
+     SYNTAX      TruthValue
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION
+        "When this value is set to true, the associated egress queue group profile is of type
+         dynamic. Otherwise, the associated egress queue group profile is of type static."
+     DEFVAL { false }
+     ::= { wwpLeosDpTsQEgressQueueGroupEntry 5 }
+
+ --
+ -- Egress Queue Group to Port Association Table
+ --
+ 
+ wwpLeosDpTsQEgressQueueGroupPortAssocTable OBJECT-TYPE
+     SYNTAX     SEQUENCE OF WwpLeosDpTsQEgressQueueGroupPortAssocEntry
+     MAX-ACCESS not-accessible
+     STATUS     current
+     DESCRIPTION
+            "The (conceptual) table listing configuration parameters of an egress queue group to egress port association."
+     ::= { wwpLeosDpTsQEgressQueueGroup 4 }
+
+ wwpLeosDpTsQEgressQueueGroupPortAssocEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosDpTsQEgressQueueGroupPortAssocEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "An entry (conceptual row) in the wwpLeosDpTsQEgressQueueGroupPortAssocTable."
+     INDEX { wwpLeosDpTsQEgressQueueGroupId,
+             wwpLeosDpTsQEgressQueueGroupPortId }
+     ::= { wwpLeosDpTsQEgressQueueGroupPortAssocTable 1 }
+
+ 
+ WwpLeosDpTsQEgressQueueGroupPortAssocEntry ::=  SEQUENCE {
+     wwpLeosDpTsQEgressQueueGroupPortId              Integer32,
+     wwpLeosDpTsQEgressQueueGroupPortSchedulerWeight Unsigned32,
+     wwpLeosDpTsQEgressQueueGroupPortEIRPolicy       INTEGER,     
+     wwpLeosDpTsQEgressQueueGroupPortCIR             Unsigned32,
+     wwpLeosDpTsQEgressQueueGroupPortCBS             Unsigned32,
+     wwpLeosDpTsQEgressQueueGroupPortEIR             Unsigned32,
+     wwpLeosDpTsQEgressQueueGroupPortEBS             Unsigned32,
+     wwpLeosDpTsQEgressQueueGroupPortPriority        Integer32,
+     wwpLeosDpTsQEgressQueueGroupPortRowStatus	     RowStatus
+ }
+ 
+ wwpLeosDpTsQEgressQueueGroupPortId OBJECT-TYPE
+     SYNTAX      Integer32 (1..65535)
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "The egress port to which the egress queue group is being associated with."
+     ::= { wwpLeosDpTsQEgressQueueGroupPortAssocEntry 1 }
+
+ wwpLeosDpTsQEgressQueueGroupPortSchedulerWeight OBJECT-TYPE
+     SYNTAX      Unsigned32 (10..127)
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "Scheduler weight of the port."
+     ::= { wwpLeosDpTsQEgressQueueGroupPortAssocEntry 2 }
+
+ wwpLeosDpTsQEgressQueueGroupPortEIRPolicy OBJECT-TYPE
+     SYNTAX      INTEGER {
+                   configure(1),
+                   inherit(2)
+               } 
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "Where EIR value is chosen for the port."
+     ::= { wwpLeosDpTsQEgressQueueGroupPortAssocEntry 3 }
+
+ wwpLeosDpTsQEgressQueueGroupPortCIR OBJECT-TYPE
+     SYNTAX      Unsigned32 (0..80000000) 
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "CIR for the port."
+     ::= { wwpLeosDpTsQEgressQueueGroupPortAssocEntry 4 }
+ 
+ wwpLeosDpTsQEgressQueueGroupPortCBS OBJECT-TYPE
+     SYNTAX      Unsigned32 (0..131040)
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "CBS for the port."
+     ::= { wwpLeosDpTsQEgressQueueGroupPortAssocEntry 5 }
+ 
+ wwpLeosDpTsQEgressQueueGroupPortEIR OBJECT-TYPE
+     SYNTAX      Unsigned32 (0..80000000) 
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "EIR for the port."
+     ::= { wwpLeosDpTsQEgressQueueGroupPortAssocEntry 6 }
+ 
+ wwpLeosDpTsQEgressQueueGroupPortEBS OBJECT-TYPE
+     SYNTAX      Unsigned32 (0..131040)
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "EBS for the port."
+     ::= { wwpLeosDpTsQEgressQueueGroupPortAssocEntry 7 }
+
+ wwpLeosDpTsQEgressQueueGroupPortPriority OBJECT-TYPE
+     SYNTAX      Integer32 (0..63)
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "EBS for the port."
+     ::= { wwpLeosDpTsQEgressQueueGroupPortAssocEntry 8 }
+
+ wwpLeosDpTsQEgressQueueGroupPortRowStatus OBJECT-TYPE
+     SYNTAX      RowStatus
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION
+        "Used to manage the creation and deletion of the
+             conceptual rows in this table.
+
+             To create a row in this table, a manager must
+             set this object to 'createAndGo'. To delete a row in this
+             table, set this object to 'destroy'."
+     ::= { wwpLeosDpTsQEgressQueueGroupPortAssocEntry 9 }
+
+ --
+ -- Egress Queue Group Stats Table
+ --
+ 
+ wwpLeosDpTsQEgressQueueGroupStatsTable OBJECT-TYPE
+     SYNTAX     SEQUENCE OF WwpLeosDpTsQEgressQueueGroupStatsEntry
+     MAX-ACCESS not-accessible
+     STATUS     current
+     DESCRIPTION
+            "The (conceptual) table listing stats of egress queue group."
+     ::= { wwpLeosDpTsQEgressQueueGroup 5 }
+
+ wwpLeosDpTsQEgressQueueGroupStatsEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosDpTsQEgressQueueGroupStatsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "An entry (conceptual row) in the wwpLeosDpTsQEgressQueueGroupStatsTable."
+     INDEX { wwpLeosDpTsQEgressQueueGroupId,
+                  wwpLeosDpTsQEgressQueueGroupPortId,
+                  wwpLeosDpTsQEgressQueueGroupStatsQueueId }
+
+     ::= { wwpLeosDpTsQEgressQueueGroupStatsTable 1 }
+
+ 
+ WwpLeosDpTsQEgressQueueGroupStatsEntry ::=  SEQUENCE {
+     wwpLeosDpTsQEgressQueueGroupStatsQueueId                 INTEGER, 
+     wwpLeosDpTsQEgressQueueGroupQueueStatsTxBytes            Counter64,
+     wwpLeosDpTsQEgressQueueGroupQueueStatsTxPkts             Counter64,
+     wwpLeosDpTsQEgressQueueGroupQueueStatsDroppedBytes       Counter64,
+     wwpLeosDpTsQEgressQueueGroupQueueStatsDroppedPkts        Counter64,
+     wwpLeosDpTsQEgressQueueGroupQueueStatsClear             TruthValue
+ }
+
+ wwpLeosDpTsQEgressQueueGroupStatsQueueId OBJECT-TYPE
+     SYNTAX      INTEGER (0..7)
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "The queue group queue Id."
+     ::= { wwpLeosDpTsQEgressQueueGroupStatsEntry 1 }
+
+ wwpLeosDpTsQEgressQueueGroupQueueStatsTxBytes OBJECT-TYPE
+     SYNTAX      Counter64
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "Tx bytes for this queue"
+     ::= { wwpLeosDpTsQEgressQueueGroupStatsEntry 2 }
+
+ wwpLeosDpTsQEgressQueueGroupQueueStatsTxPkts OBJECT-TYPE
+     SYNTAX      Counter64
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "Tx packets for this queue."
+     ::= { wwpLeosDpTsQEgressQueueGroupStatsEntry 3 }
+
+ wwpLeosDpTsQEgressQueueGroupQueueStatsDroppedBytes OBJECT-TYPE
+     SYNTAX      Counter64
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "Dropped bytes for this queue."
+     ::= { wwpLeosDpTsQEgressQueueGroupStatsEntry 4 }
+
+ wwpLeosDpTsQEgressQueueGroupQueueStatsDroppedPkts OBJECT-TYPE
+     SYNTAX      Counter64
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "Dropped packets for this queue."
+     ::= { wwpLeosDpTsQEgressQueueGroupStatsEntry 5 }
+
+ wwpLeosDpTsQEgressQueueGroupQueueStatsClear OBJECT-TYPE
+     SYNTAX      TruthValue
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "When this value is set to true, this queue's statistics is reset to 0. When
+	 read, this always returns false "
+     ::= { wwpLeosDpTsQEgressQueueGroupStatsEntry 6 }
+
+ --
+ -- Dynamic Egress Queue Group Profile Table
+ --
+
+ wwpLeosDpTsQDynEgressQueueGroupProfileTable OBJECT-TYPE
+     SYNTAX     SEQUENCE OF WwpLeosDpTsQDynEgressQueueGroupProfileEntry
+     MAX-ACCESS not-accessible
+     STATUS     current
+     DESCRIPTION
+            "The (conceptual) table listing configuration parameters of a dynamic egress queue Group profile."
+     ::= { wwpLeosDpTsQDynEgressQueueGroupProfile 1 }
+
+ wwpLeosDpTsQDynEgressQueueGroupProfileEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosDpTsQDynEgressQueueGroupProfileEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "An entry (conceptual row) in the wwpLeosDpTsQDynEgressQueueGroupProfileTable."
+     INDEX { wwpLeosDpTsQDynEgressQueueGroupProfileId }
+     ::= { wwpLeosDpTsQDynEgressQueueGroupProfileTable 1 }
+
+
+ WwpLeosDpTsQDynEgressQueueGroupProfileEntry ::=  SEQUENCE {
+     wwpLeosDpTsQDynEgressQueueGroupProfileId        Integer32,
+     wwpLeosDpTsQDynEgressQueueGroupProfileName      DisplayString,
+     wwpLeosDpTsQDynEgressQueueGroupProfileRowStatus RowStatus
+ }
+
+ wwpLeosDpTsQDynEgressQueueGroupProfileId OBJECT-TYPE
+     SYNTAX      Integer32 (0..127)
+     MAX-ACCESS  not-accessible
+     STATUS      current
+     DESCRIPTION
+        "The dynamic egress queue group profile id."
+     ::= { wwpLeosDpTsQDynEgressQueueGroupProfileEntry 1 }
+
+ wwpLeosDpTsQDynEgressQueueGroupProfileName OBJECT-TYPE
+     SYNTAX      DisplayString (SIZE (1..16))
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "Profile name associated with this index."
+     ::= { wwpLeosDpTsQDynEgressQueueGroupProfileEntry 2 }
+
+ wwpLeosDpTsQDynEgressQueueGroupProfileRowStatus OBJECT-TYPE
+     SYNTAX      RowStatus
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "Used to manage the creation and deletion of the
+             conceptual rows in this table.
+
+             To create a row in this table, a manager must
+             set this object to 'createAndGo'. To delete a row in this
+             table, set this object to 'destroy'."
+     ::= { wwpLeosDpTsQDynEgressQueueGroupProfileEntry 3 }
+
+ --
+ -- Dynamic Egress Queue Group Profile Queue Configuration Table
+ --
+
+ wwpLeosDpTsQDynEgressQueueGroupProfileQConfigTable OBJECT-TYPE
+     SYNTAX     SEQUENCE OF WwpLeosDpTsQDynEgressQueueGroupProfileQConfigEntry
+     MAX-ACCESS not-accessible
+     STATUS     current
+     DESCRIPTION
+            "The (conceptual) table listing configuration parameters of an egress queue of dynamic egress queue group profile."
+     ::= { wwpLeosDpTsQDynEgressQueueGroupProfile 2 }
+
+ wwpLeosDpTsQDynEgressQueueGroupProfileQConfigEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosDpTsQDynEgressQueueGroupProfileQConfigEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "An entry (conceptual row) in the wwpLeosDpTsQDynEgressQueueGroupProfileQConfigTable."
+     INDEX { wwpLeosDpTsQDynEgressQueueGroupProfileId,
+             wwpLeosDpTsQDynEgressQueueGroupProfileQueueId }
+     ::= { wwpLeosDpTsQDynEgressQueueGroupProfileQConfigTable 1 }
+
+
+ WwpLeosDpTsQDynEgressQueueGroupProfileQConfigEntry ::=  SEQUENCE {
+     wwpLeosDpTsQDynEgressQueueGroupProfileQueueId          Integer32,
+     wwpLeosDpTsQDynEgressQueueGroupProfileQCAPId           Integer32,
+     wwpLeosDpTsQDynEgressQueueGroupProfileQSchedulerWeight Unsigned32,
+     wwpLeosDpTsQDynEgressQueueGroupProfileQCIRP            Unsigned32,
+     wwpLeosDpTsQDynEgressQueueGroupProfileQCBS             Unsigned32,
+     wwpLeosDpTsQDynEgressQueueGroupProfileQEIRP            Unsigned32,
+     wwpLeosDpTsQDynEgressQueueGroupProfileQEBS             Unsigned32
+ }
+
+ wwpLeosDpTsQDynEgressQueueGroupProfileQueueId OBJECT-TYPE
+     SYNTAX      Integer32 (0..7)
+     MAX-ACCESS  not-accessible
+     STATUS      current
+     DESCRIPTION
+        "The dynamic egress queue group profile queue Id."
+     ::= { wwpLeosDpTsQDynEgressQueueGroupProfileQConfigEntry 1 }
+
+ wwpLeosDpTsQDynEgressQueueGroupProfileQCAPId OBJECT-TYPE
+     SYNTAX      Integer32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "The congestion avoidance profile id associated with the queue."
+     ::= { wwpLeosDpTsQDynEgressQueueGroupProfileQConfigEntry 2 }
+
+ wwpLeosDpTsQDynEgressQueueGroupProfileQSchedulerWeight OBJECT-TYPE
+     SYNTAX      Unsigned32 (0..127)
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "Scheduler weight of the queue."
+     ::= { wwpLeosDpTsQDynEgressQueueGroupProfileQConfigEntry 3 }
+
+ wwpLeosDpTsQDynEgressQueueGroupProfileQCIRP OBJECT-TYPE
+     SYNTAX      Unsigned32 (0..100)
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "CIR percent for the queue."
+     ::= { wwpLeosDpTsQDynEgressQueueGroupProfileQConfigEntry 4 }
+
+ wwpLeosDpTsQDynEgressQueueGroupProfileQCBS OBJECT-TYPE
+     SYNTAX      Unsigned32 (0..131040)
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "CBS for the queue."
+     ::= { wwpLeosDpTsQDynEgressQueueGroupProfileQConfigEntry 5 }
+
+ wwpLeosDpTsQDynEgressQueueGroupProfileQEIRP OBJECT-TYPE
+     SYNTAX      Unsigned32 (0..100)
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "EIR percent for the queue."
+     ::= { wwpLeosDpTsQDynEgressQueueGroupProfileQConfigEntry 6 }
+
+ wwpLeosDpTsQDynEgressQueueGroupProfileQEBS OBJECT-TYPE
+     SYNTAX      Unsigned32 (0..131040)
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "EBS for the queue."
+     ::= { wwpLeosDpTsQDynEgressQueueGroupProfileQConfigEntry 7 }
+
+--
+-- RCOStoCos Queue Map Table 
+--
+ 
+ wwpLeosDpTsQueueMapTable OBJECT-TYPE
+     SYNTAX     SEQUENCE OF WwpLeosDpTsQueueMapEntry
+     MAX-ACCESS not-accessible
+     STATUS     current
+     DESCRIPTION
+            "The (conceptual) table listing configuration parameters of RCOS to COS Queue mapping."
+     ::= { wwpLeosDpTsQRcosToCosQueueMap 2 }
+
+ wwpLeosDpTsQueueMapEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosDpTsQueueMapEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "An entry (conceptual row) in the wwpLeosDpTsQueueMapTable."
+     INDEX { wwpLeosDpTsQueueMapId}
+     ::= { wwpLeosDpTsQueueMapTable 1 }
+
+ 
+ WwpLeosDpTsQueueMapEntry ::=  SEQUENCE {
+     wwpLeosDpTsQueueMapId                   INTEGER,
+     wwpLeosDpTsQueueMapName				 DisplayString,
+     wwpLeosDpTsQueueMapQCount				 INTEGER,
+     wwpLeosDpTsQueueMapRCOS0				 INTEGER,
+     wwpLeosDpTsQueueMapRCOS1				 INTEGER,
+     wwpLeosDpTsQueueMapRCOS2				 INTEGER,
+     wwpLeosDpTsQueueMapRCOS3				 INTEGER,
+     wwpLeosDpTsQueueMapRCOS4				 INTEGER,
+     wwpLeosDpTsQueueMapRCOS5				 INTEGER,
+     wwpLeosDpTsQueueMapRCOS6				 INTEGER,
+     wwpLeosDpTsQueueMapRCOS7				 INTEGER,
+     wwpLeosDpTsQueueMapRowStatus			 RowStatus  
+  }
+  
+  
+ wwpLeosDpTsQueueMapId OBJECT-TYPE
+     SYNTAX      INTEGER (1..65535)
+     MAX-ACCESS  not-accessible
+     STATUS      current
+     DESCRIPTION
+        "Unique index for the queue map."
+     ::= { wwpLeosDpTsQueueMapEntry 1 }
+
+ wwpLeosDpTsQueueMapName OBJECT-TYPE
+     SYNTAX      DisplayString (SIZE(1..31) )
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION
+        "Queue map name."
+     ::= { wwpLeosDpTsQueueMapEntry 2 }
+ 
+ wwpLeosDpTsQueueMapQCount OBJECT-TYPE
+     SYNTAX      INTEGER 
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION
+        "number of queues associated with the map."
+     ::= { wwpLeosDpTsQueueMapEntry 3 }
+
+ wwpLeosDpTsQueueMapRCOS0 OBJECT-TYPE
+     SYNTAX      INTEGER
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION
+        "The COS queue value for RCOS[0]."
+     ::= { wwpLeosDpTsQueueMapEntry 4 }
+
+ wwpLeosDpTsQueueMapRCOS1 OBJECT-TYPE
+     SYNTAX      INTEGER
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION
+        "The COS queue value for RCOS[1]."
+     ::= { wwpLeosDpTsQueueMapEntry 5 }
+ 
+ wwpLeosDpTsQueueMapRCOS2 OBJECT-TYPE
+     SYNTAX      INTEGER
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION
+        "The COS queue value for RCOS[2]."
+     ::= { wwpLeosDpTsQueueMapEntry 6 }
+
+ wwpLeosDpTsQueueMapRCOS3 OBJECT-TYPE
+     SYNTAX      INTEGER
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION
+        "The COS queue value for RCOS[3]."
+     ::= { wwpLeosDpTsQueueMapEntry 7 }
+
+ wwpLeosDpTsQueueMapRCOS4 OBJECT-TYPE
+     SYNTAX      INTEGER
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION
+        "The COS queue value for RCOS[4]."
+     ::= { wwpLeosDpTsQueueMapEntry 8 }
+
+ wwpLeosDpTsQueueMapRCOS5 OBJECT-TYPE
+     SYNTAX      INTEGER
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION
+        "The COS queue value for RCOS[5]."
+     ::= { wwpLeosDpTsQueueMapEntry 9 }
+ 
+ wwpLeosDpTsQueueMapRCOS6 OBJECT-TYPE
+     SYNTAX      INTEGER
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION
+        "The COS queue value for RCOS[6]."
+     ::= { wwpLeosDpTsQueueMapEntry 10 }
+
+ wwpLeosDpTsQueueMapRCOS7 OBJECT-TYPE
+     SYNTAX      INTEGER
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION
+        "The COS queue value for RCOS[7]."
+     ::= { wwpLeosDpTsQueueMapEntry 11 }
+ 
+ wwpLeosDpTsQueueMapRowStatus OBJECT-TYPE
+     SYNTAX      RowStatus
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION
+        "Used to manage the creation and deletion of the 
+             conceptual rows in this table.
+
+             To create a row in this table, a manager must
+             set this object to 'createAndGo'. To delete a row in this
+             table, set this object to 'destroy'."
+     ::= { wwpLeosDpTsQueueMapEntry 12 }     
+     
+     
+ --
+ -- COS Mapping tables (Ingress tables)
+ --
+ 
+ wwpLeosDpTsCosMapProfileTable OBJECT-TYPE
+ 	SYNTAX		SEQUENCE OF WwpLeosDpTsCosMapProfileEntry
+ 	MAX-ACCESS	not-accessible
+ 	STATUS		current
+ 	DESCRIPTION
+ 		"The (conceptual) table listing the resolved CoS map profiles."
+ 	::= { wwpLeosDpTsCosMapping 1 }
+ 	
+ wwpLeosDpTsCosMapProfileEntry	OBJECT-TYPE
+ 	SYNTAX		WwpLeosDpTsCosMapProfileEntry
+ 	MAX-ACCESS	not-accessible
+ 	STATUS		current       
+ 	DESCRIPTION
+ 		"An entry in the wwpLeosDpTsCosMapProfileTable."
+ 	INDEX {     wwpLeosDpTsCosMapProfileId }
+ 	::= { wwpLeosDpTsCosMapProfileTable 1 }
+ 	
+ WwpLeosDpTsCosMapProfileEntry	::= SEQUENCE {
+ 	wwpLeosDpTsCosMapProfileId		INTEGER,
+ 	wwpLeosDpTsCosMapProfileName	DisplayString,
+ 	wwpLeosDpTsCosMapRowStatus		RowStatus
+ }
+ 
+ wwpLeosDpTsCosMapProfileId		OBJECT-TYPE
+ 	SYNTAX		INTEGER	(1..65535)
+ 	MAX-ACCESS	not-accessible
+ 	STATUS		current
+ 	DESCRIPTION
+ 		"Unique identifier for the resolved CoS map profile. The maximum allowed profiles
+ 		on the device is equal to the number of ports + 1 (Default COS map)."
+ 	::= { wwpLeosDpTsCosMapProfileEntry 1 }
+ 	
+ wwpLeosDpTsCosMapProfileName	OBJECT-TYPE
+ 	SYNTAX		DisplayString (SIZE (1..15))
+ 	MAX-ACCESS	read-create
+ 	STATUS		current
+ 	DESCRIPTION
+ 		"Name of the COS map profile." 			
+ 	::= { wwpLeosDpTsCosMapProfileEntry 2 }
+ 	
+ wwpLeosDpTsCosMapRowStatus		OBJECT-TYPE
+ 	SYNTAX		RowStatus
+ 	MAX-ACCESS	read-create
+ 	STATUS		current
+ 	DESCRIPTION
+ 		"Setting this object to createAndGo creates a COS map profile. Setting the object
+ 		to destroy deletes a COS map profile."
+ 	::= { wwpLeosDpTsCosMapProfileEntry 3 }       
+ 	
+wwpLeosDpTsDot1dCosMapTable		OBJECT-TYPE
+ 	SYNTAX		SEQUENCE OF WwpLeosDpTsDot1dCosMapEntry
+ 	MAX-ACCESS	not-accessible
+ 	STATUS		deprecated
+ 	DESCRIPTION
+ 		"Conceptual table which represents the dot1d CoS map to internal RCOS values for
+ 		 a given profile."
+ 	::= { wwpLeosDpTsCosMapping 2 }
+ 	
+ wwpLeosDpTsDot1dCosMapEntry	OBJECT-TYPE
+ 	SYNTAX		WwpLeosDpTsDot1dCosMapEntry
+ 	MAX-ACCESS	not-accessible
+ 	STATUS		deprecated
+ 	DESCRIPTION
+ 		"An entry in the wwpLeosDpTsDot1dCosMapTable."    
+ 	INDEX	{ wwpLeosDpTsCosMapProfileId, wwpLeosDpTsDot1dCosMapDot1dValue }
+ 	::= { wwpLeosDpTsDot1dCosMapTable 1 }
+ 	
+ WwpLeosDpTsDot1dCosMapEntry	::= SEQUENCE {
+ 	wwpLeosDpTsDot1dCosMapDot1dValue	      INTEGER,
+ 	wwpLeosDpTsDot1dCosMapRCOS		      INTEGER
+ }
+ 
+ wwpLeosDpTsDot1dCosMapDot1dValue	OBJECT-TYPE
+ 	SYNTAX		INTEGER (0..7)
+ 	MAX-ACCESS	not-accessible
+ 	STATUS		current
+ 	DESCRIPTION
+ 		"The dot1d CoS value."
+ 	::= { wwpLeosDpTsDot1dCosMapEntry 1 }
+ 	
+ wwpLeosDpTsDot1dCosMapRCOS		OBJECT-TYPE
+ 	SYNTAX		INTEGER (0..7)
+ 	MAX-ACCESS	read-write
+ 	STATUS		current
+ 	DESCRIPTION
+ 		"The corresponding RCOS value mapped to the dot1d CoS value."
+ 	::= { wwpLeosDpTsDot1dCosMapEntry 2 }
+ 
+ wwpLeosDpTsDscpCosMapTable		OBJECT-TYPE
+ 	SYNTAX		SEQUENCE OF WwpLeosDpTsDscpCosMapEntry
+ 	MAX-ACCESS	not-accessible
+ 	STATUS		current
+ 	DESCRIPTION
+ 		"Conceptual table which represents the DSCP CoS map to internal RCOS values for
+ 		 a given profile."
+ 	::= { wwpLeosDpTsCosMapping 3 }
+ 	
+ wwpLeosDpTsDscpCosMapEntry	OBJECT-TYPE
+ 	SYNTAX		WwpLeosDpTsDscpCosMapEntry
+ 	MAX-ACCESS	not-accessible
+ 	STATUS		current
+ 	DESCRIPTION
+ 		"An entry in the wwpLeosDpTsDscpCosMapTable."    
+ 	INDEX	{ wwpLeosDpTsCosMapProfileId, wwpLeosDpTsDscpCosMapDscpValue }
+ 	::= { wwpLeosDpTsDscpCosMapTable 1 }
+ 	
+ WwpLeosDpTsDscpCosMapEntry	::= SEQUENCE {
+ 	wwpLeosDpTsDscpCosMapDscpValue	INTEGER,
+ 	wwpLeosDpTsDscpCosMapRCOS	      INTEGER,
+   wwpLeosDpTsDscpCosMapRColorValue DpTsRCosMappingColor
+ }
+ 
+ wwpLeosDpTsDscpCosMapDscpValue	OBJECT-TYPE
+ 	SYNTAX		INTEGER (0..63)
+ 	MAX-ACCESS	not-accessible
+ 	STATUS		current
+ 	DESCRIPTION
+ 		"The DSCP CoS value."
+ 	::= { wwpLeosDpTsDscpCosMapEntry 1 }
+ 	
+ wwpLeosDpTsDscpCosMapRCOS		OBJECT-TYPE
+ 	SYNTAX		INTEGER (0..7)
+ 	MAX-ACCESS	read-write
+ 	STATUS		current
+ 	DESCRIPTION
+ 		"The RCOS value to which the DSCP CoS is mapped."
+ 	::= { wwpLeosDpTsDscpCosMapEntry 2 }
+
+ wwpLeosDpTsDscpCosMapRColorValue		OBJECT-TYPE
+ 	SYNTAX		DpTsRCosMappingColor
+ 	MAX-ACCESS	read-write
+ 	STATUS		current
+ 	DESCRIPTION
+ 		"The internal resolved color R-Color of the frame. 
+       Green (1), Yellow(2) represents frame's internal R-Color."
+ 	::= { wwpLeosDpTsDscpCosMapEntry 3 }
+ 
+wwpLeosDpTsDot1dDeiCosMapTable		OBJECT-TYPE
+ 	SYNTAX		SEQUENCE OF WwpLeosDpTsDot1dDeiCosMapEntry
+ 	MAX-ACCESS	not-accessible
+ 	STATUS		current
+ 	DESCRIPTION
+ 		"Conceptual table which represents the dot1d/dot1d-dei cos/color map to internal
+       RCOS/Rcolor values for a given profile. This table is the new extended version of the
+       deprecated wwpLeosDpTsDot1dCosMapTable. It has color attributes now."
+ 	::= { wwpLeosDpTsCosMapping 4 }
+
+ wwpLeosDpTsDot1dDeiCosMapEntry	OBJECT-TYPE
+ 	SYNTAX		WwpLeosDpTsDot1dDeiCosMapEntry
+ 	MAX-ACCESS	not-accessible
+ 	STATUS		current
+ 	DESCRIPTION
+ 		"An entry in the wwpLeosDpTsDot1dDeiCosMapTable which is an extended version
+       of wwpLeosDpTsDot1dCosMapTable."
+ 	INDEX	{ wwpLeosDpTsCosMapProfileId, wwpLeosDpTsDot1dDeiCosMapDot1dValue, wwpLeosDpTsDot1dDeiCosMapDeiValue }
+ 	::= { wwpLeosDpTsDot1dDeiCosMapTable 1 }
+ 	
+ WwpLeosDpTsDot1dDeiCosMapEntry  ::= SEQUENCE {
+ 	wwpLeosDpTsDot1dDeiCosMapDot1dValue	       INTEGER,
+	wwpLeosDpTsDot1dDeiCosMapDeiValue          INTEGER,
+ 	wwpLeosDpTsDot1dDeiCosMapRCosValue         INTEGER,
+	wwpLeosDpTsDot1dDeiCosMapRColorValue       DpTsRCosMappingColor
+ }
+
+ wwpLeosDpTsDot1dDeiCosMapDot1dValue	OBJECT-TYPE
+ 	SYNTAX		INTEGER (0..7)
+ 	MAX-ACCESS	not-accessible
+ 	STATUS		current
+ 	DESCRIPTION
+ 		"The dot1d COS value."
+ 	::= { wwpLeosDpTsDot1dDeiCosMapEntry 1 }
+ 	
+ wwpLeosDpTsDot1dDeiCosMapDeiValue  	OBJECT-TYPE
+ 	SYNTAX		INTEGER (0..1)
+ 	MAX-ACCESS	not-accessible
+ 	STATUS		current
+ 	DESCRIPTION
+ 		"The dot1d DEI value (0) green (1) yellow at ingress."
+ 	::= { wwpLeosDpTsDot1dDeiCosMapEntry 2 }
+ 	
+ wwpLeosDpTsDot1dDeiCosMapRCosValue		OBJECT-TYPE
+ 	SYNTAX		INTEGER (0..7)
+ 	MAX-ACCESS	read-write
+ 	STATUS		current
+ 	DESCRIPTION
+ 		"The corresponding RCos value mapped to the dot1d COS and dot1d DEI value."
+ 	::= { wwpLeosDpTsDot1dDeiCosMapEntry 3 }
+
+ wwpLeosDpTsDot1dDeiCosMapRColorValue		OBJECT-TYPE
+ 	SYNTAX		DpTsRCosMappingColor
+ 	MAX-ACCESS	read-write
+ 	STATUS		current
+ 	DESCRIPTION
+ 		"The corresponding RColor value mapped to the dot1d CoS and dot1dei value."
+ 	::= { wwpLeosDpTsDot1dDeiCosMapEntry 4 }
+
+wwpLeosDpTsMplsTcCosMapTable            OBJECT-TYPE
+        SYNTAX          SEQUENCE OF WwpLeosDpTsMplsTcCosMapEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+                "Conceptual table which represents the MPLS-TC COS/color map to internal RCOS/Rcolor values for a given profile. "
+        ::= { wwpLeosDpTsCosMapping 5 }
+
+ wwpLeosDpTsMplsTcCosMapEntry   OBJECT-TYPE
+        SYNTAX          WwpLeosDpTsMplsTcCosMapEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+                "An entry in the wwpLeosDpTsMplsTcCosMapTable. "
+        INDEX   { wwpLeosDpTsCosMapProfileId, wwpLeosDpTsMplsTcCosMapMplsTcValue}
+        ::= { wwpLeosDpTsMplsTcCosMapTable 1 }
+
+ WwpLeosDpTsMplsTcCosMapEntry  ::= SEQUENCE {
+        wwpLeosDpTsMplsTcCosMapMplsTcValue             Integer32,
+        wwpLeosDpTsMplsTcCosMapRCosValue               Integer32,
+        wwpLeosDpTsMplsTcCosMapRColorValue       DpTsRCosMappingColor
+ }
+
+ wwpLeosDpTsMplsTcCosMapMplsTcValue     OBJECT-TYPE
+        SYNTAX          Integer32 (0..7)
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+                "The MPLS-TC value."
+        ::= { wwpLeosDpTsMplsTcCosMapEntry 1 }
+
+
+ wwpLeosDpTsMplsTcCosMapRCosValue               OBJECT-TYPE
+        SYNTAX          Integer32 (0..7)
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+                "The corresponding RCos value mapped to the MPLS-TC value."
+        ::= { wwpLeosDpTsMplsTcCosMapEntry 2 }
+
+ wwpLeosDpTsMplsTcCosMapRColorValue             OBJECT-TYPE
+        SYNTAX          DpTsRCosMappingColor
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+                "The corresponding RColor value mapped to the MPLS-TC value."
+        ::= { wwpLeosDpTsMplsTcCosMapEntry 3 }
+
+ --
+ -- Traffic-services cos global info
+ --
+ 
+ wwpLeosDpTsCosCpuCosRemarkL2   OBJECT-TYPE
+        SYNTAX        DpOnOffSwitch
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+                "This object provides configurable option to control PCP/DEI remarking of CPU generated frames.
+                 By default, device does not perform PCP/DEI remarking of CPU generated frames.
+                 On(1) means allow remarking of CPU generated frames, Off(2) means do not allow remarking of CPU generated frames." 
+        DEFVAL { off }
+        ::= { wwpLeosDpTsCos 1 } 
+
+ wwpLeosDpTsCosCpuL3PcpControl  OBJECT-TYPE
+        SYNTAX        INTEGER {
+                        dscpMapped (1),
+                        interfacePriority (2)
+                      }
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+                "This object specifies configurable option to control the PCP of CPU generated L3 protocols frame.
+                 By default, PCP of CPU generated L3 protocol frames is derived from interface's priority."
+        DEFVAL { interfacePriority }
+        ::= { wwpLeosDpTsCos 2 } 
+
+ --
+ -- Egress RCOS to FCOS Mapping tables
+ --
+ wwpLeosDpTsFrameCosMapProfileTable OBJECT-TYPE
+ 	SYNTAX		SEQUENCE OF WwpLeosDpTsFrameCosMapProfileEntry
+ 	MAX-ACCESS	not-accessible
+ 	STATUS		current
+ 	DESCRIPTION
+ 		"The (conceptual) table listing the frame CoS map profiles."
+ 	::= { wwpLeosDpTsFrameCosMapping 1 }
+ 	
+ wwpLeosDpTsFrameCosMapProfileEntry	OBJECT-TYPE
+ 	SYNTAX		WwpLeosDpTsFrameCosMapProfileEntry
+ 	MAX-ACCESS	not-accessible
+ 	STATUS		current       
+ 	DESCRIPTION
+ 		"An entry in the wwpLeosDpTsFrameCosMapProfileTable."
+ 	INDEX { wwpLeosDpTsFrameCosMapProfileId }
+ 	::= { wwpLeosDpTsFrameCosMapProfileTable 1 }
+ 	
+ WwpLeosDpTsFrameCosMapProfileEntry	::= SEQUENCE {
+ 	wwpLeosDpTsFrameCosMapProfileId         INTEGER,
+ 	wwpLeosDpTsFrameCosMapProfileName       DisplayString,
+	wwpLeosDpTsFrameCosMapRowStatus         RowStatus,
+	wwpLeosDpTsFrameCosMapType              DpCosMapTypes
+ }
+ 
+ wwpLeosDpTsFrameCosMapProfileId		OBJECT-TYPE
+ 	SYNTAX		INTEGER	(1..65535)
+ 	MAX-ACCESS	not-accessible
+ 	STATUS		current
+ 	DESCRIPTION
+ 		"Unique identifier for the frame CoS map profile."
+ 	::= { wwpLeosDpTsFrameCosMapProfileEntry 1 }
+ 	
+ wwpLeosDpTsFrameCosMapProfileName	OBJECT-TYPE
+ 	SYNTAX		DisplayString (SIZE (1..15))
+ 	MAX-ACCESS	read-create
+ 	STATUS		current
+ 	DESCRIPTION
+ 		"Name of the frame CoS map profile." 			
+ 	::= { wwpLeosDpTsFrameCosMapProfileEntry 2 }
+ 	
+ wwpLeosDpTsFrameCosMapRowStatus	OBJECT-TYPE
+ 	SYNTAX		RowStatus
+ 	MAX-ACCESS	read-create
+ 	STATUS		current
+ 	DESCRIPTION
+ 		"Setting this object to createAndGo creates a frame CoS map profile. Setting the object
+ 		to destroy deletes a frame CoS map profile."
+ 	::= { wwpLeosDpTsFrameCosMapProfileEntry 3 }       
+
+ wwpLeosDpTsFrameCosMapType		OBJECT-TYPE
+ 	SYNTAX		DpCosMapTypes
+ 	MAX-ACCESS	read-create
+ 	STATUS		current
+	DESCRIPTION
+ 		"This object identifies type of resolved CoS to dot1d CoS map."
+	DEFVAL		{ global }
+ 	::= { wwpLeosDpTsFrameCosMapProfileEntry 4 }
+ 	
+wwpLeosDpTsFrameCosMapTable		OBJECT-TYPE
+ 	SYNTAX		SEQUENCE OF WwpLeosDpTsFrameCosMapEntry
+ 	MAX-ACCESS	not-accessible
+ 	STATUS		current
+ 	DESCRIPTION
+ 		"Conceptual table which represents the resolved CoS to dot1d CoS map for a given profile."
+ 	::= { wwpLeosDpTsFrameCosMapping 2 }
+ 	
+ wwpLeosDpTsFrameCosMapEntry	OBJECT-TYPE
+ 	SYNTAX		WwpLeosDpTsFrameCosMapEntry
+ 	MAX-ACCESS	not-accessible
+ 	STATUS		current
+ 	DESCRIPTION
+ 		"An entry in the wwpLeosDpTsRCosToFrameCosMapTable."    
+ 	INDEX	{ wwpLeosDpTsFrameCosMapProfileId, wwpLeosDpTsFrameCosMapRCosValue, wwpLeosDpTsFrameCosMapRColorValue } 
+ 	::= { wwpLeosDpTsFrameCosMapTable 1 }
+ 	
+ WwpLeosDpTsFrameCosMapEntry	::= SEQUENCE {
+   wwpLeosDpTsFrameCosMapRCosValue        Integer32,
+   wwpLeosDpTsFrameCosMapRColorValue      DpTsRCosMappingColor,
+   wwpLeosDpTsFrameCosMapDot1dValue       Integer32,
+   wwpLeosDpTsFrameCosMapDot1dDeiValue    Integer32,
+   wwpLeosDpTsFrameCosMapMplsTcValue      Integer32
+ }
+ 
+ wwpLeosDpTsFrameCosMapRCosValue	OBJECT-TYPE
+ 	SYNTAX		Integer32 (0..7)
+ 	MAX-ACCESS	not-accessible
+ 	STATUS		current
+ 	DESCRIPTION
+ 		"The resolved COS value."
+ 	::= { wwpLeosDpTsFrameCosMapEntry 1 }
+ 	
+ wwpLeosDpTsFrameCosMapRColorValue	OBJECT-TYPE
+ 	SYNTAX		DpTsRCosMappingColor
+ 	MAX-ACCESS	not-accessible
+ 	STATUS		current
+ 	DESCRIPTION
+ 	"The corresponding resolved color value. Green (1) and Yellow(2) get 
+	 mapped to the dot1d COS/CFI/DEI value."
+ 	::= { wwpLeosDpTsFrameCosMapEntry 2 }
+ 
+ wwpLeosDpTsFrameCosMapDot1dValue		OBJECT-TYPE
+ 	SYNTAX		Integer32 (0..7)
+ 	MAX-ACCESS	read-write
+ 	STATUS		current
+ 	DESCRIPTION
+ 		"The dot1d COS value for the outgoing frame"
+ 	::= { wwpLeosDpTsFrameCosMapEntry 3 }
+ 
+ wwpLeosDpTsFrameCosMapDot1dDeiValue		OBJECT-TYPE
+ 	SYNTAX		Integer32 (0..1)
+ 	MAX-ACCESS	read-write
+ 	STATUS		current
+ 	DESCRIPTION
+ 	"The outgoing frame CFI/DEI frame marking. Green (0), Yellow(1) in the CFI/DEI bit position 
+	  of the frame represents the frame's outgoing color"
+ 	::= { wwpLeosDpTsFrameCosMapEntry 4 }
+
+ wwpLeosDpTsFrameCosMapMplsTcValue		OBJECT-TYPE
+ 	SYNTAX		Integer32 (-1|0..7)
+ 	MAX-ACCESS	read-write
+ 	STATUS		current
+ 	DESCRIPTION
+ 		"The MPLS TC value for the outgoing frame.
+		-1 Indicates this object-type is not supported."
+ 	::= { wwpLeosDpTsFrameCosMapEntry 5 }
+ 	
+ --
+ -- Frame Integrity
+ --
+
+ wwpLeosDpTsFIStatus OBJECT-TYPE
+       SYNTAX        INTEGER {
+                       enabled(1),
+                       disabled(2)
+                     }
+       MAX-ACCESS    read-only
+       STATUS        current
+       DESCRIPTION
+          "The attribute indicates if frame integrity checking is enabled or disabled." 
+       DEFVAL { disabled }
+       ::= { wwpLeosDpTsFrameIntegrity 1 } 
+
+ wwpLeosDpTsFIDiscardAddressInvalid OBJECT-TYPE
+       SYNTAX       DpOnOffSwitch
+       MAX-ACCESS   read-only
+       STATUS       current
+       DESCRIPTION
+          "This attribute indicates if packets with suspect source and destination addresses
+           should be discarded."
+       DEFVAL { off }
+       ::= { wwpLeosDpTsFrameIntegrity 2 } 
+
+
+ wwpLeosDpTsFIDiscardIcmpOverSize OBJECT-TYPE
+       SYNTAX       DpOnOffSwitch
+       MAX-ACCESS   read-only
+       STATUS       current
+       DESCRIPTION
+          "This attribute indicates if oversized ICMP packets should be discarded."
+       DEFVAL { off }
+       ::= { wwpLeosDpTsFrameIntegrity 3 } 
+
+ wwpLeosDpTsFIDiscardTcpMalformed OBJECT-TYPE
+       SYNTAX       DpOnOffSwitch
+       MAX-ACCESS   read-only
+       STATUS       current
+       DESCRIPTION
+          "This attribute indicates if malformed TCP packets should be discarded."
+       DEFVAL { off }
+       ::= { wwpLeosDpTsFrameIntegrity 4 } 
+
+ --
+ -- Protocol Cos Mapping tables (Ingress tables)
+ --
+
+ wwpLeosDpTsProtocolCosMapProfileTable  OBJECT-TYPE
+   SYNTAX      SEQUENCE OF WwpLeosDpTsProtocolCosMapProfileEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+      "The (conceptual) table listing the Protocol CoS map profiles."
+   ::= { wwpLeosDpTsProtocolCosMapping 1 }
+   
+ wwpLeosDpTsProtocolCosMapProfileEntry OBJECT-TYPE
+   SYNTAX      WwpLeosDpTsProtocolCosMapProfileEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current       
+   DESCRIPTION
+      "An entry in the wwpLeosDpTsProtocolCosMapProfileTable."
+   INDEX { wwpLeosDpTsProtocolCosMapProfileId }
+   ::= { wwpLeosDpTsProtocolCosMapProfileTable 1 }
+   
+ WwpLeosDpTsProtocolCosMapProfileEntry ::= SEQUENCE {
+   wwpLeosDpTsProtocolCosMapProfileId     Integer32,
+   wwpLeosDpTsProtocolCosMapProfileName   DisplayString,
+   wwpLeosDpTsProtocolCosMapAdminState    INTEGER,
+   wwpLeosDpTsProtocolCosMapRowStatus     RowStatus
+ }
+ 
+ wwpLeosDpTsProtocolCosMapProfileId    OBJECT-TYPE
+   SYNTAX      Integer32 (1..65535)
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+      "Unique identifier for the Protocol CoS map profile." 
+   ::= { wwpLeosDpTsProtocolCosMapProfileEntry 1 }
+   
+ wwpLeosDpTsProtocolCosMapProfileName  OBJECT-TYPE
+   SYNTAX      DisplayString (SIZE (1..15))
+   MAX-ACCESS  read-create
+   STATUS      current
+   DESCRIPTION
+      "Name of the Protocol COS map profile."         
+   ::= { wwpLeosDpTsProtocolCosMapProfileEntry 2 }
+   
+ wwpLeosDpTsProtocolCosMapAdminState  OBJECT-TYPE
+   SYNTAX  INTEGER {
+             enabled(1),
+             disabled(2)
+             }
+   MAX-ACCESS  read-create
+   STATUS      current
+   DESCRIPTION
+      "Setting this object to 'enabled' administratively enables this protocol-cos map 
+       Setting this object to 'disabled' administratively disables this protocol-cos map."
+   ::= { wwpLeosDpTsProtocolCosMapProfileEntry 3 }
+   
+ wwpLeosDpTsProtocolCosMapRowStatus    OBJECT-TYPE
+   SYNTAX      RowStatus
+   MAX-ACCESS  read-create
+   STATUS      current
+   DESCRIPTION
+      "Setting the object to createAndGo creates a protocol-cos map profile. 
+       Setting the object to destroy deletes a protocol-cos map profile.
+       Row creation will be rejected if the maximum number of rows have been created."
+
+   ::= { wwpLeosDpTsProtocolCosMapProfileEntry 4 }       
+   
+wwpLeosDpTsProtocolDscpDot1dMapTable    OBJECT-TYPE
+   SYNTAX      SEQUENCE OF WwpLeosDpTsProtocolDscpDot1dMapEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+      "Conceptual table which represents the mapping of protocol-id to dscp, dot1d and mpls-tc values for
+       a given profile."
+   ::= { wwpLeosDpTsProtocolCosMapping 2 }
+   
+ wwpLeosDpTsProtocolDscpDot1dMapEntry OBJECT-TYPE
+   SYNTAX      WwpLeosDpTsProtocolDscpDot1dMapEntry
+   MAX-ACCESS  not-accessible
+   STATUS     current
+   DESCRIPTION
+      "An entry in the wwpLeosDpTsProtocolDscpDot1dMapTable."    
+   INDEX { wwpLeosDpTsProtocolCosMapProfileId, wwpLeosDpTsProtocolDscpDot1dMapProtocolId }
+   ::= { wwpLeosDpTsProtocolDscpDot1dMapTable 1 }
+   
+ WwpLeosDpTsProtocolDscpDot1dMapEntry ::= SEQUENCE {
+   wwpLeosDpTsProtocolDscpDot1dMapProtocolId      Integer32,
+   wwpLeosDpTsProtocolDscpDot1dMapProtocolName    DisplayString,
+   wwpLeosDpTsProtocolDscpDot1dMapDscpValue       Integer32,
+   wwpLeosDpTsProtocolDscpDot1dMapDot1dValue      Integer32,
+   wwpLeosDpTsProtocolDscpDot1dMapMplsTcValue     Integer32,
+   wwpLeosDpTsProtocolDscpDot1dMapDscpMode        DpProtocolCosMapDscpMode
+ }
+ 
+ wwpLeosDpTsProtocolDscpDot1dMapProtocolId OBJECT-TYPE
+   SYNTAX      Integer32 (1..65535)
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+      "The Protocol Identifier value."
+   ::= { wwpLeosDpTsProtocolDscpDot1dMapEntry 1 }
+   
+ wwpLeosDpTsProtocolDscpDot1dMapProtocolName OBJECT-TYPE
+   SYNTAX      DisplayString
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "The Protocol name corresponding to protocol-id."
+   ::= { wwpLeosDpTsProtocolDscpDot1dMapEntry 2 }
+   
+ wwpLeosDpTsProtocolDscpDot1dMapDscpValue  OBJECT-TYPE
+   SYNTAX      Integer32 (-1|0..63)
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "The corresponding Dscp value mapped to the protocol id value. Dscp value sets to -1 for
+      protocols not having L3 header."
+   ::= { wwpLeosDpTsProtocolDscpDot1dMapEntry 3 }
+   
+ wwpLeosDpTsProtocolDscpDot1dMapDot1dValue   OBJECT-TYPE
+   SYNTAX      Integer32 (0..7)
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "The corresponding dot1d value mapped to the protocol id value. For protocols having L3 header
+      dot1d value will display corresponding pcp value derived from dscp value like dscp/8. Setting 
+      of this field is not allowed for L3 protocols."
+   ::= { wwpLeosDpTsProtocolDscpDot1dMapEntry 4 }
+ 
+ wwpLeosDpTsProtocolDscpDot1dMapMplsTcValue OBJECT-TYPE
+   SYNTAX      Integer32 (-1|0..7)
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "The corresponding Mpls Tc value to the protocol id value. Mpls Tc value sets to -1 for protocols
+      not having MPLS header."
+   ::= { wwpLeosDpTsProtocolDscpDot1dMapEntry 5 } 
+
+ wwpLeosDpTsProtocolDscpDot1dMapDscpMode OBJECT-TYPE
+   SYNTAX      DpProtocolCosMapDscpMode 
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "DSCP mode for transit and reply node, dscp of reply or transit type frames can either be preserved 
+       or assigned from protocol-cos-map table. If no reply or transit type frames are supported for any 
+       protocol then dscp mode will be none (NA)"
+   ::= { wwpLeosDpTsProtocolDscpDot1dMapEntry 6 } 
+
+ --
+ -- PFG Policy tables
+ -- 
+  
+ wwpLeosDpPfgPolicyTable OBJECT-TYPE
+       SYNTAX       SEQUENCE OF WwpLeosDpPfgPolicyEntry
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION
+          "The (conceptual) table which represents the forwarding
+           restrictions for a given global PFG Policy."
+        ::= { wwpLeosDpPfg 1 }
+ 		
+ wwpLeosDpPfgPolicyEntry OBJECT-TYPE
+       SYNTAX       WwpLeosDpPfgPolicyEntry
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION
+          "An entry (conceptual row) in the wwpLeosDpPfgPolicyTable"
+       INDEX { wwpLeosDpPfgPolicyIndex }
+       ::= { wwpLeosDpPfgPolicyTable 1 } 
+
+ WwpLeosDpPfgPolicyEntry ::= SEQUENCE { 
+       wwpLeosDpPfgPolicyIndex        Integer32,
+       wwpLeosDpPfgPolicyName         DisplayString,
+       wwpLeosDpPfgPolicyFwdGrpA      INTEGER,     
+       wwpLeosDpPfgPolicyFwdGrpB      INTEGER,
+       wwpLeosDpPfgPolicyAdminState   INTEGER
+ }
+ 
+ wwpLeosDpPfgPolicyIndex OBJECT-TYPE
+       SYNTAX        Integer32 (0..1)
+       MAX-ACCESS    not-accessible
+       STATUS        current
+       DESCRIPTION
+          "A unique index which is used to identify a global PFG Policy."
+       ::= { wwpLeosDpPfgPolicyEntry 1 }
+ 
+ wwpLeosDpPfgPolicyName OBJECT-TYPE
+       SYNTAX        DisplayString (SIZE (1..15))
+       MAX-ACCESS    read-only
+       STATUS        current
+       DESCRIPTION
+          "The descriptive string used to identify a global PFG Policy."
+       ::= { wwpLeosDpPfgPolicyEntry 2 }
+  
+ wwpLeosDpPfgPolicyFwdGrpA OBJECT-TYPE
+       SYNTAX      INTEGER {
+                     a(1),
+                     b(2),
+                     ab(3)
+                     }
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+          "The group restrictions that apply to all members of
+           PFG A. A numerical value of 1 indicates that PFG A
+           forwards only to other port members within PFG A: 
+           A-> A. A numerical value of 2 indicates that PFG A
+           forwards only to members of PFG B: A-> B. Finally,
+           a value of 3 indicates that PFG A forwards both 
+           group A and B: A-> A,B."
+       DEFVAL { 3 }
+       ::= { wwpLeosDpPfgPolicyEntry 3 }
+ 
+ wwpLeosDpPfgPolicyFwdGrpB OBJECT-TYPE
+       SYNTAX      INTEGER {
+                     a(1),
+                     b(2),
+                     ab(3)
+                     }
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+          "The group restrictions that apply to all members of
+           PFG B. A numerical value of 1 indicates that PFG B
+           forwards only to other port members within PFG A: 
+           A-> A. A numerical value of 2 indicates that PFG B
+           forwards only to members of PFG B: A-> B. Finally,
+           a value of 3 indicates that PFG B forwards both 
+           group A and B: A-> A,B."
+       DEFVAL { 1 }
+       ::= { wwpLeosDpPfgPolicyEntry 4 }
+     
+  wwpLeosDpPfgPolicyAdminState OBJECT-TYPE
+       SYNTAX  INTEGER {
+                 enabled(1),
+                 disabled(2)
+                 }
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+          "The administrative state of PFG on a particular global
+           PFG Policy. Disabling a global PFG Policy disables PFG 
+           on all forwarding domains that enable that Policy."
+       DEFVAL { 2 }
+       ::= { wwpLeosDpPfgPolicyEntry 5 }
+  
+ --
+ -- VLAN PFG state table
+ -- 
+  
+ wwpLeosDpPfgVlanTable OBJECT-TYPE
+       SYNTAX       SEQUENCE OF WwpLeosDpPfgVlanEntry
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION
+          "The (conceptual) table which represents the PFG
+           state of a particular VLAN."
+       ::= { wwpLeosDpPfg 2 }
+ 		
+ wwpLeosDpPfgVlanEntry OBJECT-TYPE
+       SYNTAX       WwpLeosDpPfgVlanEntry
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION
+          "An entry (conceptual row) in the wwpLeosDpPfgVlanTable."
+       INDEX { wwpLeosDpPfgVlanId }
+       ::= { wwpLeosDpPfgVlanTable 1 } 
+
+ WwpLeosDpPfgVlanEntry ::= SEQUENCE { 
+       wwpLeosDpPfgVlanId             Integer32,
+       wwpLeosDpPfgVlanName           DisplayString,
+       wwpLeosDpPfgVlanAdminState     INTEGER,
+       wwpLeosDpPfgVlanOperState      INTEGER
+ }
+ 
+ wwpLeosDpPfgVlanId OBJECT-TYPE
+       SYNTAX        Integer32 (1..4095)
+       MAX-ACCESS    not-accessible
+       STATUS        current
+       DESCRIPTION
+          "A unique index to identify a VLAN within the table."
+       ::= { wwpLeosDpPfgVlanEntry 1 }
+ 
+ wwpLeosDpPfgVlanName OBJECT-TYPE
+       SYNTAX        DisplayString (SIZE (1..15))
+       MAX-ACCESS    read-only
+       STATUS        current
+       DESCRIPTION
+          "The descriptive string used to identify a particular
+	       VLAN."
+       ::= { wwpLeosDpPfgVlanEntry 2 }
+  
+ wwpLeosDpPfgVlanAdminState OBJECT-TYPE
+       SYNTAX  INTEGER {
+                 enabled(1),
+                 disabled(2)
+                 }
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+          "The administrative state of PFGs
+             on a particular VLAN."
+       DEFVAL { 2 }
+       ::= { wwpLeosDpPfgVlanEntry 3 }
+     
+  wwpLeosDpPfgVlanOperState OBJECT-TYPE
+       SYNTAX  INTEGER {
+                 enabled(1),
+                 disabled(2),
+                 vsOverride(3)
+                 }
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+          "The operational state of PFG on on a particular VLAN.
+           This state is set to 'enabled' only when PFG is 
+           administratively enabled globally, on the global
+           PFG Policy a VLAN references, and on the VLAN itself.
+           The operational state is set to 'vsOverride' when the
+           VLAN is currently the active VLAN of a VS."
+       DEFVAL { 2 }
+       ::= { wwpLeosDpPfgVlanEntry 4 }
+
+ --
+ -- VS PFG state table
+ -- 
+  
+ wwpLeosDpPfgVsTable OBJECT-TYPE
+       SYNTAX       SEQUENCE OF WwpLeosDpPfgVsEntry
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION
+          "The (conceptual) table which represents the PFG
+           state of a particular VS."
+       ::= { wwpLeosDpPfg 3 }
+ 		
+ wwpLeosDpPfgVsEntry OBJECT-TYPE
+       SYNTAX       WwpLeosDpPfgVsEntry
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION
+          "An entry (conceptual row) in the wwpLeosDpPfgVsTable."
+       INDEX { wwpLeosDpPfgVsIndex }
+       ::= { wwpLeosDpPfgVsTable 1 } 
+
+ WwpLeosDpPfgVsEntry ::= SEQUENCE { 
+       wwpLeosDpPfgVsIndex        Integer32,
+       wwpLeosDpPfgVsName         DisplayString,
+       wwpLeosDpPfgVsActiveVlan   DisplayString,
+       wwpLeosDpPfgVsAdminState   INTEGER,
+       wwpLeosDpPfgVsOperState    INTEGER
+ }
+ 
+ wwpLeosDpPfgVsIndex OBJECT-TYPE
+       SYNTAX        Integer32 (1..4095)
+       MAX-ACCESS    not-accessible
+       STATUS        current
+       DESCRIPTION
+          "A unique index to identify a VS within the table."
+       ::= { wwpLeosDpPfgVsEntry 1 }
+ 
+ wwpLeosDpPfgVsName OBJECT-TYPE
+       SYNTAX        DisplayString (SIZE (1..47))
+       MAX-ACCESS    read-only
+       STATUS        current
+       DESCRIPTION
+          "The descriptive string used to identify a particular
+	       VS."
+       ::= { wwpLeosDpPfgVsEntry 2 }
+       
+ wwpLeosDpPfgVsActiveVlan OBJECT-TYPE
+       SYNTAX        DisplayString (SIZE (1..15))
+       MAX-ACCESS    read-only
+       STATUS        current
+       DESCRIPTION
+          "The active VLAN for a particular VS. The PFG
+           administrative state for the identified VLAN
+           is overridden by the administrative state
+           of the VS this particular entry is associated
+           with."
+       ::= { wwpLeosDpPfgVsEntry 3 }
+  
+ wwpLeosDpPfgVsAdminState OBJECT-TYPE
+       SYNTAX  INTEGER {
+                   enabled(1),
+                   disabled(2)
+     				 }
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+          "The administrative state of PFG on a particular VS."
+       DEFVAL { 2 }
+       ::= { wwpLeosDpPfgVsEntry 4 }
+     
+ wwpLeosDpPfgVsOperState OBJECT-TYPE
+       SYNTAX  INTEGER {
+                  enabled(1),
+                  disabled(2)
+                  }
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+          "The operation state of PFG on on a particular VS.
+           The operational state of PFG is enabled only when
+           PFG is administratively enabled globally, on the global
+           PFG Policy a VLAN references, and on the VS itself."
+       DEFVAL { 2 }
+       ::= { wwpLeosDpPfgVsEntry 5 }
+     
+ --
+ -- PFG Member Table
+ --  
+ wwpLeosDpPfgMembTable OBJECT-TYPE
+       SYNTAX     SEQUENCE OF WwpLeosDpPfgMembEntry
+       MAX-ACCESS not-accessible
+       STATUS     current
+       DESCRIPTION
+          "The (conceptual) table listing the forwarding
+           group for PFG port members."  
+       ::= { wwpLeosDpPfg 4 }
+     
+ wwpLeosDpPfgMembEntry  OBJECT-TYPE
+       SYNTAX       WwpLeosDpPfgMembEntry
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION
+          "An entry (conceptual row) in the wwpLeosDpPfgMembTable."
+       INDEX { wwpLeosDpPfgPolicyIndex, wwpLeosDpPfgMembPortId }
+       ::= { wwpLeosDpPfgMembTable 1 }
+     
+ WwpLeosDpPfgMembEntry ::=  SEQUENCE {
+       wwpLeosDpPfgMembPortId         Integer32,
+       wwpLeosDpPfgMembPortName       DisplayString,
+       wwpLeosDpPfgMembPolicyName     DisplayString,
+       wwpLeosDpPfgMembFwdGrp         INTEGER     
+ }
+ 
+ wwpLeosDpPfgMembPortId   OBJECT-TYPE
+       SYNTAX           Integer32 (1..4095)
+       MAX-ACCESS       not-accessible
+       STATUS           current
+       DESCRIPTION
+          "The port identifier associated with a particular
+           PFG Policy Set."               
+       ::= { wwpLeosDpPfgMembEntry 1 }
+ 
+ wwpLeosDpPfgMembPortName OBJECT-TYPE
+       SYNTAX     DisplayString (SIZE (1..15))
+       MAX-ACCESS read-only
+       STATUS     current
+       DESCRIPTION
+       "The descriptive string used to identify a particular
+	    Port."   
+       ::= { wwpLeosDpPfgMembEntry 2 }
+     
+ wwpLeosDpPfgMembPolicyName OBJECT-TYPE
+       SYNTAX     DisplayString (SIZE (1..15))
+       MAX-ACCESS read-only
+       STATUS     current
+       DESCRIPTION
+          "The descriptive string used to identify a particular
+           global PFG Policy."    
+       ::= { wwpLeosDpPfgMembEntry 3 }
+     
+ wwpLeosDpPfgMembFwdGrp OBJECT-TYPE
+       SYNTAX      INTEGER {
+                    a(1),
+                    b(2)
+                    }
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+          "The PFG a particular port belongs to. Port membership
+           is specified on a per global PFG Policy basis."      
+     ::= { wwpLeosDpPfgMembEntry 4 }
+     
+ --
+ -- PFG Global Admin State
+ --
+ wwpLeosDpPfgGlobalAdminState     OBJECT-TYPE
+       SYNTAX           INTEGER {
+                           enabled(1),
+                           disabled(2)
+                           }		 
+       MAX-ACCESS       read-write
+       STATUS           current
+       DESCRIPTION
+          "The administrative state used to identify whether or
+           not PFG is globally enabled." 
+     ::= { wwpLeosDpPfg 5 }
+     
+ --
+ -- Port-based PFG Egress Profile table
+ --
+ wwpLeosDpPfgPortFwdEgrProfTable OBJECT-TYPE
+      SYNTAX       SEQUENCE OF WwpLeosDpPfgPortFwdEgrProfEntry
+      MAX-ACCESS   not-accessible
+      STATUS       current
+      DESCRIPTION
+           "The (conceptual) table listing the egress profiles.
+            To create an entry in this table use the SNMP
+            set operation.
+            -  wwpLeosDpPfgPortFwdEgrProfName must be specified.
+            -  wwpLeosDpPfgPortFwdEgrProfRowStatus must be specified to 'createAndGo'."
+      ::= { wwpLeosDpPfg 6 }
+      
+ wwpLeosDpPfgPortFwdEgrProfEntry OBJECT-TYPE
+      SYNTAX       WwpLeosDpPfgPortFwdEgrProfEntry
+      MAX-ACCESS   not-accessible
+      STATUS       current
+      DESCRIPTION
+           "An entry (conceptual row) in the wwpLeosDpPfgPortFwdEgrProfTable."
+      INDEX { wwpLeosDpPfgPortFwdEgrProfId }
+      ::= { wwpLeosDpPfgPortFwdEgrProfTable 1 } 
+     
+ WwpLeosDpPfgPortFwdEgrProfEntry ::= SEQUENCE {
+      wwpLeosDpPfgPortFwdEgrProfId                Integer32,
+      wwpLeosDpPfgPortFwdEgrProfName              DisplayString,
+      wwpLeosDpPfgPortFwdFloodTypes               BITS,
+      wwpLeosDpPfgPortFwdPhysPortList             DpPfgPortFwdPortList,
+      wwpLeosDpPfgPortFwdAggrPortList             DpPfgPortFwdPortList,
+      wwpLeosDpPfgPortFwdEgrProfRowStatus         RowStatus
+ }
+ 
+ wwpLeosDpPfgPortFwdEgrProfId OBJECT-TYPE
+      SYNTAX        Integer32 (1..65535)
+      MAX-ACCESS    not-accessible
+      STATUS        current
+      DESCRIPTION
+           "This object specifies a unique egress profile identifier."
+      ::= { wwpLeosDpPfgPortFwdEgrProfEntry 1 }
+
+ wwpLeosDpPfgPortFwdEgrProfName OBJECT-TYPE
+      SYNTAX        DisplayString (SIZE (1..31))
+      MAX-ACCESS    read-create
+      STATUS        current
+      DESCRIPTION
+           "This object specifies a unique name of an egress profile. 
+            A non-zero-length name must be specified at create 
+            time."
+      ::= { wwpLeosDpPfgPortFwdEgrProfEntry 2 }
+
+ wwpLeosDpPfgPortFwdFloodTypes   OBJECT-TYPE
+      SYNTAX  BITS {
+                     broadcast (5),
+                     unknownMulticast (6),
+                     unknownUnicast (7)
+                   }
+      MAX-ACCESS    read-create
+      STATUS      current
+      DESCRIPTION
+           "The allowed flood traffic types for the egress profile.
+
+            Bit 5: allow broadcast traffic
+            Bit 6: allow unknown multi-cast traffic
+            Bit 7: allow unknown uni-cast traffic
+
+            Any combination of these bits may be set.
+            If none of these bits are set then
+            none of these traffic types will be allowed for
+            ports assigned this egress profile.
+            The default value is to allow all these flood
+            traffic types"
+      DEFVAL        { { broadcast, unknownMulticast, unknownUnicast } }
+      ::= { wwpLeosDpPfgPortFwdEgrProfEntry 3 }
+
+ wwpLeosDpPfgPortFwdPhysPortList OBJECT-TYPE
+      SYNTAX        DpPfgPortFwdPortList
+      MAX-ACCESS    read-create
+      STATUS        current
+      DESCRIPTION
+            "Specifies physical ports to which this egress profile applies."
+      ::= { wwpLeosDpPfgPortFwdEgrProfEntry 4 }
+
+ wwpLeosDpPfgPortFwdAggrPortList OBJECT-TYPE
+      SYNTAX        DpPfgPortFwdPortList
+      MAX-ACCESS    read-create
+      STATUS        current
+      DESCRIPTION
+           "Specifies Aggregators to which this egress profile applies.
+            Unique identifers for Aggregators have a different range
+            than those used by physical ports.
+            The first octet specifies the Aggregators whose unique
+            identifiers lie in the first eight values of this range;
+            the second octet specifies the next eight values, etc."
+      REFERENCE
+           "IEEE 802.3 Subclause 30.7.1.1.1"
+      ::= { wwpLeosDpPfgPortFwdEgrProfEntry 5 }
+
+ wwpLeosDpPfgPortFwdEgrProfRowStatus OBJECT-TYPE
+      SYNTAX      RowStatus
+      MAX-ACCESS  read-create
+      STATUS      current
+      DESCRIPTION
+           "To create a row in this table, a manager must
+            set this object to 'createAndGo'. To delete the 
+            entry set this to 'destroy'. To update an entry
+            this object may not be set."
+      ::= { wwpLeosDpPfgPortFwdEgrProfEntry 16 }
+
+ --
+ -- Port-based PFG Port table
+ --
+ wwpLeosDpPfgPortFwdPortTable OBJECT-TYPE
+      SYNTAX       SEQUENCE OF WwpLeosDpPfgPortFwdPortEntry
+      MAX-ACCESS   not-accessible
+      STATUS       current
+      DESCRIPTION
+           "The (conceptual) table listing the assignments of
+            egress profiles to (ingress) ports.
+            To create an entry in this table use the SNMP
+            set operation.
+            -  wwpLeosDpPfgPortFwdPortId must be specified.
+            -  wwpLeosDpPfgPortFwdPortEgrProfId must be specified.
+            -  wwpLeosDpPfgPortFwdPortRowStatus must be specified to 'createAndGo'."
+      ::= { wwpLeosDpPfg 7 }
+      
+ wwpLeosDpPfgPortFwdPortEntry OBJECT-TYPE
+      SYNTAX       WwpLeosDpPfgPortFwdPortEntry
+      MAX-ACCESS   not-accessible
+      STATUS       current
+      DESCRIPTION
+           "An entry (conceptual row) in the wwpLeosDpPfgPortFwdPortTable."
+      INDEX { wwpLeosDpPfgPortFwdPortIndex }
+      ::= { wwpLeosDpPfgPortFwdPortTable 1 } 
+     
+ WwpLeosDpPfgPortFwdPortEntry ::= SEQUENCE {
+      wwpLeosDpPfgPortFwdPortIndex             Unsigned32,
+      wwpLeosDpPfgPortFwdPortId                Integer32,
+      wwpLeosDpPfgPortFwdPortEgrProfId         Integer32,
+      wwpLeosDpPfgPortFwdPortName              DisplayString,
+      wwpLeosDpPfgPortFwdPortEgrProfName       DisplayString,
+      wwpLeosDpPfgPortFwdPortRowStatus         RowStatus
+ }
+ 
+ wwpLeosDpPfgPortFwdPortIndex OBJECT-TYPE
+      SYNTAX        Unsigned32
+      MAX-ACCESS    not-accessible
+      STATUS        current
+      DESCRIPTION
+           "A unique index to identify a port forwarding
+            assignment within the table."
+      ::= { wwpLeosDpPfgPortFwdPortEntry 1 }
+
+ wwpLeosDpPfgPortFwdPortId OBJECT-TYPE
+      SYNTAX        Integer32 (1..65535)
+      MAX-ACCESS    read-create
+      STATUS        current
+      DESCRIPTION
+           "This object specifies a port identifier."
+      ::= { wwpLeosDpPfgPortFwdPortEntry 2 }
+
+ wwpLeosDpPfgPortFwdPortEgrProfId OBJECT-TYPE
+      SYNTAX        Integer32 (1..65535)
+      MAX-ACCESS    read-create
+      STATUS        current
+      DESCRIPTION
+           "This object specifies an egress profile identifier."
+      ::= { wwpLeosDpPfgPortFwdPortEntry 3 }
+
+ wwpLeosDpPfgPortFwdPortName OBJECT-TYPE
+      SYNTAX        DisplayString (SIZE (1..31))
+      MAX-ACCESS    read-only
+      STATUS        current
+      DESCRIPTION
+          "The descriptive string used to identify a port."
+      ::= { wwpLeosDpPfgPortFwdPortEntry 4 }
+
+ wwpLeosDpPfgPortFwdPortEgrProfName OBJECT-TYPE
+      SYNTAX        DisplayString (SIZE (1..31))
+      MAX-ACCESS    read-only
+      STATUS        current
+      DESCRIPTION
+          "The descriptive string used to identify an Egress Profile."
+      ::= { wwpLeosDpPfgPortFwdPortEntry 5 }
+
+ wwpLeosDpPfgPortFwdPortRowStatus OBJECT-TYPE
+      SYNTAX      RowStatus
+      MAX-ACCESS  read-create
+      STATUS      current
+      DESCRIPTION
+           "To create a row in this table, a manager must
+            set this object to 'createAndGo'. To delete the 
+            entry set this to 'destroy'."
+      ::= { wwpLeosDpPfgPortFwdPortEntry 16 }
+
+ --
+ -- Port-based PFG Admin State
+ --
+ wwpLeosDpPfgPortFwdGlobalAttrs OBJECT IDENTIFIER ::= { wwpLeosDpPfg 8 }
+     
+ wwpLeosDpPfgPortFwdAdminState  OBJECT-TYPE
+      SYNTAX           INTEGER {
+                                enabled(1),
+                                disabled(2)
+                               }     
+      MAX-ACCESS       read-write
+      STATUS           current
+      DESCRIPTION
+           "The administrative state used to identify whether or
+            not Port-based PFG is globally enabled." 
+      DEFVAL        {disabled}
+      ::= { wwpLeosDpPfgPortFwdGlobalAttrs 1 }
+
+ wwpLeosDpPfgPortFwdOperStatus  OBJECT-TYPE
+      SYNTAX           INTEGER {
+                                enabled(1),
+                                disabled(2)
+                               }     
+      MAX-ACCESS       read-only
+      STATUS           current
+      DESCRIPTION
+           "The operational status of Port-based PFG. The operational
+            state of Port-based PFG is enabled only when PFG is
+            administratively enabled globally and when
+            Port-based PFG is administratively enabled." 
+      ::= { wwpLeosDpPfgPortFwdGlobalAttrs 2 }
+
+ --
+ -- Dataplane sub-port tables
+ --
+ wwpLeosDpSubPortTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosDpSubPortEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+          "Table of sub-ports.
+           To create an entry in this table use the SNMP multiple
+           set operation.
+           -  wwpLeosDpSubPortName must be specified.
+           -  wwpLeosDpSubPortClassifier must be specified.
+           -  wwpLeosDpSubPortParentPortId must be specified.
+           -  wwpLeosDpSubPortRowStatus must be specified to createAndGo."
+     ::= { wwpLeosDpSubPort 1 }
+   		
+ wwpLeosDpSubPortEntry OBJECT-TYPE
+     SYNTAX       WwpLeosDpSubPortEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+          "Sub-port entry in the sub-port table."
+     INDEX { wwpLeosDpSubPortIndex }
+     ::= { wwpLeosDpSubPortTable 1 } 
+     
+ WwpLeosDpSubPortEntry ::= SEQUENCE {
+     wwpLeosDpSubPortIndex                       DpSubPortIndex,
+     wwpLeosDpSubPortName                        DisplayString,
+     wwpLeosDpSubPortType                        INTEGER,
+     wwpLeosDpSubPortVtagStack                   Unsigned32,
+     wwpLeosDpSubPortParentPortId                Unsigned32,
+     wwpLeosDpSubPortVirtualSwitchIdx            Unsigned32,
+     wwpLeosDpSubPortStatsStatus                 INTEGER,
+     wwpLeosDpSubPortStatsClear                  INTEGER,
+     wwpLeosDpSubPortRowStatus                   RowStatus
+ }
+ 
+ wwpLeosDpSubPortIndex OBJECT-TYPE
+      SYNTAX        DpSubPortIndex
+      MAX-ACCESS    not-accessible
+      STATUS        current
+      DESCRIPTION
+           "This object specifies a unique index into the table."
+      ::= { wwpLeosDpSubPortEntry 1 }
+
+ wwpLeosDpSubPortName OBJECT-TYPE
+      SYNTAX        DisplayString (SIZE (1..31))
+      MAX-ACCESS    read-create
+      STATUS        current
+      DESCRIPTION
+           "This object specifies a unique name of a sub-port. 
+            A non-zero-length name must be specified at create 
+            time."
+      ::= { wwpLeosDpSubPortEntry 2 }
+      
+ wwpLeosDpSubPortType OBJECT-TYPE
+      SYNTAX        INTEGER {
+                        untagged(1),
+                        tagged(2)
+                    }
+      MAX-ACCESS    read-create
+      STATUS        current
+      DESCRIPTION
+           "This object specifies a sub-port type:
+            - tagged 
+            - untagged"
+      DEFVAL        {tagged}
+      ::= { wwpLeosDpSubPortEntry 3 }
+
+ wwpLeosDpSubPortVtagStack OBJECT-TYPE
+      SYNTAX        Unsigned32 (1..4094)
+      MAX-ACCESS    read-create
+      STATUS        current
+      DESCRIPTION
+           "This object specifies the vlan classifier of the
+            sub-port."
+      ::= { wwpLeosDpSubPortEntry 4 }
+
+ wwpLeosDpSubPortParentPortId OBJECT-TYPE
+      SYNTAX        Unsigned32 (1..65535)
+      MAX-ACCESS    read-create
+      STATUS        current
+      DESCRIPTION
+           "This object specifies the parent port. This item must
+            specify an existing logical port interface PGID."
+      ::= { wwpLeosDpSubPortEntry 5 }
+      
+ wwpLeosDpSubPortVirtualSwitchIdx OBJECT-TYPE
+      SYNTAX        Unsigned32  (0..1048575)
+      MAX-ACCESS    read-write
+      STATUS        current
+      DESCRIPTION
+           "This object specifies the index of the attached Virtual Switch.
+            Setting the value to 0 detaches the sub-port from the VS."
+      DEFVAL        {0}
+      ::= { wwpLeosDpSubPortEntry 6 }
+  
+ wwpLeosDpSubPortStatsStatus OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        enabled(1),
+                        disabled(2)
+                    }
+      MAX-ACCESS    read-create
+      STATUS        current
+      DESCRIPTION
+           "This object specifies the enabled status of statistics
+            on a sub-port. By default statistics will be disabled."
+      DEFVAL        {disabled}
+      ::= { wwpLeosDpSubPortEntry 7 }
+      
+ wwpLeosDpSubPortStatsClear OBJECT-TYPE
+      SYNTAX        INTEGER {
+                        clear(1),
+                        none(2)
+                    }
+      MAX-ACCESS    read-write
+      STATUS        current
+      DESCRIPTION
+           "This object is set to clear statistics on a particular
+            sub-port."
+      DEFVAL        {2}
+      ::= { wwpLeosDpSubPortEntry 8 }
+      
+ wwpLeosDpSubPortRowStatus OBJECT-TYPE
+     SYNTAX      RowStatus
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION
+          "To create a row in this table, a manager must
+           set this object to 'createAndGo'. To delete the 
+           entry set this to destroy. To update an entry
+           this object may not be set."
+     ::= { wwpLeosDpSubPortEntry 64 }
+     
+ wwpLeosDpSubPortStatsTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosDpSubPortStatsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+          "Table of sub-ports statistics.
+           Entries in this table are added automatically once a 
+           sub-port has been created."
+     ::= { wwpLeosDpSubPort 2 }
+   		
+ wwpLeosDpSubPortStatsEntry OBJECT-TYPE
+     SYNTAX       WwpLeosDpSubPortStatsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+          "Sub-port entry in the sub-port Table."
+     INDEX { wwpLeosDpSubPortStatsIndex }
+     ::= { wwpLeosDpSubPortStatsTable 1 } 
+     
+ WwpLeosDpSubPortStatsEntry ::= SEQUENCE {
+     wwpLeosDpSubPortStatsIndex                  DpSubPortIndex,
+     wwpLeosDpSubPortStatsName                   DisplayString,
+     wwpLeosDpSubPortStatsByteTxCount            Counter64,
+     wwpLeosDpSubPortStatsByteRxCount            Counter64,
+     wwpLeosDpSubPortStatsPktTxCount             Counter64,
+     wwpLeosDpSubPortStatsPktRxCount             Counter64
+ }
+ 
+ wwpLeosDpSubPortStatsIndex OBJECT-TYPE
+      SYNTAX        DpSubPortIndex
+      MAX-ACCESS    not-accessible
+      STATUS        current
+      DESCRIPTION
+           "This object specifies a unique index into the table."
+      ::= { wwpLeosDpSubPortStatsEntry 1 }
+      
+ wwpLeosDpSubPortStatsName OBJECT-TYPE
+      SYNTAX        DisplayString (SIZE (1..31))
+      MAX-ACCESS    read-only
+      STATUS        current
+      DESCRIPTION
+           "This object specifies a unique name of a sub-port."
+      ::= { wwpLeosDpSubPortStatsEntry 2 }
+      
+ wwpLeosDpSubPortStatsByteTxCount OBJECT-TYPE
+      SYNTAX        Counter64
+      MAX-ACCESS    read-only
+      STATUS        current
+      DESCRIPTION
+           "This object specifies the transmitted byte counts for
+            a sub-port."
+      ::= { wwpLeosDpSubPortStatsEntry 3 }
+      
+ wwpLeosDpSubPortStatsByteRxCount OBJECT-TYPE
+      SYNTAX        Counter64
+      MAX-ACCESS    read-only
+      STATUS        current
+      DESCRIPTION
+           "This object specifies the received byte counts for
+            a sub-port."
+      ::= { wwpLeosDpSubPortStatsEntry 4 }
+      
+ wwpLeosDpSubPortStatsPktTxCount OBJECT-TYPE
+      SYNTAX        Counter64
+      MAX-ACCESS    read-only
+      STATUS        current
+      DESCRIPTION
+           "This object specifies the transmitted packet counts for
+            a sub-port."
+      ::= { wwpLeosDpSubPortStatsEntry 5 }
+      
+ wwpLeosDpSubPortStatsPktRxCount OBJECT-TYPE
+      SYNTAX        Counter64
+      MAX-ACCESS    read-only
+      STATUS        current
+      DESCRIPTION
+           "This object specifies the received packet counts 
+            for a sub-port."
+      ::= { wwpLeosDpSubPortStatsEntry 6 }
+      
+ wwpLeosDpSubPortStatsClearAll OBJECT-TYPE
+      SYNTAX           INTEGER {
+                           clear(1),
+                           none(2)
+                           }		 
+      MAX-ACCESS       read-write
+      STATUS           current
+      DESCRIPTION
+           "An object used to clear statistics on all sub-ports." 
+      DEFVAL        {2}
+      ::= { wwpLeosDpSubPort 3 }
+
+ --
+ -- Dataplane Layer 2 Control Frame Tunnelling table
+ --
+ wwpLeosDpL2CftGlobalAttrs OBJECT IDENTIFIER ::= { wwpLeosDpL2Cft 1 }
+ wwpLeosDpL2CftMode OBJECT-TYPE
+     SYNTAX          INTEGER {
+                         mefCe1(1),
+                         mefCe2(2)
+                         }
+     MAX-ACCESS      read-write
+     STATUS          current
+     DESCRIPTION
+             "This object specifies the L2CFT device mode."
+     DEFVAL          { 1 }
+      ::= { wwpLeosDpL2CftGlobalAttrs 1 }
+
+ wwpLeosDpL2CftPriority OBJECT IDENTIFIER ::= { wwpLeosDpL2CftGlobalAttrs 2 }
+ wwpLeosDpL2CftPriorityHigh OBJECT-TYPE
+     SYNTAX          Integer32 (0..7)
+     MAX-ACCESS      read-write
+     STATUS          current
+     DESCRIPTION
+             "This object specifies the high priority which can be assigned to forwarded untagged L2 control
+              frames. System supports 3 possible fixed resolved CoS values for forwarded untagged L2 control 
+              frames. Value assigned to this object is used by custom L2CFT profiles which set high mapping
+              to wwpLeosDpL2CftProfilePriority object."
+     DEFVAL          { 6 }
+      ::= { wwpLeosDpL2CftPriority 1 }
+
+ wwpLeosDpL2CftPriorityMedium OBJECT-TYPE
+     SYNTAX          Integer32 (0..7)
+     MAX-ACCESS      read-write
+     STATUS          current
+     DESCRIPTION
+             "This object specifies the medium priority which can be assigned to forwarded untagged L2 control
+              frames. System supports 3 possible fixed resolved CoS values for forwarded untagged L2 control 
+              frames. Value assigned to this object is used by custom L2CFT profiles which set medium mapping
+              to wwpLeosDpL2CftProfilePriority object."
+     DEFVAL          { 4 }
+      ::= { wwpLeosDpL2CftPriority 2 }
+
+ wwpLeosDpL2CftPriorityLow OBJECT-TYPE
+     SYNTAX          Integer32 (0..7)
+     MAX-ACCESS      read-write
+     STATUS          current
+     DESCRIPTION
+             "This object specifies the low priority which can be assigned to forwarded untagged L2 control
+              frames. System supports 3 possible fixed resolved CoS values for forwarded untagged L2 control 
+              frames. Value assigned to this object is used by custom L2CFT profiles which set low mapping
+              to wwpLeosDpL2CftProfilePriority object."
+     DEFVAL          { 2 }
+      ::= { wwpLeosDpL2CftPriority 3 }
+
+ wwpLeosDpL2CftL2PTMACTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosDpL2CftL2PTMACEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "The (conceptual) table listing the l2 control frame protocol L2PT
+              MAC addresses."
+     ::= { wwpLeosDpL2Cft 2 }
+
+ wwpLeosDpL2CftL2PTMACEntry OBJECT-TYPE
+     SYNTAX       WwpLeosDpL2CftL2PTMACEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "The layer 2 control frame protocol L2PT MAC address. If L2PT Tunneling is 
+              enabled, destination MAC of untagged L2 control frames is swapped with 
+              L2PT MAC before forwarding these frames into the network. Original protocol
+              destination MAC is restored when frames having L2PT MAC as destination MAC
+              ingress from network and are switched to the subscriber device."
+     INDEX { wwpLeosDpL2CftL2PTMACIndex}
+     ::= { wwpLeosDpL2CftL2PTMACTable 1 }
+
+ WwpLeosDpL2CftL2PTMACEntry ::= SEQUENCE {
+     wwpLeosDpL2CftL2PTMACIndex           Integer32,
+     wwpLeosDpL2CftL2PTMACName            DisplayString,
+     wwpLeosDpL2CftL2PTMACAddr            MacAddress,
+     wwpLeosDpL2CftL2PTMACStatus          RowStatus 
+ }
+
+ wwpLeosDpL2CftL2PTMACIndex OBJECT-TYPE
+     SYNTAX       Integer32 (1)
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+             "This object specifies the L2PT MAC index that is used as a unique
+              index in the table."
+     ::= { wwpLeosDpL2CftL2PTMACEntry 1 }
+
+ wwpLeosDpL2CftL2PTMACName OBJECT-TYPE
+     SYNTAX       DisplayString (SIZE (1..15))
+     MAX-ACCESS   read-create
+     STATUS       current
+     DESCRIPTION
+        "Specifies the L2PT MAC name corresponding to the given index."
+     ::= { wwpLeosDpL2CftL2PTMACEntry 2 }
+
+ wwpLeosDpL2CftL2PTMACAddr OBJECT-TYPE
+     SYNTAX       MacAddress
+     MAX-ACCESS   read-write
+     STATUS       current
+     DESCRIPTION
+        "Specifies the L2PT MAC address corresponding to the given index."
+     ::= { wwpLeosDpL2CftL2PTMACEntry 3 }
+
+ wwpLeosDpL2CftL2PTMACStatus OBJECT-TYPE
+     SYNTAX       RowStatus
+     MAX-ACCESS   read-create
+     STATUS       current
+     DESCRIPTION
+        "Specifies the L2PT MAC address corresponding to the given index."
+     ::= { wwpLeosDpL2CftL2PTMACEntry 4 }
+
+ wwpLeosDpL2CftProfileTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosDpL2CftProfileEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "Table of l2-cft profiles."
+     ::= { wwpLeosDpL2Cft 3 }
+
+ wwpLeosDpL2CftProfileEntry OBJECT-TYPE
+     SYNTAX       WwpLeosDpL2CftProfileEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "Layer 2 Control Frame Tunnelling Profile entry indexed by wwpLeosDpL2CftProfileIndex."
+     INDEX { wwpLeosDpL2CftProfileIndex }
+     ::= { wwpLeosDpL2CftProfileTable 1 }
+
+ WwpLeosDpL2CftProfileEntry ::= SEQUENCE {
+     wwpLeosDpL2CftProfileIndex           Integer32,
+     wwpLeosDpL2CftProfileName            DisplayString,
+     wwpLeosDpL2CftProfilePriority        INTEGER,
+     wwpLeosDpL2CftProfileTunnelMethod    INTEGER, 
+     wwpLeosDpL2CftProfileRowStatus       RowStatus,
+     wwpLeosDpL2CftProfileCosPolicy       INTEGER 
+ }
+
+ wwpLeosDpL2CftProfileIndex OBJECT-TYPE
+      SYNTAX        Integer32 (1..64)
+      MAX-ACCESS    not-accessible
+      STATUS        current
+      DESCRIPTION
+              "This object specifies a unique index into the table."
+      ::= { wwpLeosDpL2CftProfileEntry 1 }
+
+ wwpLeosDpL2CftProfileName OBJECT-TYPE
+      SYNTAX        DisplayString (SIZE (1..31))
+      MAX-ACCESS    read-create
+      STATUS        current
+      DESCRIPTION
+              "This object specifies a unique name for the l2-cft profile."
+      ::= { wwpLeosDpL2CftProfileEntry 2 }
+
+ wwpLeosDpL2CftProfilePriority  OBJECT-TYPE
+     SYNTAX          INTEGER {
+                         low (1),
+                         medium (2),
+                         high (3)
+                         }
+     MAX-ACCESS      read-create
+     STATUS          current
+     DESCRIPTION
+              "This object specifies the fixed RCoS to use for forwarded untagged 
+               L2 control frames. Possible values are specified by 
+               wwpLeosDpL2CftPriorityHigh, wwpLeosDpL2CftPriorityMedium and 
+               wwpLeosDpL2CftPriorityLow objects.
+               An untagged L2CF that is processed with an untagged-disposition of 
+               forwarding, is flooded to all interfaces in the forwarding-domain, 
+               and is subject to the same egress restrictions as normal data frames.
+               A frame that is classified as an Untagged L2CF is forwarded by 
+               an L2CFT Instance using the RCoS value specified by this object. 
+               The object does not apply to a tagged L2CF frame that is classified 
+               as a Transparent or L2PT form of a L2CF. Such frames are given the 
+               same internal treatment as data frames that are classified to the 
+               same ingress port and service."
+     DEFVAL          { high }
+      ::= { wwpLeosDpL2CftProfileEntry 3 }
+
+ wwpLeosDpL2CftProfileTunnelMethod  OBJECT-TYPE
+     SYNTAX          INTEGER {
+                         l2pt (1),
+                         transparent (2)
+                         }
+     MAX-ACCESS      read-create
+     STATUS          current
+     DESCRIPTION
+              "This object specifies the tunnel-method to use for forwarded untagged 
+               L2 control frames. Setting this object sets the tunneling method for a given
+               L2CFT profile entry."
+     DEFVAL          { transparent }
+      ::= { wwpLeosDpL2CftProfileEntry 4 }
+
+ wwpLeosDpL2CftProfileRowStatus  OBJECT-TYPE
+     SYNTAX          RowStatus
+     MAX-ACCESS      read-create
+     STATUS          current
+     DESCRIPTION
+              "Used to manage the creation and deletion of the conceptual rows in 
+               this table.
+               To create a row in this table, set this object to 'createAndGo'.
+               To delete a row in this table, set this object to 'destroy'.
+               If the entry exists, it is displayed as 'active'."
+      ::= { wwpLeosDpL2CftProfileEntry 5 }
+
+ wwpLeosDpL2CftProfileCosPolicy  OBJECT-TYPE
+     SYNTAX          INTEGER {
+                         fixed (1),
+                         ignore (2)
+                         }
+     MAX-ACCESS      read-create
+     STATUS          current
+     DESCRIPTION
+              "This object specifies the CoS policy to be used for forwarded untagged
+               L2 control frames. Setting this objects sets the CoS policy for a given 
+               L2CFT profile entry. It can be set to fixed or ignore. Fixed CoS policy
+               shall assign CoS configured in wwpLeosDpL2CftProfilePriority object while
+               ignore policy shall assign untagged l2cp frames same priority as untagged 
+               data frames get."
+     DEFVAL          { fixed }
+      ::= { wwpLeosDpL2CftProfileEntry 6 }
+
+--
+ -- Dataplane L2-CFT Profile L2CFT Protocols
+ --
+ wwpLeosDpL2CftProfileL2CftProtocolTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosDpL2CftProfileL2CftProtocolEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "Table of L2-Cft profile Layer 2 Control Frame Tunneling (L2CFT) protocols."
+     ::= { wwpLeosDpL2Cft 4 }
+
+ wwpLeosDpL2CftProfileL2CftProtocolEntry OBJECT-TYPE
+     SYNTAX       WwpLeosDpL2CftProfileL2CftProtocolEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "L2 CFT Profile L2CFT protocol entry in the L2 CFT Profile L2CFT
+             protocol table.
+             Normally, Layer 2 Control Frames(L2CFs) received in hardware are
+             handled according to their default disposistion. L2CFT modifies
+             this default behavior, so that the L2CFs for certain protocols can
+             be forwarded/discarded."
+     INDEX { wwpLeosDpL2CftProfileIndex,
+             wwpLeosDpL2CftProfileL2CftProtocolType }
+     ::= { wwpLeosDpL2CftProfileL2CftProtocolTable 1 }
+
+ WwpLeosDpL2CftProfileL2CftProtocolEntry ::= SEQUENCE {
+     wwpLeosDpL2CftProfileL2CftProtocolType               INTEGER,
+     wwpLeosDpL2CftProfileL2CftProtocolUntagDisposition   INTEGER,
+     wwpLeosDpL2CftProfileL2CftProtocolTagDisposition     INTEGER,
+     wwpLeosDpL2CftProfileL2CftProtocolRowStatus          RowStatus
+ }
+
+ wwpLeosDpL2CftProfileL2CftProtocolType OBJECT-TYPE
+      SYNTAX        INTEGER {
+                              unknown(0),
+                              ciscoCdp(1),
+                              ciscoDtp(2),
+                              ciscoPagp(3),
+                              ciscoUdld(4),
+                              ciscoVtp(5),
+                              ciscoPvst(6),
+                              ciscoStpUplinkFast(7),
+                              vlanBridge(8),
+                              xstp(9),
+                              lacp(10),
+                              lacpMarker(11),
+                              oam(12),
+                              lldp(13),
+                              i8021x(14),
+                              gmrp(15),
+                              gvrp(16),
+                              elmi(17),
+                              esmc(18),
+                              ptpPeerDelay(19),
+                              bridgeReserved0C0D(20),
+                              bridgeReserved0B0F(21),
+                              brigeBlock(22),
+                              allBridgesBlock(23),
+                              garpBlock(24)
+                    }
+      MAX-ACCESS    not-accessible
+      STATUS        current
+      DESCRIPTION
+              "This object specifies a unique protocol type index into the table."
+      ::= { wwpLeosDpL2CftProfileL2CftProtocolEntry 1 }
+
+ wwpLeosDpL2CftProfileL2CftProtocolUntagDisposition OBJECT-TYPE
+      SYNTAX        INTEGER {
+                        none(0),
+                        discard(1),
+                        forward(2)
+                    }
+      MAX-ACCESS    read-create
+      STATUS        current
+      DESCRIPTION
+              "This object specifies the L2CFT Profile contained protocol's untagged disposition.
+               If the profile is associated to a subscriber facing port and enabled on the port,
+               untagged L2CFs (of the protocols included in the profile) ingressing on the port 
+               are handled according to the untagged-disposition specified in the profile."
+      DEFVAL        {forward}
+      ::= { wwpLeosDpL2CftProfileL2CftProtocolEntry 2 }
+
+ wwpLeosDpL2CftProfileL2CftProtocolTagDisposition OBJECT-TYPE
+      SYNTAX        INTEGER {
+                        none(0),
+                        discard(1)
+                    }
+      MAX-ACCESS    read-create
+      STATUS        current
+      DESCRIPTION
+              "This object specifies the L2CFT Profile contained protocol's tagged disposition.
+               If the profile is associated to a subscriber facing port and enabled on the port,
+               tagged L2CFs (of the protocols included in the profile) ingressing on the port 
+               are handled according to the tagged-disposition specified in the profile. Tagged
+               L2CFs include priority, single and double tagged L2 control frames."
+      DEFVAL        {none}
+      ::= { wwpLeosDpL2CftProfileL2CftProtocolEntry 3 }
+
+ wwpLeosDpL2CftProfileL2CftProtocolRowStatus OBJECT-TYPE
+      SYNTAX        RowStatus
+      MAX-ACCESS    read-create
+      STATUS        current
+      DESCRIPTION
+              "Used to manage the creation and deletion of the conceptual rows in 
+               this table.
+               To create a row in this table, set this object to 'createAndGo'.
+               To delete a row in this table, set this object to 'destroy'.
+               If the entry exists, it is displayed as 'active'."
+      ::= { wwpLeosDpL2CftProfileL2CftProtocolEntry 4 }
+
+--
+ -- Dataplane L2-CFT Resources Info
+ --
+ wwpLeosDpL2CftResources OBJECT IDENTIFIER ::= { wwpLeosDpL2Cft 5 }
+
+ wwpLeosDpL2CftProfilesMax OBJECT-TYPE
+     SYNTAX          Integer32
+     MAX-ACCESS      read-only
+     STATUS          current
+     DESCRIPTION
+             "This object indicates the max number of L2CFT Profiles that can be configured."
+     ::= { wwpLeosDpL2CftResources 1 }
+
+ wwpLeosDpL2CftProfilesInUse OBJECT-TYPE
+     SYNTAX          Integer32
+     MAX-ACCESS      read-only
+     STATUS          current
+     DESCRIPTION
+             "This object indicates number of L2CFT Profile that are currently configured."
+     ::= { wwpLeosDpL2CftResources 2 }
+
+ wwpLeosDpL2CftTaggedPVSTL2ptInstancesMax OBJECT-TYPE
+     SYNTAX          Integer32
+     MAX-ACCESS      read-only
+     STATUS          current
+     DESCRIPTION
+             "This object indicates the max number of Tagged PVST L2PT instances supported."
+     ::= { wwpLeosDpL2CftResources 3 }
+
+ wwpLeosDpL2CftTaggedPVSTL2ptInstancesInUse OBJECT-TYPE
+     SYNTAX          Integer32
+     MAX-ACCESS      read-only
+     STATUS          current
+     DESCRIPTION
+             "This object indicates number of Tagged PVST L2PT instances that are configured."
+     ::= { wwpLeosDpL2CftResources 4 }
+
+ --
+ -- Capture Global Config Objects
+ --
+
+ wwpLeosDpPacketCaptureGlobalConfig  OBJECT IDENTIFIER ::= { wwpLeosDpPacketCapture 1 }
+
+ wwpLeosDpPacketCaptureGlobalAdminStatus OBJECT-TYPE
+     SYNTAX          INTEGER {
+                           enabled(1),
+                           disabled(2)
+                     }
+     MAX-ACCESS      read-write
+     STATUS          current
+     DESCRIPTION
+         "This object specifies whether the Capture feature is globally enabled or disabled.
+          Capture profiles operational status depends on Capture global admin status i.e.
+          capture profile will be operationally enabled only if both capture profile admin state
+          and global capture admin state are enabled."
+     DEFVAL          { disabled }
+     ::= { wwpLeosDpPacketCaptureGlobalConfig 1 }
+
+ wwpLeosDpPacketCaptureNumIngressCaptureProfileDefs OBJECT-TYPE
+     SYNTAX          Unsigned32
+     MAX-ACCESS      read-only
+     STATUS          current
+     DESCRIPTION
+        "This object specifies the total number of ingress Capture profile definitions on the device."
+     ::= { wwpLeosDpPacketCaptureGlobalConfig 2 }
+
+ wwpLeosDpPacketCaptureEgressCaptureProfile OBJECT-TYPE
+     SYNTAX          TruthValue
+     MAX-ACCESS      read-only
+     STATUS          current
+     DESCRIPTION
+        "As there is just one egress profile can be configured at device level,
+         so this object specifies whether the egress capture profile is defined or not.
+         If value for this object is set to true, then it means egress profile is defined."
+     ::= { wwpLeosDpPacketCaptureGlobalConfig 3 }
+
+ wwpLeosDpPacketCaptureHostOriginatedCaptureProfileId OBJECT-TYPE
+     SYNTAX          Unsigned32
+     MAX-ACCESS      read-write
+     STATUS          current
+     DESCRIPTION
+        "This object specifies the host originated capture profile index
+         which will be used to store the packets generated by the CPU itself."
+     ::= { wwpLeosDpPacketCaptureGlobalConfig 4 }
+
+ --
+ --  Capture Profile Table
+ --
+ wwpLeosDpPacketCaptureProfileTable OBJECT-TYPE
+     SYNTAX          SEQUENCE OF WwpLeosDpPacketCaptureProfileTableEntry 
+     MAX-ACCESS      not-accessible
+     STATUS          current
+     DESCRIPTION
+        "A table of Capture profiles configured on the device. Each
+         table entry contains the Capture profile configuration data."
+     ::= { wwpLeosDpPacketCapture 2 }
+
+ wwpLeosDpPacketCaptureProfileTableEntry OBJECT-TYPE
+     SYNTAX          WwpLeosDpPacketCaptureProfileTableEntry
+     MAX-ACCESS      not-accessible
+     STATUS          current
+     DESCRIPTION
+        "An entry containing the Capture profile configuration data."
+     INDEX { wwpLeosDpPacketCaptureProfileId }
+     ::= { wwpLeosDpPacketCaptureProfileTable 1 }
+
+ WwpLeosDpPacketCaptureProfileTableEntry ::=  SEQUENCE {
+     wwpLeosDpPacketCaptureProfileId                 Integer32,
+     wwpLeosDpPacketCaptureProfileType               INTEGER,
+     wwpLeosDpPacketCaptureProfileName               DisplayString,
+     wwpLeosDpPacketCaptureProfileAdminState         INTEGER,
+     wwpLeosDpPacketCaptureProfileFileName           DisplayString,
+     wwpLeosDpPacketCaptureProfileFileSize           Unsigned32,
+     wwpLeosDpPacketCaptureProfileMaxNumFiles        Unsigned32,
+     wwpLeosDpPacketCaptureProfileFileOverwrite      DpOnOffSwitch,
+     wwpLeosDpPacketCaptureProfileNumPktsToCapture   Unsigned32,
+     wwpLeosDpPacketCaptureProfilePktLength          Unsigned32,
+     wwpLeosDpPacketCaptureProfileDuration           Unsigned32,
+     wwpLeosDpPacketCaptureProfileAttachedInterfaces Unsigned32,
+     wwpLeosDpPacketCaptureProfileRowStatus          RowStatus,
+     wwpLeosDpPacketCaptureProfileFileExport         DpOnOffSwitch
+     }
+
+ wwpLeosDpPacketCaptureProfileId OBJECT-TYPE
+     SYNTAX          Integer32 (1..128)
+     MAX-ACCESS      not-accessible
+     STATUS          current
+     DESCRIPTION
+        "This object specifies a unique index into the capture profile table."
+     ::= { wwpLeosDpPacketCaptureProfileTableEntry 1 }
+
+ wwpLeosDpPacketCaptureProfileType OBJECT-TYPE
+     SYNTAX          INTEGER {
+                           ingress(1),
+                           egress(2),
+                           none(3)
+                     }
+     MAX-ACCESS      read-create
+     STATUS          current
+     DESCRIPTION
+        "This object specifies the direction for the capture profile
+         i.e. ingress or egress direction for packet capture."
+     ::= { wwpLeosDpPacketCaptureProfileTableEntry 2 }
+
+  wwpLeosDpPacketCaptureProfileName OBJECT-TYPE
+     SYNTAX          DisplayString (SIZE (1..31))
+     MAX-ACCESS      read-create
+     STATUS          current
+     DESCRIPTION
+        "This object specifies a unique name for a capture profile."
+     ::= { wwpLeosDpPacketCaptureProfileTableEntry 3 }
+
+ wwpLeosDpPacketCaptureProfileAdminState OBJECT-TYPE
+     SYNTAX          INTEGER {
+                           enabled(1),
+                           disabled(2)
+                     }
+     MAX-ACCESS      read-create
+     STATUS          current
+     DESCRIPTION
+        "Setting this object to 'enabled' administratively enables the capture profile 
+         Setting this object to 'disabled' administratively disables the capture profile."
+     DEFVAL          { enabled }
+     ::= { wwpLeosDpPacketCaptureProfileTableEntry 4 }
+
+ wwpLeosDpPacketCaptureProfileFileName OBJECT-TYPE
+     SYNTAX          DisplayString (SIZE (1..128)) 
+     MAX-ACCESS      read-create
+     STATUS          current
+     DESCRIPTION
+        "This object specifies text file name for the Capture profile
+         in which captured packets will be stored.
+         File name can be a maximum of 128 characters."
+     ::= { wwpLeosDpPacketCaptureProfileTableEntry 5 }
+
+ wwpLeosDpPacketCaptureProfileFileSize OBJECT-TYPE
+     SYNTAX          Unsigned32
+     UNITS           "kb"
+     MAX-ACCESS      read-create
+     STATUS          current
+     DESCRIPTION
+        "This object specifies file size of a capture profile in kb.
+         File size can vary from 64 kb to 4096 kb.
+         File default size is 1024 kb for any capture profile configured."
+     DEFVAL          { 1024 }
+     ::= { wwpLeosDpPacketCaptureProfileTableEntry 6 }
+
+ wwpLeosDpPacketCaptureProfileMaxNumFiles OBJECT-TYPE
+     SYNTAX          Unsigned32
+     MAX-ACCESS      read-create
+     STATUS          current
+     DESCRIPTION
+        "This object specifies maximum number of files for the Capture profile
+         in which captured packets will be stored.
+         Then the given file size will be in ratio for configured number of files
+         i.e. Each file size will be equal to configured file size divided by
+         configured number of files."
+     DEFVAL          { 1 }
+     ::= { wwpLeosDpPacketCaptureProfileTableEntry 7 }
+
+ wwpLeosDpPacketCaptureProfileFileOverwrite OBJECT-TYPE
+     SYNTAX          DpOnOffSwitch
+     MAX-ACCESS      read-create
+     STATUS          current
+     DESCRIPTION
+        "This object specifies file overwrite option for the Capture profile
+         i.e. if this object is set to 'on' then capture file content will be overwritten
+         once exceeds the configured file size
+         and if this is set to 'off' then it will not write anything to file
+         once exceeds the configured file size."
+     DEFVAL          { on }
+     ::= { wwpLeosDpPacketCaptureProfileTableEntry 8 }
+
+ wwpLeosDpPacketCaptureProfileNumPktsToCapture OBJECT-TYPE
+     SYNTAX          Unsigned32
+     MAX-ACCESS      read-create
+     STATUS          current
+     DESCRIPTION
+        "This object specifies the total number of packets to capture for the Capture profile.
+         Packet capture will be stopped once number of packets captured equal to configured 
+         number of packets in capture profile.
+         If number of packets to capture configured to '0' then all the sampled frames
+         received up to configured maximum rate will be captured."
+     DEFVAL          { 0 }
+     ::= { wwpLeosDpPacketCaptureProfileTableEntry 9 }
+
+ wwpLeosDpPacketCaptureProfilePktLength OBJECT-TYPE
+     SYNTAX          Unsigned32
+     UNITS           "bytes"
+     MAX-ACCESS      read-create
+     STATUS          current
+     DESCRIPTION
+        "This object represents the length in bytes of packets to be captured and stored on a device.
+         Maximum configurable packet length shall be limited to max frame size supported.
+         By default, first 64 bytes of packet will get capture."
+     DEFVAL          { 64 }
+     ::= { wwpLeosDpPacketCaptureProfileTableEntry 10 }
+
+ wwpLeosDpPacketCaptureProfileDuration OBJECT-TYPE
+     SYNTAX          Unsigned32
+     MAX-ACCESS      read-create
+     STATUS          current
+     DESCRIPTION
+        "This object indicates the time duration in seconds for the capture with incremental value of 10.
+         If not specified by user or configured to '0', then packets will be captured
+         and stored in file always if packet capture is enabled."
+     DEFVAL          { 0 }
+     ::= { wwpLeosDpPacketCaptureProfileTableEntry 11 }
+
+ wwpLeosDpPacketCaptureProfileAttachedInterfaces OBJECT-TYPE
+     SYNTAX          Unsigned32
+     MAX-ACCESS      read-only
+     STATUS          current
+     DESCRIPTION
+        "This object specifies the counter for total number of interfaces to which this 
+         capture profile is attached."
+     ::= { wwpLeosDpPacketCaptureProfileTableEntry 12 }
+
+ wwpLeosDpPacketCaptureProfileRowStatus OBJECT-TYPE
+     SYNTAX          RowStatus
+     MAX-ACCESS      read-create
+     STATUS          current
+     DESCRIPTION
+              "Used to manage the creation and deletion of the conceptual rows in
+               this table.
+               To create a row in this table, set this object to 'createAndGo'.
+               To delete a row in this table, set this object to 'destroy'.
+               If the entry exists, it is displayed as 'active'."
+      ::= { wwpLeosDpPacketCaptureProfileTableEntry 13 }
+
+ wwpLeosDpPacketCaptureProfileFileExport OBJECT-TYPE
+     SYNTAX          DpOnOffSwitch
+     MAX-ACCESS      read-create
+     STATUS          current
+     DESCRIPTION
+        "This object specifies file export option for the Capture profile.
+         If this object is set to 'on' then PCAP capture file will be
+         exported to configured file export server once capture 
+         is completed."
+     DEFVAL          { off }
+     ::= { wwpLeosDpPacketCaptureProfileTableEntry 14 }
+
+  END

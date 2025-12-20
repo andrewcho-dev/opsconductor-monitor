@@ -1,0 +1,161 @@
+-- This file was included in WWP MIB release 04-21-05-0007
+ --
+ -- CIENA-CES-AIB-MIB.my
+ --
+ --
+
+ CIENA-CES-AIB-MIB DEFINITIONS ::= BEGIN
+
+--
+-- Below is variable used according to need 
+--
+
+ IMPORTS       
+   Integer32, IpAddress, OBJECT-TYPE, MODULE-IDENTITY, NOTIFICATION-TYPE
+       FROM SNMPv2-SMI        
+   MacAddress
+       FROM SNMPv2-TC
+   cienaCesConfig, cienaCesNotifications
+       FROM CIENA-SMI
+   cienaGlobalSeverity, cienaGlobalMacAddress
+       FROM CIENA-GLOBAL-MIB;
+    
+ cienaCesIpAibMIB MODULE-IDENTITY
+             LAST-UPDATED "202302010000Z"
+             ORGANIZATION "Ciena Corp."
+             CONTACT-INFO
+                 "   Mib Meister
+                     7035 Ridge Road
+                     Hanover, Maryland 21076
+                     USA
+                     Phone:  +1 800 921 1144
+                     Email:  support@ciena.com" 
+             DESCRIPTION
+                 "This module defines the AIB related Information."
+
+             REVISION
+                 "202302010000Z"
+             DESCRIPTION
+                 "Added cienaCesIpAibAdjacencyChangeNotification for IP AIB adjacency change
+                 notifications"
+            
+             REVISION
+                 "201808030000Z"
+             DESCRIPTION
+                 "Initial version."
+
+             ::= { cienaCesConfig 50 }
+
+ --
+ -- Node definitions
+ --
+   
+ cienaCesIpAibMIBObjects OBJECT IDENTIFIER ::= { cienaCesIpAibMIB 1 }
+ 
+ --
+ -- Aib Node
+ --
+ cienaCesIpAib OBJECT IDENTIFIER ::= { cienaCesIpAibMIBObjects 1 }
+   
+ -- Notifications
+ cienaCesIpAibMIBNotificationPrefix  OBJECT IDENTIFIER ::=  { cienaCesNotifications 113 }
+ cienaCesIpAibMIBNotifications       OBJECT IDENTIFIER ::=  { cienaCesIpAibMIBNotificationPrefix 1 }
+ --
+ 
+ --
+ -- Adjacency Information Base MIB definitions 
+ --      
+ cienaCesIpAibTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF CienaCesIpAibEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "Table of Adjacency and their associated attributes."
+    ::= { cienaCesIpAib 1 }
+      
+ cienaCesIpAibEntry OBJECT-TYPE
+    SYNTAX     CienaCesIpAibEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "Each entry represents a Adjacency Information."
+    INDEX { cienaCesIpVrfId, cienaCesIpInterfaceIndex, cienaCesIpAibNextHopAddr }
+    ::= { cienaCesIpAibTable 1 }
+      
+ CienaCesIpAibEntry ::=  SEQUENCE { 
+    cienaCesIpVrfId                              Integer32,
+    cienaCesIpInterfaceIndex                     Integer32,
+    cienaCesIpAibNextHopAddr                     IpAddress,
+    cienaCesIpInterfaceIfIndex                   Integer32,
+    cienaCesIpNextHopAddr                        IpAddress,
+    cienaCesIpAibMacAddr                         MacAddress
+ }
+ cienaCesIpVrfId OBJECT-TYPE
+    SYNTAX Integer32 (1..1)
+    MAX-ACCESS       not-accessible
+    STATUS           current
+    DESCRIPTION
+        "Unique Vrf-id for VPN identifier.
+         This will be used in future for VPN currently not in use."
+    ::= { cienaCesIpAibEntry 1 }
+ 
+
+ cienaCesIpInterfaceIndex OBJECT-TYPE
+    SYNTAX Integer32 (1..4096)
+    MAX-ACCESS       not-accessible
+    STATUS           current
+    DESCRIPTION
+        "Index of the interface."
+    ::= { cienaCesIpAibEntry 2 }
+             
+ cienaCesIpAibNextHopAddr OBJECT-TYPE
+    SYNTAX       IpAddress
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "Next hop IP address."
+    ::= { cienaCesIpAibEntry 3 }
+
+ cienaCesIpInterfaceIfIndex OBJECT-TYPE
+    SYNTAX Integer32 (1..4096)
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+        "Index of the interface."
+    ::= { cienaCesIpAibEntry 4 }
+
+  cienaCesIpNextHopAddr OBJECT-TYPE
+    SYNTAX       IpAddress
+    MAX-ACCESS   read-only 
+    STATUS       current
+    DESCRIPTION
+        "Next hop IP address."
+    ::= { cienaCesIpAibEntry 5 }
+       
+ cienaCesIpAibMacAddr OBJECT-TYPE
+    SYNTAX       MacAddress
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+        "Mac address."
+    ::= { cienaCesIpAibEntry 6 }
+
+-- IP AIB Notifications
+
+  cienaCesIpAibAdjacencyChangeNotification NOTIFICATION-TYPE
+       OBJECTS {
+                  cienaGlobalSeverity,
+                  cienaGlobalMacAddress,
+                  cienaCesIpInterfaceIfIndex,
+                  cienaCesIpNextHopAddr,
+                  cienaCesIpAibMacAddr
+       }
+       STATUS       current
+       DESCRIPTION
+          "cienaCesIpAibAdjacencyChangeNotification will be generated whenever
+          mac address of an IP AIB entry (IP next hop) changes i.e. goes from
+          resolved to unresolved or vice-versa. This notification can be used
+          for detection of IP adjacency failure in the network."
+       ::= {  cienaCesIpAibMIBNotifications 1 }
+
+ END

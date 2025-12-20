@@ -1,0 +1,4336 @@
+-- This file was included in WWP MIB release 04-21-05-0007
+ --
+ -- WWP-LEOS-TRAFFIC-PROFILE-MIB.my
+ --
+
+ WWP-LEOS-TRAFFIC-PROFILE-MIB DEFINITIONS ::= BEGIN
+
+ IMPORTS
+   Integer32, Unsigned32, Counter32, Counter64, IpAddress, OBJECT-TYPE, MODULE-IDENTITY, NOTIFICATION-TYPE
+       FROM SNMPv2-SMI
+   RowStatus, DisplayString, MacAddress, TEXTUAL-CONVENTION, TruthValue
+            FROM SNMPv2-TC
+   InetAddress, InetAddressType, InetAddressPrefixLength
+            FROM INET-ADDRESS-MIB
+   wwpModules,    wwpModulesLeos
+       FROM WWP-SMI;
+
+
+ wwpLeosTrafficProfileMIB MODULE-IDENTITY
+	LAST-UPDATED "202410140000Z"
+	ORGANIZATION "Ciena Corp."
+	CONTACT-INFO
+                    "   Mib Meister
+                        7035 Ridge Road
+                        Hanover, Maryland 21076
+                        USA
+                        Phone:  +1 800 921 1144
+                        Email:  support@ciena.com"
+
+                DESCRIPTION
+      "The MIB module for the WWP leos traffic profiling specific information."
+
+	REVISION "202410140000Z"
+	DESCRIPTION
+      "Added new OIDs for microflow-action, greedy-microflow-action, serviceflow and microflow statistics.
+       Introduced new notification wwpLeosTprofDynProfMicroFlowStatus and defined RateUnsigned64 TEXTUAL-CONVENTION for Counter64."
+
+	REVISION "202105210000Z"
+	DESCRIPTION
+      "Updated DisplayString length of OIDs wwpLeosTrafficProfileStdVs, wwpLeosTrafficProfileGlobalVs, wwpLeosTrafficProfileGlobalParentVs,
+       wwpLeosTrafficProfileEnvelopeFlowVs and wwpLeosTprofDynamicServiceFlowVs to allow up to 47 characters."
+
+	REVISION "202003250000Z"
+	DESCRIPTION
+      "Added wwpLeosTrafficProfileStdVlanMax to wwpLeosTrafficProfileStdEntry for supporting VLAN range on standard traffic profile.
+       Added wwpLeosTrafficProfileGlobalVlanMax to wwpLeosTrafficProfileGlobalEntry forsupporting VLAN range on global traffic profile."
+
+	REVISION "201905280000Z"
+	DESCRIPTION
+      "Added scalar object wwpLeosTrafficProfileExtendedResource under wwpLeosTrafficProfileGlobalAttrs for extended traffic profiling scale.
+       Added scalar object wwpLeosTrafficProfileStdResourceType under wwpLeosTrafficProfileStdTable to represent resource type of standard traffic profiles."
+
+	REVISION "201809170000Z"
+	DESCRIPTION
+      "Added object wwpLeosTrafficProfileDynamicProfile under wwpLeosTrafficProfile
+       Added below tables and their entries under wwpLeosTrafficProfileDynamicProfile for Dynamic-Profile Microflow Policing feature:
+      - wwpLeosTrafficProfileDynamicGlobalAttrs
+      - wwpLeosTrafficProfileDynamicProfileTable
+      - wwpLeosTrafficProfileDynamicServiceFlowTable
+      - wwpLeosTrafficProfileDynamicMicroflowTable."
+
+	REVISION "201807020000Z"
+	DESCRIPTION
+		"Added globall2l3Extended mode for wwpLeosTrafficProfileGlobalProfileMode.
+		 Added wwpLeosTrafficProfileGlobalProfileType under wwpLeosTrafficProfileGlobalAttrs."
+
+	REVISION     "201711150000Z"
+	DESCRIPTION
+		"Updated contact info."
+	REVISION "201708100000Z"
+	DESCRIPTION
+		"Added below tables and their entries for MIBS of feature MEF 10.3 Ingress Metering: 
+		- wwpLeosTrafficProfileEnvelopeTable
+		- wwpLeosTrafficProfileEnvelopeFlowTable
+		- wwpLeosTrafficProfileEnvelopeFlowStatisticsTable
+		- wwpLeosTrafficProfileEnvelopeResources."
+
+	REVISION "201707060000Z"
+	DESCRIPTION
+		"All the entries of wwpLeosTrafficProfileStdTotalStatsTable have been marked obsolete."
+
+	REVISION "201702210000Z"
+	DESCRIPTION
+		"Added wwpLeosTrafficProfileGlobalParentIndex and wwpLeosTrafficProfileGlobalParentTable to support global traffic profile hierarchy.
+		 Added wwpLeosTrafficProfileGlobalVlanTable, wwpLeosTrafficProfileGlobalDot1dTable, and wwpLeosTrafficProfileGlobalDscpTable
+		 to support lists of those values."
+
+	REVISION "201512310000Z"
+	DESCRIPTION
+		"Updated wwpLeosTrafficProfileGlobalVs and wwpLeosTrafficProfileStdVs to allow the VS name length up to 31 characters."
+      
+	REVISION "201508270000Z"
+	DESCRIPTION
+		"Added wwpLeosTrafficProfileGlobalReIndx to WwpLeosTrafficProfileGlobalEntry to allow SNMP messages to change
+		the precedence values of traffic-profiling global profiles."
+	
+	REVISION "201508130000Z"
+	DESCRIPTION
+		"Changed wwpLeosTrafficProfileGlobalVs to use the VS name instead of the ID."
+
+	REVISION "201504230000Z"   
+	DESCRIPTION
+		"Added wwpLeosTrafficProfileGlobalProfileMode,wwpLeosTrafficProfileGlobalTable, and wwpLeosTrafficProfileGlobalStatsTable"
+
+	REVISION    "201304230000Z"
+	DESCRIPTION
+		"Miscellaneous spelling and description corrections."
+
+	REVISION "201107070000Z"
+	DESCRIPTION 
+		"Added objects wwpLeosTrafficProfileStdHCAcceptedBytes and wwpLeosTrafficProfileStdHCDroppedBytes."
+
+	REVISION "201103271700Z"
+	DESCRIPTION 
+			"Added classifier mode under the  wwpLeosTrafficProfilePortEntry.
+			Added  wwpLeosTrafficProfileStdUntaggedState under WwpLeosTrafficProfileStdEntry"
+
+	REVISION "200908251700Z"
+	DESCRIPTION 
+			"Added modes hierarchicalVlan(12), hierarchicalPort(13) to wwpLeosTrafficProfileMode 
+			under wwpLeosTrafficProfilePortEntry.
+			Added  wwpLeosTrafficProfileStdDefaultProfile, wwpLeosTrafficProfileStdDrop,
+			wwpLeosTrafficProfileStdParentIndex, wwpLeosTrafficProfileStdChildMode under wwpLeosTrafficProfileStdTable"
+
+	REVISION	"200811141700Z"
+	DESCRIPTION
+			"Added modes stdVlanDot1dPri, stdVlanIpp, stdDscp to wwpLeosTrafficProfileMode under wwpLeosTrafficProfilePortEntry.
+			Added objects wwpLeosTrafficProfileStdCbs, wwpLeosTrafficProfileEbs, wwpLeosTrafficProfileStdDscpRemarkPolicy, 
+			wwpLeosTrafficProfileStdFixedDscp to wwpLeosTrafficProfileStdEntryTable"
+
+	REVISION  "200807281700Z"
+	DESCRIPTION
+			"Added wwpLeosTrafficProfileMeterPoolTable under wwpLeosTrafficProfile
+			wwpLeosTrafficProfileStdIndx mib object value has been changed from 1..32 to 1..64 
+			Added wwpLeosTrafficProfileMeterPool mib object under wwpLeosTrafficProfilePortEntry."
+
+	REVISION   "200806281700Z"
+	DESCRIPTION
+	        "Added additional trafficPorfileMode stdDscp.
+	         Profile Index changed for following mib object from 1 through 8 to 1 through 32
+	         	wwpLeosTrafficProfileStdIndx,
+	         	wwpLeosTrafficProfileStdDot1dTpProfile,
+	         	wwpLeosTrafficProfileStdIpPrecToProfile,
+	         	wwpLeosTrafficProfileStdPhbToProfile.
+	         Added new wwpLeosTrafficProfileStdDscpTable.
+	         Added new wwpLeosTrafficProfileStdVlanTable."
+        REVISION    "200806161700Z"  
+        DESCRIPTION
+                    "added value in cascaded enumerations for deprecated values"
+        REVISION    "200806131700Z"
+        DESCRIPTION
+                    "added entries related to tos-stamping"
+     	REVISION    "200806041700Z"    
+        DESCRIPTION
+		   "changed description of entries relating to cascaded profiling"
+     	REVISION    "200805211700Z"
+        DESCRIPTION
+		    "deprecated all entries related to cascaded traffic profiling."
+     	REVISION    "200805151700Z"
+	DESCRIPTION
+		    "Added Total Statistics."
+	REVISION    "200104031700Z"
+	DESCRIPTION
+		    "Initial creation."
+	    ::= { wwpModulesLeos 27 }	
+ 
+
+-- -------------------------------------------------------------
+-- Textual Conventions
+-- -------------------------------------------------------------
+PortList ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "Each octet within this value specifies a set of eight
+        ports, with the first octet specifying ports 1 through
+        8, the second octet specifying ports 9 through 16, etc.
+        Within each octet, the most significant bit represents
+        the lowest numbered port, and the least significant bit
+        represents the highest numbered port.  Thus, each port
+        of the bridge is represented by a single bit within the
+        value of this object.  If that bit has a value of '1'
+        then that port is included in the set of ports; the port
+        is not included if its bit has a value of '0'."
+    SYNTAX      OCTET STRING (SIZE (0..255))
+
+
+RateUnsigned64 ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION  "A Counter64 value used to represent tx/rx rates in
+                 kbps unit, which are used by the service flows and
+                 microflows of a dynamic-profile."
+    SYNTAX       Counter64
+				
+ --
+ -- Node definitions
+ --
+	
+ wwpLeosTrafficProfileObjects OBJECT IDENTIFIER ::= { wwpLeosTrafficProfileMIB 1 }
+ 
+ wwpLeosTrafficProfile OBJECT IDENTIFIER ::= { wwpLeosTrafficProfileObjects 1 }
+
+ wwpLeosTrafficProfileNotifAttrs OBJECT IDENTIFIER ::= { wwpLeosTrafficProfileObjects 2 }
+
+ -- Notifications 
+  
+ wwpLeosTrafficProfileNotificationPrefix     OBJECT IDENTIFIER ::= { wwpLeosTrafficProfileMIB 2 } 
+ wwpLeosTrafficProfileNotifications          OBJECT IDENTIFIER ::=  { wwpLeosTrafficProfileNotificationPrefix 0 }
+
+ -- Conformance information 
+ 
+ wwpLeosTrafficProfileMIBConformance OBJECT IDENTIFIER ::= { wwpLeosTrafficProfileMIB 3 } 
+ wwpLeosTrafficProfileMIBCompliances OBJECT IDENTIFIER ::= { wwpLeosTrafficProfileMIBConformance 1 } 		
+ wwpLeosTrafficProfileMIBGroups      OBJECT IDENTIFIER ::= { wwpLeosTrafficProfileMIBConformance 2 }  
+
+ -- global attributes for flow
+ wwpLeosTrafficProfileGlobalAttrs	   OBJECT IDENTIFIER ::= { wwpLeosTrafficProfile 1 }  
+ 
+ -- 
+ -- Global Attributes
+ -- 
+ wwpLeosTrafficProfileGlobalState    OBJECT-TYPE
+     SYNTAX         INTEGER {
+			enabled(1),
+			disabled(2)
+			}
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+	     "Setting this object to 'enabled' enables traffic profiling globally. 
+	      Setting this object to 'disabled' disables traffic profiling globally."
+     ::= { wwpLeosTrafficProfileGlobalAttrs 1 }    
+
+ wwpLeosTrafficProfileGlobalMeterProvisioningState    OBJECT-TYPE
+     SYNTAX         INTEGER {
+			pir(1),
+			eir(2)
+			}
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+	     "Setting this object to 'pir' allows meters to be provisioned in PIR. 
+	      Setting this object to 'eir' allows meters to be provisioned in EIR."
+     ::= { wwpLeosTrafficProfileGlobalAttrs 2 }    
+     
+wwpLeosTrafficProfileGlobalProfileMode    OBJECT-TYPE
+     SYNTAX         INTEGER {
+			port(1),
+			globall2l3(2),
+			globall2l3Extended(3)
+			}
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+	     "Setting this object to 'port' allows port based standard profiles to be provisioned. 
+	      Setting this object to 'globall2l3' allows global profiles to be provisioned.
+	      Setting this object to 'globall2l3Extended' adds support of IPv6 and L2 qualifiers
+	      over 'globalL2L3' mode."
+     ::= { wwpLeosTrafficProfileGlobalAttrs 3 }    
+     
+wwpLeosTrafficProfileGlobalProfileType    OBJECT-TYPE
+     SYNTAX         INTEGER {
+			none(1),
+			globalProfile(2),
+			dynamicProfile(3)
+			}
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+	     "This object allows provisioning of global profiles or dynamic profiles when 
+	      wwpLeosTrafficProfileGlobalProfileMode is set to globall2l3 or globall2l3Extended.
+	      Setting this object to 'globalProfile' allows global profiles to be provisioned.
+	      Setting this object to 'dynamicProfile' allows dynamic profiles to be provisioned.
+	      This object is not applicable when wwpLeosTrafficProfileGlobalProfileMode is set as port."
+     ::= { wwpLeosTrafficProfileGlobalAttrs 4 }    
+
+ wwpLeosTrafficProfileExtendedResource    OBJECT-TYPE
+     SYNTAX         INTEGER {
+			enabled(1),
+			disabled(2)
+			}
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+              "This object allows to globally control traffic profiling extended resource."
+     DEFVAL { disabled }
+     ::= { wwpLeosTrafficProfileGlobalAttrs 5 }    
+
+     
+ --
+ -- Traffic profiling on per port basis.
+ -- 
+ wwpLeosTrafficProfilePortTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosTrafficProfilePortEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+	     "A table of traffic profile port entries."
+     ::= { wwpLeosTrafficProfile 2 }
+		
+ wwpLeosTrafficProfilePortEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosTrafficProfilePortEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+	     "A traffic profile entry in the wwpLeosTrafficProfilePortTable."
+     INDEX { wwpLeosTrafficProfilePort }    
+     ::= { wwpLeosTrafficProfilePortTable 1 }
+     
+ WwpLeosTrafficProfilePortEntry ::= SEQUENCE {
+     wwpLeosTrafficProfilePort			        INTEGER,
+     wwpLeosTrafficProfileAdminState		        INTEGER,
+     wwpLeosTrafficProfileOperState		        INTEGER,
+     wwpLeosTrafficProfileMode			        INTEGER,
+     wwpLeosTrafficProfileNonConformCascadedProfile	INTEGER,
+     wwpLeosTrafficProfileNonConformStdProfile	        INTEGER,
+     wwpLeosTrafficProfileArpCascadedProfile	        INTEGER,
+     wwpLeosTrafficProfileArpStdProfile		        INTEGER,
+     wwpLeosTrafficProfileMeterPool		        INTEGER,
+     wwpLeosTrafficProfileClassifierMode	        INTEGER
+ }    
+     
+ wwpLeosTrafficProfilePort    OBJECT-TYPE
+     SYNTAX         INTEGER (1..65535)
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the port number and is also used as index in
+	      the table."
+     ::= { wwpLeosTrafficProfilePortEntry 1 }     
+     
+ wwpLeosTrafficProfileAdminState    OBJECT-TYPE
+     SYNTAX         INTEGER {
+			enabled(1),
+			disabled(2)
+			}
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+	     "Setting this object to 'enabled' administratively enables traffic profiling on the given port.
+	      Setting this object to 'disabled' administratively disables traffic profiling on the given port."
+     ::= { wwpLeosTrafficProfilePortEntry 2 }  
+ 
+ wwpLeosTrafficProfileOperState    OBJECT-TYPE
+     SYNTAX         INTEGER {
+			enabled(1),
+			disabled(2)
+			}
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies operational state of the traffic profiling for a given port
+	      on the device."
+     ::= { wwpLeosTrafficProfilePortEntry 3 }
+
+ wwpLeosTrafficProfileMode    OBJECT-TYPE
+     SYNTAX         INTEGER {
+			cascadedDot1dPri(1),
+			cascadedDscp(2),
+			cascadedIpPrec(3),
+			stdDot1(4),
+			stdDiffServ(5),
+			stdIpPrec(6),
+			stdVlan(7),
+			stdDscp(8),
+			stdVlanDot1DPri(9),
+			stdVlanIpp(10),
+			stdVlanDscp(11),
+			hierarchicalVlan(12),
+			hierarchicalPort(13),
+			none(14),
+			advanced(15)
+			}
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the mode of traffic profiling for a given port."
+     ::= { wwpLeosTrafficProfilePortEntry 4 }
+ 
+ wwpLeosTrafficProfileNonConformCascadedProfile    OBJECT-TYPE
+     SYNTAX         INTEGER {
+			drop(0),
+			profile1(1),
+			profile2(2),
+			profile3(3),
+            deprecated(4)			
+			}
+     MAX-ACCESS     read-write
+     STATUS         deprecated
+     DESCRIPTION
+	     "This object specifies that the device should map non-conformance traffic ingressing
+	      on a given port to the cascaded profile specified by
+	      wwpLeosTrafficProfileNonConformCascadedProfile. This object becomes effective
+	      only if the device is running in cascaded profile mode. This object sets to drop
+              if used on a device that does not have cascaded-profiling."
+     ::= { wwpLeosTrafficProfilePortEntry 5 }
+ 
+ wwpLeosTrafficProfileNonConformStdProfile    OBJECT-TYPE
+     SYNTAX         INTEGER (0..32) 
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies that the device should map non-conformance traffic ingressing
+	      on a given port to standard profile specified by
+	      wwpLeosTrafficProfileNonConformStdProfile. This object becomes effective
+	      only if the device is running in standard profile mode."
+     ::= { wwpLeosTrafficProfilePortEntry 6 }
+ 
+ wwpLeosTrafficProfileArpCascadedProfile    OBJECT-TYPE
+     SYNTAX         INTEGER {
+			bypass(0),
+			profile1(1),
+			profile2(2),
+			profile3(3),
+            deprecated(4)			
+			}
+     MAX-ACCESS     read-write
+     STATUS         deprecated
+     DESCRIPTION
+	     "This object specifies that the device should map ARP frames ingressing
+	      on a given port to cascaded profile specified by
+	      wwpLeosTrafficProfileArpCascadedProfile. This object is set to bypass
+              if used on a device that does not have cascaded-profiling."
+     ::= { wwpLeosTrafficProfilePortEntry 7 }
+ 
+ wwpLeosTrafficProfileArpStdProfile    OBJECT-TYPE
+     SYNTAX         INTEGER (0..32)
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies that the device should map ARP frames ingressing
+	      on a given port to standard profile specified by
+	      wwpLeosTrafficProfileArpStdProfile. This object becomes effective
+	      only if the device is running in standard profile mode."
+     ::= { wwpLeosTrafficProfilePortEntry 8 } 
+     
+  wwpLeosTrafficProfileMeterPool 	OBJECT-TYPE
+      SYNTAX     INTEGER(1..8)
+      MAX-ACCESS read-write
+      STATUS 	current
+      DESCRIPTION
+      	"This object specifies the Meter Pool Index for a port."
+      ::= { wwpLeosTrafficProfilePortEntry 9}	
+  
+
+  wwpLeosTrafficProfileClassifierMode 	OBJECT-TYPE
+      SYNTAX INTEGER {
+		  narrow(1),
+		  wide(2)
+		  }
+      MAX-ACCESS read-write
+      STATUS 	current
+      DESCRIPTION
+      	"This object specifies how narrow or wide traffic is classified to a port's meters."
+      ::= { wwpLeosTrafficProfilePortEntry 10}	
+
+
+ --
+ -- Cascaded profile
+ -- 
+ wwpLeosTrafficProfileCascadedTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosTrafficProfileCascadedEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION
+	     "A table of cascaded traffic profile entries.
+	      To create an entry in this table, the following criteria must be met:
+	      -All indexes must be specified.
+	      -wwpLeosTrafficProfileCascadedCir must be specified.
+	      -If wwpLeosTrafficProfileCascadedPir is not specified or is specified and is < wwpLeosTrafficProfileCascadedCir
+	      then device sets wwpLeosTrafficProfileCascadedPir to wwpLeosTrafficProfileCascadedCir
+	      -wwpLeosTrafficProfileCascadedStatus must be set to 'createAndGo'."	      
+     ::= { wwpLeosTrafficProfile 3 }
+		
+ wwpLeosTrafficProfileCascadedEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosTrafficProfileCascadedEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION
+	     "A cascaded traffic profile entry in the wwpLeosTrafficProfileCascadedTable."
+     INDEX { wwpLeosTrafficProfilePort , wwpLeosTrafficProfileCascadedIndx}    
+     ::= { wwpLeosTrafficProfileCascadedTable 1 }
+     
+ WwpLeosTrafficProfileCascadedEntry ::= SEQUENCE {     
+     wwpLeosTrafficProfileCascadedIndx				INTEGER,
+     wwpLeosTrafficProfileCascadedCir				Integer32,
+     wwpLeosTrafficProfileCascadedPir				Integer32,     
+     wwpLeosTrafficProfileCascadedStatus		   	RowStatus
+ }   
+ 
+ wwpLeosTrafficProfileCascadedIndx    OBJECT-TYPE
+     SYNTAX         INTEGER (1..3)
+     MAX-ACCESS     read-only
+     STATUS         deprecated
+     DESCRIPTION
+	     "This object is an index in the table and it represents
+	      profile index which can be 1, 2 or 3."
+     ::= { wwpLeosTrafficProfileCascadedEntry 1 }  
+ wwpLeosTrafficProfileCascadedCir    OBJECT-TYPE
+     SYNTAX         Integer32
+     UNITS	    	"kbps"
+     MAX-ACCESS     read-write
+     STATUS         deprecated
+     DESCRIPTION
+	     "This object specifies the cir associated with a given cascaded traffic profile.
+	      Units are kbps."
+     ::= { wwpLeosTrafficProfileCascadedEntry 2 }
+
+ wwpLeosTrafficProfileCascadedPir    OBJECT-TYPE
+     SYNTAX         Integer32
+     UNITS	    	"kbps"
+     MAX-ACCESS     read-write
+     STATUS         deprecated
+     DESCRIPTION
+	     "This object specifies the pir associated with a given cascaded traffic profile.
+	      Units are kbps."
+     ::= { wwpLeosTrafficProfileCascadedEntry 3 }
+     
+ wwpLeosTrafficProfileCascadedStatus    OBJECT-TYPE
+     SYNTAX         RowStatus
+     MAX-ACCESS     read-create
+     STATUS         deprecated
+     DESCRIPTION
+	     "Setting this object to 'createAndGo' along with wwpLeosTrafficProfileCascadedCir
+	      and wwpLeosTrafficProfileCascadedPir results in creating a cascaded traffic profile entry.
+	      Setting this object to 'destroy' deletes the entry from the table."
+     ::= { wwpLeosTrafficProfileCascadedEntry 5 }
+    
+ --
+ -- Std profile
+ -- 
+ wwpLeosTrafficProfileStdTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosTrafficProfileStdEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+	     "A table of Std traffic profile entries.
+	      To create an entry in this table, the following criteria must be met:
+	      -All indexes must be specified.
+	      -wwpLeosTrafficProfileStdCir must be specified.
+	      -If wwpLeosTrafficProfileStdPir is not specified or is specified and is < wwpLeosTrafficProfileStdCir
+	      then device sets wwpLeosTrafficProfileStdPir to wwpLeosTrafficProfileStdCir.
+	      -wwpLeosTrafficProfileStdStatus must be set to 'createAndGo'."
+     ::= { wwpLeosTrafficProfile 4 }
+		
+ wwpLeosTrafficProfileStdEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosTrafficProfileStdEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+	     "A standard traffic profile entry in the wwpLeosTrafficProfileStdTable."
+     INDEX { wwpLeosTrafficProfilePort , wwpLeosTrafficProfileStdIndx}    
+     ::= { wwpLeosTrafficProfileStdTable 1 }
+     
+ WwpLeosTrafficProfileStdEntry ::= SEQUENCE {
+     wwpLeosTrafficProfileStdIndx		INTEGER,
+     wwpLeosTrafficProfileStdCir		Integer32,
+     wwpLeosTrafficProfileStdPir		Integer32,
+     wwpLeosTrafficProfileStdName		DisplayString,
+     wwpLeosTrafficProfileStdStatus		RowStatus,
+     wwpLeosTrafficProfileStdVlan		INTEGER,
+     wwpLeosTrafficProfileStdCbs            	Unsigned32,
+     wwpLeosTrafficProfileStdEbs            	Unsigned32,
+     wwpLeosTrafficProfileStdDscpRemarkPolicy 	INTEGER,
+     wwpLeosTrafficProfileStdFixedDscp		INTEGER,
+     wwpLeosTrafficProfileStdUnsetVlan		INTEGER,
+     wwpLeosTrafficProfileStdDefaultProfile	INTEGER,
+     wwpLeosTrafficeProfileStdDrop		INTEGER,
+     wwpLeosTrafficProfileStdParentIndex	Integer32,
+     wwpLeosTrafficProfileStdChildMode		INTEGER, 
+     wwpLeosTrafficProfileStdStatsMonitor	INTEGER,
+     wwpLeosTrafficProfileStdUntaggedState      INTEGER,
+     wwpLeosTrafficProfileStdVs			DisplayString,
+     wwpLeosTrafficProfileStdRemarkColorPolicy 	INTEGER,
+     wwpLeosTrafficProfileStdRemarkRcosPolicy 	INTEGER,
+     wwpLeosTrafficProfileStdYellowRemarkRcos 	INTEGER,
+     wwpLeosTrafficProfileStdGreenRemarkRcos 	INTEGER,
+     wwpLeosTrafficProfileStdIngressColorAware 	INTEGER,
+     wwpLeosTrafficProfileStdEir                Integer32,
+     wwpLeosTrafficProfileStdResourceType       INTEGER,
+     wwpLeosTrafficProfileStdVlanMax            Integer32
+   } 
+ 
+ wwpLeosTrafficProfileStdIndx    OBJECT-TYPE
+     SYNTAX         INTEGER (1..4096)
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+	     "This object is used as index in the table and it represents
+	      profile index, which can be 1 through 64."
+     ::= { wwpLeosTrafficProfileStdEntry 1 }  
+ 
+ wwpLeosTrafficProfileStdCir    OBJECT-TYPE
+     SYNTAX         Integer32
+     UNITS			"kbps"
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the cir associated with a given standard traffic profile."
+     ::= { wwpLeosTrafficProfileStdEntry 2 }
+
+ wwpLeosTrafficProfileStdPir    OBJECT-TYPE
+     SYNTAX         Integer32
+     UNITS			"kbps"
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the pir associated with a given standard traffic profile."
+     ::= { wwpLeosTrafficProfileStdEntry 3 }
+     
+ wwpLeosTrafficProfileStdName  OBJECT-TYPE
+     SYNTAX       DisplayString(SIZE (0..15))
+     MAX-ACCESS   read-create
+     STATUS       current
+     DESCRIPTION
+	     "The name associated with this profile. This must be unique per port.
+         The name does not have to be set on create. However, when updating the name,
+         it must have some value - zero-string is not supported." 
+     ::= { wwpLeosTrafficProfileStdEntry 4 }	
+ 
+ wwpLeosTrafficProfileStdStatus    OBJECT-TYPE
+     SYNTAX         RowStatus
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+	     "Setting this object to 'createandgo' along with wwpLeosTrafficProfileStdCir
+	      and or wwpLeosTrafficProfileStdPir results in creating a standard traffic profile entry.
+	      Setting this object to 'destroy' deletes the entry from the table."
+     ::= { wwpLeosTrafficProfileStdEntry 5 }
+
+ wwpLeosTrafficProfileStdVlan    OBJECT-TYPE
+     SYNTAX         INTEGER (1..4095)
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the VLAN associated with a profile.This object also specifies the minimum 
+	      value of VLAN range associated with a profile."
+     ::= { wwpLeosTrafficProfileStdEntry 6 }
+
+ wwpLeosTrafficProfileStdCbs    OBJECT-TYPE
+     SYNTAX       Unsigned32 
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the committed burst size associated with a given
+              standard traffic profile."
+     DEFVAL { 2 }
+     ::= { wwpLeosTrafficProfileStdEntry 7 }
+
+ wwpLeosTrafficProfileStdEbs    OBJECT-TYPE
+     SYNTAX       Unsigned32      
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the excess burst size associated with a given 
+              standard traffic profile."
+     DEFVAL { 2 }
+     ::= { wwpLeosTrafficProfileStdEntry 8 }
+ 
+ wwpLeosTrafficProfileStdDscpRemarkPolicy OBJECT-TYPE
+ 	  SYNTAX		INTEGER {
+ 	  						leave(1),
+ 	  						fixed(2)
+ 	  			}
+ 	  MAX-ACCESS	read-write
+ 	  STATUS		current
+ 	  DESCRIPTION
+ 	  	"Leave => Don't remark the frame.
+ 	  	Fixed => Remark the DSCP of a frame with the fixed DSCP value for IP frames
+ 	  	that classify to the traffic profile."
+ 	  ::= { wwpLeosTrafficProfileStdEntry 9 }
+ 	   
+ wwpLeosTrafficProfileStdFixedDscp OBJECT-TYPE
+ 	  SYNTAX		INTEGER (0..63)
+ 	  MAX-ACCESS	read-write
+ 	  STATUS		current
+ 	  DESCRIPTION
+ 	  	"Fixed DSCP value to use for frames classifying to a traffic profile
+ 	  	when the dscp-remark-policy ID is 'Fixed'."
+ 	   ::= { wwpLeosTrafficProfileStdEntry 10 } 
+ 
+ wwpLeosTrafficProfileStdUnsetVlan	OBJECT-TYPE
+      SYNTAX		INTEGER {
+      						 none(0),
+      						 unset(1)
+      						 }
+ 	  MAX-ACCESS	read-write
+ 	  STATUS		current
+ 	  DESCRIPTION
+ 	  	"Setting this object to unset(1) unsets the VLAN associated with a profile.
+		 This object returns a value of none(0) on a get."
+ 	   ::= { wwpLeosTrafficProfileStdEntry 11 } 
+ 
+ wwpLeosTrafficProfileStdDefaultProfile   OBJECT-TYPE
+ 	SYNTAX    	INTEGER {
+ 				 true(1),
+ 				 false(2)
+ 				}
+	MAX-ACCESS	read-create
+ 	STATUS		current
+ 	DESCRIPTION
+ 	  	"Setting this object to true(1) during createAndGo(4) creates a Tier-1 default profile."
+ 	   ::= { wwpLeosTrafficProfileStdEntry 12 } 
+  
+  wwpLeosTrafficeProfileStdDrop		OBJECT-TYPE
+  	SYNTAX    	INTEGER {
+ 				 true(1),
+ 				 false(2)
+ 				}
+	MAX-ACCESS	read-create
+ 	STATUS		current
+ 	DESCRIPTION
+ 	  	"Setting this value to true causes metering to end and all traffic to drop."
+ 	   ::= { wwpLeosTrafficProfileStdEntry 13 } 
+	
+	wwpLeosTrafficProfileStdParentIndex	OBJECT-TYPE
+		SYNTAX	Integer32
+		MAX-ACCESS read-create
+		STATUS current
+		DESCRIPTION 
+		"This object is set when creating a child traffic profile to specify the parent index."
+		::= { wwpLeosTrafficProfileStdEntry 14 }
+
+	wwpLeosTrafficProfileStdChildMode 	OBJECT-TYPE
+		SYNTAX INTEGER {  
+			dot1dPri(1),
+			ipprec(2),
+			dscp(3),
+			vlan(4),
+			vlanCos(5),
+			none(99)
+		}      
+		MAX-ACCESS read-create
+		STATUS     current
+		DESCRIPTION
+			"When the port mode is hierarchical-vlan, the valid child-modes are dot1dPri, ipprec, and dscp.
+			When the port mode is hierarchical-port, the valid childModes are dot1dPri, ipprec, dscp and vlan(4)."
+		::= { wwpLeosTrafficProfileStdEntry 15}
+   
+
+ wwpLeosTrafficProfileStdStatsMonitor OBJECT-TYPE
+ 	SYNTAX   INTEGER {
+ 				on(1),
+ 				off(2)
+ 			}
+ 	MAX-ACCESS read-write
+ 	STATUS current
+ 	DESCRIPTION
+ 		"To disable stats collection, set this object to off(2).
+ 		To enable stats collection, set this object to on(1)."
+ ::= { wwpLeosTrafficProfileStdEntry  16}
+
+ wwpLeosTrafficProfileStdUntaggedState OBJECT-TYPE
+ 	SYNTAX   INTEGER {
+ 				on(1),
+ 				off(2)
+ 			 }
+ 	MAX-ACCESS read-write
+ 	STATUS current
+ 	DESCRIPTION
+ 		"To enable this profile to match untagged traffic set this to on(1). To disable, set to off(2)"
+ ::= { wwpLeosTrafficProfileStdEntry  17}
+
+ wwpLeosTrafficProfileStdVs  OBJECT-TYPE
+     SYNTAX       DisplayString(SIZE (0..47))
+     MAX-ACCESS   read-create
+     STATUS       current
+     DESCRIPTION
+	 "The virtual-switch name associated with this profile. The virtual-switch name must 
+	  exist before using it as a profile classifier." 
+     ::= { wwpLeosTrafficProfileStdEntry 18 }	
+
+ wwpLeosTrafficProfileStdRemarkColorPolicy OBJECT-TYPE
+ 	SYNTAX   INTEGER {
+ 				leave(1),
+ 				yellowRemarkToGreen(2),
+				greenRemarkToYellow(3)
+ 			 }
+ 	MAX-ACCESS read-write
+ 	STATUS current
+ 	DESCRIPTION
+ 		"This sets the profile's color remarking policy at the meter output."
+ ::= { wwpLeosTrafficProfileStdEntry  19}
+
+ wwpLeosTrafficProfileStdRemarkRcosPolicy OBJECT-TYPE
+ 	SYNTAX   INTEGER {
+ 				leave(1),
+ 				remarkGreen(2),
+				remarkYellow(3),
+				remarkBoth(4),
+ 				remarkGreenRcosOnly(5),
+				remarkYellowRcosOnly(6),
+				remarkBothRcosOnly(7)
+ 			 }
+ 	MAX-ACCESS read-write
+ 	STATUS current
+ 	DESCRIPTION
+ 		"This sets the profile's rcos remarking policy based on meter color."
+ ::= { wwpLeosTrafficProfileStdEntry  20}
+     
+ wwpLeosTrafficProfileStdYellowRemarkRcos OBJECT-TYPE
+ 	SYNTAX   INTEGER (0..7)
+ 	MAX-ACCESS read-write
+ 	STATUS current
+ 	DESCRIPTION
+ 		"This sets the profile's rcos remarking policy based on meter color."
+ ::= { wwpLeosTrafficProfileStdEntry  21}
+     
+ wwpLeosTrafficProfileStdGreenRemarkRcos OBJECT-TYPE
+ 	SYNTAX   INTEGER (0..7)
+ 	MAX-ACCESS read-write
+ 	STATUS current
+ 	DESCRIPTION
+ 		"This sets the profile's rcos remarking policy based on meter color."
+ ::= { wwpLeosTrafficProfileStdEntry  22}
+
+ wwpLeosTrafficProfileStdIngressColorAware OBJECT-TYPE
+ 	SYNTAX   INTEGER {
+ 				on(1),
+ 				off(2)
+ 			 }
+ 	MAX-ACCESS read-write
+ 	STATUS current
+ 	DESCRIPTION
+ 		"This sets the profile's meter ingress color awareness."
+ ::= { wwpLeosTrafficProfileStdEntry  23}
+
+ wwpLeosTrafficProfileStdEir    OBJECT-TYPE
+     SYNTAX         Integer32
+     UNITS			"kbps"
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the eir associated with a given standard traffic profile.
+	      Sets/Gets on this are only valid when the global meter-provisioning mode is set
+	      to EIR. All other times it is ignored and a 0 is returned."
+     ::= { wwpLeosTrafficProfileStdEntry 24 }
+     
+ wwpLeosTrafficProfileStdResourceType OBJECT-TYPE
+ 	SYNTAX      INTEGER {
+                                default(1),
+                                extended(2),
+                                automatic(3),
+                                unsupported(4)
+ 			    }
+ 	MAX-ACCESS read-create
+ 	STATUS     current
+ 	DESCRIPTION
+            "This object specifies the resource-type for standard traffic profile.
+            If this object is default, traffic profile will consume existing resource.
+            If this object is extended, traffic profile will consume service meters and 
+            service counters.
+            If this object is set to automatic, then device will determine the resource type
+            for this traffic profile. For devices which do not support this capabiliy, the 
+            value of unsupported is used."
+      ::= { wwpLeosTrafficProfileStdEntry  25 }
+
+ wwpLeosTrafficProfileStdVlanMax    OBJECT-TYPE
+     SYNTAX         Integer32 (-1|1..4094)
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+             "This object specifies the maximum value of VLAN range associated with a profile.
+             wwpLeosTrafficProfileStdVlan must be set along with this object to set the minimum value of VLAN 
+             range associated with a profile.
+             The value -1 signifies that this object is not used as a classifier."
+     DEFVAL { -1 }
+     ::= { wwpLeosTrafficProfileStdEntry 26 }
+
+ --
+ -- Std profile dot1d table
+ -- 
+ wwpLeosTrafficProfileStdDot1dTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosTrafficProfileStdDot1dEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+	     "A table of Std dot1d traffic profile entries. 
+	      To create an entry in the table, the following criteria must be met:
+	      -set wwpLeosTrafficProfileStdDot1dStatus to 'createAndGo'.
+	      -set wwpLeosTrafficProfileStdDot1dToProfile to a valid profile.
+	      
+	      To delete entry, set wwpLeosTrafficProfileStdDot1dStatus to 'destroy'."
+     ::= { wwpLeosTrafficProfile 5 }
+		
+ wwpLeosTrafficProfileStdDot1dEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosTrafficProfileStdDot1dEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+	     "A standard dot1d traffic profile entry in the wwpLeosTrafficProfileStdDot1dTable."
+     INDEX { wwpLeosTrafficProfilePort , wwpLeosTrafficProfileStdDot1d}    
+     ::= { wwpLeosTrafficProfileStdDot1dTable 1 }
+     
+ WwpLeosTrafficProfileStdDot1dEntry ::= SEQUENCE {
+     wwpLeosTrafficProfileStdDot1d				INTEGER,
+     wwpLeosTrafficProfileStdDot1dToProfile		        INTEGER,         
+     wwpLeosTrafficProfileStdDot1dStatus			RowStatus
+ } 
+ 
+ wwpLeosTrafficProfileStdDot1d    OBJECT-TYPE
+     SYNTAX         INTEGER (0..7)
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the dot1d priority for the associated
+	      standard profile entry in the wwpLeosTrafficProfileStdDot1dTable."
+     ::= { wwpLeosTrafficProfileStdDot1dEntry 1 }  
+     
+ wwpLeosTrafficProfileStdDot1dToProfile    OBJECT-TYPE
+     SYNTAX         INTEGER (1..4096)
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the profile to which wwpLeosTrafficProfileStdDot1d 
+	      must be mapped."
+     ::= { wwpLeosTrafficProfileStdDot1dEntry 2 }
+ 
+ wwpLeosTrafficProfileStdDot1dStatus    OBJECT-TYPE
+     SYNTAX         RowStatus
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+	     "To create an entry in the table, the following criteria must be met:
+	      - set wwpLeosTrafficProfileStdDot1dStatus to 'createAndGo'. 
+	      - set wwpLeosTrafficProfileStdDot1dToProfile to a valid profile.
+	      
+	      To delete entry, set wwpLeosTrafficProfileStdDot1dStatus to 'destroy'."
+     ::= { wwpLeosTrafficProfileStdDot1dEntry 3 }
+ 
+ --
+ -- Std profile IP Prec table
+ -- 
+ wwpLeosTrafficProfileStdIpPrecTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosTrafficProfileStdIpPrecEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+	     "A table of standard IP precedence traffic profile entries.
+	      To create an entry in the table, the following criteria must be met:
+	      -set wwpLeosTrafficProfileStdIpPrecStatus to 'createAndGo'. 
+	      -set wwpLeosTrafficProfileStdIpPrecToProfile to a valid profile.
+	      
+	      To delete entry, set wwpLeosTrafficProfileStdIpPrecStatus to 'destroy'."
+     ::= { wwpLeosTrafficProfile 6 }
+		
+ wwpLeosTrafficProfileStdIpPrecEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosTrafficProfileStdIpPrecEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+	     "A standard ip precedence traffic profile entry in the wwpLeosTrafficProfileStdTable."
+     INDEX { wwpLeosTrafficProfilePort , wwpLeosTrafficProfileStdIpPrec}    
+     ::= { wwpLeosTrafficProfileStdIpPrecTable 1 }
+     
+ WwpLeosTrafficProfileStdIpPrecEntry ::= SEQUENCE {
+     wwpLeosTrafficProfileStdIpPrec				INTEGER,
+     wwpLeosTrafficProfileStdIpPrecToProfile		INTEGER,     
+     wwpLeosTrafficProfileStdIpPrecStatus		RowStatus
+ } 
+ 
+ wwpLeosTrafficProfileStdIpPrec    OBJECT-TYPE
+     SYNTAX         INTEGER (0..7)
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the ip precedence for the associated
+	      standard profile entry in wwpLeosTrafficProfileStdTable."
+     ::= { wwpLeosTrafficProfileStdIpPrecEntry 1 }  
+     
+ wwpLeosTrafficProfileStdIpPrecToProfile    OBJECT-TYPE
+     SYNTAX         INTEGER (1..4096)
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the profile to which wwpLeosTrafficProfileStdIpPrec 
+	      must be mapped."
+     ::= { wwpLeosTrafficProfileStdIpPrecEntry 2 }
+ 
+ wwpLeosTrafficProfileStdIpPrecStatus    OBJECT-TYPE
+     SYNTAX         RowStatus
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+	     "To create an entry in the table, the following criteria must be met:
+	      -set wwpLeosTrafficProfileStdIpPrecStatus to 'createAndGo'. 
+	      -set wwpLeosTrafficProfileStdIpPrecToProfile to a valid profile.
+	      
+	      To delete an entry set wwpLeosTrafficProfileStdIpPrecStatus to 'destroy'."
+     ::= { wwpLeosTrafficProfileStdIpPrecEntry 3 }
+ 
+ --
+ -- Std profile phb table
+ -- 
+ wwpLeosTrafficProfileStdPhbTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosTrafficProfileStdPhbEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+	     "A table of standard phb traffic profile entries.
+	      To create an entry in the table, the following criteria must be met:
+	      -set wwpLeosTrafficProfileStdPhbStatus to 'createAndGo'. 
+	      -set wwpLeosTrafficProfileStdPhbToProfile to a valid profile.
+	      
+	      To delete entry, set wwpLeosTrafficProfileStdPhbStatus to 'destroy'."
+     ::= { wwpLeosTrafficProfile 7 }
+		
+ wwpLeosTrafficProfileStdPhbEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosTrafficProfileStdPhbEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+	     "A standard Phb traffic profile entry in the wwpLeosTrafficProfileStdTable."
+     INDEX { wwpLeosTrafficProfilePort , wwpLeosTrafficProfileStdPhb}    
+     ::= { wwpLeosTrafficProfileStdPhbTable 1 }
+     
+ WwpLeosTrafficProfileStdPhbEntry ::= SEQUENCE {
+     wwpLeosTrafficProfileStdPhb					INTEGER,
+     wwpLeosTrafficProfileStdPhbToProfile		INTEGER,     
+     wwpLeosTrafficProfileStdPhbStatus			RowStatus
+ } 
+ 
+ wwpLeosTrafficProfileStdPhb    OBJECT-TYPE
+     SYNTAX         INTEGER  {
+			cs0(1),
+			cs1(2),
+			cs2(3),
+			cs3(4),
+			cs4(5),
+			cs5(6),
+			cs6(7),
+			cs7(8),
+			af1(9),
+			af2(10),
+			af3(11),
+			af4(12),
+			ef(13)
+		    }
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the diff-serv values for the associated
+	      standard profile entry in wwpLeosTrafficProfileStdTable."
+     ::= { wwpLeosTrafficProfileStdPhbEntry 1 }
+     
+ wwpLeosTrafficProfileStdPhbToProfile    OBJECT-TYPE
+     SYNTAX         INTEGER (1..32)
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the profile to which wwpLeosTrafficProfileStdPhb 
+	      must be mapped."
+     ::= { wwpLeosTrafficProfileStdPhbEntry 2 }  
+ 
+ wwpLeosTrafficProfileStdPhbStatus    OBJECT-TYPE
+     SYNTAX         RowStatus
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+	     "To create an entry in the table, the following criteria must be met:
+	      -set wwpLeosTrafficProfileStdPhbStatus to 'createAndGo'. 
+	      -set wwpLeosTrafficProfileStdPhbToProfile to a valid profile.
+	      
+	      To delete entry, set wwpLeosTrafficProfileStdPhbStatus to 'destroy'."
+     ::= { wwpLeosTrafficProfileStdPhbEntry 3 } 
+     
+  --
+  -- Cascaded Profile Stats 
+  -- 
+  wwpLeosTrafficProfileCascadedStatsTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosTrafficProfileCascadedStatsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION
+	     "A table of cascaded profile stats."
+     ::= { wwpLeosTrafficProfile 8 }
+		
+ wwpLeosTrafficProfileCascadedStatsEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosTrafficProfileCascadedStatsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION
+	     "A cascaded traffic profile entry in the wwpLeosTrafficProfileCascadedStatsTable."
+     INDEX { wwpLeosTrafficProfilePort , wwpLeosTrafficProfileCascadedIndx }    
+     ::= { wwpLeosTrafficProfileCascadedStatsTable 1 }
+     
+ WwpLeosTrafficProfileCascadedStatsEntry ::= SEQUENCE {
+     wwpLeosTrafficProfileCascadedAcceptedBytesHi	Counter32,
+     wwpLeosTrafficProfileCascadedAcceptedBytesLo	Counter32,
+     wwpLeosTrafficProfileCascadedDroppedBytesHi	Counter32,
+     wwpLeosTrafficProfileCascadedDroppedBytesLo	Counter32,
+     wwpLeosTrafficProfileCascadedRemarkedBytesHi	Counter32,
+     wwpLeosTrafficProfileCascadedRemarkedBytesLo	Counter32
+ }
+ 
+ wwpLeosTrafficProfileCascadedAcceptedBytesHi    OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         deprecated
+     DESCRIPTION
+	     "This object specifies the higher bytes of accepted frames of the
+	      given cascaded profile."
+     ::= { wwpLeosTrafficProfileCascadedStatsEntry 1 }  
+ 
+ wwpLeosTrafficProfileCascadedAcceptedBytesLo    OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         deprecated
+     DESCRIPTION
+	     "This object specifies the lower bytes of accepted frames of the
+	      given cascaded profile."
+     ::= { wwpLeosTrafficProfileCascadedStatsEntry 2 }
+
+ wwpLeosTrafficProfileCascadedDroppedBytesHi    OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         deprecated
+     DESCRIPTION
+	     "This object specifies the higher bytes of dropped frames of the
+	      given cascaded profile."
+     ::= { wwpLeosTrafficProfileCascadedStatsEntry 3 }
+  
+ wwpLeosTrafficProfileCascadedDroppedBytesLo    OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         deprecated
+     DESCRIPTION
+	     "This object specifies the lower bytes of dropped frames of the
+	      given cascaded profile."
+     ::= { wwpLeosTrafficProfileCascadedStatsEntry 4 }
+
+  wwpLeosTrafficProfileCascadedRemarkedBytesHi    OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         deprecated
+     DESCRIPTION
+	     "This object specifies the higher bytes of remarked frames of the
+	      given cascaded profile."
+     ::= { wwpLeosTrafficProfileCascadedStatsEntry 5 }
+
+  wwpLeosTrafficProfileCascadedRemarkedBytesLo    OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         deprecated
+     DESCRIPTION
+	     "This object specifies the lower bytes of remarked frames of the
+	      given cascaded profile."
+     ::= { wwpLeosTrafficProfileCascadedStatsEntry 6 }  
+ 
+  --
+  -- Standard Profile Stats 
+  -- 
+  wwpLeosTrafficProfileStdStatsTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosTrafficProfileStdStatsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+	     "A table of standard profile stats."
+     ::= { wwpLeosTrafficProfile 9 }
+		
+ wwpLeosTrafficProfileStdStatsEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosTrafficProfileStdStatsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+	     "The entry in wwpLeosTrafficProfileStdStatsTable."
+     INDEX { wwpLeosTrafficProfilePort , wwpLeosTrafficProfileStdIndx  }    
+     ::= { wwpLeosTrafficProfileStdStatsTable 1 }
+     
+ WwpLeosTrafficProfileStdStatsEntry ::= SEQUENCE {
+     wwpLeosTrafficProfileStdAcceptedBytesHi	Counter32,
+     wwpLeosTrafficProfileStdAcceptedBytesLo	Counter32,
+     wwpLeosTrafficProfileStdDroppedBytesHi	Counter32,
+     wwpLeosTrafficProfileStdDroppedBytesLo	Counter32,     
+     wwpLeosTrafficProfileStdHCAcceptedBytes    Counter64,
+     wwpLeosTrafficProfileStdHCDroppedBytes     Counter64,     
+     wwpLeosTrafficProfileStdHCAcceptedPackets	Counter64,
+     wwpLeosTrafficProfileStdHCDroppedPackets   Counter64
+ }
+ 
+ wwpLeosTrafficProfileStdAcceptedBytesHi    OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the higher bytes of accepted frames of the
+	      given standard profile."
+     ::= { wwpLeosTrafficProfileStdStatsEntry 1 }  
+ 
+ wwpLeosTrafficProfileStdAcceptedBytesLo    OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the lower bytes of accepted frames of the
+	      given standard profile."
+     ::= { wwpLeosTrafficProfileStdStatsEntry 2 }
+
+ wwpLeosTrafficProfileStdDroppedBytesHi    OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the higher bytes of dropped frames of the
+	      given standard profile."
+     ::= { wwpLeosTrafficProfileStdStatsEntry 3 }
+  
+ wwpLeosTrafficProfileStdDroppedBytesLo    OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the higher bytes of dropped frames of the
+	      given standard profile."
+     ::= { wwpLeosTrafficProfileStdStatsEntry 4 }
+ 
+ wwpLeosTrafficProfileStdHCAcceptedBytes    OBJECT-TYPE
+     SYNTAX         Counter64
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the bytes of accepted frame data of the
+	      given standard profile."
+     ::= { wwpLeosTrafficProfileStdStatsEntry 5 }
+     
+ wwpLeosTrafficProfileStdHCDroppedBytes    OBJECT-TYPE
+     SYNTAX         Counter64
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the bytes of dropped frame data by a  
+	      given standard profile."
+
+     ::= { wwpLeosTrafficProfileStdStatsEntry 6 }
+
+wwpLeosTrafficProfileStdHCAcceptedPackets    OBJECT-TYPE
+     SYNTAX         Counter64
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the number of packets passed by a standard profile"
+     ::= { wwpLeosTrafficProfileStdStatsEntry 7 }
+ 
+ wwpLeosTrafficProfileStdHCDroppedPackets    OBJECT-TYPE
+     SYNTAX         Counter64
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the number of packets dropped by a standard profile"
+     ::= { wwpLeosTrafficProfileStdStatsEntry 8 }
+
+--
+-- cascaded traffic profile global table
+-- 
+ wwpLeosTrafficProfileCascadedGlobalTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosTrafficProfileCascadedGlobalEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION
+	     "A table of global attributes used by cascaded traffic profile table.
+	      To create an entry in this table, the following criteria must be met:
+	      -All indexes must be specified.
+	      -wwpLeosTrafficProfileCascadedGlobalDot1d,wwpLeosTrafficProfileCascadedGlobalIpPrec and
+	        wwpLeosTrafficProfileCascadedGlobalDscp may be specified.
+	      -wwpLeosTrafficProfileCascadedGlobalName may be specified.
+	      -wwpLeosTrafficProfileCascadedGlobalStatus must be set to 'createAndGo'."	      
+     ::= { wwpLeosTrafficProfile 10 }
+		
+ wwpLeosTrafficProfileCascadedGlobalEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosTrafficProfileCascadedGlobalEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION
+	     "A global cascaded traffic profile entry in the wwpLeosTrafficProfileCascadedGlobalTable."
+     INDEX {wwpLeosTrafficProfileCascadedIndx}    
+     ::= { wwpLeosTrafficProfileCascadedGlobalTable 1 }
+     
+ WwpLeosTrafficProfileCascadedGlobalEntry ::= SEQUENCE {
+     wwpLeosTrafficProfileCascadedGlobalDot1d		INTEGER,
+     wwpLeosTrafficProfileCascadedGlobalIpPrec		INTEGER,
+     wwpLeosTrafficProfileCascadedGlobalDscp		INTEGER,
+     wwpLeosTrafficProfileCascadedGlobalName		DisplayString,     
+     wwpLeosTrafficProfileCascadedGlobalStatus		RowStatus
+ }
+ 
+     
+ wwpLeosTrafficProfileCascadedGlobalDot1d    OBJECT-TYPE
+     SYNTAX         INTEGER (-1..7)
+     MAX-ACCESS     read-write
+     STATUS         deprecated
+     DESCRIPTION
+	     "This specifies the dot1d priority for a given cascaded traffic profile.
+	      If this object returns -1 then the value was not set by user
+	      and is ignored."
+     ::= { wwpLeosTrafficProfileCascadedGlobalEntry 1 }
+
+ wwpLeosTrafficProfileCascadedGlobalIpPrec    OBJECT-TYPE
+     SYNTAX         INTEGER (-1..7)
+     MAX-ACCESS     read-write
+     STATUS         deprecated
+     DESCRIPTION
+	     "This specifies the ip precedence value for a given cascaded traffic profile.
+	      If this object returns -1 then the value was not set by user
+	      and is ignored."
+     ::= { wwpLeosTrafficProfileCascadedGlobalEntry 2 }
+
+  wwpLeosTrafficProfileCascadedGlobalDscp    OBJECT-TYPE
+     SYNTAX         INTEGER (-1..63)
+     MAX-ACCESS     read-write
+     STATUS         deprecated
+     DESCRIPTION
+	     "This specifies the DSCP value for a given cascaded traffic profile.
+	      If this object returns -1 then the value was not set by user
+	      and is ignored."
+     ::= { wwpLeosTrafficProfileCascadedGlobalEntry 3 }
+  
+  wwpLeosTrafficProfileCascadedGlobalName  OBJECT-TYPE
+     SYNTAX       DisplayString(SIZE (0..15))
+     MAX-ACCESS   read-write
+     STATUS       deprecated
+     DESCRIPTION
+	     "The name associated with this profile. This must be a unique name per profile.
+         The name does not have to be set on create. However, when updating the name,
+         it must have some value - zero-string is not supported." 
+     ::= { wwpLeosTrafficProfileCascadedGlobalEntry 4 }  
+
+  wwpLeosTrafficProfileCascadedGlobalStatus    OBJECT-TYPE
+     SYNTAX         RowStatus
+     MAX-ACCESS     read-create
+     STATUS         deprecated
+     DESCRIPTION
+	     "Setting this object to 'createandgo' will result in creating an global 
+	      cascaded traffic profile entry.
+	      Setting this object to 'destroy' will delete the entry from the table."
+     ::= { wwpLeosTrafficProfileCascadedGlobalEntry 5 }  
+  --
+  -- Cascaded Profile  Total Stats 
+  -- 
+  wwpLeosTrafficProfileCascadedTotalStatsTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosTrafficProfileCascadedTotalStatsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION
+	     "A table of cascaded profile stats."
+     ::= { wwpLeosTrafficProfile 11 }
+		
+ wwpLeosTrafficProfileCascadedTotalStatsEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosTrafficProfileCascadedTotalStatsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION
+	     "A cascaded traffic profile entry in the wwpLeosTrafficProfileCascadedTotalStatsTable."
+     INDEX { wwpLeosTrafficProfilePort , wwpLeosTrafficProfileCascadedIndx }    
+     ::= { wwpLeosTrafficProfileCascadedTotalStatsTable 1 }
+     
+ WwpLeosTrafficProfileCascadedTotalStatsEntry ::= SEQUENCE {
+     wwpLeosTrafficProfileCascadedTotalAcceptedBytesHi	Counter32,
+     wwpLeosTrafficProfileCascadedTotalAcceptedBytesLo	Counter32,
+     wwpLeosTrafficProfileCascadedTotalDroppedBytesHi	Counter32,
+     wwpLeosTrafficProfileCascadedTotalDroppedBytesLo	Counter32,
+     wwpLeosTrafficProfileCascadedTotalRemarkedBytesHi	Counter32,
+     wwpLeosTrafficProfileCascadedTotalRemarkedBytesLo	Counter32
+ }
+ 
+ wwpLeosTrafficProfileCascadedTotalAcceptedBytesHi    OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         deprecated
+     DESCRIPTION
+	     "This object specifies the higher bytes of accepted frames of the
+	      given cascaded profile."
+     ::= { wwpLeosTrafficProfileCascadedTotalStatsEntry 1 }  
+ 
+ wwpLeosTrafficProfileCascadedTotalAcceptedBytesLo    OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         deprecated
+     DESCRIPTION
+	     "This object specifies the lower bytes of accepted frames of the
+	      given cascaded profile."
+     ::= { wwpLeosTrafficProfileCascadedTotalStatsEntry 2 }
+
+ wwpLeosTrafficProfileCascadedTotalDroppedBytesHi    OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         deprecated
+     DESCRIPTION
+	     "This object specifies the higher bytes of dropped frames of the
+	      given cascaded profile."
+     ::= { wwpLeosTrafficProfileCascadedTotalStatsEntry 3 }
+  
+ wwpLeosTrafficProfileCascadedTotalDroppedBytesLo    OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         deprecated
+     DESCRIPTION
+	     "This object specifies the lower bytes of dropped frames of the
+	      given cascaded profile."
+     ::= { wwpLeosTrafficProfileCascadedTotalStatsEntry 4 }
+
+  wwpLeosTrafficProfileCascadedTotalRemarkedBytesHi    OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         deprecated
+     DESCRIPTION
+	     "This object specifies the higher bytes of remarked frames of the
+	      given cascaded profile."
+     ::= { wwpLeosTrafficProfileCascadedTotalStatsEntry 5 }
+
+  wwpLeosTrafficProfileCascadedTotalRemarkedBytesLo    OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         deprecated
+     DESCRIPTION
+	     "This object specifies the lower bytes of remarked frames of the
+	      given cascaded profile."
+     ::= { wwpLeosTrafficProfileCascadedTotalStatsEntry 6 }  
+ 
+  --
+  -- Standard Profile Total Stats 
+  -- 
+  wwpLeosTrafficProfileStdTotalStatsTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosTrafficProfileStdTotalStatsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       obsolete
+     DESCRIPTION
+	     "A table of standard profile total stats. This table is obsolete due to not being implemented."
+     ::= { wwpLeosTrafficProfile 12 }
+		
+ wwpLeosTrafficProfileStdTotalStatsEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosTrafficProfileStdTotalStatsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       obsolete
+     DESCRIPTION
+	     "The entry in wwpLeosTrafficProfileStdTotalStatsTable."
+     INDEX { wwpLeosTrafficProfilePort , wwpLeosTrafficProfileStdIndx  }    
+     ::= { wwpLeosTrafficProfileStdTotalStatsTable 1 }
+     
+ WwpLeosTrafficProfileStdTotalStatsEntry ::= SEQUENCE {
+     wwpLeosTrafficProfileStdTotalAcceptedBytesHi	Counter32,
+     wwpLeosTrafficProfileStdTotalAcceptedBytesLo	Counter32,
+     wwpLeosTrafficProfileStdTotalDroppedBytesHi	Counter32,
+     wwpLeosTrafficProfileStdTotalDroppedBytesLo	Counter32     
+ }
+ 
+ wwpLeosTrafficProfileStdTotalAcceptedBytesHi    OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         obsolete
+     DESCRIPTION
+	     "This object specifies the higher bytes of accepted frames of the
+	      given standard profile."
+     ::= { wwpLeosTrafficProfileStdTotalStatsEntry 1 }  
+ 
+ wwpLeosTrafficProfileStdTotalAcceptedBytesLo    OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         obsolete
+     DESCRIPTION
+	     "This object specifies the lower bytes of accepted frames of the
+	      given standard profile."
+     ::= { wwpLeosTrafficProfileStdTotalStatsEntry 2 }
+
+ wwpLeosTrafficProfileStdTotalDroppedBytesHi    OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         obsolete
+     DESCRIPTION
+	     "This object specifies the higher bytes of dropped frames of the
+	      given standard profile."
+     ::= { wwpLeosTrafficProfileStdTotalStatsEntry 3 }
+  
+ wwpLeosTrafficProfileStdTotalDroppedBytesLo    OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         obsolete
+     DESCRIPTION
+	     "This object specifies the higher bytes of dropped frames of the
+	      given standard profile."
+     ::= { wwpLeosTrafficProfileStdTotalStatsEntry 4 }
+ 
+  -- Std Profile Vlan Table
+ 
+  wwpLeosTrafficProfileStdVlanTable  OBJECT-TYPE
+    SYNTAX  SEQUENCE OF WwpLeosTrafficProfileStdVlanEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+    	"A table of standard VLAN traffic profile entries.
+    	 To create an entry in the table, the following criteria must be met:
+    	 -set wwpLeosTrafficProfileStdVlanStatus to 'createAndGo'.
+    	 -set wwpLeosTrafficProfileStdVlan to a valid profile.
+    	 
+    	 To delete entry, set wwpLeosTrafficProfileStdVlanStatus to 'destroy'."
+    ::= { wwpLeosTrafficProfile 14 }
+   
+   wwpLeosTrafficProfileStdVlanEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosTrafficProfileStdVlanEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+	     "A standard VLAN traffic profile entry in the wwpLeosTrafficProfileStdTable."
+     INDEX { wwpLeosTrafficProfilePort , wwpLeosTrafficProfileStdVlanIndex}    
+     ::= { wwpLeosTrafficProfileStdVlanTable 1 }
+     
+ WwpLeosTrafficProfileStdVlanEntry ::= SEQUENCE {
+     wwpLeosTrafficProfileStdVlanIndex				INTEGER,
+     wwpLeosTrafficProfileStdVlanToProfile		INTEGER,     
+     wwpLeosTrafficProfileStdVlanStatus		    RowStatus
+ } 
+ 
+ wwpLeosTrafficProfileStdVlanIndex    OBJECT-TYPE
+     SYNTAX         INTEGER (1..4094)
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the Vlan for the associated
+	      standard profile entry in wwpLeosTrafficProfileStdTable."
+     ::= { wwpLeosTrafficProfileStdVlanEntry 1 }  
+     
+ wwpLeosTrafficProfileStdVlanToProfile    OBJECT-TYPE
+     SYNTAX         INTEGER (1..4096)
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the profile to which wwpLeosTrafficProfileStdVlan 
+	      must be mapped."
+     ::= { wwpLeosTrafficProfileStdVlanEntry 2 }
+ 
+ wwpLeosTrafficProfileStdVlanStatus    OBJECT-TYPE
+     SYNTAX         RowStatus
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+	     "To create an entry in the table, the following criteria must be met:
+	      -set wwpLeosTrafficProfileStdVlanStatus to 'createAndGo'. 
+	      -set wwpLeosTrafficProfileStdVlanToProfile to a valid profile.
+	      
+	      To delete entry, set wwpLeosTrafficProfileStdVlanStatus to 'destroy'."
+     ::= { wwpLeosTrafficProfileStdVlanEntry 3 }     
+  
+ --
+ -- Std profile DSCP table
+ --                 
+ 
+   wwpLeosTrafficProfileStdDscpTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosTrafficProfileStdDscpEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+	     "A table of standard DSCP traffic profile entries.
+	      To create an entry in the table, the following criteria must be met:
+	      -set wwpLeosTrafficProfileStdDscpStatus to 'createAndGo'. 
+	      -set wwpLeosTrafficProfileStdDscpToProfile to a valid profile.
+	      
+	      To delete entry, set wwpLeosTrafficProfileStdDscpStatus to 'destroy'."
+     ::= { wwpLeosTrafficProfile 15 }
+		
+ wwpLeosTrafficProfileStdDscpEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosTrafficProfileStdDscpEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+	     "A standard DSCP traffic profile entry in the wwpLeosTrafficProfileStdTable."
+     INDEX { wwpLeosTrafficProfilePort , wwpLeosTrafficProfileStdDscp}    
+     ::= { wwpLeosTrafficProfileStdDscpTable 1 }
+     
+ WwpLeosTrafficProfileStdDscpEntry ::= SEQUENCE {
+     wwpLeosTrafficProfileStdDscp				INTEGER,
+     wwpLeosTrafficProfileStdDscpToProfile		INTEGER,     
+     wwpLeosTrafficProfileStdDscpStatus		RowStatus
+ } 
+ 
+ wwpLeosTrafficProfileStdDscp    OBJECT-TYPE
+     SYNTAX         INTEGER (0..63)
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the DSCP for the associated
+	      standard profile entry in wwpLeosTrafficProfileStdTable."
+     ::= { wwpLeosTrafficProfileStdDscpEntry 1 }  
+     
+ wwpLeosTrafficProfileStdDscpToProfile    OBJECT-TYPE
+     SYNTAX         INTEGER (1..4096)
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the profile to which wwpLeosTrafficProfileStdDscp 
+	      must be mapped."
+     ::= { wwpLeosTrafficProfileStdDscpEntry 2 }
+ 
+ wwpLeosTrafficProfileStdDscpStatus    OBJECT-TYPE
+     SYNTAX         RowStatus
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+	     "To create an entry in the table following criteria must be met:
+	      -set wwpLeosTrafficProfileStdDscpStatus to 'createAndGo'. 
+	      -set wwpLeosTrafficProfileStdDscpToProfile to a valid profile.
+	      
+	      To delete entry, set wwpLeosTrafficProfileStdDscpStatus to 'destroy'."
+     ::= { wwpLeosTrafficProfileStdDscpEntry 3 }  
+     
+ --
+ -- Meter-Pool Table
+ --
+ wwpLeosTrafficProfileMeterPoolTable   OBJECT-TYPE
+    SYNTAX  SEQUENCE OF WwpLeosTrafficProfileMeterPoolEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+       " A table of meter pools."
+    ::= { wwpLeosTrafficProfile 16 } 
+    
+  wwpLeosTrafficProfileMeterPoolEntry OBJECT-TYPE
+     SYNTAX      WwpLeosTrafficProfileMeterPoolEntry
+     MAX-ACCESS not-accessible
+     STATUS current
+     DESCRIPTION
+        " A Meter Pool Entry in wwpLeosTrafficProfileMeterPoolTable"
+     INDEX { wwpLeosTrafficProfileMeterPoolIndex }
+   ::= {wwpLeosTrafficProfileMeterPoolTable 1 }
+        
+ WwpLeosTrafficProfileMeterPoolEntry ::= SEQUENCE {
+     wwpLeosTrafficProfileMeterPoolIndex  INTEGER,
+     wwpLeosTrafficProfileMeterPoolName   DisplayString,
+     wwpLeosTrafficProfileMeterPoolNumOfMeters  Integer32,
+     wwpLeosTrafficProfileMeterPoolMetersUsed   Integer32,
+     wwpLeosTrafficProfileMeterPoolNumOfStats  Integer32,
+     wwpLeosTrafficProfileMeterPoolStatsUsed   Integer32,
+     wwpLeosTrafficProfileMeterPoolNumOfClassifiers  Integer32,
+     wwpLeosTrafficProfileMeterPoolClassifiersUsed   Integer32
+  }
+  wwpLeosTrafficProfileMeterPoolIndex OBJECT-TYPE
+     SYNTAX 	INTEGER(1..8)  
+     MAX-ACCESS    not-accessible
+     STATUS 		current
+     DESCRIPTION 
+     	" A Meter Pool Index"
+   ::= { wwpLeosTrafficProfileMeterPoolEntry 1}
+   
+  wwpLeosTrafficProfileMeterPoolName OBJECT-TYPE
+     SYNTAX  DisplayString(SIZE (0..15))
+     MAX-ACCESS read-only
+     STATUS current
+     DESCRIPTION
+        "A Meter Pool Name"
+  ::= { wwpLeosTrafficProfileMeterPoolEntry 2}
+  
+  wwpLeosTrafficProfileMeterPoolNumOfMeters OBJECT-TYPE
+     SYNTAX Integer32
+     MAX-ACCESS read-only
+     STATUS current
+     DESCRIPTION 
+     	"Number of Meters for a pool"
+  ::= {wwpLeosTrafficProfileMeterPoolEntry 3}
+  
+  wwpLeosTrafficProfileMeterPoolMetersUsed OBJECT-TYPE
+     SYNTAX Integer32
+     MAX-ACCESS  read-only
+     STATUS current
+     DESCRIPTION
+     	"Number of Used Meters in a Pool"
+  ::= {wwpLeosTrafficProfileMeterPoolEntry 4}  
+  
+  wwpLeosTrafficProfileMeterPoolNumOfStats OBJECT-TYPE
+     SYNTAX Integer32
+     MAX-ACCESS read-only
+     STATUS current
+     DESCRIPTION 
+     	"Number of Stats Counters for a pool"
+  ::= {wwpLeosTrafficProfileMeterPoolEntry 5}
+  
+  wwpLeosTrafficProfileMeterPoolStatsUsed OBJECT-TYPE
+     SYNTAX Integer32
+     MAX-ACCESS  read-only
+     STATUS current
+     DESCRIPTION
+     	"Number of Used Stats Counters in a Pool"
+  ::= {wwpLeosTrafficProfileMeterPoolEntry 6}  
+
+  wwpLeosTrafficProfileMeterPoolNumOfClassifiers OBJECT-TYPE
+     SYNTAX Integer32
+     MAX-ACCESS read-only
+     STATUS current
+     DESCRIPTION 
+     	"Number of Classifiers for a pool"
+  ::= {wwpLeosTrafficProfileMeterPoolEntry 7}
+  
+  wwpLeosTrafficProfileMeterPoolClassifiersUsed OBJECT-TYPE
+     SYNTAX Integer32
+     MAX-ACCESS  read-only
+     STATUS current
+     DESCRIPTION
+     	"Number of Used Classifiers in a Pool"
+  ::= {wwpLeosTrafficProfileMeterPoolEntry 8}  
+     	   
+     
+--
+-- Tos Stamp
+-- 
+  wwpLeosTrafficProfileTosStampTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosTrafficProfileTosStampEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+	     "A table of TosStamps entries."
+     ::= { wwpLeosTrafficProfile 20 }
+ 
+ wwpLeosTrafficProfileTosStampEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosTrafficProfileTosStampEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+	     "The entry in wwpLeosTrafficProfileTosStampTable."
+     INDEX { wwpLeosTrafficProfilePort  }    
+     ::= { wwpLeosTrafficProfileTosStampTable 1 }
+      
+ WwpLeosTrafficProfileTosStampEntry ::= SEQUENCE {
+     wwpLeosTrafficProfileTosStampState         	INTEGER,
+     wwpLeosTrafficProfileTosStampValue     	INTEGER    
+ }
+ wwpLeosTrafficProfileTosStampState    OBJECT-TYPE
+     SYNTAX         INTEGER {
+                             on(1),
+                             off(2)}
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the state of the TOS Stamp on a port."
+     ::= { wwpLeosTrafficProfileTosStampEntry 1 }
+
+ wwpLeosTrafficProfileTosStampValue    OBJECT-TYPE
+     SYNTAX         INTEGER(0..63)
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the value of the TOS Stamp. For IP
+             prec, left shift the value by 3 bits."
+     ::= { wwpLeosTrafficProfileTosStampEntry  2}
+
+--
+-- IP/DSCP enable disable
+-- 
+  wwpLeosTrafficProfileIpDscpTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosTrafficProfileIpDscpEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+	     "A table of IP DSCP entries."
+     ::= { wwpLeosTrafficProfile 21 }
+ 
+ wwpLeosTrafficProfileIpDscpEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosTrafficProfileIpDscpEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+	     "The entry in wwpLeosTrafficProfileIpDscpTable."
+     INDEX { wwpLeosTrafficProfilePort  }    
+     ::= { wwpLeosTrafficProfileIpDscpTable 1 }
+      
+ WwpLeosTrafficProfileIpDscpEntry ::= SEQUENCE {
+     wwpLeosTrafficProfileIpp0Cs0State         	INTEGER,
+     wwpLeosTrafficProfileIpp1Cs1State     	INTEGER,
+     wwpLeosTrafficProfileIpp2Cs2State         	INTEGER,    
+     wwpLeosTrafficProfileIpp3Cs3State         	INTEGER,
+     wwpLeosTrafficProfileIpp4Cs4State         	INTEGER,
+     wwpLeosTrafficProfileIpp5Cs5State         	INTEGER,
+     wwpLeosTrafficProfileIpp6Cs6State         	INTEGER,
+     wwpLeosTrafficProfileIpp7Cs7State         	INTEGER,
+     wwpLeosTrafficProfileAf1State              INTEGER,
+     wwpLeosTrafficProfileAf2State              INTEGER,
+     wwpLeosTrafficProfileAf3State              INTEGER,
+     wwpLeosTrafficProfileAf4State              INTEGER,
+     wwpLeosTrafficProfileEfState               INTEGER
+ }
+ wwpLeosTrafficProfileIpp0Cs0State    OBJECT-TYPE
+     SYNTAX        INTEGER {
+                    on(1),
+                    off(2)}
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the state of the Ipp0 or cs0 enable/disable on a port."
+     ::= { wwpLeosTrafficProfileIpDscpEntry 1 }
+
+ wwpLeosTrafficProfileIpp1Cs1State    OBJECT-TYPE
+     SYNTAX          INTEGER {
+                    on(1),
+                    off(2)}
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the state of the Ipp1 or cs1 enable/disable on a port."
+     ::= { wwpLeosTrafficProfileIpDscpEntry 2 }
+
+ wwpLeosTrafficProfileIpp2Cs2State    OBJECT-TYPE
+     SYNTAX          INTEGER {
+                    on(1),
+                    off(2)}
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the state of the Ipp2 or cs2 enable/disable on a port."
+     ::= { wwpLeosTrafficProfileIpDscpEntry 3 }
+
+ wwpLeosTrafficProfileIpp3Cs3State    OBJECT-TYPE
+     SYNTAX          INTEGER {
+                    on(1),
+                    off(2)}
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the state of the Ipp3 or cs3 enable/disable on a port."
+     ::= { wwpLeosTrafficProfileIpDscpEntry 4 }
+
+ wwpLeosTrafficProfileIpp4Cs4State    OBJECT-TYPE
+     SYNTAX          INTEGER {
+                    on(1),
+                    off(2)}
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the state of the Ipp4 or cs4 enable/disable on a port."
+     ::= { wwpLeosTrafficProfileIpDscpEntry 5 }
+
+ wwpLeosTrafficProfileIpp5Cs5State    OBJECT-TYPE
+     SYNTAX          INTEGER {
+                    on(1),
+                    off(2)}
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the state of the Ipp5 or cs5 enable/disable on a port."
+     ::= { wwpLeosTrafficProfileIpDscpEntry 6 }
+
+ wwpLeosTrafficProfileIpp6Cs6State    OBJECT-TYPE
+     SYNTAX          INTEGER {
+                    on(1),
+                    off(2)}
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the state of the Ipp6 or cs6 enable/disable on a port."
+     ::= { wwpLeosTrafficProfileIpDscpEntry 7 }
+
+ wwpLeosTrafficProfileIpp7Cs7State    OBJECT-TYPE
+     SYNTAX          INTEGER {
+                    on(1),
+                    off(2)}
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the state of the Ipp7 or cs7 enable/disable on a port."
+     ::= { wwpLeosTrafficProfileIpDscpEntry 8 }
+
+ wwpLeosTrafficProfileAf1State    OBJECT-TYPE
+     SYNTAX          INTEGER {
+                    on(1),
+                    off(2)}
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the state of the Af1 enable/disable on a port."
+     ::= { wwpLeosTrafficProfileIpDscpEntry 9 }
+
+ wwpLeosTrafficProfileAf2State    OBJECT-TYPE
+     SYNTAX          INTEGER {
+                    on(1),
+                    off(2)}
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the state of the Af2 enable/disable on a port."
+     ::= { wwpLeosTrafficProfileIpDscpEntry 10 }
+
+ wwpLeosTrafficProfileAf3State    OBJECT-TYPE
+     SYNTAX          INTEGER {
+                    on(1),
+                    off(2)}
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the state of the Af3 enable/disable on a port."
+     ::= { wwpLeosTrafficProfileIpDscpEntry 11}
+
+ wwpLeosTrafficProfileAf4State    OBJECT-TYPE
+     SYNTAX          INTEGER {
+                    on(1),
+                    off(2)}
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the state of the Af4 enable/disable on a port."
+     ::= { wwpLeosTrafficProfileIpDscpEntry 12 }
+
+ wwpLeosTrafficProfileEfState    OBJECT-TYPE
+     SYNTAX          INTEGER {
+                    on(1),
+                    off(2)}
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the state of the Ef enable/disable on a port."
+     ::= { wwpLeosTrafficProfileIpDscpEntry 13 }
+ 
+ 
+ --
+ -- Std profile stdVlanDot1DPri table
+ -- 
+ wwpLeosTrafficProfileStdVlanDot1dTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosTrafficProfileStdVlanDot1dEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+	     "A table of Std Vlan dot1d traffic profile entries.	      
+	      To create an entry in the table, the following criteria must be met:
+	      - set wwpLeosTrafficProfileStdDot1dStatus to 'createAndGo'.
+	      
+	      To delete entry, set wwpLeosTrafficProfileStdDot1dStatus to 'destroy'."
+     ::= { wwpLeosTrafficProfile 40 }
+		
+ wwpLeosTrafficProfileStdVlanDot1dEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosTrafficProfileStdVlanDot1dEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+	     "A standard dot1d traffic profile entry in the wwpLeosTrafficProfileStdDot1dTable."
+     INDEX { wwpLeosTrafficProfilePort, wwpLeosTrafficProfileStdDot1d, wwpLeosTrafficProfileStdIndx}    
+     ::= { wwpLeosTrafficProfileStdVlanDot1dTable 1 }
+     
+ WwpLeosTrafficProfileStdVlanDot1dEntry ::= SEQUENCE {
+     wwpLeosTrafficProfileStdVlanDot1dStatus			RowStatus
+ } 
+ 
+ wwpLeosTrafficProfileStdVlanDot1dStatus    OBJECT-TYPE
+     SYNTAX         RowStatus
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+	     "To create an entry in the table, the following criteria must be met:
+	      - set wwpLeosTrafficProfileStdDot1dStatus to 'createAndGo'.
+	      
+	      To delete entry, set wwpLeosTrafficProfileStdDot1dStatus to 'destroy'."
+     ::= { wwpLeosTrafficProfileStdVlanDot1dEntry 1 }
+
+
+--
+ -- Std profile stdVlanIpPrec table
+ -- 
+ wwpLeosTrafficProfileStdVlanIpPrecTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosTrafficProfileStdVlanIpPrecEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+	     "A table of standard VLAN IP precedence traffic profile entries.	      
+	      To create an entry in the table, the following criteria must be met:
+	      - set wwpLeosTrafficProfileStdVlanIpPrecStatus to 'createAndGo'.	      
+	      To delete entry, set wwpLeosTrafficProfileStdVlanIpPrecStatus to 'destroy'."
+     ::= { wwpLeosTrafficProfile 41 }
+		
+ wwpLeosTrafficProfileStdVlanIpPrecEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosTrafficProfileStdVlanIpPrecEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+	     "A standard VLAN IP precedence traffic profile entry in the wwpLeosTrafficProfileStdVlanIpPrecTable."
+     INDEX { wwpLeosTrafficProfilePort ,wwpLeosTrafficProfileStdIpPrec, wwpLeosTrafficProfileStdIndx}    
+     ::= { wwpLeosTrafficProfileStdVlanIpPrecTable 1 }
+     
+ WwpLeosTrafficProfileStdVlanIpPrecEntry ::= SEQUENCE {
+     wwpLeosTrafficProfileStdVlanIpPrecStatus			RowStatus
+ } 
+ 
+  
+ wwpLeosTrafficProfileStdVlanIpPrecStatus    OBJECT-TYPE
+     SYNTAX         RowStatus
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+	     "To create an entry in the table, the following criteria must be met:
+	      - set wwpLeosTrafficProfileStdVlanIpPrecStatus to 'createAndGo'.	      
+	      To delete entry, set wwpLeosTrafficProfileStdVlanIpPrecStatus to 'destroy'."
+     ::= { wwpLeosTrafficProfileStdVlanIpPrecEntry 1 }
+
+ --
+ -- Std profile stdVlanDscp table
+ --  
+ wwpLeosTrafficProfileStdVlanDscpTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosTrafficProfileStdVlanDscpEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+	     "A table of standard VLAN DSCP traffic profile entries.	      
+	      To create an entry in the table, the following criteria must be met:
+	      - set wwpLeosTrafficProfileStdVlanDscpStatus to 'createAndGo'.
+	      
+	      To delete entry, set wwpLeosTrafficProfileStdVlanDscpStatus to 'destroy'."
+     ::= { wwpLeosTrafficProfile 42 }
+		
+ wwpLeosTrafficProfileStdVlanDscpEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosTrafficProfileStdVlanDscpEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+	     "A standard VLAN DSCP traffic profile entry in the wwpLeosTrafficProfileStdVlanDscpTable."
+     INDEX { wwpLeosTrafficProfilePort , wwpLeosTrafficProfileStdDscp, wwpLeosTrafficProfileStdIndx }    
+     ::= { wwpLeosTrafficProfileStdVlanDscpTable 1 }
+     
+ WwpLeosTrafficProfileStdVlanDscpEntry ::= SEQUENCE {
+     wwpLeosTrafficProfileStdVlanDscpStatus			RowStatus
+ } 
+ 
+  
+ wwpLeosTrafficProfileStdVlanDscpStatus    OBJECT-TYPE
+     SYNTAX         RowStatus
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+	     "To create an entry in the table, the following criteria must be met:
+	      - set wwpLeosTrafficProfileStdVlanDscpStatus to 'createAndGo'.
+	      
+	      To delete entry, set wwpLeosTrafficProfileStdVlanDscpStatus to 'destroy'."
+     ::= { wwpLeosTrafficProfileStdVlanDscpEntry 2 }
+
+ --
+ -- Global Profiles
+ --
+ wwpLeosTrafficProfileGlobalTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosTrafficProfileGlobalEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+	     "A table of global traffic profile entries.
+	      To create an entry in this table, the following criteria must be met:
+	      -All indexes must be specified.
+	      -wwpLeosTrafficProfileGlobalCir must be specified.
+	      -If wwpLeosTrafficProfileGlobalPir is not specified or is specified and is < wwpLeosTrafficProfileGlobalCir
+	      then device sets wwpLeosTrafficProfileGlobalPir to wwpLeosTrafficProfileGlobalCir.
+	      -wwpLeosTrafficProfileGlobalStatus must be set to 'createAndGo'."
+     ::= { wwpLeosTrafficProfile 43 }
+		
+ wwpLeosTrafficProfileGlobalEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosTrafficProfileGlobalEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+	     "A global traffic profile entry in the wwpLeosTrafficProfileGlobalTable."
+     INDEX { wwpLeosTrafficProfileGlobalIndx}    
+     ::= { wwpLeosTrafficProfileGlobalTable 1 }
+     
+ WwpLeosTrafficProfileGlobalEntry ::= SEQUENCE {
+     wwpLeosTrafficProfileGlobalIndx		Integer32,
+     wwpLeosTrafficProfileGlobalCir		Integer32,
+     wwpLeosTrafficProfileGlobalPir		Integer32,
+     wwpLeosTrafficProfileGlobalName		DisplayString,
+     wwpLeosTrafficProfileGlobalVlan		Integer32,
+     wwpLeosTrafficProfileGlobalCbs            	Integer32,
+     wwpLeosTrafficProfileGlobalEbs            	Integer32,
+     wwpLeosTrafficProfileGlobalDscpRemarkPolicy 	INTEGER,
+     wwpLeosTrafficProfileGlobalFixedDscp		Integer32,
+     wwpLeosTrafficProfileGlobalUntaggedState  		INTEGER,
+     wwpLeosTrafficProfileGlobalVs			DisplayString,
+     wwpLeosTrafficProfileGlobalRemarkColorPolicy 	INTEGER,
+     wwpLeosTrafficProfileGlobalRemarkRcosPolicy 	INTEGER,
+     wwpLeosTrafficProfileGlobalYellowRemarkRcos 	Integer32,
+     wwpLeosTrafficProfileGlobalGreenRemarkRcos 	Integer32,
+     wwpLeosTrafficProfileGlobalIngressColorAware 	INTEGER,
+     wwpLeosTrafficProfileGlobalEir			Integer32,
+     wwpLeosTrafficProfileGlobalDot1dpri		Integer32,	
+     wwpLeosTrafficProfileGlobalDscp			Integer32,
+     wwpLeosTrafficProfileGlobalPortList		PortList,
+     wwpLeosTrafficProfileGlobalL4SrcPort		Integer32,
+     wwpLeosTrafficProfileGlobalL4DstPort		Integer32,
+     wwpLeosTrafficProfileGlobalSrcIpAddrType           InetAddressType,
+     wwpLeosTrafficProfileGlobalSrcIpAddr		InetAddress,
+     wwpLeosTrafficProfileGlobalSrcIpAddrPrefixLength   InetAddressPrefixLength,
+     wwpLeosTrafficProfileGlobalDstIpAddrType           InetAddressType,
+     wwpLeosTrafficProfileGlobalDstIpAddr		InetAddress,
+     wwpLeosTrafficProfileGlobalDstIpAddrPrefixLength   InetAddressPrefixLength,
+     wwpLeosTrafficProfileGlobalBaseEType		Integer32,
+     wwpLeosTrafficProfileGlobalIpProtocol		Integer32,
+     wwpLeosTrafficProfileGlobalAggList                 PortList,
+     wwpLeosTrafficProfileGlobalAdminState              INTEGER,  
+     wwpLeosTrafficProfileGlobalStatus	        	RowStatus,
+     wwpLeosTrafficProfileGlobalReIndx			Integer32,
+     wwpLeosTrafficProfileGlobalParentIndex		Integer32,
+     wwpLeosTrafficProfileGlobalVlanMax    		Integer32
+ } 
+ 
+ wwpLeosTrafficProfileGlobalIndx    OBJECT-TYPE
+     SYNTAX         Integer32 (0..7000)
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION
+	     "This object is used as index in the table and it represents
+	      the profile precedence, which can be 0 through 7000."
+     ::= { wwpLeosTrafficProfileGlobalEntry 1 }  
+ 
+ wwpLeosTrafficProfileGlobalCir    OBJECT-TYPE
+     SYNTAX         Integer32
+     UNITS			"kbps"
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the cir associated with a given global traffic profile."
+     ::= { wwpLeosTrafficProfileGlobalEntry 2 }
+
+ wwpLeosTrafficProfileGlobalPir    OBJECT-TYPE
+     SYNTAX         Integer32
+     UNITS			"kbps"
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the pir associated with a given global traffic profile."
+     ::= { wwpLeosTrafficProfileGlobalEntry 3 }
+     
+ wwpLeosTrafficProfileGlobalName  OBJECT-TYPE
+     SYNTAX       DisplayString(SIZE (0..15))
+     MAX-ACCESS   read-create
+     STATUS       current
+     DESCRIPTION
+	     "The name associated with this profile. This must be unique.
+         The name must be set on create." 
+     ::= { wwpLeosTrafficProfileGlobalEntry 4 }	
+ 
+ wwpLeosTrafficProfileGlobalVlan    OBJECT-TYPE
+     SYNTAX         Integer32(-1..4095)
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the VLAN associated with a profile. The value -1 signifies that Vlan is not used as a classifier.
+	      This object also specifies the minimum value of VLAN range associated with a profile."
+     DEFVAL { -1 }
+     ::= { wwpLeosTrafficProfileGlobalEntry 5 }
+
+ wwpLeosTrafficProfileGlobalCbs    OBJECT-TYPE
+     SYNTAX       Integer32 
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the committed burst size associated with a given
+              global traffic profile."
+     ::= { wwpLeosTrafficProfileGlobalEntry 6 }
+
+ wwpLeosTrafficProfileGlobalEbs    OBJECT-TYPE
+     SYNTAX       Integer32      
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the excess burst size associated with a given 
+              global traffic profile."
+     ::= { wwpLeosTrafficProfileGlobalEntry 7 }
+ 
+ wwpLeosTrafficProfileGlobalDscpRemarkPolicy OBJECT-TYPE
+     SYNTAX	INTEGER {
+ 	  	          leave(1),
+ 	                  fixed(2)
+ 	  		}
+     MAX-ACCESS 	read-create
+     STATUS		current
+     DESCRIPTION
+        	"Leave => Don't remark the frame.
+ 	  	Fixed => Remark the DSCP of a frame with the fixed DSCP value for IP frames
+ 	  	that classify to the traffic profile."
+     DEFVAL { leave }
+     ::= { wwpLeosTrafficProfileGlobalEntry 8 }
+ 	   
+ wwpLeosTrafficProfileGlobalFixedDscp OBJECT-TYPE
+    SYNTAX	Integer32 (0..63)
+    MAX-ACCESS	read-create
+    STATUS	current
+    DESCRIPTION
+ 	  	"Fixed DSCP value to use for frames classifying to a traffic profile when the dscp-remark-policy ID is 'Fixed'."
+    DEFVAL { 0 }   
+    ::= { wwpLeosTrafficProfileGlobalEntry 9 } 
+  
+ wwpLeosTrafficProfileGlobalUntaggedState OBJECT-TYPE
+    SYNTAX   INTEGER {
+ 			on(1),
+ 			off(2)
+	       	     }
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+ 		"To enable this profile to match untagged traffic set this to on(1). To disable, set to off(2)"
+    DEFVAL { off }
+    ::= { wwpLeosTrafficProfileGlobalEntry  10}
+
+ wwpLeosTrafficProfileGlobalVs  OBJECT-TYPE
+    SYNTAX       DisplayString(SIZE (0..47))
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "The virtual-switch name associated with this profile. The virtual-switch name must exist before
+         using it as a profile classifier. A zero-length string indicates this classifier is not used."
+    ::= { wwpLeosTrafficProfileGlobalEntry 11 }	
+
+ wwpLeosTrafficProfileGlobalRemarkColorPolicy OBJECT-TYPE
+     SYNTAX   INTEGER {
+ 			leave(1),
+ 			yellowRemarkToGreen(2),
+			greenRemarkToYellow(3)
+ 		      }
+     MAX-ACCESS read-create
+     STATUS current
+     DESCRIPTION
+ 		"This sets the profile's color remarking policy at the meter output."
+     DEFVAL { leave }
+     ::= { wwpLeosTrafficProfileGlobalEntry  12}
+
+ wwpLeosTrafficProfileGlobalRemarkRcosPolicy OBJECT-TYPE
+     SYNTAX   INTEGER {
+ 			leave(1),
+ 			remarkGreen(2),
+			remarkYellow(3),
+			remarkBoth(4),
+ 			remarkGreenRcosOnly(5),
+			remarkYellowRcosOnly(6),
+			remarkBothRcosOnly(7)
+  		      }
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+ 		"This sets the profile's rcos remarking policy based on meter color."
+    DEFVAL { leave }
+    ::= { wwpLeosTrafficProfileGlobalEntry  13}
+     
+ wwpLeosTrafficProfileGlobalYellowRemarkRcos OBJECT-TYPE
+    SYNTAX   Integer32 (0..7)
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+ 		"This sets the profile's rcos remarking policy based on meter color."
+    DEFVAL { 2 }
+    ::= { wwpLeosTrafficProfileGlobalEntry  14}
+     
+ wwpLeosTrafficProfileGlobalGreenRemarkRcos OBJECT-TYPE
+    SYNTAX   Integer32 (0..7)
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+ 		"This sets the profile's rcos remarking policy based on meter color."
+    DEFVAL { 2 }
+    ::= { wwpLeosTrafficProfileGlobalEntry  15}
+
+ wwpLeosTrafficProfileGlobalIngressColorAware OBJECT-TYPE
+    SYNTAX   INTEGER {
+ 			on(1),
+ 			off(2)
+ 		     }
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+ 		"This sets the profile's meter ingress color awareness."
+    DEFVAL { on }
+ ::= { wwpLeosTrafficProfileGlobalEntry  16}
+
+ wwpLeosTrafficProfileGlobalEir    OBJECT-TYPE
+     SYNTAX         Integer32
+     UNITS		"kbps"
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the eir associated with a given standard traffic profile.
+	      Sets/Gets on this are only valid when the global meter-provisioning mode is set
+	      to EIR. All other times it is ignored and a 0 is returned."
+     ::= { wwpLeosTrafficProfileGlobalEntry 17 }
+
+ wwpLeosTrafficProfileGlobalDot1dpri OBJECT-TYPE
+    SYNTAX   Integer32 (-1..7)
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+ 		"This sets the dot1dpri classifier value for the profile. A value of -1 indicates that this classifier is not used."
+    DEFVAL { -1 }
+    ::= { wwpLeosTrafficProfileGlobalEntry  18}
+
+ wwpLeosTrafficProfileGlobalDscp OBJECT-TYPE
+    SYNTAX   Integer32 (-1..63)
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+ 		"This sets the dscp classifier value for the profile. A value of -1 indicates that this classifier is not used"
+    DEFVAL { -1 }
+    ::= { wwpLeosTrafficProfileGlobalEntry  19}
+
+ wwpLeosTrafficProfileGlobalPortList OBJECT-TYPE
+    SYNTAX   PortList
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+ 		"This sets the port list classifier for the profile. A value of 0 indicates that this classifier is not used."
+    ::= { wwpLeosTrafficProfileGlobalEntry  20}
+
+ wwpLeosTrafficProfileGlobalL4SrcPort OBJECT-TYPE
+    SYNTAX   Integer32 (-1..65535)
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+ 		"This sets the L4 source port classifier for the profile. A value of -1 indicates that this classifier is not used."
+    DEFVAL { -1 }
+    ::= { wwpLeosTrafficProfileGlobalEntry  21}
+
+ wwpLeosTrafficProfileGlobalL4DstPort OBJECT-TYPE
+    SYNTAX   Integer32 (-1..65535)
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+ 		"This sets the L4 dest port classifier for the profile. A value of -1 indicates that this classifier is not used."
+    DEFVAL { -1 }
+    ::= { wwpLeosTrafficProfileGlobalEntry  22}
+
+ wwpLeosTrafficProfileGlobalSrcIpAddrType OBJECT-TYPE
+    SYNTAX  InetAddressType
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+ 		"This identifies the address family of the source IP address (IPv4/IPv6). A value of unknown indicates that this classifier is not used."
+    DEFVAL { unknown }
+    ::= { wwpLeosTrafficProfileGlobalEntry  23}
+
+ wwpLeosTrafficProfileGlobalSrcIpAddr OBJECT-TYPE
+    SYNTAX   InetAddress
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+ 		"This contains the source IP address for the profile."
+    ::= { wwpLeosTrafficProfileGlobalEntry  24}
+
+ wwpLeosTrafficProfileGlobalSrcIpAddrPrefixLength OBJECT-TYPE
+    SYNTAX   InetAddressPrefixLength
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+ 		"This sets the prefix length of the source IP address."
+    ::= { wwpLeosTrafficProfileGlobalEntry  25}
+
+ wwpLeosTrafficProfileGlobalDstIpAddrType OBJECT-TYPE
+    SYNTAX  InetAddressType
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+ 		"This identifies the address family of the destination IP address (IPv4/IPv6). A value of unknown indicates that this classifier is not used."
+    DEFVAL { unknown }
+    ::= { wwpLeosTrafficProfileGlobalEntry  26}
+
+ wwpLeosTrafficProfileGlobalDstIpAddr OBJECT-TYPE
+    SYNTAX   InetAddress
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+ 		"This contains the destination IP address for the profile."
+    ::= { wwpLeosTrafficProfileGlobalEntry  27}
+
+ wwpLeosTrafficProfileGlobalDstIpAddrPrefixLength OBJECT-TYPE
+    SYNTAX   InetAddressPrefixLength
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+ 		"This sets the prefix length of the destination IP address."
+    ::= { wwpLeosTrafficProfileGlobalEntry  28}
+
+ wwpLeosTrafficProfileGlobalBaseEType OBJECT-TYPE
+    SYNTAX   Integer32 (-1..65535)
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+ 		"This sets the ethernet type classifier for the profile. A value of -1 indicates that this classifier is not used."
+    DEFVAL { -1 }
+    ::= { wwpLeosTrafficProfileGlobalEntry  29}
+
+ wwpLeosTrafficProfileGlobalIpProtocol OBJECT-TYPE
+    SYNTAX   Integer32 (-1..255)
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+ 		"This sets the IP protocol classifier for the profile. A value of -1 indicates that this classifier is not used."
+    DEFVAL { -1 }
+    ::= { wwpLeosTrafficProfileGlobalEntry  30}
+
+ wwpLeosTrafficProfileGlobalAggList OBJECT-TYPE
+    SYNTAX   PortList
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+ 		"This sets the aggregate port list classifier for the profile. Position 1 in the list corresponds to pgid 2049.
+ 		 A value of 0 indicates that this classifier is not used."
+    ::= { wwpLeosTrafficProfileGlobalEntry  31}
+
+ wwpLeosTrafficProfileGlobalAdminState OBJECT-TYPE
+    SYNTAX   INTEGER {
+ 			enabled(1),
+ 			disabled(2)
+ 		     }
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+ 		"This sets the admin state of the traffic profile."
+    DEFVAL { disabled }
+ ::= { wwpLeosTrafficProfileGlobalEntry  32}
+ 
+ wwpLeosTrafficProfileGlobalStatus    OBJECT-TYPE
+     SYNTAX         RowStatus
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+	     "Setting this object to 'createandgo' along with wwpLeosTrafficProfileGlobalCir
+	      and or wwpLeosTrafficProfileGlobalPir results in creating a global traffic profile entry.
+	      Setting this object to 'destroy' deletes the entry from the table."
+     ::= { wwpLeosTrafficProfileGlobalEntry 33 }
+
+ wwpLeosTrafficProfileGlobalReIndx    OBJECT-TYPE
+     SYNTAX         Integer32 (0..7000)
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+	     "Setting this object effectively alters the profile precedence of this table entry
+	      to the value being set.  It may only be set to a value that is not presently being
+	      used as an index into this table.  After the device responds to a successful set,
+	      this row may be accessed at the new index, and the old index effectively becomes an
+	      unused row in this table.
+
+	      A get on this object will return the current precedence of this table row."
+     ::= { wwpLeosTrafficProfileGlobalEntry 34 } 
+
+ wwpLeosTrafficProfileGlobalParentIndex OBJECT-TYPE
+    SYNTAX   Integer32 (-1..7000)
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION 
+ 		"This object is set when creating a child traffic profile to specify the parent index.
+ 		 A value of -1 indicates that this profile has no parent profile."
+    DEFVAL { -1 }
+    ::= { wwpLeosTrafficProfileGlobalEntry 35 }
+
+ wwpLeosTrafficProfileGlobalVlanMax    OBJECT-TYPE
+     SYNTAX         Integer32(-1..4094)
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+		"This object specifies the maximum value of VLAN range associated with a profile.
+		 wwpLeosTrafficProfileGlobalVlan must be set along with this object to set the minimum value of VLAN range 
+		 associated with a profile.
+		 The value -1 signifies that this object is not used as a classifier."
+     DEFVAL { -1 }
+     ::= { wwpLeosTrafficProfileGlobalEntry 36 }
+
+ --
+ -- Global Profile Vlan Table
+ --
+ wwpLeosTrafficProfileGlobalVlanTable  OBJECT-TYPE
+    SYNTAX  SEQUENCE OF WwpLeosTrafficProfileGlobalVlanEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+ 		"A table of global VLAN traffic profile entries.
+ 		 To create an entry in the table set wwpLeosTrafficProfileGlobalVlanStatus
+ 		 to 'createAndGo'.
+       
+ 		 To delete entry, set wwpLeosTrafficProfileGlobalVlanStatus to 'destroy'."
+    ::= { wwpLeosTrafficProfile 45 }
+   
+ wwpLeosTrafficProfileGlobalVlanEntry  OBJECT-TYPE
+    SYNTAX       WwpLeosTrafficProfileGlobalVlanEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+ 		"A global VLAN traffic profile entry in the wwpLeosTrafficProfileGlobalTable."
+    INDEX { wwpLeosTrafficProfileGlobalIndx , wwpLeosTrafficProfileGlobalListVlan }
+    ::= { wwpLeosTrafficProfileGlobalVlanTable 1 }
+     
+ WwpLeosTrafficProfileGlobalVlanEntry ::= SEQUENCE {    
+     wwpLeosTrafficProfileGlobalListVlan           Integer32,
+     wwpLeosTrafficProfileGlobalVlanStatus			RowStatus
+ }
+ 
+ wwpLeosTrafficProfileGlobalListVlan    OBJECT-TYPE
+    SYNTAX         Integer32(0..4095)
+    MAX-ACCESS     not-accessible
+    STATUS         current
+    DESCRIPTION
+       "This object specifies the VLAN that is part of a list associated with a profile."
+    ::= { wwpLeosTrafficProfileGlobalVlanEntry 1 }
+
+ wwpLeosTrafficProfileGlobalVlanStatus    OBJECT-TYPE
+    SYNTAX         RowStatus
+    MAX-ACCESS     read-create
+    STATUS         current
+    DESCRIPTION
+ 		"To create an entry in the table set wwpLeosTrafficProfileGlobalVlanStatus to 'createAndGo'.
+        
+ 		 To delete entry, set wwpLeosTrafficProfileGlobalVlanStatus to 'destroy'."
+    ::= { wwpLeosTrafficProfileGlobalVlanEntry 2 }     
+  
+ --
+ -- Global profile dot1d table
+ -- 
+ wwpLeosTrafficProfileGlobalDot1dTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF WwpLeosTrafficProfileGlobalDot1dEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+ 		"A table of global dot1d traffic profile entries. 
+ 		 To create an entry in the table set wwpLeosTrafficProfileGlobalDot1dStatus
+ 		 to 'createAndGo'.
+        
+ 		 To delete entry, set wwpLeosTrafficProfileGlobalDot1dStatus to 'destroy'."
+    ::= { wwpLeosTrafficProfile 46 }
+      
+ wwpLeosTrafficProfileGlobalDot1dEntry  OBJECT-TYPE
+    SYNTAX       WwpLeosTrafficProfileGlobalDot1dEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+ 		"A global dot1d traffic profile entry in the wwpLeosTrafficProfileGlobalDot1dTable."
+    INDEX { wwpLeosTrafficProfileGlobalIndx , wwpLeosTrafficProfileGlobalListDot1dpri }    
+    ::= { wwpLeosTrafficProfileGlobalDot1dTable 1 }
+     
+ WwpLeosTrafficProfileGlobalDot1dEntry ::= SEQUENCE {
+    wwpLeosTrafficProfileGlobalListDot1dpri     Integer32,     
+    wwpLeosTrafficProfileGlobalDot1dStatus		RowStatus
+ } 
+
+ wwpLeosTrafficProfileGlobalListDot1dpri OBJECT-TYPE
+    SYNTAX     Integer32 (0..7)
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "This sets the dot1dpri classifier value in the list for the profile."
+    ::= { wwpLeosTrafficProfileGlobalDot1dEntry 1 }
+
+ wwpLeosTrafficProfileGlobalDot1dStatus    OBJECT-TYPE
+    SYNTAX         RowStatus
+    MAX-ACCESS     read-create
+    STATUS         current
+    DESCRIPTION
+ 		"To create an entry in the table set wwpLeosTrafficProfileGlobalDot1dStatus to 'createAndGo'.
+        
+ 		 To delete entry, set wwpLeosTrafficProfileGlobalDot1dStatus to 'destroy'."
+    ::= { wwpLeosTrafficProfileGlobalDot1dEntry 2 }
+ 
+ --
+ -- Global profile DSCP table
+ --                 
+ 
+ wwpLeosTrafficProfileGlobalDscpTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF WwpLeosTrafficProfileGlobalDscpEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+ 		"A table of global DSCP traffic profile entries.
+ 		 To create an entry in the table set wwpLeosTrafficProfileGlobalDscpStatus
+ 		 to 'createAndGo'.
+        
+ 		 To delete entry, set wwpLeosTrafficProfileGlobalDscpStatus to 'destroy'."
+    ::= { wwpLeosTrafficProfile 47 }
+      
+ wwpLeosTrafficProfileGlobalDscpEntry  OBJECT-TYPE
+    SYNTAX       WwpLeosTrafficProfileGlobalDscpEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+ 		"A global DSCP traffic profile entry in the wwpLeosTrafficProfileGlobalTable."
+    INDEX { wwpLeosTrafficProfileGlobalIndx , wwpLeosTrafficProfileGlobalListDscp }    
+    ::= { wwpLeosTrafficProfileGlobalDscpTable 1 }
+     
+ WwpLeosTrafficProfileGlobalDscpEntry ::= SEQUENCE {
+    wwpLeosTrafficProfileGlobalListDscp      Integer32,   
+    wwpLeosTrafficProfileGlobalDscpStatus		RowStatus
+ }
+ 
+ wwpLeosTrafficProfileGlobalListDscp OBJECT-TYPE
+    SYNTAX     Integer32 (0..63)
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "This sets the dscp classifier value in the list for the profile."
+    ::= { wwpLeosTrafficProfileGlobalDscpEntry 1 }
+ 
+ wwpLeosTrafficProfileGlobalDscpStatus    OBJECT-TYPE
+    SYNTAX         RowStatus
+    MAX-ACCESS     read-create
+    STATUS         current
+    DESCRIPTION
+ 		"To create an entry in the table set wwpLeosTrafficProfileGlobalDscpStatus to 'createAndGo'.
+
+ 		 To delete entry, set wwpLeosTrafficProfileGlobalDscpStatus to 'destroy'."
+    ::= { wwpLeosTrafficProfileGlobalDscpEntry 2 }
+
+ --
+ -- Global Parent Profiles
+ --
+ wwpLeosTrafficProfileGlobalParentTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosTrafficProfileGlobalParentEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+        "A table of parent global traffic profile entries.
+         To create an entry in this table, the following criteria must be met:
+         -All indexes must be specified.
+         -wwpLeosTrafficProfileGlobalParentName must be specified
+         -wwpLeosTrafficProfileGlobalCir must be specified.
+         -wwpLeosTrafficProfileGlobalCbs must be specified.
+         -wwpLeosTrafficProfileGlobalParentStatus must be set to 'createAndGo'."
+     ::= { wwpLeosTrafficProfile 48 }
+      
+ wwpLeosTrafficProfileGlobalParentEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosTrafficProfileGlobalParentEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+        "A parent global traffic profile entry in the wwpLeosTrafficProfileGlobalParentTable."
+     INDEX { wwpLeosTrafficProfileGlobalParentIndx }    
+     ::= { wwpLeosTrafficProfileGlobalParentTable 1 }
+     
+ WwpLeosTrafficProfileGlobalParentEntry ::= SEQUENCE {
+     wwpLeosTrafficProfileGlobalParentIndx                   Integer32,
+     wwpLeosTrafficProfileGlobalParentCir                    Integer32,
+     wwpLeosTrafficProfileGlobalParentName                   DisplayString,
+     wwpLeosTrafficProfileGlobalParentVlan                   Integer32,
+     wwpLeosTrafficProfileGlobalParentCbs                    Integer32,
+     wwpLeosTrafficProfileGlobalParentUntaggedState          INTEGER,
+     wwpLeosTrafficProfileGlobalParentVs                     DisplayString,
+     wwpLeosTrafficProfileGlobalParentDot1dpri               Integer32,  
+     wwpLeosTrafficProfileGlobalParentDscp                   Integer32,
+     wwpLeosTrafficProfileGlobalParentPortList               PortList,
+     wwpLeosTrafficProfileGlobalParentL4SrcPort              Integer32,
+     wwpLeosTrafficProfileGlobalParentL4DstPort              Integer32,
+     wwpLeosTrafficProfileGlobalParentSrcIpAddrType          InetAddressType,
+     wwpLeosTrafficProfileGlobalParentSrcIpAddr              InetAddress,
+     wwpLeosTrafficProfileGlobalParentSrcIpAddrPrefixLength  InetAddressPrefixLength,
+     wwpLeosTrafficProfileGlobalParentDstIpAddrType          InetAddressType,
+     wwpLeosTrafficProfileGlobalParentDstIpAddr              InetAddress,
+     wwpLeosTrafficProfileGlobalParentDstIpAddrPrefixLength  InetAddressPrefixLength,
+     wwpLeosTrafficProfileGlobalParentBaseEType              Integer32,
+     wwpLeosTrafficProfileGlobalParentIpProtocol             Integer32,
+     wwpLeosTrafficProfileGlobalParentAggList                PortList,
+     wwpLeosTrafficProfileGlobalParentAdminState             INTEGER,  
+     wwpLeosTrafficProfileGlobalParentStatus                 RowStatus
+
+ } 
+
+ wwpLeosTrafficProfileGlobalParentIndx    OBJECT-TYPE
+     SYNTAX         Integer32 (0..7000)
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION
+        "This object is used as index in the table."
+     ::= { wwpLeosTrafficProfileGlobalParentEntry 1 }  
+
+ wwpLeosTrafficProfileGlobalParentCir    OBJECT-TYPE
+     SYNTAX         Integer32
+     UNITS          "kbps"
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "This object specifies the cir associated with a given parent global traffic profile."
+     ::= { wwpLeosTrafficProfileGlobalParentEntry 2 }
+     
+ wwpLeosTrafficProfileGlobalParentName  OBJECT-TYPE
+     SYNTAX       DisplayString(SIZE (0..15))
+     MAX-ACCESS   read-create
+     STATUS       current
+     DESCRIPTION
+        "The name associated with this profile. This must be unique.
+         The name must be set on create." 
+     ::= { wwpLeosTrafficProfileGlobalParentEntry 3 } 
+ 
+ wwpLeosTrafficProfileGlobalParentVlan    OBJECT-TYPE
+     SYNTAX         Integer32(-1..4095)
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "This object specifies the VLAN associated with a profile. The value -1 signifies that Vlan is not used as a classifier"
+     DEFVAL { -1 }
+     ::= { wwpLeosTrafficProfileGlobalParentEntry 4 }
+
+ wwpLeosTrafficProfileGlobalParentCbs    OBJECT-TYPE
+     SYNTAX         Integer32 
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "This object specifies the committed burst size associated with a given
+         global traffic profile."
+     ::= { wwpLeosTrafficProfileGlobalParentEntry 5 }
+  
+ wwpLeosTrafficProfileGlobalParentUntaggedState OBJECT-TYPE
+    SYNTAX   INTEGER {
+         on(1),
+         off(2)
+                 }
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+      "To enable this profile to match untagged traffic set this to on(1). To disable, set to off(2)"
+    DEFVAL { off }
+    ::= { wwpLeosTrafficProfileGlobalParentEntry 6 }
+
+ wwpLeosTrafficProfileGlobalParentVs  OBJECT-TYPE
+    SYNTAX       DisplayString(SIZE (0..47))
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "The virtual-switch name associated with this profile. The virtual-switch name must exist before
+         using it as a profile classifier. A zero-length string indicates this classifier is not used."
+    ::= { wwpLeosTrafficProfileGlobalParentEntry 7 } 
+
+ wwpLeosTrafficProfileGlobalParentDot1dpri OBJECT-TYPE
+    SYNTAX   Integer32 (-1..7)
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+      "This sets the dot1dpri classifier value for the profile. A value of -1 indicates that this classifier is not used."
+    DEFVAL { -1 }
+    ::= { wwpLeosTrafficProfileGlobalParentEntry 8 }
+
+ wwpLeosTrafficProfileGlobalParentDscp OBJECT-TYPE
+    SYNTAX   Integer32 (-1..63)
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+      "This sets the dscp classifier value for the profile. A value of -1 indicates that this classifier is not used"
+    DEFVAL { -1 }
+    ::= { wwpLeosTrafficProfileGlobalParentEntry 9 }
+
+ wwpLeosTrafficProfileGlobalParentPortList OBJECT-TYPE
+    SYNTAX   PortList
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+      "This sets the port list classifier for the profile. A value of 0 indicates that this classifier is not used."
+    ::= { wwpLeosTrafficProfileGlobalParentEntry 10 }
+
+ wwpLeosTrafficProfileGlobalParentL4SrcPort OBJECT-TYPE
+    SYNTAX   Integer32 (-1..65535)
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+      "This sets the L4 source port classifier for the profile. A value of -1 indicates that this classifier is not used."
+    DEFVAL { -1 }
+    ::= { wwpLeosTrafficProfileGlobalParentEntry 11 }
+
+ wwpLeosTrafficProfileGlobalParentL4DstPort OBJECT-TYPE
+    SYNTAX   Integer32 (-1..65535)
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+      "This sets the L4 dest port classifier for the profile. A value of -1 indicates that this classifier is not used."
+    DEFVAL { -1 }
+    ::= { wwpLeosTrafficProfileGlobalParentEntry 12 }
+
+ wwpLeosTrafficProfileGlobalParentSrcIpAddrType OBJECT-TYPE
+    SYNTAX  InetAddressType
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+      "This identifies the address family of the source IP address (IPv4/IPv6). A value of unknown indicates that this classifier is not used."
+    DEFVAL { unknown }
+    ::= { wwpLeosTrafficProfileGlobalParentEntry 13 }
+
+ wwpLeosTrafficProfileGlobalParentSrcIpAddr OBJECT-TYPE
+    SYNTAX   InetAddress
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+      "This contains the source IP address for the profile."
+    ::= { wwpLeosTrafficProfileGlobalParentEntry 14 }
+
+ wwpLeosTrafficProfileGlobalParentSrcIpAddrPrefixLength OBJECT-TYPE
+    SYNTAX   InetAddressPrefixLength
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+      "This sets the prefix length of the source IP address."
+    ::= { wwpLeosTrafficProfileGlobalParentEntry 15 }
+
+ wwpLeosTrafficProfileGlobalParentDstIpAddrType OBJECT-TYPE
+    SYNTAX  InetAddressType
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+      "This identifies the address family of the destination IP address (IPv4/IPv6). A value of unknown indicates that this classifier is not used."
+    DEFVAL { unknown }
+    ::= { wwpLeosTrafficProfileGlobalParentEntry 16 }
+
+ wwpLeosTrafficProfileGlobalParentDstIpAddr OBJECT-TYPE
+    SYNTAX   InetAddress
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+      "This contains the destination IP address for the profile."
+    ::= { wwpLeosTrafficProfileGlobalParentEntry 17 }
+
+ wwpLeosTrafficProfileGlobalParentDstIpAddrPrefixLength OBJECT-TYPE
+    SYNTAX   InetAddressPrefixLength
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+      "This sets the prefix length of the destination IP address."
+    ::= { wwpLeosTrafficProfileGlobalParentEntry 18 }
+
+ wwpLeosTrafficProfileGlobalParentBaseEType OBJECT-TYPE
+    SYNTAX   Integer32 (-1..65535)
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+      "This sets the ethernet type classifier for the profile. A value of -1 indicates that this classifier is not used."
+    DEFVAL { -1 }
+    ::= { wwpLeosTrafficProfileGlobalParentEntry 19 }
+
+ wwpLeosTrafficProfileGlobalParentIpProtocol OBJECT-TYPE
+    SYNTAX   Integer32 (-1..255)
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+      "This sets the IP protocol classifier for the profile. A value of -1 indicates that this classifier is not used."
+    DEFVAL { -1 }
+    ::= { wwpLeosTrafficProfileGlobalParentEntry 20 }
+
+ wwpLeosTrafficProfileGlobalParentAggList OBJECT-TYPE
+    SYNTAX   PortList
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+      "This sets the aggregate port list classifier for the profile. Position 1 in the list corresponds to pgid 2049.
+       A value of 0 indicates that this classifier is not used."
+    ::= { wwpLeosTrafficProfileGlobalParentEntry 21 }
+
+ wwpLeosTrafficProfileGlobalParentAdminState OBJECT-TYPE
+    SYNTAX   INTEGER {
+         enabled(1),
+         disabled(2)
+           }
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+      "This sets the admin state of the traffic profile."
+    DEFVAL { disabled }
+    ::= { wwpLeosTrafficProfileGlobalParentEntry 22 }
+
+ wwpLeosTrafficProfileGlobalParentStatus    OBJECT-TYPE
+     SYNTAX         RowStatus
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "Setting this object to 'createandgo' along with wwpLeosTrafficProfileGlobalCir
+         and wwpLeosTrafficProfileGlobalCbs results in creating a parent global traffic profile entry.
+         Setting this object to 'destroy' deletes the entry from the table."
+     ::= { wwpLeosTrafficProfileGlobalParentEntry 23 }
+--
+-- Global profile stats table
+--
+wwpLeosTrafficProfileGlobalStatsTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosTrafficProfileGlobalStatsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+	     "A table of standard profile stats."
+     ::= { wwpLeosTrafficProfile 44 }
+		     
+     
+wwpLeosTrafficProfileGlobalStatsEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosTrafficProfileGlobalStatsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+	     "The entry in wwpLeosTrafficProfileGlobalStatsTable."
+     INDEX { wwpLeosTrafficProfileGlobalIndx  }    
+     ::= { wwpLeosTrafficProfileGlobalStatsTable 1 }
+
+ WwpLeosTrafficProfileGlobalStatsEntry ::= SEQUENCE { 
+     wwpLeosTrafficProfileGlobalHCAcceptedBytes    Counter64,
+     wwpLeosTrafficProfileGlobalHCDroppedBytes     Counter64,     
+     wwpLeosTrafficProfileGlobalHCAcceptedPackets  Counter64,
+     wwpLeosTrafficProfileGlobalHCDroppedPackets   Counter64
+ }
+ wwpLeosTrafficProfileGlobalHCAcceptedBytes    OBJECT-TYPE
+     SYNTAX         Counter64
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the bytes of accepted frame data of the
+	      given global profile."
+     ::= { wwpLeosTrafficProfileGlobalStatsEntry 1 }
+     
+ wwpLeosTrafficProfileGlobalHCDroppedBytes    OBJECT-TYPE
+     SYNTAX         Counter64
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the bytes of dropped frame data by a  
+	      given global profile."
+
+     ::= { wwpLeosTrafficProfileGlobalStatsEntry 2 }
+
+wwpLeosTrafficProfileGlobalHCAcceptedPackets    OBJECT-TYPE
+     SYNTAX         Counter64
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the number of packets passed by a global profile"
+     ::= { wwpLeosTrafficProfileGlobalStatsEntry 3 }
+ 
+ wwpLeosTrafficProfileGlobalHCDroppedPackets    OBJECT-TYPE
+     SYNTAX         Counter64
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+	     "This object specifies the number of packets dropped by a global profile"
+     ::= { wwpLeosTrafficProfileGlobalStatsEntry 4 }
+
+--
+-- MEF 10.3 Envelope table
+--
+ wwpLeosTrafficProfileEnvelopeTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosTrafficProfileEnvelopeEntry
+     MAX-ACCESS   not-accessible 
+     STATUS       current
+     DESCRIPTION
+        "A table of traffic profile envelope entries. An envelope is a set of bandwidth profile flows
+         To create an entry in this table, the following criteria must be met:
+         - wwpLeosTrafficProfileEnvelopeName must be unique
+         - wwpLeosTrafficProfileEnvelopeStatus must be set to 'createAndGo'."
+     ::= { wwpLeosTrafficProfile 49 }
+
+ wwpLeosTrafficProfileEnvelopeEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosTrafficProfileEnvelopeEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+        "A traffic profile envelope entry in the wwpLeosTrafficProfileEnvelopeTable."
+     INDEX { wwpLeosTrafficProfileEnvelopeId }
+     ::= { wwpLeosTrafficProfileEnvelopeTable 1 }
+
+ WwpLeosTrafficProfileEnvelopeEntry ::= SEQUENCE {
+     wwpLeosTrafficProfileEnvelopeId                      Integer32,
+     wwpLeosTrafficProfileEnvelopeName                    DisplayString,
+     wwpLeosTrafficProfileEnvelopeAdminState              INTEGER,
+     wwpLeosTrafficProfileEnvelopeOperState               INTEGER,
+     wwpLeosTrafficProfileEnvelopeCouplingFlag            INTEGER,
+     wwpLeosTrafficProfileEnvelopeFlowCouplingFlagControl INTEGER,
+     wwpLeosTrafficProfileEnvelopePortList                PortList,
+     wwpLeosTrafficProfileEnvelopeAggList                 PortList,
+     wwpLeosTrafficProfileEnvelopeFlowStatisticsControl   INTEGER,
+     wwpLeosTrafficProfileEnvelopeFlowClassificationMode  INTEGER,
+     wwpLeosTrafficProfileEnvelopeNumFlows                Unsigned32,
+     wwpLeosTrafficProfileEnvelopeStatus                  RowStatus
+}
+
+ wwpLeosTrafficProfileEnvelopeId    OBJECT-TYPE
+     SYNTAX         Integer32 (1..4092)
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION
+        "This object is used as index in wwpLeosTrafficProfileEnvelopeTable table."
+     ::= { wwpLeosTrafficProfileEnvelopeEntry 1 }
+
+ wwpLeosTrafficProfileEnvelopeName    OBJECT-TYPE
+     SYNTAX         DisplayString(SIZE (1..31))
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "The name associated with this envelope. This must be unique among other traffic profile names."
+     ::= { wwpLeosTrafficProfileEnvelopeEntry 2 }
+
+ wwpLeosTrafficProfileEnvelopeAdminState    OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        enabled(1),
+                        disabled(2)
+                        }
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "Setting this object to 'enabled' administratively enables this envelope
+         Setting this object to 'disabled' administratively disables this envelope."
+     DEFVAL { disabled }
+     ::= { wwpLeosTrafficProfileEnvelopeEntry 3 }
+
+ wwpLeosTrafficProfileEnvelopeOperState    OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        enabled(1),
+                        disabled(2)
+                        }
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "This object specifies operational state of this envelope."
+     DEFVAL { disabled }
+     ::= { wwpLeosTrafficProfileEnvelopeEntry 4 }
+
+ wwpLeosTrafficProfileEnvelopeCouplingFlag    OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        off(0),
+                        on(1)
+                        }
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "Envelope coupling flag allow sharing of unused tokens from lowest rank committed bucket to the 
+         highest rank excess bucket in an traffic profile envelope. As per MEF 10.3 standard, Coupling Flag 
+         must have only one of two possible values, 0 or 1."
+     DEFVAL { off }
+     ::= { wwpLeosTrafficProfileEnvelopeEntry 5 }
+
+ wwpLeosTrafficProfileEnvelopeFlowCouplingFlagControl    OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        off(0),
+                        on(1)
+                        }
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "Envelope flow coupling flag parameter allow sharing of overflow tokens from committed bucket to 
+         excess bucket. As per MEF 10.3 standard, Coupling Flag must have only one of two possible values, 0 or 1."
+     DEFVAL { off }
+     ::= { wwpLeosTrafficProfileEnvelopeEntry 6 }
+
+ wwpLeosTrafficProfileEnvelopePortList    OBJECT-TYPE
+     SYNTAX         PortList
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "This object specifies the Port List associated with traffic profile envelope."
+     ::= { wwpLeosTrafficProfileEnvelopeEntry 7 }
+ 
+ wwpLeosTrafficProfileEnvelopeAggList    OBJECT-TYPE
+     SYNTAX         PortList
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "This object specifies the aggregation port associated with traffic profile envelope."
+     ::= { wwpLeosTrafficProfileEnvelopeEntry 8 }
+ 
+ wwpLeosTrafficProfileEnvelopeFlowStatisticsControl    OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        on(1),
+                        off(2)
+                        }
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "Envelope flow statistics control is bandwidth profile flow statistics control.
+         Statistics can be enabled or disabled for all bandwidth profile flows in the envelope."
+     DEFVAL { on }
+     ::= { wwpLeosTrafficProfileEnvelopeEntry 9 }
+
+ wwpLeosTrafficProfileEnvelopeFlowClassificationMode    OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        none(1),
+                        port(2),
+                        vsOnly(3),
+                        vsWithRcos(4),
+                        vsWithCvlanPcp(5)
+                        }
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "Classification criteria for metering all the flows of an enevelope.
+         All the flows in the envelope shall follow same classification criteria."
+     DEFVAL { none }
+     ::= { wwpLeosTrafficProfileEnvelopeEntry 10 }
+
+ wwpLeosTrafficProfileEnvelopeNumFlows    OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..8) 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The number of bandwidth profile flows within this envelope."
+    ::= { wwpLeosTrafficProfileEnvelopeEntry 11 }
+
+ wwpLeosTrafficProfileEnvelopeStatus    OBJECT-TYPE
+     SYNTAX         RowStatus
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "To create an entry in the table set wwpLeosTrafficProfileEnvelopeStatus to 'createAndGo'
+         To delete entry, set wwpLeosTrafficProfileEnvelopeStatus to 'destroy'
+         Envelope must be disabled to destroy the envelope."
+     ::= { wwpLeosTrafficProfileEnvelopeEntry 12 }
+
+--
+-- MEF 10.3 Envelope Flow table
+-- 
+ wwpLeosTrafficProfileEnvelopeFlowTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosTrafficProfileEnvelopeFlowEntry
+     MAX-ACCESS   not-accessible 
+     STATUS       current
+     DESCRIPTION
+        "A Table of traffic profile envelope flow entries
+         To create an entry in this table, the following criteria must be met:
+         - If wwpLeosTrafficProfileEnvelopeFlowName is provided,it must be unique within envelope
+         - Unique value of wwpLeosTrafficProfileEnvelopeFlowRank in an envelope must be specified
+         - All Indexes must be specified
+         - wwpLeosTrafficProfileEnvelopeFlowStatus must be set to 'createAndGo'."
+     ::= { wwpLeosTrafficProfile 50 }
+
+ wwpLeosTrafficProfileEnvelopeFlowEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosTrafficProfileEnvelopeFlowEntry 
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+        "A traffic profile envelope flow entry in the wwpLeosTrafficProfileEnvelopeFlowTable."
+     INDEX { wwpLeosTrafficProfileEnvelopeId, wwpLeosTrafficProfileEnvelopeFlowIndex }
+     ::= { wwpLeosTrafficProfileEnvelopeFlowTable 1 }
+
+ WwpLeosTrafficProfileEnvelopeFlowEntry ::= SEQUENCE {
+     wwpLeosTrafficProfileEnvelopeFlowIndex                Integer32,
+     wwpLeosTrafficProfileEnvelopeFlowRank                 Integer32,
+     wwpLeosTrafficProfileEnvelopeFlowName                 DisplayString,
+     wwpLeosTrafficProfileEnvelopeFlowPriType              INTEGER,
+     wwpLeosTrafficProfileEnvelopeFlowRcos                 Integer32,
+     wwpLeosTrafficProfileEnvelopeFlowDot1dPri             Integer32,
+     wwpLeosTrafficProfileEnvelopeFlowCouplingFlag         INTEGER,
+     wwpLeosTrafficProfileEnvelopeFlowVs                   DisplayString,
+     wwpLeosTrafficProfileEnvelopeFlowCir                  Unsigned32,
+     wwpLeosTrafficProfileEnvelopeFlowPir                  Unsigned32,
+     wwpLeosTrafficProfileEnvelopeFlowEir                  Unsigned32,
+     wwpLeosTrafficProfileEnvelopeFlowCirMax               Unsigned32,
+     wwpLeosTrafficProfileEnvelopeFlowPirMax               Unsigned32,
+     wwpLeosTrafficProfileEnvelopeFlowEirMax               Unsigned32,
+     wwpLeosTrafficProfileEnvelopeFlowCbs                  Unsigned32,
+     wwpLeosTrafficProfileEnvelopeFlowEbs                  Unsigned32,
+     wwpLeosTrafficProfileEnvelopeFlowIngressColorAware    INTEGER,
+     wwpLeosTrafficProfileEnvelopeFlowStatisticsCollection INTEGER,
+     wwpLeosTrafficProfileEnvelopeFlowStatus               RowStatus
+}
+
+ wwpLeosTrafficProfileEnvelopeFlowIndex    OBJECT-TYPE
+     SYNTAX         Integer32 (1..8)
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION
+        "This object is an index for a bandwidth profile flow in an envelope."
+     ::= { wwpLeosTrafficProfileEnvelopeFlowEntry 1 }
+
+ wwpLeosTrafficProfileEnvelopeFlowRank    OBJECT-TYPE
+     SYNTAX         Integer32 (0..7)
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "This object decides rank value of a flow in envelope. 
+         Rank must be unique in the envelope."
+     ::= { wwpLeosTrafficProfileEnvelopeFlowEntry 2 }
+ 
+ wwpLeosTrafficProfileEnvelopeFlowName    OBJECT-TYPE
+     SYNTAX         DisplayString(SIZE (1..33))
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "The name associated with this envelope flow. This must be unique within envelope.
+         If this object is not configured, envelope name (string) from object wwpLeosTrafficProfileEnvelopeName 
+         and flow rank(numeric value) from object wwpLeosTrafficProfileEnvelopeFlowRank will be appended with a 
+         period in between to generate value for this object."
+     ::= { wwpLeosTrafficProfileEnvelopeFlowEntry 3 }
+
+
+ wwpLeosTrafficProfileEnvelopeFlowPriType    OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        none(1),
+                        rCos(2),
+                        dot1dPri(3)
+                        }
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "This object decides how rank of a flow in envelope will be decided
+         rCos: Resolve CoS. Rank of this flow will be equal to RCOS. Classifies flow based on VS and R-CoS 
+         dot1Pri: CE-VLAN priority. Rank of this flow will be equal to PCP value. Classifies flow based on VS and CVLAN PCP.
+         none: Bandwidth profile flow rank when classifier is only VS."
+     DEFVAL { none }
+     ::= { wwpLeosTrafficProfileEnvelopeFlowEntry 4 }
+ 
+ wwpLeosTrafficProfileEnvelopeFlowRcos    OBJECT-TYPE
+     SYNTAX         Integer32 (-1|0..7)
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "This object indicates the Rcos classifier value for the flow when flowPriType is set to rCos. 
+         This Classifies flow based on VS and R-CoS. R-Cos value will be equal to rank of the flow.
+         A value of -1 indicates that this classifier is not used."
+      DEFVAL { -1 }
+     ::= { wwpLeosTrafficProfileEnvelopeFlowEntry 5 }
+
+ wwpLeosTrafficProfileEnvelopeFlowDot1dPri    OBJECT-TYPE
+     SYNTAX         Integer32 (-1|0..7)
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "This object indicates the CVLAN dot1dpri classifier value for the flow when flowPriType is set to dot1dPri.
+         This Classifies flow based on VS and CVLAN PCP. dot1dPri value will be equal to rank of the flow.
+         A value of -1 indicates that this classifier is not used."
+     DEFVAL { -1 }
+     ::= { wwpLeosTrafficProfileEnvelopeFlowEntry 6 }
+
+ wwpLeosTrafficProfileEnvelopeFlowCouplingFlag    OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        off(0),
+                        on(1)
+                        }
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "Envelope flow coupling flag parameter allow sharing of overflow tokens from committed bucket to excess bucket.
+         As per MEF 10.3 standard, Coupling Flag must have only one of two possible values, 0 or 1."
+     DEFVAL { off }
+     ::= { wwpLeosTrafficProfileEnvelopeFlowEntry 7 }
+
+ wwpLeosTrafficProfileEnvelopeFlowVs    OBJECT-TYPE
+     SYNTAX         DisplayString(SIZE (0..47))
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "The virtual-switch name associated with this envelope flow. The virtual-switch name must exist before
+         using it as a profile classifier. A zero-length string indicates this classifier is not used."
+     ::= { wwpLeosTrafficProfileEnvelopeFlowEntry 8 }
+
+ wwpLeosTrafficProfileEnvelopeFlowCir    OBJECT-TYPE
+     SYNTAX         Unsigned32
+     UNITS          "kbps"
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "This object specifies the cir associated with a given traffic profile envelope flow."
+     ::= { wwpLeosTrafficProfileEnvelopeFlowEntry 9 }
+
+ wwpLeosTrafficProfileEnvelopeFlowPir    OBJECT-TYPE
+     SYNTAX         Unsigned32
+     UNITS          "kbps"
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "This object specifies the pir associated with a given standard traffic envelope flow.
+         Pir of a flow will be equal to sum of cir and eir. 
+         Sets/Gets on this are only valid when the global meter-provisioning mode is set
+         to PIR. All other times it is ignored and a 0 is returned."
+     ::= { wwpLeosTrafficProfileEnvelopeFlowEntry 10 }
+
+ wwpLeosTrafficProfileEnvelopeFlowEir    OBJECT-TYPE
+     SYNTAX         Unsigned32 
+     UNITS          "kbps"
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "This object specifies the eir associated with a given standard traffic envelope flow.
+         Sets/Gets on this are only valid when the global meter-provisioning mode is set
+         to EIR. All other times it is ignored and a 0 is returned."
+     ::= { wwpLeosTrafficProfileEnvelopeFlowEntry 11 }
+
+ wwpLeosTrafficProfileEnvelopeFlowCirMax    OBJECT-TYPE
+     SYNTAX         Unsigned32
+     UNITS          "kbps"
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "This object is the maximum committed information rate in kbps.
+         This will limit the rate of tokens added to the committed token bucket."
+     ::= { wwpLeosTrafficProfileEnvelopeFlowEntry 12 }
+
+ wwpLeosTrafficProfileEnvelopeFlowPirMax    OBJECT-TYPE
+     SYNTAX         Unsigned32
+     UNITS          "kbps"
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "This object is the maximum peak information rate in kbps.
+         PirMax of a flow will be equal to sum of cirMax and eirMax.
+         Sets/Gets on this are only valid when the global meter-provisioning mode is set
+         to PIR. All other times it is ignored and a 0 is returned."
+     ::= { wwpLeosTrafficProfileEnvelopeFlowEntry 13 }
+
+ wwpLeosTrafficProfileEnvelopeFlowEirMax    OBJECT-TYPE
+     SYNTAX         Unsigned32
+     UNITS          "kbps"
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "This object is the maximum excess information rate in kbps.
+         This will limit the rate of tokens added to the excess token bucket.
+         Sets/Gets on this are only valid when the global meter-provisioning mode is set
+         to EIR. All other times it is ignored and a 0 is returned."
+     ::= { wwpLeosTrafficProfileEnvelopeFlowEntry 14 }
+
+ wwpLeosTrafficProfileEnvelopeFlowCbs    OBJECT-TYPE
+     SYNTAX         Unsigned32
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "This object specifies the committed burst size associated with a given
+         traffic profile envelope flow."
+     ::= { wwpLeosTrafficProfileEnvelopeFlowEntry 15 }
+
+ wwpLeosTrafficProfileEnvelopeFlowEbs    OBJECT-TYPE
+     SYNTAX         Unsigned32
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "This object specifies the excess burst size associated with a given
+         traffic profile envelope flow."
+     ::= { wwpLeosTrafficProfileEnvelopeFlowEntry 16 }
+
+ wwpLeosTrafficProfileEnvelopeFlowIngressColorAware    OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        enabled(1),
+                        disabled(2)
+                        }
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "This object indicates whether traffic profile envelope flow is color-aware or color-blind."
+     DEFVAL { enabled}
+     ::= { wwpLeosTrafficProfileEnvelopeFlowEntry 17 }
+
+ wwpLeosTrafficProfileEnvelopeFlowStatisticsCollection    OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        on(1),
+                        off(2)
+                        }
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "Envelope flow statistics is bandwidth profile flow statistics control."
+     DEFVAL { on }
+     ::= { wwpLeosTrafficProfileEnvelopeFlowEntry 18 }
+
+ wwpLeosTrafficProfileEnvelopeFlowStatus    OBJECT-TYPE
+     SYNTAX         RowStatus
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "To create an entry in the table set wwpLeosTrafficProfileEnvelopeFlowStatus to 'createAndGo'
+         To delete entry, set wwpLeosTrafficProfileEnvelopeFlowStatus to 'destroy'."
+     ::= { wwpLeosTrafficProfileEnvelopeFlowEntry 19 }
+
+--
+-- MEF 10.3 flow statistics table
+-- 
+ wwpLeosTrafficProfileEnvelopeFlowStatisticsTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosTrafficProfileEnvelopeFlowStatisticsEntry
+     MAX-ACCESS   not-accessible 
+     STATUS       current
+     DESCRIPTION
+        "A table of traffic profile envelope flow statistics."
+     ::= { wwpLeosTrafficProfile 51 }
+
+ wwpLeosTrafficProfileEnvelopeFlowStatisticsEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosTrafficProfileEnvelopeFlowStatisticsEntry 
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+        "A entry in the table wwpLeosTrafficProfileEnvelopeFlowStatisticsTable."
+     AUGMENTS { wwpLeosTrafficProfileEnvelopeFlowEntry }
+     ::= { wwpLeosTrafficProfileEnvelopeFlowStatisticsTable 1 }
+
+ WwpLeosTrafficProfileEnvelopeFlowStatisticsEntry ::= SEQUENCE {
+     wwpLeosTrafficProfileEnvelopeFlowAcceptedBytes   Counter64,
+     wwpLeosTrafficProfileEnvelopeFlowAcceptedPackets Counter64,
+     wwpLeosTrafficProfileEnvelopeFlowDroppedBytes    Counter64,
+     wwpLeosTrafficProfileEnvelopeFlowDroppedPackets  Counter64,
+     wwpLeosTrafficProfileEnvelopeFlowStatsClear      INTEGER 
+}
+
+  wwpLeosTrafficProfileEnvelopeFlowAcceptedBytes OBJECT-TYPE
+     SYNTAX      Counter64
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "This object specifies number of bytes of accepted frame of envelope flow."
+     ::= { wwpLeosTrafficProfileEnvelopeFlowStatisticsEntry 1 }
+
+  wwpLeosTrafficProfileEnvelopeFlowAcceptedPackets OBJECT-TYPE
+     SYNTAX      Counter64
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "This object specifies number of packets of accepted frame of envelope flow."
+     ::= { wwpLeosTrafficProfileEnvelopeFlowStatisticsEntry 2 }
+
+  wwpLeosTrafficProfileEnvelopeFlowDroppedBytes OBJECT-TYPE
+     SYNTAX      Counter64
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "This object specifies number of bytes of dropped frame of envelope flow."
+     ::= { wwpLeosTrafficProfileEnvelopeFlowStatisticsEntry 3 }
+
+  wwpLeosTrafficProfileEnvelopeFlowDroppedPackets OBJECT-TYPE
+     SYNTAX      Counter64
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "This object specifies number of packets of dropped frame of envelope flow."
+     ::= { wwpLeosTrafficProfileEnvelopeFlowStatisticsEntry 4 }
+
+  wwpLeosTrafficProfileEnvelopeFlowStatsClear OBJECT-TYPE
+     SYNTAX      INTEGER {
+                     clear(1),
+                     none(2)
+                     }
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION
+        "To clear the statistics for the given flow of envelope set the value of this
+         object to clear(1)."
+     ::= { wwpLeosTrafficProfileEnvelopeFlowStatisticsEntry 5 }
+
+--
+-- MEF 10.3 envelope resource table
+-- 
+ wwpLeosTrafficProfileEnvelopeResources OBJECT IDENTIFIER ::= { wwpLeosTrafficProfile 52 }
+
+  wwpLeosTrafficProfileEnvelopesAllocated OBJECT-TYPE
+     SYNTAX          Integer32
+     MAX-ACCESS      read-only
+     STATUS          current
+     DESCRIPTION
+        "This object indicates total number of envelopes allocated."
+     ::= { wwpLeosTrafficProfileEnvelopeResources 1 }
+  
+  wwpLeosTrafficProfileEnvelopesUsed OBJECT-TYPE
+     SYNTAX          Integer32
+     MAX-ACCESS      read-only
+     STATUS          current
+     DESCRIPTION
+        "This object indicates total number of envelopes used."
+     ::= { wwpLeosTrafficProfileEnvelopeResources 2 }
+  
+  wwpLeosTrafficProfileEnvelopesAvailable OBJECT-TYPE
+     SYNTAX          Integer32
+     MAX-ACCESS      read-only
+     STATUS          current
+     DESCRIPTION
+        "This object indicates number of envelopes available."
+     ::= { wwpLeosTrafficProfileEnvelopeResources 3 }
+  
+  wwpLeosTrafficProfileEnvelopesWithStatsAllocated OBJECT-TYPE
+     SYNTAX          Integer32
+     MAX-ACCESS      read-only
+     STATUS          current
+     DESCRIPTION
+        "This object indicates total number of envelopes with statistics allocated."
+     ::= { wwpLeosTrafficProfileEnvelopeResources 4 }
+  
+  wwpLeosTrafficProfileEnvelopesWithStatsUsed OBJECT-TYPE
+     SYNTAX          Integer32
+     MAX-ACCESS      read-only
+     STATUS          current
+     DESCRIPTION
+        "This object indicates total number of envelopes with statistics used."
+     ::= { wwpLeosTrafficProfileEnvelopeResources 5 }
+  
+  wwpLeosTrafficProfileEnvelopesWithStatsAvailable OBJECT-TYPE
+     SYNTAX          Integer32
+     MAX-ACCESS      read-only
+     STATUS          current
+     DESCRIPTION
+        "This object indicates number of envelopes with statistics available."
+     ::= { wwpLeosTrafficProfileEnvelopeResources 6 }
+
+ --
+ -- Dynamic Microflow Policing
+ --
+
+ wwpLeosTrafficProfileDynamicProfile OBJECT IDENTIFIER ::= { wwpLeosTrafficProfile 53 }
+   
+ -- dynamic profiling global attributes
+   wwpLeosTrafficProfileDynamicGlobalAttrs OBJECT IDENTIFIER ::= { wwpLeosTrafficProfileDynamicProfile 1 }
+ 
+   wwpLeosTprofDynamicAdminState OBJECT-TYPE
+     SYNTAX         INTEGER {
+         enabled(1),
+         disabled(2)
+         }
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+        "Setting this object to 'enabled' administratively enables the dynamic profiling globally.
+         Setting this object to 'disabled' administratively disables the dynamic profiling gloablly."
+     DEFVAL { disabled }
+     ::= { wwpLeosTrafficProfileDynamicGlobalAttrs 1 }    
+
+   wwpLeosTprofDynamicOperState OBJECT-TYPE
+     SYNTAX         INTEGER {
+         enabled(1),
+         disabled(2)
+         }
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "This object specifies global operational state of dynamic profiling."
+     DEFVAL { disabled }
+     ::= { wwpLeosTrafficProfileDynamicGlobalAttrs 2 }    
+
+   wwpLeosTprofDynamicServiceFlowMonitorTimer OBJECT-TYPE   
+     SYNTAX         Integer32 (1..10)
+     UNITS          "seconds" 
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+        "This object is used to represent the time interval(in seconds) at which bandwidth 
+         utilization of service-flow is monitored. This can not be modified if 
+         wwpLeosTrafficProfileDynamicAdminState is in enabled state."
+     DEFVAL { 1 }
+     ::= { wwpLeosTrafficProfileDynamicGlobalAttrs 3 }    
+    
+   wwpLeosTprofDynamicMicroflowMonitorTimer OBJECT-TYPE   
+     SYNTAX         Integer32 (1..10)
+     UNITS          "seconds" 
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+        "This object is used to represent the time interval(in seconds) at which drop rate of
+         detected microfolows is monitored. This can not be modified if 
+         wwpLeosTrafficProfileDynamicAdminState is in enabled state."
+     DEFVAL { 3 }
+     ::= { wwpLeosTrafficProfileDynamicGlobalAttrs 4 }    
+         
+   wwpLeosTprofDynamicGreedyMicroflowMonitorTimer OBJECT-TYPE   
+     SYNTAX         Integer32 (1..10)
+     UNITS          "seconds" 
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+        "This object is used to represent the time interval(in seconds) at which drop rate of 
+         greedy microfolows is monitored. This can not be modified if 
+         wwpLeosTrafficProfileDynamicAdminState is in enabled state."
+     DEFVAL { 5 }
+     ::= { wwpLeosTrafficProfileDynamicGlobalAttrs 5 }    
+         
+   wwpLeosTprofDynamicMicroflowBatchMonitorCount OBJECT-TYPE   
+     SYNTAX         Integer32 (1..20)
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+        "This object is used to represent the count of microflows which can be monitored 
+         simultaneously to find greedy microflows. This can not be modified if 
+         wwpLeosTrafficProfileDynamicAdminState is in enabled state."
+     DEFVAL { 10 }
+     ::= { wwpLeosTrafficProfileDynamicGlobalAttrs 6 }    
+ 
+   wwpLeosTprofDynamicMaxGreedyMicroflowCount OBJECT-TYPE   
+     SYNTAX         Unsigned32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "This object is used to represent the maximum number of greedy microflows that
+         can be rate limited as per current resource allocations."
+     ::= { wwpLeosTrafficProfileDynamicGlobalAttrs 7 }    
+ 
+   wwpLeosTprofDynamicL2Classifiers OBJECT-TYPE   
+     SYNTAX         DisplayString 
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "This object is used to represent the layer 2 classifiers supported in dynamic profiling,
+         based on which microflows are detected." 
+     ::= { wwpLeosTrafficProfileDynamicGlobalAttrs 8 }    
+ 
+   wwpLeosTprofDynamicMplsClassifiers OBJECT-TYPE   
+     SYNTAX         DisplayString 
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "This object is used to represent the MPLS header and MPLS payload classifiers supported
+         in dynamic profiling based on which microflows are detected. Upto 3 MPLS labels are supported
+         i.e. MPLS frame parsing is only supported when bottom of stack label is present within first 
+         three MPLS labels."
+     ::= { wwpLeosTrafficProfileDynamicGlobalAttrs 9 }    
+ 
+   wwpLeosTprofDynamicL3Classifiers OBJECT-TYPE   
+     SYNTAX         DisplayString 
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "This object is used to represent the layer 3 classifiers supported in dynamic profiling,
+         based on which microflows are detected." 
+     ::= { wwpLeosTrafficProfileDynamicGlobalAttrs 10 }    
+
+--
+-- DMFP Dynamic microflow-action and greedy-microflow-action
+--
+   DynamicProfileMicroflowAction ::= TEXTUAL-CONVENTION
+     STATUS         current
+     DESCRIPTION    "Represents the action that needs to be taken while monitoring a microflow.
+                     Rate limiting can also be applied while monitoring the microflow."
+     SYNTAX         INTEGER {
+                       monitorWithRateLimit(1),
+                       monitorWithoutRateLimit(2)
+                    }
+
+   DynamicProfileGreedyMicroflowAction ::= TEXTUAL-CONVENTION
+     STATUS         current
+     DESCRIPTION    "Represents the action that needs to be taken while monitoring a greedy microflow.
+                     Rate limiting can also be applied while monitoring the greedy microflow.
+                     Additionally, a notification can also be generated when greedy microflow is detected
+                     or becomes well behaved."
+     SYNTAX         INTEGER {
+                       monitorWithRateLimit(1),
+                       monitorWithRateLimitAndNotification(2),
+                       monitorWithNotification(3)
+                    }
+
+--
+-- DMFP Dynamic Profile table
+--
+   wwpLeosTrafficProfileDynamicProfileTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosTrafficProfileDynamicProfileEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+        "A table of dynamic profile entries.
+         To create an entry in this table, the following criteria must be met:
+         - wwpLeosTprofDynamicProfileName must be unique
+         - wwpLeosTprofDynamicProfileStatus must be set to 'createAndGo'."
+     ::= { wwpLeosTrafficProfileDynamicProfile 2 }
+
+   wwpLeosTrafficProfileDynamicProfileEntry OBJECT-TYPE
+     SYNTAX       WwpLeosTrafficProfileDynamicProfileEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+        "A dynamic profile entry in the wwpLeosTrafficProfileDynamicProfileTable."
+     INDEX { wwpLeosTprofDynamicProfileIndx}
+     ::= { wwpLeosTrafficProfileDynamicProfileTable 1 }
+
+--
+-- DMFP Dynamic-Profile table
+--
+ WwpLeosTrafficProfileDynamicProfileEntry ::= SEQUENCE {
+    wwpLeosTprofDynamicProfileIndx                                 Integer32,
+    wwpLeosTprofDynamicProfileName                                 DisplayString,
+    wwpLeosTprofDynamicProfileAdminState                           INTEGER,
+    wwpLeosTprofDynamicProfileOperState                            INTEGER,
+    wwpLeosTprofDynamicProfileServiceFlowCir                       Unsigned32,
+    wwpLeosTprofDynamicProfileServiceFlowCbs                       Unsigned32,
+    wwpLeosTprofDynamicProfileServiceFlowUtilizationThreshold      Unsigned32,
+    wwpLeosTprofDynamicProfileServiceFlowOverThresholdCount        Unsigned32,
+    wwpLeosTprofDynamicProfileServiceFlowUnderThresholdCount       Unsigned32,
+    wwpLeosTprofDynamicProfileGreedyMicroflowCir                   Unsigned32,
+    wwpLeosTprofDynamicProfileGreedyMicroflowCbs                   Unsigned32,
+    wwpLeosTprofDynamicProfileGreedyMicroflowDropThreshold         Unsigned32,
+    wwpLeosTprofDynamicProfileGreedyMicroflowUnderThresholdCount   Unsigned32,
+    wwpLeosTprofDynamicProfileMicroflowOverThresholdCount          Unsigned32,
+    wwpLeosTprofDynamicProfileMicroflowUnderThresholdCount         Unsigned32,
+    wwpLeosTprofDynamicProfileMicroflowMonitorCount                Unsigned32,
+    wwpLeosTprofDynamicProfileStatus                               RowStatus,
+    wwpLeosTprofDynamicProfileMicroflowAction                      DynamicProfileMicroflowAction,
+    wwpLeosTprofDynamicProfileGreedyMicroflowAction                DynamicProfileGreedyMicroflowAction
+ }
+
+ wwpLeosTprofDynamicProfileIndx OBJECT-TYPE
+     SYNTAX         Integer32 (1..8)
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION
+        "This object is used as index in wwpLeosTrafficProfileDynamicProfileEntry table."
+     ::= { wwpLeosTrafficProfileDynamicProfileEntry 1 }
+
+ wwpLeosTprofDynamicProfileName OBJECT-TYPE
+     SYNTAX         DisplayString(SIZE (1..31))
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "The name associated with this dynamic profile. This must be unique among other dynamic profile names.
+         The name must be set on create."
+    ::= { wwpLeosTrafficProfileDynamicProfileEntry 2 }
+    
+  wwpLeosTprofDynamicProfileAdminState OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        enabled(1),
+                        disabled(2)
+                        }
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "Setting this object to 'enabled' administratively enables this dynamic profile.
+         Setting this object to 'disabled' administratively disables this dynamic profile."
+     DEFVAL { disabled }
+     ::= { wwpLeosTrafficProfileDynamicProfileEntry 3 }
+
+ wwpLeosTprofDynamicProfileOperState OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        enabled(1),
+                        disabled(2)
+                        }
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "This object specifies operational state of this dynamic profile."
+     DEFVAL { disabled }
+     ::= { wwpLeosTrafficProfileDynamicProfileEntry 4 }
+
+ wwpLeosTprofDynamicProfileServiceFlowCir OBJECT-TYPE
+     SYNTAX         Unsigned32
+     UNITS          "kbps"
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "This object specifies the cir of each service-flow associated with this dynamic profile."
+     DEFVAL { 100000 }
+     ::= { wwpLeosTrafficProfileDynamicProfileEntry 5 }
+
+ wwpLeosTprofDynamicProfileServiceFlowCbs OBJECT-TYPE
+     SYNTAX         Unsigned32
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "This object specifies the committed burst size of each service-flow associated with this
+         dynamic profile."
+     DEFVAL { 256 }
+     ::= { wwpLeosTrafficProfileDynamicProfileEntry 6 }
+
+ wwpLeosTprofDynamicProfileServiceFlowUtilizationThreshold OBJECT-TYPE
+     SYNTAX         Unsigned32
+     UNITS          "kbps"
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "This object specifies the threshold for bandwidth utilization of a service-flow 
+         associated with this dynamic profile. Microflows related to given service-flow 
+         will only be detected if bandwidth utilization remains over configured threshold."
+     DEFVAL { 60000 }
+     ::= { wwpLeosTrafficProfileDynamicProfileEntry 7 }
+
+ wwpLeosTprofDynamicProfileServiceFlowOverThresholdCount OBJECT-TYPE
+     SYNTAX         Unsigned32
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "This object specifies the over-threshold count for service-flows associated with this 
+         dynamic profile. Bandwidth utilization of service-flows should remain above 
+         wwpLeosTprofDynamicProfileServiceFlowUtilizationThreshold for these many times continuously 
+         to mark that the flow is overutilizing allocated bandwidth."
+     DEFVAL { 5 }
+     ::= { wwpLeosTrafficProfileDynamicProfileEntry 8 }
+
+ wwpLeosTprofDynamicProfileServiceFlowUnderThresholdCount OBJECT-TYPE
+     SYNTAX         Unsigned32
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "This object specifies the under-threshold count for service-flows associated with this 
+         dynamic profile. Bandwidth utilization of service-flows should remain below
+         wwpLeosTprofDynamicProfileServiceFlowUtilizationThreshold for these many times continuously 
+         to clear the over-utilization state of service-flow."
+     DEFVAL { 5 }
+     ::= { wwpLeosTrafficProfileDynamicProfileEntry 9 }   
+       
+ wwpLeosTprofDynamicProfileGreedyMicroflowCir OBJECT-TYPE
+     SYNTAX         Unsigned32
+     UNITS          "kbps"
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "This object specifies the cir at which a detected microflow need to be rate limited 
+         during monitoring or if it is a greedy microflow."
+     DEFVAL { 10000 }
+     ::= { wwpLeosTrafficProfileDynamicProfileEntry 10 }
+
+ wwpLeosTprofDynamicProfileGreedyMicroflowCbs OBJECT-TYPE
+     SYNTAX         Unsigned32
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "This object specifies the committed burst size for greedy-microflows associated with this 
+         dynamic profile."
+     DEFVAL { 256 }
+     ::= { wwpLeosTrafficProfileDynamicProfileEntry 11 }
+
+ wwpLeosTprofDynamicProfileGreedyMicroflowDropThreshold OBJECT-TYPE
+     SYNTAX         Unsigned32
+     UNITS          "kbps"
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "This object specifies the threshold for drop rate of microflows associated with 
+         this dynamic profile. Microflows related to given dynamic profile will be greedy
+         microflows if drop rate remains over configured threshold."
+     DEFVAL { 1000 }
+     ::= { wwpLeosTrafficProfileDynamicProfileEntry 12 }
+
+ wwpLeosTprofDynamicProfileGreedyMicroflowUnderThresholdCount OBJECT-TYPE
+     SYNTAX         Unsigned32
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "This object specifies the under-threshold count for greedy-microflows associated with this 
+         dynamic profile. Drop rate of greedy-microflows should remain below 
+         wwpLeosTprofDynamicProfileGreedyMicroflowDropThreshold for these many times continuously 
+         to mark the microflow as normal microflow."
+     DEFVAL { 5 }
+     ::= { wwpLeosTrafficProfileDynamicProfileEntry 13 }  
+ 
+ wwpLeosTprofDynamicProfileMicroflowOverThresholdCount OBJECT-TYPE
+     SYNTAX         Unsigned32
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "This object specifies the over-threshold count for microflows associated with this 
+         dynamic profile. Drop rate of monitored microflows should remain above 
+         wwpLeosTprofDynamicProfileGreedyMicroflowDropThreshold for these many times continuously 
+         to mark the microflow as greedy microflow."
+     DEFVAL { 5 }
+     ::= { wwpLeosTrafficProfileDynamicProfileEntry 14 }  
+
+ wwpLeosTprofDynamicProfileMicroflowUnderThresholdCount OBJECT-TYPE
+     SYNTAX         Unsigned32
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "This object specifies the under-threshold count for microflows associated with this 
+         dynamic profile. Drop rate of monitored microflows should remain below 
+         wwpLeosTprofDynamicProfileGreedyMicroflowDropThreshold for these many times continuously 
+         to mark the microflow as non-greedy microflow."
+     DEFVAL { 5 }
+     ::= { wwpLeosTrafficProfileDynamicProfileEntry 15 }  
+ 
+ wwpLeosTprofDynamicProfileMicroflowMonitorCount OBJECT-TYPE
+     SYNTAX         Unsigned32
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "This object specifies the monitor count for microflows associated with this dynamic 
+         profile. A detected micro flow will be monitored these many times before getting 
+         removed from microflow database."
+     DEFVAL { 5 }
+     ::= { wwpLeosTrafficProfileDynamicProfileEntry 16 }  
+   
+  wwpLeosTprofDynamicProfileStatus OBJECT-TYPE
+     SYNTAX         RowStatus
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "To create an entry in the table set wwpLeosTprofDynamicProfileStatus to 'createAndGo'
+         To delete entry, set wwpLeosTprofDynamicProfileStatus to 'destroy'
+         Dynamic-profile must be disabled to destroy the profile."
+     ::= { wwpLeosTrafficProfileDynamicProfileEntry 17 }
+
+  wwpLeosTprofDynamicProfileMicroflowAction OBJECT-TYPE
+     SYNTAX       DynamicProfileMicroflowAction
+     MAX-ACCESS   read-create
+     STATUS       current
+     DESCRIPTION
+        "This object specifies the action for microflows associated with this dynamic profile.
+         If the wwpLeosTprofDynamicProfileMicroflowAction is configured as monitorWithRateLimit,
+         then the detected microflows will be rate limited as per the wwpLeosTprofDynamicProfileGreedyMicroflowCir
+         and wwpLeosTprofDynamicProfileGreedyMicroflowCbs values. On the other hand, if the
+         wwpLeosTprofDynamicProfileMicroflowAction is configured as monitorWithoutRateLimit,
+         the detected microflows will not be rate-limited."
+     ::= { wwpLeosTrafficProfileDynamicProfileEntry 18 }
+
+  wwpLeosTprofDynamicProfileGreedyMicroflowAction OBJECT-TYPE
+     SYNTAX       DynamicProfileGreedyMicroflowAction
+     MAX-ACCESS   read-create
+     STATUS       current
+     DESCRIPTION
+        "This object specifies the action for greedy microflows associated with this dynamic profile.
+         If the wwpLeosTprofDynamicProfileGreedyMicroflowAction is configured as monitorWithRateLimit
+         or monitorWithRateLimitAndNotification, the detected greedy microflows will be rate limited
+         according to the wwpLeosTprofDynamicProfileGreedyMicroflowCir and wwpLeosTprofDynamicProfileGreedyMicroflowCbs
+         values. Additionally, when the wwpLeosTprofDynamicProfileGreedyMicroflowAction is configured
+         as monitorWithRateLimitAndNotification or monitorWithNotification, SNMP trap and syslog
+         notifications will be generated."
+     ::= { wwpLeosTrafficProfileDynamicProfileEntry 19 }
+
+--
+-- DMFP Service Flow table
+--
+ wwpLeosTrafficProfileDynamicServiceFlowTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosTrafficProfileDynamicServiceFlowEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+        "A table of dynamic profile service-flow entries.
+         To create an entry in this table, the following criteria must be met:
+         - wwpLeosTprofDynamicServiceFlowDynProfId must be specified.
+         - wwpLeosTprofDynamicServiceFlowPortList and/or wwpLeosTprofDynamicServiceFlowAggList must be specified.
+         - wwpLeosTprofDynamicServiceFlowStatus must be set to 'createAndGo'."
+     ::= { wwpLeosTrafficProfileDynamicProfile 3 }
+
+ wwpLeosTrafficProfileDynamicServiceFlowEntry OBJECT-TYPE
+     SYNTAX       WwpLeosTrafficProfileDynamicServiceFlowEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+        "A dynamic profile's service-flow entry in the wwpLeosTrafficProfileDynamicServiceFlowTable."
+     INDEX { wwpLeosTprofDynamicServiceFlowIndex}
+     ::= { wwpLeosTrafficProfileDynamicServiceFlowTable 1 }
+
+ WwpLeosTrafficProfileDynamicServiceFlowEntry ::= SEQUENCE {
+     wwpLeosTprofDynamicServiceFlowIndex       Integer32,
+     wwpLeosTprofDynamicServiceFlowDynProfId   Integer32,
+     wwpLeosTprofDynamicServiceFlowPortList    PortList,
+     wwpLeosTprofDynamicServiceFlowAggList     PortList,
+     wwpLeosTprofDynamicServiceFlowVs          DisplayString,
+     wwpLeosTprofDynamicServiceFlowVlan        Integer32,
+     wwpLeosTprofDynamicServiceFlowStatus      RowStatus,
+     wwpLeosTprofDynamicServiceFlowLastAcceptedRate  RateUnsigned64,
+     wwpLeosTprofDynamicServiceFlowLastDropRate      RateUnsigned64,
+     wwpLeosTprofDynamicServiceFlowLastAcceptedBytes Counter64,
+     wwpLeosTprofDynamicServiceFlowLastDroppedBytes  Counter64
+ }
+ 
+ wwpLeosTprofDynamicServiceFlowIndex OBJECT-TYPE
+     SYNTAX         Integer32 (1..64) 
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION
+        "This object is an index for a service-flow in dynamic profile."
+     ::= { wwpLeosTrafficProfileDynamicServiceFlowEntry 1 }
+    
+ wwpLeosTprofDynamicServiceFlowDynProfId OBJECT-TYPE
+     SYNTAX         Integer32 (1..8) 
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "This object specifies the dynamic profile index related to service-flow."
+     ::= { wwpLeosTrafficProfileDynamicServiceFlowEntry 2 }
+    
+ wwpLeosTprofDynamicServiceFlowPortList OBJECT-TYPE
+     SYNTAX         PortList
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "This object specifies the port list associated with dynamic profile's service-flow."
+     ::= { wwpLeosTrafficProfileDynamicServiceFlowEntry 3 }
+
+ wwpLeosTprofDynamicServiceFlowAggList OBJECT-TYPE
+     SYNTAX         PortList
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "This object specifies the aggregation port list associated with dynamic profile's service-flow."
+     ::= { wwpLeosTrafficProfileDynamicServiceFlowEntry 4 }      
+
+ wwpLeosTprofDynamicServiceFlowVs OBJECT-TYPE
+     SYNTAX         DisplayString(SIZE (0..47))
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "The virtual-switch name associated with this service-flow. The virtual-switch name must exist before
+         using it as a flow classifier. A zero-length string indicates this classifier is not used.
+         Vs can not be set along with wwpLeosTprofDynamicServiceFlowVlan."
+     ::= { wwpLeosTrafficProfileDynamicServiceFlowEntry 5 }
+    
+ wwpLeosTprofDynamicServiceFlowVlan OBJECT-TYPE
+     SYNTAX         Integer32(-1..4095)
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "This object specifies the VLAN associated with a service-flow.
+         The value -1 signifies that Vlan is not used as a classifier.
+         Vlan can not be set along with wwpLeosTprofDynamicServiceFlowVs."
+     ::= { wwpLeosTrafficProfileDynamicServiceFlowEntry 6 }
+    
+ wwpLeosTprofDynamicServiceFlowStatus OBJECT-TYPE
+     SYNTAX         RowStatus
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+        "To create an entry in the table set wwpLeosTprofDynamicServiceFlowStatus to 'createAndGo'
+         To delete entry, set wwpLeosTprofDynamicServiceFlowStatus to 'destroy'."
+     ::= { wwpLeosTrafficProfileDynamicServiceFlowEntry 7 }
+
+ wwpLeosTprofDynamicServiceFlowLastAcceptedRate OBJECT-TYPE
+    SYNTAX      RateUnsigned64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "This object specifies the accepted rate in kbps for a service flow.
+        This is the value calculated by the device during last monitoring
+        cycle of the service flow and does not provide the current value."
+    ::= { wwpLeosTrafficProfileDynamicServiceFlowEntry 8 }
+
+ wwpLeosTprofDynamicServiceFlowLastDropRate OBJECT-TYPE
+    SYNTAX      RateUnsigned64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "This object specifies the drop rate in kbps for a service flow.
+        This is the value calculated by the device during last monitoring
+        cycle of the service flow and does not provide the current value."
+    ::= { wwpLeosTrafficProfileDynamicServiceFlowEntry 9 }
+
+ wwpLeosTprofDynamicServiceFlowLastAcceptedBytes OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "This object specifies the accepted count in bytes for a service flow.
+        This is the value calculated by the device during last monitoring
+        cycle of the service flow and does not provide the current value."
+    ::= { wwpLeosTrafficProfileDynamicServiceFlowEntry 10 }
+
+ wwpLeosTprofDynamicServiceFlowLastDroppedBytes OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "This object specifies the dropped count in bytes for a service flow.
+        This is the value calculated by the device during last monitoring
+        cycle of the service flow and does not provide the current value."
+    ::= { wwpLeosTrafficProfileDynamicServiceFlowEntry 11 }
+
+--
+-- DMFP Micro-flow table
+--
+ wwpLeosTrafficProfileDynamicMicroflowTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosTrafficProfileDynamicMicroflowEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+        "A table of dynamic profile's microflow entries.
+         This table gets populated with flows detected based on certain fixed attributes (Src/Dst MAC, 
+         Src/Dst IPv4 Address, Src/Dst IPv6 Address, MPLS Labels and IPv4 over MPLS etc...) of incoming
+         traffic qualified based on parmaters set in service-flow when service-flow utilization rate is
+         greater than equal to wwpLeosTrafficProfileDynamicProfileServiceFlowUtilizationThreshold."
+     ::= { wwpLeosTrafficProfileDynamicProfile 4 }
+
+   wwpLeosTrafficProfileDynamicMicroflowEntry OBJECT-TYPE
+     SYNTAX       WwpLeosTrafficProfileDynamicMicroflowEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+        "A microflow entry in the wwpLeosTrafficProfileDynamicMicroflowTable."
+     INDEX { wwpLeosTprofDynamicMicroflowIndex }
+     ::= { wwpLeosTrafficProfileDynamicMicroflowTable 1 }
+
+    
+ DynamicMicroflowType ::= TEXTUAL-CONVENTION
+  STATUS         current
+  DESCRIPTION    "Represents type of mircoflow."
+  SYNTAX         INTEGER {
+                    normal (1),
+                    greedy (2)
+                 }
+
+ WwpLeosTrafficProfileDynamicMicroflowEntry ::= SEQUENCE {
+    wwpLeosTprofDynamicMicroflowIndex            Integer32,
+    wwpLeosTprofDynamicMicroflowDynProfId        Integer32,
+    wwpLeosTprofDynamicMicroflowServiceflowId    Integer32,
+    wwpLeosTprofDynamicMicroflowSrcMac           MacAddress,
+    wwpLeosTprofDynamicMicroflowDstMac           MacAddress,
+    wwpLeosTprofDynamicMicroflowBaseEtype        Integer32,
+    wwpLeosTprofDynamicMicroflowMplsLabelCount   Integer32,
+    wwpLeosTprofDynamicMicroflowMplsLabel1       Unsigned32,
+    wwpLeosTprofDynamicMicroflowMplsLabel2       Unsigned32,
+    wwpLeosTprofDynamicMicroflowMplsLabel3       Unsigned32,
+    wwpLeosTprofDynamicMicroflowSrcIpAddrType    InetAddressType,
+    wwpLeosTprofDynamicMicroflowSrcIp            InetAddress,
+    wwpLeosTprofDynamicMicroflowDstIpAddrType    InetAddressType,
+    wwpLeosTprofDynamicMicroflowDstIp            InetAddress,
+    wwpLeosTprofDynamicMicroflowType             DynamicMicroflowType,
+    wwpLeosTprofDynamicMicroflowMonitoredCount   Integer32,
+    wwpLeosTprofDynamicMicroflowIsRateLimited    TruthValue,
+    wwpLeosTprofDynamicMicroflowLastAcceptedRate  RateUnsigned64,
+    wwpLeosTprofDynamicMicroflowLastDropRate      RateUnsigned64,
+    wwpLeosTprofDynamicMicroflowLastAcceptedBytes Counter64,
+    wwpLeosTprofDynamicMicroflowLastDroppedBytes  Counter64
+ }
+ 
+ wwpLeosTprofDynamicMicroflowIndex OBJECT-TYPE
+     SYNTAX         Integer32 (1..2048)
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION
+        "This object is an index for a dynamic profile microflow."
+     ::= { wwpLeosTrafficProfileDynamicMicroflowEntry 1 }
+    
+ wwpLeosTprofDynamicMicroflowDynProfId OBJECT-TYPE
+     SYNTAX         Integer32 (1..8)
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "This object represents the dynamic profile's index related to microflow."
+     ::= { wwpLeosTrafficProfileDynamicMicroflowEntry 2 }
+ 
+ wwpLeosTprofDynamicMicroflowServiceflowId OBJECT-TYPE
+     SYNTAX         Integer32 (1..8)
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "This object represents the service-flow index related to microflow."
+     ::= { wwpLeosTrafficProfileDynamicMicroflowEntry 3 } 
+    
+ wwpLeosTprofDynamicMicroflowSrcMac OBJECT-TYPE
+     SYNTAX       MacAddress
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "This object is used to represent the source mac address vlaue if used as classifier.
+         All zeros address is returned if this is not used as classifier in microflow."
+     ::= { wwpLeosTrafficProfileDynamicMicroflowEntry 4 }
+
+ wwpLeosTprofDynamicMicroflowDstMac OBJECT-TYPE
+     SYNTAX       MacAddress
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "This object is used to represent the destination mac address vlaue if used as classifier.
+         All zeros address is returned if this is not used as classifier in microflow."
+     ::= { wwpLeosTrafficProfileDynamicMicroflowEntry 5 }
+     
+ wwpLeosTprofDynamicMicroflowBaseEtype OBJECT-TYPE
+     SYNTAX       Integer32
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "This object is used to represent the ethernet type value if used as classifier. 
+         A value of -1 indicates that this classifier is not used."
+     ::= { wwpLeosTrafficProfileDynamicMicroflowEntry 6 }
+
+ wwpLeosTprofDynamicMicroflowMplsLabelCount OBJECT-TYPE
+     SYNTAX       Integer32
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "This object is used to represent the MPLS labels count if MPLS is used as classifier.
+         If no MPLS label is present then 0 is set."
+     ::= { wwpLeosTrafficProfileDynamicMicroflowEntry 7 }
+
+ wwpLeosTprofDynamicMicroflowMplsLabel1 OBJECT-TYPE
+     SYNTAX       Unsigned32
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "This object is used to represent the first MPLS label value if MPLS is used as classifier.
+         First MPLS label is set to 0 if wwpLeosTprofDynamicMicroflowMplsLabelCount
+         less than 1."
+     ::= { wwpLeosTrafficProfileDynamicMicroflowEntry 8 }
+    
+ wwpLeosTprofDynamicMicroflowMplsLabel2 OBJECT-TYPE
+     SYNTAX       Unsigned32
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "This object is used to represent the second MPLS label value if MPLS is used as classifier.
+         Second MPLS label is set to 0 if wwpLeosTprofDynamicMicroflowMplsLabelCount
+         less than 2."
+     ::= { wwpLeosTrafficProfileDynamicMicroflowEntry 9 }
+
+ wwpLeosTprofDynamicMicroflowMplsLabel3 OBJECT-TYPE
+     SYNTAX       Unsigned32
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "This object represents the third MPLS label value if MPLS is used as classifier.
+         Third MPLS label is set to 0 if wwpLeosTprofDynamicMicroflowMplsLabelCount
+         less than 3."
+     ::= { wwpLeosTrafficProfileDynamicMicroflowEntry 10 }
+       
+ wwpLeosTprofDynamicMicroflowSrcIpAddrType OBJECT-TYPE
+     SYNTAX       InetAddressType
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "This object represents the source IP address version (IPv4/IPv6) if Src-IP or 
+         IP over MPLS is used as classifier. A value of unknown indicates that this 
+         classifier is not used."
+     DEFVAL { unknown }
+     ::= { wwpLeosTrafficProfileDynamicMicroflowEntry 11 }
+
+ wwpLeosTprofDynamicMicroflowSrcIp OBJECT-TYPE
+     SYNTAX       InetAddress
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "This object represents the source IP address value."
+     ::= { wwpLeosTrafficProfileDynamicMicroflowEntry 12 }
+    
+ wwpLeosTprofDynamicMicroflowDstIpAddrType OBJECT-TYPE
+     SYNTAX       InetAddressType
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "This object represents the destination IP address version (IPv4/IPv6) if Dst-IP or 
+         IP over MPLS is used as classifier. A value of unknown indicates that this 
+         classifier is not used."
+     DEFVAL { unknown }
+     ::= { wwpLeosTrafficProfileDynamicMicroflowEntry 13 }
+
+ wwpLeosTprofDynamicMicroflowDstIp OBJECT-TYPE
+     SYNTAX       InetAddress
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "This object represents the destination IP address value."
+     ::= { wwpLeosTrafficProfileDynamicMicroflowEntry 14 }
+
+ wwpLeosTprofDynamicMicroflowType OBJECT-TYPE
+     SYNTAX       DynamicMicroflowType
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "This object is used to represent the type of microflow i.e. normal or greedy."
+     ::= { wwpLeosTrafficProfileDynamicMicroflowEntry 15 }   
+    
+ wwpLeosTprofDynamicMicroflowMonitoredCount OBJECT-TYPE
+     SYNTAX       Integer32
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "This object is used to represent the count which means that for this
+         many times a microflow has been monitored."
+     ::= { wwpLeosTrafficProfileDynamicMicroflowEntry 16 }
+
+ wwpLeosTprofDynamicMicroflowIsRateLimited OBJECT-TYPE
+     SYNTAX          TruthValue
+     MAX-ACCESS      read-only
+     STATUS          current
+     DESCRIPTION
+        "This object is used to represent whether the microflow is rate limited or not.
+         This rate limit will be applied as per the wwpLeosTprofDynamicProfileGreedyMicroflowCir
+         and wwpLeosTprofDynamicProfileGreedyMicroflowCbs values."
+     ::= { wwpLeosTrafficProfileDynamicMicroflowEntry 17 }
+
+ wwpLeosTprofDynamicMicroflowLastAcceptedRate OBJECT-TYPE
+     SYNTAX      RateUnsigned64
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "This object specifies the accepted rate in kbps for a microflow.
+         This is the value calculated by the device during the last monitoring
+         cycle of the microflow and does not provide the current value."
+     ::= { wwpLeosTrafficProfileDynamicMicroflowEntry 18 }
+
+ wwpLeosTprofDynamicMicroflowLastDropRate OBJECT-TYPE
+     SYNTAX      RateUnsigned64
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "This object specifies the drop rate in kbps for a microflow.
+         This is the value calculated by the device during the last monitoring
+         cycle of the microflow and does not provide the current value."
+     ::= { wwpLeosTrafficProfileDynamicMicroflowEntry 19 }
+
+ wwpLeosTprofDynamicMicroflowLastAcceptedBytes OBJECT-TYPE
+     SYNTAX      Counter64
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "This object specifies the accepted count in bytes for a microflow.
+         This is the value calculated by the device during the last monitoring
+         cycle of the microflow and does not provide the current value."
+     ::= { wwpLeosTrafficProfileDynamicMicroflowEntry 20 }
+
+ wwpLeosTprofDynamicMicroflowLastDroppedBytes OBJECT-TYPE
+     SYNTAX      Counter64
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "This object specifies the dropped count in bytes for a microflow.
+         This is the value calculated by the device during the last monitoring
+         cycle of the microflow and does not provide the current value."
+     ::= { wwpLeosTrafficProfileDynamicMicroflowEntry 21 }
+
+ --
+ -- Notification Attributes
+ --
+ wwpLeosTprofDynamicMicroflowDesc OBJECT-TYPE
+     SYNTAX          DisplayString
+     MAX-ACCESS      accessible-for-notify
+     STATUS          current
+     DESCRIPTION
+        "This object is used to represent the status of the microflow.
+         The status can be any of the following:
+         the microflow is detected as greedy,
+         the greedy microflow has become well-behaved,
+         the greedy microflow has been deleted from the device, etc."
+     ::= { wwpLeosTrafficProfileNotifAttrs 1 }
+
+ wwpLeosTprofDynamicMicroflowProfileName OBJECT-TYPE
+     SYNTAX          DisplayString
+     MAX-ACCESS      accessible-for-notify
+     STATUS          current
+     DESCRIPTION
+        "This object is used to represent the name of the dynamic profile associated with this microflow."
+     ::= { wwpLeosTrafficProfileNotifAttrs 2 }
+
+ wwpLeosTprofDynamicMicroflowPortName OBJECT-TYPE
+     SYNTAX          DisplayString
+     MAX-ACCESS      accessible-for-notify
+     STATUS          current
+     DESCRIPTION
+        "This object specifies the port associated with the microflow."
+     ::= { wwpLeosTrafficProfileNotifAttrs 3 }
+
+ wwpLeosTprofDynamicMicroflowVsName OBJECT-TYPE
+     SYNTAX          DisplayString
+     MAX-ACCESS      accessible-for-notify
+     STATUS          current
+     DESCRIPTION
+        "This object specifies the virtual-switch associated with the microflow."
+     ::= { wwpLeosTrafficProfileNotifAttrs 4 }
+
+ wwpLeosTprofDynamicMicroflowVlanId OBJECT-TYPE
+     SYNTAX          Unsigned32
+     MAX-ACCESS      accessible-for-notify
+     STATUS          current
+     DESCRIPTION
+        "This object specifies the VLAN associated with the microflow."
+     ::= { wwpLeosTrafficProfileNotifAttrs 5 }
+
+ --
+ -- notifications
+ --
+
+ wwpLeosTprofDynProfMicroflowStatus  NOTIFICATION-TYPE
+        OBJECTS                    {
+                                     wwpLeosTprofDynamicMicroflowDesc,
+                                     wwpLeosTprofDynamicMicroflowProfileName,
+                                     wwpLeosTprofDynamicMicroflowType,
+                                     wwpLeosTprofDynamicMicroflowIsRateLimited,
+                                     wwpLeosTprofDynamicMicroflowPortName,
+                                     wwpLeosTprofDynamicMicroflowVsName,
+                                     wwpLeosTprofDynamicMicroflowVlanId,
+                                     wwpLeosTprofDynamicMicroflowSrcMac,
+                                     wwpLeosTprofDynamicMicroflowDstMac,
+                                     wwpLeosTprofDynamicMicroflowBaseEtype,
+                                     wwpLeosTprofDynamicMicroflowMplsLabel1,
+                                     wwpLeosTprofDynamicMicroflowMplsLabel2,
+                                     wwpLeosTprofDynamicMicroflowMplsLabel3,
+                                     wwpLeosTprofDynamicMicroflowSrcIpAddrType,
+                                     wwpLeosTprofDynamicMicroflowSrcIp,
+                                     wwpLeosTprofDynamicMicroflowDstIpAddrType,
+                                     wwpLeosTprofDynamicMicroflowDstIp
+                                   }
+        STATUS                     current
+        DESCRIPTION
+           "A wwpLeosTprofDynProfMicroFlowStatus trap is raised
+            to provide the status of the detected microflow."
+        ::= { wwpLeosTrafficProfileNotifications 1 }
+END
+ --
+ -- WWP-LEOS-TRAFFIC-PROFILE-MIB
+ --
+

@@ -1,0 +1,1194 @@
+-- This file was included in WWP MIB release 04-21-05-0007
+ --
+ -- WWP-LEOS-TWAMP-MIB.my
+ --
+ --
+
+ WWP-LEOS-TWAMP-MIB DEFINITIONS ::= BEGIN
+
+ IMPORTS
+     Integer32, Unsigned32, IpAddress, OBJECT-TYPE, MODULE-IDENTITY
+	    FROM SNMPv2-SMI
+     DisplayString
+            FROM SNMPv2-TC
+     InetAddressType, InetAddress
+	    FROM INET-ADDRESS-MIB
+     wwpModulesLeos
+	    FROM WWP-SMI;
+
+ wwpLeosTwampMIB MODULE-IDENTITY
+            LAST-UPDATED "201711150000Z"
+            ORGANIZATION "Ciena Corp."
+            CONTACT-INFO
+          "   Mib Meister
+              7035 Ridge Road
+              Hanover, Maryland 21076
+              USA
+              Phone:  +1 800 921 1144
+              Email:  support@ciena.com"
+
+            DESCRIPTION
+                    "The MIB module for the WWP Specifc twamp mib. It contains the
+                     variables which applies to TWAMP functionality on the chassis for the WWP System."
+            REVISION     "201711150000Z"
+            DESCRIPTION
+                    "Updated contact info."
+            REVISION    "201309160000Z"
+            DESCRIPTION
+                    "Add new MIB OIDs to support IP protocol version independent Inet addressing.
+                     Deprecated following tables that were indexed by IPv4 address:
+                     wwpLeosTwampServerSessionDenyTable
+                     wwpLeosTwampServerSessionDenyStatsTable
+                     Introduced replacement tables:
+                     wwpLeosTwampServerExtServerSessionDenyTable
+                     wwpLeosTwampServerExtSessionDenyStatsTable"
+            REVISION    "201304230000Z"
+            DESCRIPTION
+                    "Miscellaneous spelling and description corrections."
+            REVISION  "200808080800Z"
+            DESCRIPTION
+                    "Added wwpLeosTwampClientSessionsTable under wwpLeosTwampModule
+                    Added wwpLeosTwampClientSessionsStatisticsTable under wwpLeosTwampModule."
+            REVISION  "200802150800Z"
+            DESCRIPTION
+                    "Initial creation."
+            ::= { wwpModulesLeos 40 }
+
+ 
+ --
+ -- Node definitions
+ --
+	
+ wwpLeosTwampMIBObjects OBJECT IDENTIFIER ::= { wwpLeosTwampMIB 1 }
+ 
+ wwpLeosTwamp OBJECT IDENTIFIER ::= { wwpLeosTwampMIBObjects 1 }
+ 
+  -- the Twamp Module 
+
+ wwpLeosTwampModule OBJECT IDENTIFIER ::= { wwpLeosTwamp 1 } 
+
+  wwpLeosTwampPort OBJECT-TYPE
+     SYNTAX             Integer32 (256..65535)
+     MAX-ACCESS         read-write
+     STATUS             current
+     DESCRIPTION
+                "TCP/UDP port for TWAMP messaging."
+     ::= { wwpLeosTwampModule 1 }   
+     
+  wwpLeosTwampEnable OBJECT-TYPE
+     SYNTAX             INTEGER {
+                            disable(0),
+                            enable(1)
+                        }
+     MAX-ACCESS         read-write
+     STATUS             current
+     DESCRIPTION
+                "System level TWAMP enable/disable."
+     ::= { wwpLeosTwampModule 2 }   
+
+ --
+ -- TWAMP Port enable/disable
+ --
+ wwpLeosTwampPortEnableTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosTwampPortEnableEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "Table of Ethernet Ports Traps."
+     ::= { wwpLeosTwampModule 3 }
+                
+ wwpLeosTwampPortEnableEntry OBJECT-TYPE
+     SYNTAX       WwpLeosTwampPortEnableEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "TWAMP enable state of the port."
+     INDEX { wwpLeosTwampPortId }
+     ::= { wwpLeosTwampPortEnableTable 1 } 
+
+ WwpLeosTwampPortEnableEntry ::= SEQUENCE { 
+     wwpLeosTwampPortId              Integer32,
+     wwpLeosTwampPortEnableState     INTEGER
+  } 
+
+ wwpLeosTwampPortId     OBJECT-TYPE
+     SYNTAX             Integer32 (1..28)
+     MAX-ACCESS         not-accessible
+     STATUS             current
+     DESCRIPTION
+                "Port index for TWAMP messaging."
+     ::= { wwpLeosTwampPortEnableEntry 1 }   
+     
+ wwpLeosTwampPortEnableState   OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        disable(0),
+                        enable(1)
+                    }
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+             "Setting this object enables or disables TWAMP messaging on the given port."
+     ::= { wwpLeosTwampPortEnableEntry 2 }
+     
+  wwpLeosTwampClientEnable OBJECT-TYPE
+     SYNTAX             INTEGER {
+                            disable(0),
+                            enable(1)
+                        }
+     MAX-ACCESS         read-write
+     STATUS             current
+     DESCRIPTION
+                "TWAMP Client enable/disable."
+     ::= { wwpLeosTwampModule 4 }   
+
+  wwpLeosTwampServerEnable OBJECT-TYPE
+     SYNTAX             INTEGER {
+                            disable(0),
+                            enable(1)
+                        }
+     MAX-ACCESS         read-write
+     STATUS             current
+     DESCRIPTION
+                "TWAMP Server enable/disable."
+     ::= { wwpLeosTwampModule 5 }   
+
+  wwpLeosTwampLightEnable OBJECT-TYPE
+     SYNTAX             INTEGER {
+                            disable(0),
+                            enable(1)
+                        }
+     MAX-ACCESS         read-write
+     STATUS             current
+     DESCRIPTION
+                "TWAMP Light enable/disable."
+     ::= { wwpLeosTwampModule 6 }   
+
+ --
+ -- TWAMP Server Test Sessions Status
+ --
+
+ wwpLeosTwampServerSessionsTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosTwampServerSessionEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "Table of Ethernet Ports Traps."
+     ::= { wwpLeosTwampModule 7 }
+                
+ wwpLeosTwampServerSessionEntry OBJECT-TYPE
+     SYNTAX       WwpLeosTwampServerSessionEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "TWAMP Server Session characteristics."
+     INDEX { wwpLeosTwampServerSessionId }
+     ::= { wwpLeosTwampServerSessionsTable 1 } 
+
+ WwpLeosTwampServerSessionEntry ::= SEQUENCE { 
+     wwpLeosTwampServerSessionId                Integer32,
+     wwpLeosTwampServerSessionState             INTEGER,     
+     wwpLeosTwampServerSessionPort              Integer32,     
+     wwpLeosTwampServerSessionHost              IpAddress,     
+     wwpLeosTwampServerSessionNumPkts           Integer32,     
+     wwpLeosTwampServerSessionSeqNum            Integer32,
+     wwpLeosTwampServerSessionHwAssist          INTEGER,
+     wwpLeosTwampServerSessionHostInetAddrType  InetAddressType,
+     wwpLeosTwampServerSessionHostInetAddress   InetAddress
+  } 
+
+ wwpLeosTwampServerSessionId     OBJECT-TYPE
+     SYNTAX             Integer32 (1..30)
+     MAX-ACCESS         not-accessible
+     STATUS             current
+     DESCRIPTION
+                "Session index for TWAMP Server records."
+     ::= { wwpLeosTwampServerSessionEntry 1 }   
+     
+ wwpLeosTwampServerSessionState   OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        listen(0),
+                        greet(1),
+                        start(2),
+                        accept(3),
+                        test(4),
+                        stop(5),
+                        error(6)
+                    }
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "The current state of the Server Session."
+     ::= { wwpLeosTwampServerSessionEntry 2 }
+     
+ wwpLeosTwampServerSessionPort     OBJECT-TYPE
+     SYNTAX             Integer32 (0..65535)
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "Host source/reply port for TWAMP Server records."
+     ::= { wwpLeosTwampServerSessionEntry 3 }   
+     
+ wwpLeosTwampServerSessionHost     OBJECT-TYPE
+     SYNTAX             IpAddress
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "Host IP address for TWAMP Server records."
+     ::= { wwpLeosTwampServerSessionEntry 4 }   
+     
+ wwpLeosTwampServerSessionNumPkts     OBJECT-TYPE
+     SYNTAX             Integer32 
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "Number of packets defined for TWAMP Server records."
+     ::= { wwpLeosTwampServerSessionEntry 5 }   
+     
+ wwpLeosTwampServerSessionSeqNum     OBJECT-TYPE
+     SYNTAX             Integer32 
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "Current sequence number for TWAMP Server records."
+     ::= { wwpLeosTwampServerSessionEntry 6 }   
+ 
+ wwpLeosTwampServerSessionHwAssist   OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        inactive(0),
+                        active(1)
+                    }
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "The current state of the Server Session FPGA Hardware Assist."
+     ::= { wwpLeosTwampServerSessionEntry 7 }
+     
+ wwpLeosTwampServerSessionHostInetAddrType   OBJECT-TYPE
+     SYNTAX         InetAddressType
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "Specifies the resolved IP address type. This OID is used in conjunction
+              with wwpLeosTwampServerSessionHostInetAddress.
+              When set to:
+              ipv4: wwpLeosTwampServerSessionHostInetAddress should be compliant with InetAddressIPv4
+              ipv6: wwpLeosTwampServerSessionHostInetAddress should be compliant with InetAddressIPv6"
+     ::= { wwpLeosTwampServerSessionEntry 8 }
+     
+ wwpLeosTwampServerSessionHostInetAddress   OBJECT-TYPE
+     SYNTAX         InetAddress
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "Specifies the resolved IP address of the host connected to the TWAMP server
+              This object is used in conjunction with wwpLeosTwampServerSessionHostInetAddrType."
+     ::= { wwpLeosTwampServerSessionEntry 9 }
+     
+ --
+ -- TWAMP TCP Session Timeout
+ --
+
+  wwpLeosTwampTimeout OBJECT-TYPE
+     SYNTAX             Integer32 (1..86400)
+     MAX-ACCESS         read-write
+     STATUS             current
+     DESCRIPTION
+                "TCP session timeout (max lifetime) for TWAMP messaging."
+     ::= { wwpLeosTwampModule 8 }   
+     
+    
+ --
+ -- TWAMP Client Test Sessions
+ --
+
+ wwpLeosTwampClientSessionsTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosTwampClientSessionEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "Table of Client Sessions.
+             To create an entry set the twampClientSessionStatus to 2 and provide SessionName and 
+             set the sessionHost to valid IP Address."
+     ::= { wwpLeosTwampModule 9 }
+                
+ wwpLeosTwampClientSessionEntry OBJECT-TYPE
+     SYNTAX       WwpLeosTwampClientSessionEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "TWAMP Client Session characteristics."
+     INDEX { wwpLeosTwampClientSessionId }
+     ::= { wwpLeosTwampClientSessionsTable 1 } 
+
+ WwpLeosTwampClientSessionEntry ::= SEQUENCE { 
+     wwpLeosTwampClientSessionId                Integer32,
+     wwpLeosTwampClientSessionStatus            INTEGER,
+     wwpLeosTwampClientSessionName              DisplayString,
+     wwpLeosTwampClientSessionHost              IpAddress,     
+     wwpLeosTwampClientSessionState             INTEGER,     
+     wwpLeosTwampClientSessionCommPort          Integer32,     
+     wwpLeosTwampClientSessionCosPolicy         INTEGER,     
+     wwpLeosTwampClientSessionDscp              Integer32,     
+     wwpLeosTwampClientSessionIpPrec            Integer32,     
+     wwpLeosTwampClientSessionType              INTEGER,     
+     wwpLeosTwampClientSessionPktSize           Integer32,     
+     wwpLeosTwampClientSessionRepeat            INTEGER,     
+     wwpLeosTwampClientSessionNumPkts           Integer32,     
+     wwpLeosTwampClientSessionSeqNum            Integer32,
+     wwpLeosTwampClientSessionRxHw              INTEGER,
+     wwpLeosTwampClientSessionTxHw              INTEGER,
+     wwpLeosTwampClientSessionDot1dpri          Integer32,
+     wwpLeosTwampClientSessionHostInetAddrType  InetAddressType,
+     wwpLeosTwampClientSessionHostInetAddress   InetAddress
+  } 
+
+ wwpLeosTwampClientSessionId     OBJECT-TYPE
+     SYNTAX             Integer32 (1..30)
+     MAX-ACCESS         not-accessible
+     STATUS             current
+     DESCRIPTION
+                "Session index for TWAMP Client records."
+     ::= { wwpLeosTwampClientSessionEntry 1 }   
+     
+ wwpLeosTwampClientSessionStatus OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        active(1),
+                        createAndGo(2),
+                        clear(3),
+                        startTest(4),
+                        stopTest(5),
+                        clearStats(6)
+                    }
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+        "Setting this object to 'createAndGo' creates the entry in the table.       
+         Setting this object to 'clear' clears the entry contents in the table.
+         Setting this object to 'startTest' begins the entry's defined test.
+         Setting this object to 'stopTest' aborts the entry's current running test.
+         Setting this object to 'clearStats' clears the statistics for that client session."
+     ::= { wwpLeosTwampClientSessionEntry 2 }
+ 
+ wwpLeosTwampClientSessionName OBJECT-TYPE
+     SYNTAX      DisplayString (SIZE (0..14))
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+             "Text string containing the session's unique name."
+     ::= { wwpLeosTwampClientSessionEntry 3 }
+
+ wwpLeosTwampClientSessionHost     OBJECT-TYPE
+     SYNTAX             IpAddress
+     MAX-ACCESS         read-write
+     STATUS             current
+     DESCRIPTION
+                "Host IP address for TWAMP test records."
+     ::= { wwpLeosTwampClientSessionEntry 4 }   
+     
+ wwpLeosTwampClientSessionState   OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        idle(0),
+                        greeting(1),
+                        serverStart(2),
+                        sessionSetup(3),
+                        sessionStart(4),
+                        testing(5),
+                        stop(6),
+                        error(7)
+                    }
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+             "The current state of the Client Session."
+     ::= { wwpLeosTwampClientSessionEntry 5 }
+     
+ wwpLeosTwampClientSessionCommPort     OBJECT-TYPE
+     SYNTAX             Integer32 (0..65535)
+     MAX-ACCESS         read-write
+     STATUS             current
+     DESCRIPTION
+                "Host source/reply port for TWAMP test records."
+     ::= { wwpLeosTwampClientSessionEntry 6 }   
+     
+ wwpLeosTwampClientSessionCosPolicy     OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        dscp(1),
+                        ipPrec(2)
+                    }
+     MAX-ACCESS         read-write
+     STATUS             current
+     DESCRIPTION
+                "IP class of service to use for test message exchange"
+     ::= { wwpLeosTwampClientSessionEntry 7 }   
+ 
+ wwpLeosTwampClientSessionDscp     OBJECT-TYPE
+     SYNTAX             Integer32 (0..63) 
+     MAX-ACCESS         read-write
+     STATUS             current
+     DESCRIPTION
+                "DSCP value to use for TWAMP test messages."
+     ::= { wwpLeosTwampClientSessionEntry 8 }   
+ 
+ wwpLeosTwampClientSessionIpPrec     OBJECT-TYPE
+     SYNTAX             Integer32 (0..7) 
+     MAX-ACCESS         read-write
+     STATUS             current
+     DESCRIPTION
+                "IP-PREC value to use for TWAMP test messages."
+     ::= { wwpLeosTwampClientSessionEntry 9 }   
+ 
+ wwpLeosTwampClientSessionType     OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        fixed(1),
+                        poisson(2)
+                    }
+     MAX-ACCESS         read-write
+     STATUS             current
+     DESCRIPTION
+                "TWAMP test session sampling method setting."
+     ::= { wwpLeosTwampClientSessionEntry 10 }   
+ 
+ wwpLeosTwampClientSessionPktSize     OBJECT-TYPE
+     SYNTAX             Integer32 (64..1500) 
+     MAX-ACCESS         read-write
+     STATUS             current
+     DESCRIPTION
+                "IP Packet size to use for TWAMP test messages."
+     ::= { wwpLeosTwampClientSessionEntry 11 }   
+ 
+ wwpLeosTwampClientSessionRepeat     OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        on(1),
+                        off(2)
+                    }
+     MAX-ACCESS         read-write
+     STATUS             current
+     DESCRIPTION
+                "TWAMP test session continuous mode setting."
+     ::= { wwpLeosTwampClientSessionEntry 12 }   
+ 
+ wwpLeosTwampClientSessionSeqNum     OBJECT-TYPE
+     SYNTAX             Integer32 
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "Current sequence number for TWAMP test messages."
+     ::= { wwpLeosTwampClientSessionEntry 13 }   
+ 
+ wwpLeosTwampClientSessionNumPkts     OBJECT-TYPE
+     SYNTAX             Integer32 
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "Number of packets defined for TWAMP test session."
+     ::= { wwpLeosTwampClientSessionEntry 14 } 
+     
+ wwpLeosTwampClientSessionRxHw   OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        inactive(0),
+                        active(1)
+                    }
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "The current state of the Client Session FPGA RX Hardware Assist."
+     ::= { wwpLeosTwampClientSessionEntry 15 }
+     
+ wwpLeosTwampClientSessionTxHw   OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        inactive(0),
+                        active(1)
+                    }
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "The current state of the Client Session FPGA TX Hardware Assist."
+     ::= { wwpLeosTwampClientSessionEntry 16 }
+     
+ wwpLeosTwampClientSessionDot1dpri OBJECT-TYPE
+     SYNTAX             Integer32 (0..7) 
+     MAX-ACCESS         read-write
+     STATUS             current
+     DESCRIPTION
+                "802.1d priority value to use for TWAMP test messages."
+     ::= { wwpLeosTwampClientSessionEntry 17 }   
+ 
+ wwpLeosTwampClientSessionHostInetAddrType     OBJECT-TYPE
+     SYNTAX             InetAddressType
+     MAX-ACCESS         read-write
+     STATUS             current
+     DESCRIPTION
+             "Specifies the resolved IP address type. This OID is used in conjunction
+              with wwpLeosTwampClientSessionHostInetAddress.
+              When set to:
+              ipv4: wwpLeosTwampClientSessionHostInetAddress should be compliant with InetAddressIPv4
+              ipv6: wwpLeosTwampClientSessionHostInetAddress should be compliant with InetAddressIPv6"
+     ::= { wwpLeosTwampClientSessionEntry 18 }   
+     
+ wwpLeosTwampClientSessionHostInetAddress     OBJECT-TYPE
+     SYNTAX             InetAddress
+     MAX-ACCESS         read-write
+     STATUS             current
+     DESCRIPTION
+             "Specifies the resolved IP address of the TWAMP server host
+              This object is used in conjunction with wwpLeosTwampClientSessionHostInetAddrType."
+     ::= { wwpLeosTwampClientSessionEntry 19 }   
+     
+ --
+ -- TWAMP Client Test Sessions Statistics Table
+ --
+
+ wwpLeosTwampClientSessionsStatisticsTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosTwampClientSessionStatisticsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "Table of Ethernet Ports Traps."
+     ::= { wwpLeosTwampModule 11 }
+                
+ wwpLeosTwampClientSessionStatisticsEntry OBJECT-TYPE
+     SYNTAX       WwpLeosTwampClientSessionStatisticsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "TWAMP Client Session characteristics."
+     INDEX { wwpLeosTwampClientSessionStatsIndex, wwpLeosTwampClientStatsRecordIndex}
+     ::= { wwpLeosTwampClientSessionsStatisticsTable 1 } 
+
+ WwpLeosTwampClientSessionStatisticsEntry ::= SEQUENCE { 
+     wwpLeosTwampClientSessionStatsIndex        Integer32,
+     wwpLeosTwampClientStatsRecordIndex         Integer32,
+     wwpLeosTwampClientSessionStatsName         DisplayString,
+     wwpLeosTwampClientSessionTimestamp         Unsigned32,
+     wwpLeosTwampClientSessionStatsPktTx        Unsigned32,
+     wwpLeosTwampClientSessionStatsPktRx        Unsigned32,
+     wwpLeosTwampClientSessionStatsPktOL        Unsigned32,
+     wwpLeosTwampClientSessionStatsPktRL        Unsigned32,
+     wwpLeosTwampClientSessionStatsRTMin        Unsigned32,
+     wwpLeosTwampClientSessionStatsRTMax        Unsigned32,
+     wwpLeosTwampClientSessionStatsRTMean       Unsigned32,
+     wwpLeosTwampClientSessionStatsRTStdDev     Unsigned32,
+     wwpLeosTwampClientSessionStatsRT95th       Unsigned32,
+     wwpLeosTwampClientSessionStatsRT99pt9th    Unsigned32,
+     wwpLeosTwampClientSessionStatsOWOMin       Unsigned32,
+     wwpLeosTwampClientSessionStatsOWOMax       Unsigned32,
+     wwpLeosTwampClientSessionStatsOWOMean      Unsigned32,
+     wwpLeosTwampClientSessionStatsOWOStdDev    Unsigned32,
+     wwpLeosTwampClientSessionStatsOWO95th      Unsigned32,
+     wwpLeosTwampClientSessionStatsOWO99pt9th   Unsigned32,
+     wwpLeosTwampClientSessionStatsOWBMin       Unsigned32,
+     wwpLeosTwampClientSessionStatsOWBMax       Unsigned32,
+     wwpLeosTwampClientSessionStatsOWBMean      Unsigned32,
+     wwpLeosTwampClientSessionStatsOWBStdDev    Unsigned32,
+     wwpLeosTwampClientSessionStatsOWB95th      Unsigned32,
+     wwpLeosTwampClientSessionStatsOWB99pt9th   Unsigned32,
+     wwpLeosTwampClientSessionStatsTPMin        Unsigned32,
+     wwpLeosTwampClientSessionStatsTPMax        Unsigned32,
+     wwpLeosTwampClientSessionStatsTPMean       Unsigned32,
+     wwpLeosTwampClientSessionStatsTPStdDev     Unsigned32,
+     wwpLeosTwampClientSessionStatsTP95th       Unsigned32,
+     wwpLeosTwampClientSessionStatsTP99pt9th    Unsigned32
+  } 
+
+ wwpLeosTwampClientSessionStatsIndex     OBJECT-TYPE
+     SYNTAX             Integer32 (1..30)
+     MAX-ACCESS         not-accessible
+     STATUS             current
+     DESCRIPTION
+                "Session index for TWAMP Server records."
+     ::= { wwpLeosTwampClientSessionStatisticsEntry 1 }   
+     
+ wwpLeosTwampClientStatsRecordIndex     OBJECT-TYPE
+     SYNTAX             Integer32 (1..96)
+     MAX-ACCESS         not-accessible
+     STATUS             current
+     DESCRIPTION
+                "Session index for TWAMP Client Statistics records."
+     ::= { wwpLeosTwampClientSessionStatisticsEntry 2 }   
+     
+ wwpLeosTwampClientSessionStatsName OBJECT-TYPE
+     SYNTAX             DisplayString (SIZE (0..14))
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+             "Text string containing the session's unique name."
+     ::= { wwpLeosTwampClientSessionStatisticsEntry 3 }
+
+ wwpLeosTwampClientSessionTimestamp     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "The time at which this statistics record was generated - Unix epoch seconds."
+     ::= { wwpLeosTwampClientSessionStatisticsEntry 4 }   
+
+ wwpLeosTwampClientSessionStatsPktTx     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "The number of test packets emitted."
+     ::= { wwpLeosTwampClientSessionStatisticsEntry 5 }   
+
+ wwpLeosTwampClientSessionStatsPktRx     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "The number of test packets received."
+     ::= { wwpLeosTwampClientSessionStatisticsEntry 6 }   
+
+ wwpLeosTwampClientSessionStatsPktOL     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "The number of test packets lost one-way."
+     ::= { wwpLeosTwampClientSessionStatisticsEntry 7 }   
+
+ wwpLeosTwampClientSessionStatsPktRL     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "The number of test packets lost round-trip."
+     ::= { wwpLeosTwampClientSessionStatisticsEntry 8 }   
+
+ wwpLeosTwampClientSessionStatsRTMin     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "Round trip minimum interval."
+     ::= { wwpLeosTwampClientSessionStatisticsEntry 9 }   
+
+ wwpLeosTwampClientSessionStatsRTMax     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "Round trip maximum interval."
+     ::= { wwpLeosTwampClientSessionStatisticsEntry 10 }   
+
+ wwpLeosTwampClientSessionStatsRTMean     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "Round trip average interval."
+     ::= { wwpLeosTwampClientSessionStatisticsEntry 11 }   
+
+ wwpLeosTwampClientSessionStatsRTStdDev     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "Round trip standard deviation (jitter)."
+     ::= { wwpLeosTwampClientSessionStatisticsEntry 12 }   
+
+ wwpLeosTwampClientSessionStatsRT95th     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "Round trip 95th percentile."
+     ::= { wwpLeosTwampClientSessionStatisticsEntry 13 }   
+
+ wwpLeosTwampClientSessionStatsRT99pt9th     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "Round trip 99.9th percentile."
+     ::= { wwpLeosTwampClientSessionStatisticsEntry 14 }   
+
+ wwpLeosTwampClientSessionStatsOWOMin     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "One way out minimum interval."
+     ::= { wwpLeosTwampClientSessionStatisticsEntry 15 }   
+
+ wwpLeosTwampClientSessionStatsOWOMax     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "One way out maximum interval."
+     ::= { wwpLeosTwampClientSessionStatisticsEntry 16 }   
+
+ wwpLeosTwampClientSessionStatsOWOMean     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "One way out average interval."
+     ::= { wwpLeosTwampClientSessionStatisticsEntry 17 }   
+
+ wwpLeosTwampClientSessionStatsOWOStdDev     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "One way out standard deviation (jitter)."
+     ::= { wwpLeosTwampClientSessionStatisticsEntry 18 }   
+
+ wwpLeosTwampClientSessionStatsOWO95th     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "One way out 95th percentile."
+     ::= { wwpLeosTwampClientSessionStatisticsEntry 19 }   
+
+ wwpLeosTwampClientSessionStatsOWO99pt9th     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "One way out 99.9th percentile."
+     ::= { wwpLeosTwampClientSessionStatisticsEntry 20 }   
+
+ wwpLeosTwampClientSessionStatsOWBMin     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "One way back minimum interval."
+     ::= { wwpLeosTwampClientSessionStatisticsEntry 21 }   
+
+ wwpLeosTwampClientSessionStatsOWBMax     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "One way back maximum interval."
+     ::= { wwpLeosTwampClientSessionStatisticsEntry 22 }   
+
+ wwpLeosTwampClientSessionStatsOWBMean     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "One way back average interval."
+     ::= { wwpLeosTwampClientSessionStatisticsEntry 23 }   
+
+ wwpLeosTwampClientSessionStatsOWBStdDev     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "One way back standard deviation (jitter)."
+     ::= { wwpLeosTwampClientSessionStatisticsEntry 24 }   
+
+ wwpLeosTwampClientSessionStatsOWB95th     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "One way back 95th percentile."
+     ::= { wwpLeosTwampClientSessionStatisticsEntry 25 }   
+
+ wwpLeosTwampClientSessionStatsOWB99pt9th     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "One way back 99.9th percentile."
+     ::= { wwpLeosTwampClientSessionStatisticsEntry 26 }   
+
+ wwpLeosTwampClientSessionStatsTPMin     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "Target processing minimum interval."
+     ::= { wwpLeosTwampClientSessionStatisticsEntry 27 }   
+
+ wwpLeosTwampClientSessionStatsTPMax     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "Target processing maximum interval."
+     ::= { wwpLeosTwampClientSessionStatisticsEntry 28 }   
+
+ wwpLeosTwampClientSessionStatsTPMean     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "Target processing average interval."
+     ::= { wwpLeosTwampClientSessionStatisticsEntry 29 }   
+ 
+ wwpLeosTwampClientSessionStatsTPStdDev     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "Target processing standard deviation (jitter)."
+     ::= { wwpLeosTwampClientSessionStatisticsEntry 30 }   
+
+ wwpLeosTwampClientSessionStatsTP95th     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "Target processing 95th percentile."
+     ::= { wwpLeosTwampClientSessionStatisticsEntry 31 }   
+
+ wwpLeosTwampClientSessionStatsTP99pt9th     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "Target processing 99.9th percentile."
+     ::= { wwpLeosTwampClientSessionStatisticsEntry 32 }   
+
+ --
+  --  Added TWAMP Fields
+ --
+
+ wwpLeosTwampClientDscp     OBJECT-TYPE
+     SYNTAX             Integer32 (0..63) 
+     MAX-ACCESS         read-write
+     STATUS             current
+     DESCRIPTION
+                "DSCP value to use for TWAMP Client TCP messages."
+     ::= { wwpLeosTwampModule 12 }   
+ 
+ wwpLeosTwampServerDscp     OBJECT-TYPE
+     SYNTAX             Integer32 (0..63) 
+     MAX-ACCESS         read-write
+     STATUS             current
+     DESCRIPTION
+                "DSCP value to use for TWAMP Server TCP messages."
+     ::= { wwpLeosTwampModule 13 }   
+ 
+ wwpLeosTwampClientHwAssist     OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        on(1),
+                        off(2)
+                    }
+     MAX-ACCESS         read-write
+     STATUS             current
+     DESCRIPTION
+                "TWAMP Client hardware assist setting."
+     ::= { wwpLeosTwampModule 14 }   
+ 
+ wwpLeosTwampServerHwAssist     OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        on(1),
+                        off(2)
+                    }
+     MAX-ACCESS         read-write
+     STATUS             current
+     DESCRIPTION
+                "TWAMP Server hardware assist setting."
+     ::= { wwpLeosTwampModule 15 }   
+ 
+
+ --
+ -- TWAMP Server Control Sessions Status
+ --
+
+ wwpLeosTwampServerCtrlSessionsTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosTwampServerCtrlSessionEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "Table of TWAMP Control Session Records."
+     ::= { wwpLeosTwampModule 16 }
+                
+ wwpLeosTwampServerCtrlSessionEntry OBJECT-TYPE
+     SYNTAX       WwpLeosTwampServerCtrlSessionEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "TWAMP Server Control Session characteristics."
+     INDEX { wwpLeosTwampServerCtrlSessionId }
+     ::= { wwpLeosTwampServerCtrlSessionsTable 1 } 
+
+ WwpLeosTwampServerCtrlSessionEntry ::= SEQUENCE { 
+     wwpLeosTwampServerCtrlSessionId                Integer32,
+     wwpLeosTwampServerCtrlSessionState             INTEGER,     
+     wwpLeosTwampServerCtrlSessionPort              Integer32,     
+     wwpLeosTwampServerCtrlSessionHost              IpAddress,
+     wwpLeosTwampServerCtrlSessionTestMap           Unsigned32,
+     wwpLeosTwampServerCtrlSessionHostInetAddrType  InetAddressType,
+     wwpLeosTwampServerCtrlSessionHostInetAddress   InetAddress
+  } 
+
+ wwpLeosTwampServerCtrlSessionId     OBJECT-TYPE
+     SYNTAX             Integer32 (1..30)
+     MAX-ACCESS         not-accessible
+     STATUS             current
+     DESCRIPTION
+                "Session index for TWAMP Server Control Session records."
+     ::= { wwpLeosTwampServerCtrlSessionEntry 1 }   
+     
+ wwpLeosTwampServerCtrlSessionState   OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        listen(0),
+                        greet(1),
+                        start(2),
+                        accept(3),
+                        test(4),
+                        stop(5),
+                        error(6)
+                    }
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "The current state of the Server Control Session."
+     ::= { wwpLeosTwampServerCtrlSessionEntry 2 }
+     
+ wwpLeosTwampServerCtrlSessionPort     OBJECT-TYPE
+     SYNTAX             Integer32 (0..65535)
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "Host port for TWAMP Server Control session records."
+     ::= { wwpLeosTwampServerCtrlSessionEntry 3 }   
+     
+ wwpLeosTwampServerCtrlSessionHost     OBJECT-TYPE
+     SYNTAX             IpAddress
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "Host IP address for TWAMP Server Control session records."
+     ::= { wwpLeosTwampServerCtrlSessionEntry 4 }   
+     
+ wwpLeosTwampServerCtrlSessionTestMap     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "Bitmap of TWAMP Test sessions associated with Control session."
+     ::= { wwpLeosTwampServerCtrlSessionEntry 5 }   
+
+ wwpLeosTwampServerCtrlSessionHostInetAddrType     OBJECT-TYPE
+     SYNTAX             InetAddressType
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+             "Specifies the resolved IP address type. This OID is used in conjunction
+              with wwpLeosTwampServerCtrlSessionHostInetAddress.
+              When set to:
+              ipv4: wwpLeosTwampServerCtrlSessionHostInetAddress should be compliant with InetAddressIPv4
+              ipv6: wwpLeosTwampServerCtrlSessionHostInetAddress should be compliant with InetAddressIPv6"
+     ::= { wwpLeosTwampServerCtrlSessionEntry 6 }   
+     
+ wwpLeosTwampServerCtrlSessionHostInetAddress     OBJECT-TYPE
+     SYNTAX             InetAddress
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+             "Specifies the resolved IP address of the TWAMP ctrl host connected to the server
+              This object is used in conjunction with wwpLeosTwampServerCtrlSessionHostInetAddrType."
+     ::= { wwpLeosTwampServerCtrlSessionEntry 7 }   
+     
+     
+ --
+ -- TWAMP Server Session Deny Tables - config and stats
+ --
+
+ wwpLeosTwampServerSessionDenyTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosTwampServerSessionDenyEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION
+             "Table of TWAMP Server Session Deny Records."
+     ::= { wwpLeosTwampModule 17 }
+                
+ wwpLeosTwampServerSessionDenyEntry OBJECT-TYPE
+     SYNTAX       WwpLeosTwampServerSessionDenyEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION
+             "TWAMP Server Session Deny characteristics."
+     INDEX { wwpLeosTwampServerSessionDenyIp }
+     ::= { wwpLeosTwampServerSessionDenyTable 1 } 
+
+ WwpLeosTwampServerSessionDenyEntry ::= SEQUENCE { 
+     wwpLeosTwampServerSessionDenyIp            IpAddress,
+     wwpLeosTwampServerSessionDenyIngressPort   Integer32
+ } 
+
+ wwpLeosTwampServerSessionDenyIp        OBJECT-TYPE
+     SYNTAX             IpAddress
+     MAX-ACCESS         not-accessible
+     STATUS             deprecated
+     DESCRIPTION
+                "IP addess of session to deny"
+     ::= { wwpLeosTwampServerSessionDenyEntry 1 }   
+
+ wwpLeosTwampServerSessionDenyIngressPort   OBJECT-TYPE
+     SYNTAX             Integer32 (1..64)
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION
+                "physical ingress port on which the server session
+                 with given IP address will be denied"
+     ::= { wwpLeosTwampServerSessionDenyEntry 2 }
+
+ wwpLeosTwampServerSessionDenyStatsTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosTwampServerSessionDenyStatsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION
+             "Table of TWAMP Server Session Deny Statistics Records."
+     ::= { wwpLeosTwampModule 18 }
+                
+ wwpLeosTwampServerSessionDenyStatsEntry OBJECT-TYPE
+     SYNTAX       WwpLeosTwampServerSessionDenyStatsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION
+             "TWAMP Server Session Deny statistics."
+     INDEX { wwpLeosTwampServerSessionDenyStatsIp }
+     ::= { wwpLeosTwampServerSessionDenyStatsTable 1 } 
+
+ WwpLeosTwampServerSessionDenyStatsEntry ::= SEQUENCE { 
+     wwpLeosTwampServerSessionDenyStatsIp            IpAddress,
+     wwpLeosTwampServerSessionDenyStatsDropPkts      Unsigned32
+ } 
+
+ wwpLeosTwampServerSessionDenyStatsIp        OBJECT-TYPE
+     SYNTAX             IpAddress
+     MAX-ACCESS         not-accessible
+     STATUS             deprecated
+     DESCRIPTION
+                "IP addess of session deny"
+     ::= { wwpLeosTwampServerSessionDenyStatsEntry 1 }   
+
+ wwpLeosTwampServerSessionDenyStatsDropPkts      OBJECT-TYPE
+     SYNTAX             Unsigned32 
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "Number of session packets with the given IP address
+                 coming on the specified ingress physical port have been
+                 dropped"
+     ::= { wwpLeosTwampServerSessionDenyStatsEntry 2 }
+
+
+ wwpLeosTwampServerExtSessionDenyTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosTwampServerExtSessionDenyEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "Table of TWAMP Server Session Deny Records."
+     ::= { wwpLeosTwampModule 19 }
+                
+ wwpLeosTwampServerExtSessionDenyEntry OBJECT-TYPE
+     SYNTAX       WwpLeosTwampServerExtSessionDenyEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "TWAMP Server Session Deny characteristics."
+     INDEX { wwpLeosTwampServerExtSessionDenyIndex }
+     ::= { wwpLeosTwampServerExtSessionDenyTable 1 } 
+
+ WwpLeosTwampServerExtSessionDenyEntry ::= SEQUENCE { 
+     wwpLeosTwampServerExtSessionDenyIndex         Unsigned32,
+     wwpLeosTwampServerExtSessionDenyInetAddrType  InetAddressType,
+     wwpLeosTwampServerExtSessionDenyInetAddress   InetAddress,
+     wwpLeosTwampServerExtSessionDenyIngressPort   Integer32
+ } 
+
+ wwpLeosTwampServerExtSessionDenyIndex     OBJECT-TYPE
+     SYNTAX             Unsigned32 (1..4)
+     MAX-ACCESS         not-accessible
+     STATUS             current
+     DESCRIPTION
+                "Index for TWAMP Session Deny records."
+     ::= { wwpLeosTwampServerExtSessionDenyEntry 1 }   
+     
+ wwpLeosTwampServerExtSessionDenyInetAddrType   OBJECT-TYPE
+     SYNTAX             InetAddressType
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "resolved IP address type. 
+                 Used in conjunction with wwpLeosTwampServerExtSessionDenyInetAddress"
+     ::= { wwpLeosTwampServerExtSessionDenyEntry 2 }   
+
+ wwpLeosTwampServerExtSessionDenyInetAddress   OBJECT-TYPE
+     SYNTAX             InetAddress
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "IP addess of session to deny"
+     ::= { wwpLeosTwampServerExtSessionDenyEntry 3 }   
+
+ wwpLeosTwampServerExtSessionDenyIngressPort   OBJECT-TYPE
+     SYNTAX             Integer32 (1..64)
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "physical ingress port on which the server session
+                 with given IP address will be denied"
+     ::= { wwpLeosTwampServerExtSessionDenyEntry 4 }
+
+ wwpLeosTwampServerExtSessionDenyStatsTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosTwampServerExtSessionDenyStatsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "Table of TWAMP Server Session Deny Statistics Records."
+     ::= { wwpLeosTwampModule 20 }
+                
+ wwpLeosTwampServerExtSessionDenyStatsEntry OBJECT-TYPE
+     SYNTAX       WwpLeosTwampServerExtSessionDenyStatsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "TWAMP Server Session Deny statistics."
+     INDEX { wwpLeosTwampServerExtSessionDenyStatsIndex }
+     ::= { wwpLeosTwampServerExtSessionDenyStatsTable 1 } 
+
+ WwpLeosTwampServerExtSessionDenyStatsEntry ::= SEQUENCE { 
+     wwpLeosTwampServerExtSessionDenyStatsIndex         Unsigned32,
+     wwpLeosTwampServerExtSessionDenyStatsInetAddrType  InetAddressType,
+     wwpLeosTwampServerExtSessionDenyStatsInetAddress   InetAddress,
+     wwpLeosTwampServerExtSessionDenyStatsDropPkts      Unsigned32
+ } 
+
+ wwpLeosTwampServerExtSessionDenyStatsIndex     OBJECT-TYPE
+     SYNTAX             Unsigned32 (1..4)
+     MAX-ACCESS         not-accessible
+     STATUS             current
+     DESCRIPTION
+                "Index for TWAMP Session Deny Stats records."
+     ::= { wwpLeosTwampServerExtSessionDenyStatsEntry 1 }   
+     
+ wwpLeosTwampServerExtSessionDenyStatsInetAddrType   OBJECT-TYPE
+     SYNTAX             InetAddressType
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "resolved IP address type. 
+                 Used in conjunction with wwpLeosTwampServerExtSessionDenyStatsInetAddress"
+     ::= { wwpLeosTwampServerExtSessionDenyStatsEntry 2 }   
+
+ wwpLeosTwampServerExtSessionDenyStatsInetAddress   OBJECT-TYPE
+     SYNTAX             InetAddress
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+                "IP addess of denied session"
+     ::= { wwpLeosTwampServerExtSessionDenyStatsEntry 3 }   
+
+ wwpLeosTwampServerExtSessionDenyStatsDropPkts      OBJECT-TYPE
+     SYNTAX             Unsigned32 
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "Number of session packets with the given IP address
+                 coming on the specified ingress physical port have been
+                 dropped"
+     ::= { wwpLeosTwampServerExtSessionDenyStatsEntry 4 }
+
+ END

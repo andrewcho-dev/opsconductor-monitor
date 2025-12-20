@@ -397,6 +397,15 @@ def get_device_by_ip(ip):
 
 # ==================== SERVICES (FREs) ====================
 
+@mcp_bp.route('/services/raw', methods=['GET'])
+def get_services_raw():
+    """Get raw services data from MCP for debugging."""
+    limit = request.args.get('limit', 5, type=int)
+    service = get_mcp_service()
+    result = service.get_services(limit=limit, offset=0)
+    return jsonify(success_response(result))
+
+
 @mcp_bp.route('/services', methods=['GET'])
 def get_services():
     """Get services/circuits from MCP."""
@@ -407,6 +416,38 @@ def get_services():
     service = get_mcp_service()
     result = service.get_services(limit=limit, offset=offset)
     
+    # Build endpoint -> (device ID, port) lookup from included data
+    endpoint_to_info = {}
+    for item in result.get('included', []):
+        if item.get('type') == 'endPoints':
+            ep_id = item.get('id')
+            nc_data = item.get('relationships', {}).get('networkConstructs', {}).get('data', [])
+            tpe_data = item.get('relationships', {}).get('tpes', {}).get('data', [])
+            
+            device_id = nc_data[0].get('id') if nc_data else None
+            
+            # Extract port from TPE ID (format: device_id::TPE_4_PTP -> port 4)
+            port_name = None
+            if tpe_data:
+                tpe_id = tpe_data[0].get('id', '')
+                if '::TPE_' in tpe_id:
+                    port_part = tpe_id.split('::TPE_')[1].replace('_PTP', '').replace('_CTP', '')
+                    # Clean up complex port names - extract just the number if present
+                    import re
+                    match = re.match(r'^(\d+)', port_part)
+                    if match:
+                        port_name = match.group(1)
+                    elif port_part.startswith('FTP_G8032_'):
+                        # Ring FTP port - simplify display
+                        port_name = 'FTP'
+                    else:
+                        port_name = port_part
+            
+            endpoint_to_info[ep_id] = {'device_id': device_id, 'port': port_name}
+    
+    # Get device lookup (cached)
+    device_lookup = _get_device_lookup(service)
+    
     # Transform to simpler format
     services = []
     for svc in result.get('data', []):
@@ -415,9 +456,43 @@ def get_services():
         utilization = attrs.get('utilizationData', {})
         add_attrs = attrs.get('additionalAttributes', {})
         
+        # Extract endpoint device and port names
+        endpoints = svc.get('relationships', {}).get('endPoints', {}).get('data', [])
+        a_end_device = None
+        a_end_port = None
+        z_end_device = None
+        z_end_port = None
+        
+        if len(endpoints) >= 1:
+            ep_id = endpoints[0].get('id')
+            ep_info = endpoint_to_info.get(ep_id, {})
+            device_id = ep_info.get('device_id')
+            a_end_device = device_lookup.get(device_id) if device_id else None
+            a_end_port = ep_info.get('port')
+        if len(endpoints) >= 2:
+            ep_id = endpoints[1].get('id')
+            ep_info = endpoint_to_info.get(ep_id, {})
+            device_id = ep_info.get('device_id')
+            z_end_device = device_lookup.get(device_id) if device_id else None
+            z_end_port = ep_info.get('port')
+        
+        # Build display name: prefer userLabel, then construct from endpoints
+        user_label = attrs.get('userLabel') or ''
+        mgmt_name = attrs.get('mgmtName') or ''
+        if user_label.strip():
+            display_name = user_label
+        elif mgmt_name.strip():
+            display_name = mgmt_name
+        elif a_end_device and z_end_device:
+            display_name = f"{a_end_device} ↔ {z_end_device}"
+        elif a_end_device:
+            display_name = f"{a_end_device} ↔ ?"
+        else:
+            display_name = svc.get('id')
+        
         services.append({
             'id': svc.get('id'),
-            'name': attrs.get('userLabel') or attrs.get('mgmtName') or svc.get('id'),
+            'name': display_name,
             'service_class': attrs.get('serviceClass'),
             'layer_rate': attrs.get('layerRate'),
             'admin_state': display.get('adminState') or attrs.get('adminState'),
@@ -427,6 +502,10 @@ def get_services():
             'used_capacity': utilization.get('usedCapacity'),
             'utilization_percent': utilization.get('utilizationPercent'),
             'capacity_units': utilization.get('capacityUnits'),
+            'a_end': a_end_device,
+            'a_end_port': a_end_port,
+            'z_end': z_end_device,
+            'z_end_port': z_end_port,
             # Ring-specific fields
             'ring_id': add_attrs.get('ringId'),
             'ring_state': add_attrs.get('ringState'),
@@ -437,42 +516,354 @@ def get_services():
             'virtual_ring': add_attrs.get('virtualRingName'),
         })
     
+    # Group services by name into folders
+    from collections import defaultdict
+    grouped = defaultdict(list)
+    for svc in services:
+        grouped[svc['name']].append(svc)
+    
+    # Build folder structure
+    service_folders = []
+    for name, links in sorted(grouped.items()):
+        # Aggregate state - if any link is down, folder is down
+        states = [(l.get('operation_state') or '').lower() for l in links]
+        if 'down' in states:
+            folder_state = 'down'
+        elif all(s == 'up' for s in states):
+            folder_state = 'up'
+        else:
+            folder_state = 'partial'
+        
+        # Get service class from first link
+        svc_class = links[0].get('service_class') if links else None
+        
+        service_folders.append({
+            'name': name,
+            'service_class': svc_class,
+            'link_count': len(links),
+            'state': folder_state,
+            'links': links,
+        })
+    
     return jsonify(success_response({
-        'services': services,
-        'total': result.get('meta', {}).get('total', len(services)),
+        'services': services,  # Keep flat list for backward compatibility
+        'service_folders': service_folders,  # New grouped structure
+        'total_links': len(services),
+        'total_services': len(service_folders),
         'limit': limit,
         'offset': offset,
     }))
 
 
+# Cache for device lookup
+_device_lookup_cache = None
+_device_lookup_time = 0
+
+def _get_device_lookup(service):
+    """Get cached device ID -> name lookup."""
+    import time
+    global _device_lookup_cache, _device_lookup_time
+    
+    # Cache for 5 minutes
+    if _device_lookup_cache and (time.time() - _device_lookup_time) < 300:
+        return _device_lookup_cache
+    
+    devices = service.get_all_devices()
+    lookup = {}
+    for d in devices:
+        attrs = d.get('attributes', {})
+        display = attrs.get('displayData', {})
+        name = attrs.get('name') or display.get('displayName') or d.get('id')
+        lookup[d.get('id')] = name
+    
+    _device_lookup_cache = lookup
+    _device_lookup_time = time.time()
+    return lookup
+
+
 @mcp_bp.route('/services/rings', methods=['GET'])
 def get_rings():
-    """Get G.8032 ring services from MCP."""
+    """Get G.8032 ring services from MCP with member services."""
     service = get_mcp_service()
     rings_raw = service.get_rings()
     
+    # Also get all services to find ring members
+    all_services_result = service.get_services(limit=500, offset=0)
+    
+    # Build endpoint -> (device ID, port) lookup from included data
+    endpoint_to_info = {}
+    for item in all_services_result.get('included', []):
+        if item.get('type') == 'endPoints':
+            ep_id = item.get('id')
+            nc_data = item.get('relationships', {}).get('networkConstructs', {}).get('data', [])
+            tpe_data = item.get('relationships', {}).get('tpes', {}).get('data', [])
+            
+            device_id = nc_data[0].get('id') if nc_data else None
+            
+            port_name = None
+            if tpe_data:
+                tpe_id = tpe_data[0].get('id', '')
+                if '::TPE_' in tpe_id:
+                    port_part = tpe_id.split('::TPE_')[1].replace('_PTP', '').replace('_CTP', '')
+                    import re
+                    match = re.match(r'^(\d+)', port_part)
+                    if match:
+                        port_name = match.group(1)
+                    elif port_part.startswith('FTP_G8032_'):
+                        # Ring FTP port - extract ring name for display
+                        port_name = 'FTP'
+                    else:
+                        port_name = port_part
+            
+            endpoint_to_info[ep_id] = {'device_id': device_id, 'port': port_name}
+    
+    # Get device lookup
+    device_lookup = _get_device_lookup(service)
+    
+    # Build services list with endpoint info
+    services_by_ring = {}
+    for svc in all_services_result.get('data', []):
+        attrs = svc.get('attributes', {})
+        add_attrs = attrs.get('additionalAttributes', {})
+        virtual_ring = add_attrs.get('virtualRingName')
+        
+        if not virtual_ring:
+            continue
+        
+        # Extract endpoint info
+        endpoints = svc.get('relationships', {}).get('endPoints', {}).get('data', [])
+        a_end_device = None
+        a_end_port = None
+        z_end_device = None
+        z_end_port = None
+        
+        if len(endpoints) >= 1:
+            ep_id = endpoints[0].get('id')
+            ep_info = endpoint_to_info.get(ep_id, {})
+            device_id = ep_info.get('device_id')
+            a_end_device = device_lookup.get(device_id) if device_id else None
+            a_end_port = ep_info.get('port')
+        if len(endpoints) >= 2:
+            ep_id = endpoints[1].get('id')
+            ep_info = endpoint_to_info.get(ep_id, {})
+            device_id = ep_info.get('device_id')
+            z_end_device = device_lookup.get(device_id) if device_id else None
+            z_end_port = ep_info.get('port')
+        
+        display = attrs.get('displayData', {})
+        utilization = attrs.get('utilizationData', {})
+        
+        svc_data = {
+            'id': svc.get('id'),
+            'name': attrs.get('userLabel') or attrs.get('mgmtName') or svc.get('id'),
+            'a_end': a_end_device,
+            'a_end_port': a_end_port,
+            'z_end': z_end_device,
+            'z_end_port': z_end_port,
+            'operation_state': display.get('operationState') or attrs.get('operationState'),
+            'admin_state': display.get('adminState') or attrs.get('adminState'),
+            'total_capacity': utilization.get('totalCapacity'),
+            'capacity_units': utilization.get('capacityUnits'),
+        }
+        
+        if virtual_ring not in services_by_ring:
+            services_by_ring[virtual_ring] = []
+        services_by_ring[virtual_ring].append(svc_data)
+    
+    # Build ring data with member services
     rings = []
     for ring in rings_raw:
         attrs = ring.get('attributes', {})
         display = attrs.get('displayData', {})
         add_attrs = attrs.get('additionalAttributes', {})
         
+        virtual_ring = add_attrs.get('virtualRingName')
+        
+        # Parse g8032Edges to get actual ring segments (inter-switch links)
+        ring_segments_raw = []
+        g8032_edges = add_attrs.get('g8032Edges') or ''
+        if g8032_edges:
+            # Format: device1::TPE_port1_...,device2::TPE_port2_...;device3::TPE_port3_...,device4::TPE_port4_...
+            segments = g8032_edges.split(';')
+            for seg in segments:
+                parts = seg.split(',')
+                if len(parts) == 2:
+                    ep1, ep2 = parts
+                    # Parse endpoint 1
+                    dev1_id = ep1.split('::')[0] if '::' in ep1 else None
+                    port1 = None
+                    if '::TPE_' in ep1:
+                        port_part = ep1.split('::TPE_')[1]
+                        import re
+                        match = re.match(r'^(\d+)', port_part)
+                        port1 = match.group(1) if match else port_part.split('_')[0]
+                    
+                    # Parse endpoint 2
+                    dev2_id = ep2.split('::')[0] if '::' in ep2 else None
+                    port2 = None
+                    if '::TPE_' in ep2:
+                        port_part = ep2.split('::TPE_')[1]
+                        match = re.match(r'^(\d+)', port_part)
+                        port2 = match.group(1) if match else port_part.split('_')[0]
+                    
+                    dev1_name = device_lookup.get(dev1_id, dev1_id[:8] + '...' if dev1_id else None)
+                    dev2_name = device_lookup.get(dev2_id, dev2_id[:8] + '...' if dev2_id else None)
+                    
+                    ring_segments_raw.append({
+                        'a_end': dev1_name,
+                        'a_end_port': port1,
+                        'z_end': dev2_name,
+                        'z_end_port': port2,
+                    })
+        
+        # Get RPL owner info first (needed for ordering)
+        rpl_owner_ctp = add_attrs.get('rplOwnerCtpId') or ''
+        rpl_device_id = rpl_owner_ctp.split('::')[0] if '::' in rpl_owner_ctp else None
+        rpl_owner_device = device_lookup.get(rpl_device_id, rpl_device_id[:8] + '...' if rpl_device_id else None)
+        rpl_owner_port = None
+        if '::TPE_' in rpl_owner_ctp:
+            port_part = rpl_owner_ctp.split('::TPE_')[1]
+            match = re.match(r'^(\d+)', port_part)
+            rpl_owner_port = match.group(1) if match else port_part.split('_')[0]
+        
+        # Order segments starting from RPL block and following the ring path
+        ring_segments = []
+        if ring_segments_raw and rpl_owner_device:
+            # Build adjacency: device -> list of (port, connected_device, connected_port, segment_index)
+            adjacency = {}
+            for idx, seg in enumerate(ring_segments_raw):
+                a_dev, a_port = seg['a_end'], seg['a_end_port']
+                z_dev, z_port = seg['z_end'], seg['z_end_port']
+                
+                if a_dev not in adjacency:
+                    adjacency[a_dev] = []
+                adjacency[a_dev].append((a_port, z_dev, z_port, idx))
+                
+                if z_dev not in adjacency:
+                    adjacency[z_dev] = []
+                adjacency[z_dev].append((z_port, a_dev, a_port, idx))
+            
+            # Start from RPL owner device/port and traverse the ring
+            visited_segments = set()
+            current_device = rpl_owner_device
+            current_port = rpl_owner_port
+            
+            # Find the segment that starts from RPL block
+            for _ in range(len(ring_segments_raw) + 1):
+                if current_device not in adjacency:
+                    break
+                
+                found_next = False
+                for port, next_dev, next_port, seg_idx in adjacency.get(current_device, []):
+                    if seg_idx in visited_segments:
+                        continue
+                    if port == current_port or current_port is None:
+                        # Add this segment
+                        seg = ring_segments_raw[seg_idx]
+                        # Check if this segment contains the RPL block
+                        is_rpl_segment = (len(ring_segments) == 0)  # First segment from RPL
+                        
+                        # Orient segment so current_device is A-end
+                        if seg['a_end'] == current_device:
+                            new_seg = dict(seg)
+                            new_seg['is_rpl_block'] = is_rpl_segment
+                            new_seg['rpl_blocked_port'] = 'a_end' if is_rpl_segment else None
+                            ring_segments.append(new_seg)
+                            current_device = seg['z_end']
+                            current_port = None  # Find any unvisited port on next device
+                        else:
+                            ring_segments.append({
+                                'a_end': seg['z_end'],
+                                'a_end_port': seg['z_end_port'],
+                                'z_end': seg['a_end'],
+                                'z_end_port': seg['a_end_port'],
+                                'is_rpl_block': is_rpl_segment,
+                                'rpl_blocked_port': 'a_end' if is_rpl_segment else None,
+                            })
+                            current_device = seg['a_end']
+                            current_port = None
+                        visited_segments.add(seg_idx)
+                        found_next = True
+                        break
+                
+                if not found_next:
+                    # Try any unvisited segment from current device
+                    for port, next_dev, next_port, seg_idx in adjacency.get(current_device, []):
+                        if seg_idx not in visited_segments:
+                            seg = ring_segments_raw[seg_idx]
+                            if seg['a_end'] == current_device:
+                                new_seg = dict(seg)
+                                new_seg['is_rpl_block'] = False
+                                new_seg['rpl_blocked_port'] = None
+                                ring_segments.append(new_seg)
+                                current_device = seg['z_end']
+                            else:
+                                ring_segments.append({
+                                    'a_end': seg['z_end'],
+                                    'a_end_port': seg['z_end_port'],
+                                    'z_end': seg['a_end'],
+                                    'z_end_port': seg['a_end_port'],
+                                    'is_rpl_block': False,
+                                    'rpl_blocked_port': None,
+                                })
+                                current_device = seg['a_end']
+                            visited_segments.add(seg_idx)
+                            found_next = True
+                            break
+                
+                if not found_next:
+                    break
+            
+            # Add any remaining unvisited segments
+            for idx, seg in enumerate(ring_segments_raw):
+                if idx not in visited_segments:
+                    new_seg = dict(seg)
+                    new_seg['is_rpl_block'] = False
+                    new_seg['rpl_blocked_port'] = None
+                    ring_segments.append(new_seg)
+        else:
+            # No RPL owner, just add flags to raw segments
+            ring_segments = []
+            for seg in ring_segments_raw:
+                new_seg = dict(seg)
+                new_seg['is_rpl_block'] = False
+                new_seg['rpl_blocked_port'] = None
+                ring_segments.append(new_seg)
+        
+        # Calculate ring health based on ring state (not member services)
+        ring_state = add_attrs.get('ringState')
+        ring_status = add_attrs.get('ringStatus')
+        if ring_state == 'OK' and ring_status == 'OK':
+            members_state = 'up'
+        else:
+            members_state = 'down'
+        
+        # Determine protection state
+        # If ring_state is not OK or ring_status is not OK, protection may have switched
+        protection_active = ring_state != 'OK' or ring_status != 'OK'
+        
         rings.append({
             'id': ring.get('id'),
             'name': attrs.get('mgmtName') or attrs.get('userLabel') or ring.get('id'),
             'ring_id': add_attrs.get('ringId'),
-            'ring_state': add_attrs.get('ringState'),
-            'ring_status': add_attrs.get('ringStatus'),
+            'ring_state': ring_state,
+            'ring_status': ring_status,
             'ring_type': add_attrs.get('ringType'),
             'ring_members': add_attrs.get('ringMembers'),
             'logical_ring': add_attrs.get('logicalRingName'),
-            'virtual_ring': add_attrs.get('virtualRingName'),
+            'virtual_ring': virtual_ring,
             'rpl_owner': add_attrs.get('rplOwnerCtpId'),
+            'rpl_owner_device': rpl_owner_device,
+            'rpl_owner_port': rpl_owner_port,
+            'protection_active': protection_active,
             'revertive': add_attrs.get('revertive'),
             'wait_to_restore': add_attrs.get('waitToRestore'),
             'guard_time': add_attrs.get('guardTime'),
             'hold_off_time': add_attrs.get('holdOffTime'),
             'raps_vid': add_attrs.get('rapsVid'),
+            'ring_segments': ring_segments,
+            'segment_count': len(ring_segments),
+            'members_state': members_state,
         })
     
     return jsonify(success_response({

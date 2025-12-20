@@ -1,0 +1,80 @@
+-- This file was included in WWP MIB release 04-21-05-0007
+--
+-- CIENA-GLOBAL-MIB.my
+--
+--
+
+	CIENA-GLOBAL-MIB DEFINITIONS ::= BEGIN
+
+ IMPORTS                
+   OBJECT-TYPE, MODULE-IDENTITY
+        FROM SNMPv2-SMI  
+   MacAddress
+   		FROM SNMPv2-TC               
+   cienaCommon
+        FROM CIENA-SMI
+   CienaGlobalSeverity, CienaTimeTicks64
+   		FROM CIENA-TC;
+
+	
+   cienaGlobal MODULE-IDENTITY
+	      LAST-UPDATED "202103240000Z"
+	      ORGANIZATION "Ciena Corp."
+	      CONTACT-INFO
+	      "   Mib Meister
+	          7035 Ridge Road
+	          Hanover, Maryland 21076
+	          USA
+	          Phone:  +1 800 921 1144
+	          Email:  support@ciena.com"
+	      DESCRIPTION
+		       "This module defines the object identifiers that are
+		       common across all 5410 modules."
+
+              REVISION "202103240000Z"
+              DESCRIPTION
+                       "Added cienaGlobalSystemUpTime, a 64-bit integer object
+                        to hold the system up time since the system was last 
+                        re-initialized."
+
+	      REVISION "201706070000Z"
+	      DESCRIPTION
+		       "Updated contact info."
+
+	      REVISION "201003280000Z"
+	      DESCRIPTION
+		       "Initial creation."
+			::= { cienaCommon 3 }
+		
+  
+--
+-- Node definitions
+--
+	
+  cienaGlobalSeverity	OBJECT-TYPE
+ 	 SYNTAX		CienaGlobalSeverity
+	 MAX-ACCESS	accessible-for-notify
+	 STATUS		current
+	 DESCRIPTION
+		"This object defines the severity of a trap and is a part of every trap defined in the system."        
+	 ::= { cienaGlobal 1 } 
+
+
+  cienaGlobalMacAddress    OBJECT-TYPE
+     SYNTAX           MacAddress
+     MAX-ACCESS       accessible-for-notify
+     STATUS           current
+     DESCRIPTION
+	     "This object indicates the chassis MAC address."     
+     ::= { cienaGlobal 2 }
+			
+  cienaGlobalSystemUpTime   OBJECT-TYPE
+     SYNTAX             CienaTimeTicks64
+     MAX-ACCESS         read-only
+     STATUS             current
+     DESCRIPTION
+             "This object represents system up-time (in hundredths
+              of a second) since the system was last re-initialized."
+     ::= { cienaGlobal 3 }
+
+  END

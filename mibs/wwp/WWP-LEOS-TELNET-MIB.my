@@ -1,0 +1,74 @@
+-- This file was included in WWP MIB release 04-21-05-0007
+ --
+ -- WWP-LEOS-TELNET-MIB.my
+ --
+ WWP-LEOS-TELNET-MIB DEFINITIONS ::= BEGIN
+
+ IMPORTS
+    OBJECT-TYPE, MODULE-IDENTITY
+            FROM SNMPv2-SMI
+    wwpModulesLeos
+            FROM WWP-SMI;  
+ 
+ wwpLeosTelnetMIB MODULE-IDENTITY
+            LAST-UPDATED "202109061400Z"
+            ORGANIZATION "Ciena Corp."
+            CONTACT-INFO
+                    "   Mib Meister
+                        7035 Ridge Road
+                        Hanover, Maryland 21076
+                        USA
+                        Phone:  +1 800 921 1144
+                        Email:  support@ciena.com"
+            DESCRIPTION  
+                    "The MIB module defines the managed objects for the TELNET
+                    available on the WWP specific products."
+            
+            REVISION    "202109061400Z"
+            DESCRIPTION
+                    "Initial creation."
+            ::= { wwpModulesLeos 48 }
+           
+ --
+ -- Node definitions
+ --
+
+ wwpLeosTelnetMIBObjects OBJECT IDENTIFIER ::= { wwpLeosTelnetMIB 1 }
+
+ --
+ --
+ wwpLeosTelnetServerGlobal OBJECT IDENTIFIER ::= { wwpLeosTelnetMIBObjects 1 }
+ 
+ wwpLeosTelnetClientGlobal OBJECT IDENTIFIER ::= { wwpLeosTelnetMIBObjects 2 }
+
+ -- Conformance information
+
+ wwpLeosTelnetMIBConformance OBJECT IDENTIFIER ::= { wwpLeosTelnetMIB 2 }
+ wwpLeosTelnetMIBCompliances OBJECT IDENTIFIER ::= { wwpLeosTelnetMIBConformance 1 }
+ wwpLeosTelnetMIBGroups      OBJECT IDENTIFIER ::= { wwpLeosTelnetMIBConformance 2 }
+
+ --
+ --  The Telnet Global Attributes
+ --
+ wwpLeosTelnetServerOperState          OBJECT-TYPE
+     SYNTAX          INTEGER {
+                                        enabled(1),
+                                        disabled(2)
+                             }
+     MAX-ACCESS      read-write
+     STATUS          current
+     DESCRIPTION
+             "This object indicates the operational state of the Telnet server."
+     ::= { wwpLeosTelnetServerGlobal 1 }
+
+ wwpLeosTelnetClientOperState          OBJECT-TYPE
+     SYNTAX          INTEGER {
+                                        enabled(1),
+                                        disabled(2)
+                             }
+     MAX-ACCESS      read-write
+     STATUS          current
+     DESCRIPTION
+             "This object indicates the operational state of the Telnet client."
+     ::= { wwpLeosTelnetClientGlobal 1 }
+END

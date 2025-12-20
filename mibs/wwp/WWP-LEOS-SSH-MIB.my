@@ -1,0 +1,1356 @@
+-- This file was included in WWP MIB release 04-21-05-0007
+ --
+ -- WWP-LEOS-SSH-MIB.my
+ --
+ WWP-LEOS-SSH-MIB DEFINITIONS ::= BEGIN
+
+ IMPORTS
+   IpAddress, Integer32, Unsigned32, OBJECT-TYPE, MODULE-IDENTITY
+            FROM SNMPv2-SMI
+   DisplayString, RowStatus, TruthValue
+            FROM SNMPv2-TC
+   InetAddressType,InetAddress,InetAddressPrefixLength
+            FROM INET-ADDRESS-MIB
+   MODULE-COMPLIANCE, OBJECT-GROUP
+            FROM SNMPv2-CONF
+   wwpModulesLeos
+            FROM WWP-SMI;
+
+ wwpLeosSSHMIB MODULE-IDENTITY
+            LAST-UPDATED "201711150000Z"
+            ORGANIZATION "Ciena Corp."
+            CONTACT-INFO
+                    "   Mib Meister
+                        7035 Ridge Road
+                        Hanover, Maryland 21076
+                        USA
+                        Phone:  +1 800 921 1144
+                        Email:  support@ciena.com"
+
+            DESCRIPTION
+                    "The MIB module defines the managed objects for the SSH
+                    available on the WWP specific products."
+            REVISION     "201711150000Z"
+            DESCRIPTION
+                    "Updated contact info."
+            REVISION    "201708070000Z"
+            DESCRIPTION
+                    "Defined the new object wwpLeosSSHServerKeyGenerateOfType which provides
+                     the ability to generate an SSH server private key of the specified type.
+                     Updated wwpLeosSSHServerClientAliveInterval to reduce the max by 1."
+            REVISION    "201507280000Z"
+            DESCRIPTION
+                    "Defined wwpLeosSSHServerAlgorithm and wwpLeosSSHClientAlgorithm and the objects
+                     they encompass, providing the ability to configure the algorithms used by various
+                     functions of the SSH server and SSH client."
+            REVISION    "201505220000Z"
+            DESCRIPTION
+                    "Added new object wwpLeosSSHServerMultiFactorAuth to support
+                    SSH Multi-Factor Authentication."
+
+            REVISION    "201411140000Z"
+            DESCRIPTION
+                    "Changed the STATUS of the following objects to obsolete and removed DEFVAL clauses as these
+                     objects are no longer supported: wwpLeosSSHServerMaxClients, wwpLeosSSHServerTftpServer,
+                     wwpLeosSSHServerMaxLimitedUsers, wwpLeosSSHServerMaxSuperUsers, wwpLeosSSHServerMaxAdminUsers.
+                     Added DEFVAL clause to wwpLeosSshServerListenerPortId.
+                     Defined the following new objects in the wwpLeosSSHServerGlobal branch: wwpLeosSSHServerKeyForm,
+                     wwpLeosSSHServerClientAliveInterval, wwpLeosSSHServerClientAliveCount, wwpLeosSSHServerLoginGraceTime,
+                     wwpLeosSSHServerMaxSharedSessions, wwpLeosSSHServerRekeyLimit, wwpLeosSSHServerRekeyTimeout,
+                     wwpLeosSSHServerStrictModes, wwpLeosSSHServerTcpForwarding, wwpLeosSSHServerTcpKeepalive.
+                     Defined the wwpLeosSSHServerListenerAddr branch and, within it, defined the
+                     wwpLeosSSHServerListenerAddressGroup object and the wwpLeosSSHServerListenerAddrTable."
+            REVISION    "201407170000Z"
+            DESCRIPTION
+                    "Defined wwpLeosSSHServerClientInetAddrPrefixLength, wwpLeosSSHServerClientResolvedInetAddrType,
+                      wwpLeosSSHServerClientResolvedInetAddr, and wwpLeosSSHServerClientOperState as new objects in
+                      WwpLeosSSHServerClientEntry.
+                     Added wwpLeosSSHServerClientInetAddrPrefixLength, wwpLeosSSHServerClientResolvedInetAddrType,
+                      wwpLeosSSHServerClientResolvedInetAddr, and wwpLeosSSHServerClientOperState to
+                      wwpLeosSSHServerClientIPv6Group.
+                     Updated wwpLeosSSHServerClientInetAddrType to allow value of dns when specifying hostname.
+                     Updated DESCRIPTION clauses of wwpLeosSSHServerClientTable and wwpLeosSSHServerClientStatus."
+            REVISION    "201304230000Z"
+            DESCRIPTION
+                    "Miscellaneous spelling and description corrections."
+            REVISION    "201204100000Z"
+            DESCRIPTION
+                    "Add new OIDs wwpLeosSSHServerClientInetAddrType and
+                     wwpLeosSSHServerClientInetAddr to support IP protocol version
+                     independent Inet addressing."
+            REVISION    "201106150000Z"
+            DESCRIPTION
+                    "Updated the Max limits for objects wwpLeosSSHServerMaxLimitedUsers and wwpLeosSSHServerMaxSuperUsers.
+                     Added new object wwpLeosSSHServerMaxAdminUsers."
+            REVISION    "200604181700Z"
+            DESCRIPTION
+                    "Initial creation."
+            ::= { wwpModulesLeos 34 }
+
+ --
+ -- Node definitions
+ --
+
+ wwpLeosSSHMIBObjects OBJECT IDENTIFIER ::= { wwpLeosSSHMIB 1 }
+
+ --
+ --
+ wwpLeosSSHServerGlobal OBJECT IDENTIFIER ::= { wwpLeosSSHMIBObjects 1 }
+
+ wwpLeosSSHServerClient OBJECT IDENTIFIER ::= { wwpLeosSSHMIBObjects 2 }
+
+ wwpLeosSSHServerListenerPort OBJECT IDENTIFIER ::= { wwpLeosSSHMIBObjects 3 }
+
+ wwpLeosSSHServerListenerAddr OBJECT IDENTIFIER ::= { wwpLeosSSHMIBObjects 4 }
+
+ wwpLeosSSHServerAlgorithm OBJECT IDENTIFIER ::= { wwpLeosSSHMIBObjects 5 }
+
+ wwpLeosSSHClientAlgorithm OBJECT IDENTIFIER ::= { wwpLeosSSHMIBObjects 6 }
+
+ -- Notifications
+
+ wwpLeosSSHMIBNotificationPrefix  OBJECT IDENTIFIER ::= { wwpLeosSSHMIB 2 }
+ wwpLeosSSHMIBNotifications       OBJECT IDENTIFIER ::=
+                       { wwpLeosSSHMIBNotificationPrefix 0 }
+
+ -- Conformance information
+
+ wwpLeosSSHMIBConformance OBJECT IDENTIFIER ::= { wwpLeosSSHMIB 3 }
+ wwpLeosSSHMIBCompliances OBJECT IDENTIFIER ::= { wwpLeosSSHMIBConformance 1 }
+ wwpLeosSSHMIBGroups      OBJECT IDENTIFIER ::= { wwpLeosSSHMIBConformance 2 }
+
+ --
+ --  The SSH Global Attributes
+ --
+ wwpLeosSSHServerAdminState          OBJECT-TYPE
+     SYNTAX          INTEGER {
+                                        disabled(1),
+                                        enabled(2)
+                             }
+     MAX-ACCESS      read-write
+     STATUS          current
+     DESCRIPTION
+             "This object indicates the global administrative state of the SSH server."
+     ::= { wwpLeosSSHServerGlobal 1 }
+
+ wwpLeosSSHServerOperState          OBJECT-TYPE
+     SYNTAX          INTEGER {
+                                        disabled(1),
+                                        enabled(2)
+                             }
+     MAX-ACCESS      read-only
+     STATUS          current
+     DESCRIPTION
+             "This object indicates the operational state of the SSH server."
+     ::= { wwpLeosSSHServerGlobal 2 }
+
+ wwpLeosSSHServerAuthenticationRetries          OBJECT-TYPE
+     SYNTAX          Integer32 (1..3)
+     MAX-ACCESS      read-write
+     STATUS          current
+     DESCRIPTION
+             "This object indicates the number of retries the SSH server should allow before rejecting the client request."
+     DEFVAL {3}
+     ::= { wwpLeosSSHServerGlobal 3 }
+
+ wwpLeosSSHServerMaxClients          OBJECT-TYPE
+     SYNTAX          Integer32
+     MAX-ACCESS      read-only
+     STATUS          obsolete
+     DESCRIPTION
+             "This object indicates the maximum number of client sessions the SSH server accepts at any given time.
+              The current number of limited, admin and super users must never exceed the value indicated by
+              wwpLeosSSHServerMaxClients.
+
+              This object refers to functionality that is no longer provided and, as such, has been deemed obsolete."
+    ::= { wwpLeosSSHServerGlobal 4 }
+
+ wwpLeosSSHServerKeyGenerateSet          OBJECT-TYPE
+     SYNTAX          TruthValue
+     MAX-ACCESS      read-write
+     STATUS          current
+     DESCRIPTION
+             "Setting this object causes the device to generate the default
+              type of SSH server host key (rsa2048). An error will be returned
+              if the system already has an SSH server host key. Get operation 
+              on this object always returns false."
+     ::= { wwpLeosSSHServerGlobal 5 }
+
+ wwpLeosSSHServerKey          OBJECT-TYPE
+     SYNTAX          OCTET STRING (SIZE(0..64))
+     MAX-ACCESS      read-only
+     STATUS          current
+     DESCRIPTION
+             "This object specifies the key that exists on the device."
+     ::= { wwpLeosSSHServerGlobal 6 }
+
+ wwpLeosSSHServerKeyStatus          OBJECT-TYPE
+     SYNTAX          INTEGER {
+                                        keyReady(1),
+                                        keyGenerating(2),
+                                        keyDoesnotExist(3),
+                                        keyGenerationFailed(4)
+                                        }
+     MAX-ACCESS      read-only
+     STATUS          current
+     DESCRIPTION
+             "This object returns the key status on the device."
+     ::= { wwpLeosSSHServerGlobal 7 }
+
+ wwpLeosSSHServerTftpServer          OBJECT-TYPE
+     SYNTAX          IpAddress
+     MAX-ACCESS      read-write
+     STATUS          obsolete
+     DESCRIPTION
+             "This object indicates the TFTP server where the public key is optionally transmitted.
+              Once this object is set, the device always uses this IP address whenever wwpLeosSSHServerKeyGenerateSet
+              is set to true. The user must set this to 0 if the user does not want the device to TFTP the public key.
+              If key generation and TFTP server is not configured through SNMP then this object always shows 0.0.0.0.
+
+              For security reasons, this object, and the function it serves has been deemed obsolete.  Devices should
+              no longer provide the ability to optionally transmit the public key as part of the key generation process."
+     ::= { wwpLeosSSHServerGlobal 8 }
+
+ wwpLeosSSHServerMaxLimitedUsers          OBJECT-TYPE
+     SYNTAX          Integer32 (0..15)
+     MAX-ACCESS      read-write
+     STATUS          obsolete
+     DESCRIPTION
+             "This object indicates the maximum number of limited users SSH server accepts at any given time.
+
+              This object has been deemed obsolete in lieu of the corresponding object defined in the
+              wwpLeosSystemTelnet branch of the wwpLeosSystemConfigMIB."
+     ::= { wwpLeosSSHServerGlobal 9 }
+
+ wwpLeosSSHServerMaxSuperUsers          OBJECT-TYPE
+     SYNTAX          Integer32 (0..15)
+     MAX-ACCESS      read-write
+     STATUS          obsolete
+     DESCRIPTION
+             "This object indicates the maximum number of super users SSH server accepts at any given time.
+
+              This object has been deemed obsolete in lieu of the corresponding object defined in the
+              wwpLeosSystemTelnet branch of the wwpLeosSystemConfigMIB."
+     ::= { wwpLeosSSHServerGlobal 10 }
+
+  wwpLeosSSHServerMaxAdminUsers          OBJECT-TYPE
+     SYNTAX          Integer32 (0..15)
+     MAX-ACCESS      read-write
+     STATUS          obsolete
+     DESCRIPTION
+             "This object indicates the maximum number of admin users SSH server accepts at any given time.
+
+              This object has been deemed obsolete in lieu of the corresponding object defined in the
+              wwpLeosSystemTelnet branch of the wwpLeosSystemConfigMIB."
+     ::= { wwpLeosSSHServerGlobal 11 }
+
+   wwpLeosSSHServerKeyForm          OBJECT-TYPE
+       SYNTAX          INTEGER {
+                                        none(1),
+                                        other(2),
+                                        md5(3),
+                                        sha1(4)
+                                        }
+       MAX-ACCESS     read-only
+       STATUS         current
+       DESCRIPTION
+               "This object indicates the encoding method used to report the key fingerprint as
+                represented by the corresponding value of the wwpLeosSSHServerKey object."
+       ::= { wwpLeosSSHServerGlobal 12 }
+
+   wwpLeosSSHServerClientAliveInterval          OBJECT-TYPE
+       SYNTAX        Integer32 (0..2147483646)
+       UNITS         "seconds"
+       MAX-ACCESS    read-write
+       STATUS        current
+       DESCRIPTION
+               "This object specifies the number of seconds of inactivity that the SSH server
+                will allow to elapse before sending a message through the encrypted channel
+                to an SSH client, requesting a response.  The lack of response from the SSH
+                client may result in a disconnection from the SSH server.  Refer to the
+                wwpLeosSSHServerClientAliveCount object for details.
+
+                When set to 0, no such message is sent and, as such, no client disconnections
+                will occur due to this mechanism."
+       ::= { wwpLeosSSHServerGlobal 13 }
+
+   wwpLeosSSHServerClientAliveCount          OBJECT-TYPE
+       SYNTAX        Integer32 (0..10)
+       MAX-ACCESS    read-write
+       STATUS        current
+       DESCRIPTION
+               "This object specifies the number of unacknowledged consecutive messages that
+                are sent, using the mechanism defined by the wwpLeosSSHServerClientAliveInterval
+                object, before the SSH server will disconnect the SSH client."
+       ::= { wwpLeosSSHServerGlobal 14 }
+
+   wwpLeosSSHServerLoginGraceTime          OBJECT-TYPE
+       SYNTAX        Integer32 (0..2147483647)
+       UNITS         "seconds"
+       MAX-ACCESS    read-write
+       STATUS        current
+       DESCRIPTION
+               "This object specifies the number of seconds that the SSH server will allow
+                for new incoming SSH connections to successfully authenticate before the
+                connection is disconnected.  Value 0 will disable this function."
+       ::= { wwpLeosSSHServerGlobal 15 }
+
+   wwpLeosSSHServerMaxSharedSessions          OBJECT-TYPE
+       SYNTAX        Integer32 (1..10)
+       MAX-ACCESS    read-write
+       STATUS        current
+       DESCRIPTION
+               "This object specifies the maximum number of sessions that the SSH server
+                will allow for each SSH client connection."
+       ::= { wwpLeosSSHServerGlobal 16 }
+
+   wwpLeosSSHServerRekeyLimit          OBJECT-TYPE
+       SYNTAX          INTEGER {
+                                        default(1),
+                                        fiveHundredMegabytes(2),
+                                        oneGigabyte(3),
+                                        twoGigabytes(4),
+                                        fourGigabytes(5)
+                                        }
+       MAX-ACCESS     read-write
+       STATUS         current
+       DESCRIPTION
+               "This object specifies the maximum amount of data that the SSH server will
+                allow on an SSH connection before the SSH session key is renegotiated.
+                When set to default, the effective rekey limit will be oneGigabyte or
+                fourGigabytes, depending on the encryption cipher that is being used on
+                the SSH connection."
+       ::= { wwpLeosSSHServerGlobal 17 }
+
+   wwpLeosSSHServerRekeyTimeout          OBJECT-TYPE
+       SYNTAX        Integer32 (0..2147483647)
+       UNITS         "seconds"
+       MAX-ACCESS    read-write
+       STATUS        current
+       DESCRIPTION
+               "This object specifies the number of seconds that the SSH server will allow
+                to elapse before the SSH session key is renegotiated.  When set to 0, time
+                based rekeying is disabled."
+       ::= { wwpLeosSSHServerGlobal 18 }
+
+   wwpLeosSSHServerStrictModes          OBJECT-TYPE
+       SYNTAX          INTEGER {
+                                        on(1),
+                                        off(2)
+                                        }
+       MAX-ACCESS     read-write
+       STATUS         current
+       DESCRIPTION
+               "This object specifies whether the SSH server will perform an additional check
+                of internal filesystem components related to a user account as a condition
+                of allowing authentication to proceed. This setting only applies to login
+                methods which cause the SSH server to access one or more files applicable to
+                the user as part of the authentication process."
+       ::= { wwpLeosSSHServerGlobal 19 }
+
+   wwpLeosSSHServerTcpForwarding          OBJECT-TYPE
+       SYNTAX          INTEGER {
+                                        on(1),
+                                        off(2)
+                                        }
+       MAX-ACCESS     read-write
+       STATUS         current
+       DESCRIPTION
+               "This object specifies whether the SSH server will allow the forwarding of
+                protocol frames to the network through the secure channel established
+                with an SSH client."
+       ::= { wwpLeosSSHServerGlobal 20 }
+
+   wwpLeosSSHServerTcpKeepalive          OBJECT-TYPE
+       SYNTAX          INTEGER {
+                                        on(1),
+                                        off(2)
+                                        }
+       MAX-ACCESS     read-write
+       STATUS         current
+       DESCRIPTION
+               "This object specifies whether the SSH server will utilize the TCP
+                keepalive mechanism of the TCP/IP stack which involves the sending
+                of periodic keepalive messages as a part of maintaining active TCP
+                connections with SSH clients."
+       ::= { wwpLeosSSHServerGlobal 21 }
+
+   wwpLeosSSHServerMultiFactorAuth          OBJECT-TYPE
+       SYNTAX          INTEGER {
+                                        on(1),
+                                        off(2)
+                                        }
+       MAX-ACCESS     read-write
+       STATUS         current
+       DESCRIPTION
+               "This object specifies whether the SSH server will require users with
+               public keys installed to complete PKA and password authentication for
+               successful login with SSH clients."
+       ::= { wwpLeosSSHServerGlobal 22 }
+
+wwpLeosSSHServerKeyGenerateOfType        OBJECT-TYPE
+       SYNTAX          INTEGER {
+                                  none(1),
+                                  dsa1024(2),
+                                  ecdsa256(3),
+                                  ecdsa384(4),
+                                  ecdsa521(5),
+                                  rsa2048(6),
+                                  secp256r1(7),
+                                  secp384r1(8),
+                                  secp521r1(9)
+                               }
+     MAX-ACCESS      read-write
+     STATUS          current
+     DESCRIPTION
+             "Setting this object causes the device to generate an SSH server
+              host key of the type specified. An error will be returned if the
+              system already has an SSH server host key. Get operation on this
+              object always returns the current key type, or none."
+     ::= { wwpLeosSSHServerGlobal 23 }
+
+ --
+ -- SSH Clients table
+ --
+ wwpLeosSSHServerClientTable OBJECT-TYPE
+     SYNTAX     SEQUENCE OF WwpLeosSSHServerClientEntry
+     MAX-ACCESS not-accessible
+     STATUS     current
+     DESCRIPTION
+            "The (conceptual) table listing the clients that are allowed connectivity by the
+             SSH component of the device."
+    ::= { wwpLeosSSHServerClient 1 }
+
+ wwpLeosSSHServerClientEntry OBJECT-TYPE
+    SYNTAX     WwpLeosSSHServerClientEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "An entry (conceptual row) in the wwpLeosSSHServerClientTable."
+    INDEX      { wwpLeosSSHServerClientIndex }
+    ::= { wwpLeosSSHServerClientTable 1 }
+
+ WwpLeosSSHServerClientEntry ::= SEQUENCE {
+    wwpLeosSSHServerClientIndex         Integer32,
+    wwpLeosSSHServerClientIpAddr        IpAddress,
+    wwpLeosSSHServerClientStatus        RowStatus,
+    wwpLeosSSHServerClientInetAddrType  InetAddressType,
+    wwpLeosSSHServerClientInetAddr      InetAddress,
+    wwpLeosSSHServerClientInetAddrPrefixLength InetAddressPrefixLength,
+    wwpLeosSSHServerClientResolvedInetAddrType InetAddressType,
+    wwpLeosSSHServerClientResolvedInetAddr     InetAddress,
+    wwpLeosSSHServerClientOperState            INTEGER
+ }
+
+ wwpLeosSSHServerClientIndex          OBJECT-TYPE
+     SYNTAX          Integer32 (1..100)
+     MAX-ACCESS      not-accessible
+     STATUS          current
+     DESCRIPTION
+             "This object indicates the unique index in the table."
+     ::= { wwpLeosSSHServerClientEntry 1 }
+
+ wwpLeosSSHServerClientIpAddr   OBJECT-TYPE
+     SYNTAX          IpAddress
+     MAX-ACCESS      read-create
+     STATUS          current
+     DESCRIPTION
+             "This object indicates the IP address of the client that is allowed to connect using SSH.
+              This object cannot be modified once entry is created with some IP.
+              Returns 0.0.0.0 when not representing IPv4 address."
+     ::= { wwpLeosSSHServerClientEntry 2 }
+
+ wwpLeosSSHServerClientStatus  OBJECT-TYPE
+     SYNTAX       RowStatus
+     MAX-ACCESS   read-create
+     STATUS       current
+     DESCRIPTION
+             "Used to manage the creation and deletion of conceptual rows in this table.
+
+              To create an entry in this table this object should be contained in a SetRequest-PDU
+              with a VarBindList specifying this object along with other objects in this row as
+              described below.
+
+              To create an entry for a single IPv4 address (legacy method):
+               wwpLeosSSHServerClientIpAddr set to a valid IPv4 address, and
+               wwpLeosSSHServerClientStatus set to createAndGo.
+
+              To create an entry for a single IPv4 or IPv6 address:
+               wwpLeosSSHServerClientInetAddrType set to ipv4 or ipv6, and
+               wwpLeosSSHServerClientInetAddr set to a valid IPv4 or IPv6 address, and
+               wwpLeosSSHServerClientStatus set to createAndGo.
+
+              To create an entry for a group of IPv4 or IPv6 addresses:
+               wwpLeosSSHServerClientInetAddrType set to ipv4 or ipv6, and
+               wwpLeosSSHServerClientInetAddr set to a valid IPv4 or IPv6 address, and
+               wwpLeosSSHServerClientInetAddrPrefixLength set to number of bits to mask, and
+               wwpLeosSSHServerClientStatus set to createAndGo.
+
+              To create an entry for a single client hostname or fully qualified domain name:
+               wwpLeosSSHServerClientInetAddrType set to dns, and
+               wwpLeosSSHServerClientInetAddr set to a valid hostname or fully qualified domain name, and
+               wwpLeosSSHServerClientStatus set to createAndGo.
+
+              To delete an entry in this table set wwpLeosSSHServerClientStatus to destroy."
+     ::= { wwpLeosSSHServerClientEntry 3 }
+
+ wwpLeosSSHServerClientInetAddrType   OBJECT-TYPE
+     SYNTAX          InetAddressType
+     MAX-ACCESS      read-create
+     STATUS          current
+     DESCRIPTION
+             "This object indicates the IP address of the client that is allowed to connect
+              using SSH.  This object cannot be modified once entry is created with some IP.
+              Used in conjunction with wwpLeosSSHServerClientInetAddr.
+              When value is :
+              ipv4 : wwpLeosSSHServerClientInetAddr should be compliant with InetAddressIPv4
+              ipv6 : wwpLeosSSHServerClientInetAddr should be compliant with InetAddressIPv6
+              dns  : wwpLeosSSHServerClientInetAddr should be compliant with InetAddressDNS."
+     ::= { wwpLeosSSHServerClientEntry 4 }
+
+ wwpLeosSSHServerClientInetAddr   OBJECT-TYPE
+     SYNTAX          InetAddress
+     MAX-ACCESS      read-create
+     STATUS          current
+     DESCRIPTION
+             "This object indicates the IP address of the client that is allowed to connect
+              using SSH. This object cannot be modified once entry is created with some IP.
+              This OID should be used in conjunction with wwpLeosSSHServerClientInetAddrType."
+     ::= { wwpLeosSSHServerClientEntry 5 }
+
+ wwpLeosSSHServerClientInetAddrPrefixLength   OBJECT-TYPE
+     SYNTAX          InetAddressPrefixLength
+     MAX-ACCESS      read-create
+     STATUS          current
+     DESCRIPTION
+             "This object indicates the prefix length associated with wwpLeosSSHServerClientInetAddr.
+
+              When creating a row using the wwpLeosSSHServerClientInetAddr object, this object may be
+              set to indicate the number of matching address bits that must match with incoming SSH
+              connections to allow connectivity.  When set to maximum value, according to the
+              wwpLeosSSHServerClientInetAddrType for this row, only the single specified address
+              specified by wwpLeosSSHServerClientInetAddr is allowed connectivity using SSH.
+              When set to a value less than the maximum value, the wwpLeosSSHServerClientInetAddr
+              value serves as a mask which is compared against incoming connections whereby the first
+              number of bits, as specified by this object, must match the address of the incoming
+              connection before SSH connectivity is allowed.  If this object is not specified during
+              the creation of a row in the table, the maximum value is used and a subsequent get of
+              this object will indicate as such.
+
+              When creating a row using the wwpLeosSShServerClientInetAddr object, if the value of
+              the wwpLeosSSHServerClientInetAddrType is dns then this object must not be specified
+              during the row creation.  For rows with a wwpLeosSSHServerClientInetAddrType value of
+              dns, this object will return a value of 0 since it has no meaning for such rows.
+
+              When creating a row using the wwpLeosSSHServerClientIpAddr, this object must not be
+              specified during the row creation.  A subsequent get on this object will reveal
+              the maximum value for IPv4 address is used, indicating this row only allows SSH
+              connectivity for the single IPv4 address specified by wwpLeosSSHServerClientIpAddr."
+     ::= { wwpLeosSSHServerClientEntry 6 }
+
+ wwpLeosSSHServerClientResolvedInetAddrType   OBJECT-TYPE
+     SYNTAX          InetAddressType
+     MAX-ACCESS      read-only
+     STATUS          current
+     DESCRIPTION
+             "For rows with a corresponding wwpLeosSSHServerClientInetAddrType value of dns,
+              this object reports the resolved IP address type for the hostname or fully qualified
+              domain name as specified by the value of wwpLeosSSHServerClientInetAddr for the row.
+              The resolved address type may be ipv4 of ipv6.  When the address is unresolved, the
+              value reported by this object is dns.
+
+              For rows with a corresponding wwpLeosSSHServerClientInetAddrType value other than
+              dns, this object will report the same value as wwpLeosSSHServerClientInetAddrType."
+     ::= { wwpLeosSSHServerClientEntry 7 }
+
+ wwpLeosSSHServerClientResolvedInetAddr   OBJECT-TYPE
+     SYNTAX          InetAddress
+     MAX-ACCESS      read-only
+     STATUS          current
+     DESCRIPTION
+             "For rows with a corresponding wwpLeosSSHServerClientInetAddrType value of dns,
+              this object reports the resolved IP address value for the hostname or fully qualified
+              domain name as specified by the value of wwpLeosSSHServerClientInetAddr for the row.
+              The resolved address is intrepreted according to the corresponding value of
+              wwpLeosSSHServerClientResolvedInetAddrType for the row.  When the address is unresolved,
+              the value reported by this object is the same as the corresponding value of
+              the wwpLeosSSHServerClientInetAddr for the row.
+
+              For rows with a corresponding wwpLeosSSHServerClientInetAddrType value other than
+              dns, this object will report the same value as wwpLeosSSHServerClientInetAddr."
+     ::= { wwpLeosSSHServerClientEntry 8 }
+
+ wwpLeosSSHServerClientOperState   OBJECT-TYPE
+     SYNTAX          INTEGER {
+                               enabled(1),
+                               disabled(2)
+                             }
+     MAX-ACCESS      read-only
+     STATUS          current
+     DESCRIPTION
+             "This object specifies the operational state of the data contained within this row.
+
+              When there exists one or more rows within the wwpLeosSSHServerClientTable then only
+              the IP address or group of IP addresses represented by each row of the table having
+              a value of enabled for its wwpLeosSSHServerClientOperState object will be known by
+              the SSH component of the device and be allowed to access the device using SSH.
+
+              When there are no rows defined in the wwpLeosSSHServerClientTable then the SSH
+              component of the device will allow access to all IP addresses."
+     ::= { wwpLeosSSHServerClientEntry 9 }
+
+ --
+ -- SSH Server Listener Port Settings
+ --
+ wwpLeosSSHServerListenerPortId   OBJECT-TYPE
+     SYNTAX          Unsigned32 (22..65535)
+     MAX-ACCESS      read-write
+     STATUS          current
+     DESCRIPTION
+             "This object indicates the port number on which SSH server is allowed to listen for clients."
+     DEFVAL {22}
+     ::= { wwpLeosSSHServerListenerPort 1 }
+
+ --
+ -- SSH Server Listener Address Settings
+ --
+ wwpLeosSSHServerListenerAddressGroup          OBJECT-TYPE
+     SYNTAX          INTEGER {
+                                all(1),
+                                mgmtInterfaces(2)
+                             }
+     MAX-ACCESS      read-write
+     STATUS          current
+     DESCRIPTION
+             "This object specifies the set of IP addresses which the SSH server, when
+              operationally enabled, will actively listen for incoming SSH connections.
+              When 'all', the SSH server will listen on all IP addresses for incoming SSH
+              conections.  When 'mgmtInterfaces' the SSH server will only listen for incoming
+              SSH connections on the operational IP addresses associated with those interfaces
+              designated as management interfaces."
+     ::= { wwpLeosSSHServerListenerAddr 1 }
+
+ wwpLeosSSHServerListenerAddrTable OBJECT-TYPE
+     SYNTAX     SEQUENCE OF WwpLeosSSHServerListenerAddrEntry
+     MAX-ACCESS not-accessible
+     STATUS     current
+     DESCRIPTION
+             "The (conceptual) table listing the IP addresses which the SSH server will
+              actively listen for incoming SSH connections while the SSH server is
+              operationally enabled as directed by the current value of the
+              wwpLeosSSHServerListenerAddressGroup object"
+    ::= { wwpLeosSSHServerListenerAddr 2 }
+
+ wwpLeosSSHServerListenerAddrEntry OBJECT-TYPE
+    SYNTAX     WwpLeosSSHServerListenerAddrEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "An entry (conceptual row) in the wwpLeosSSHServerListenerAddrTable."
+    INDEX      { wwpLeosSSHServerListenerAddrIndex }
+    ::= { wwpLeosSSHServerListenerAddrTable 1 }
+
+ WwpLeosSSHServerListenerAddrEntry ::= SEQUENCE {
+    wwpLeosSSHServerListenerAddrIndex         Integer32,
+    wwpLeosSSHServerListenerAddrInetAddrType  InetAddressType,
+    wwpLeosSSHServerListenerAddrInetAddr      InetAddress,
+    wwpLeosSSHServerListenerAddrIfIndex       Integer32
+ }
+
+ wwpLeosSSHServerListenerAddrIndex OBJECT-TYPE
+     SYNTAX          Integer32 (1..65535)
+     MAX-ACCESS      not-accessible
+     STATUS          current
+     DESCRIPTION
+             "This object serves as an arbitrary index representing a unique
+              number identifying a row in the wwpLeosSSHServerListenerAddrTable."
+     ::= { wwpLeosSSHServerListenerAddrEntry 1 }
+
+ wwpLeosSSHServerListenerAddrInetAddrType OBJECT-TYPE
+     SYNTAX          InetAddressType
+     MAX-ACCESS      read-only
+     STATUS          current
+     DESCRIPTION
+             "This object defines the type of IP Address, as indicated by the corresponding
+              value of the wwpLeosSSHServerListenerAddrInetAddr object in the same row of the
+              wwpLeosSSHServerListenerAddrEntry.
+
+              The IP Addresses this object may represent are as follows:
+              ipv4 : wwpLeosSSHServerListenerAddrInetAddr is compliant with InetAddressIPv4.
+              ipv6 : wwpLeosSSHServerListenerAddrInetAddr is compliant with InetAddressIPv6."
+     ::= { wwpLeosSSHServerListenerAddrEntry 2 }
+
+ wwpLeosSSHServerListenerAddrInetAddr OBJECT-TYPE
+     SYNTAX          InetAddress
+     MAX-ACCESS      read-only
+     STATUS          current
+     DESCRIPTION
+             "This object indicates the IP address represented by this row for which the SSH
+              server will accept incoming SSH connections.  Refer to the corresponding value
+              of the wwpLeosSSHServerListenerAddrInetAddrType object to determine the type
+              of IP address this object represents."
+     ::= { wwpLeosSSHServerListenerAddrEntry 3 }
+
+ wwpLeosSSHServerListenerAddrIfIndex OBJECT-TYPE
+     SYNTAX          Integer32
+     MAX-ACCESS      read-only
+     STATUS          current
+     DESCRIPTION
+             "This object specifies the index of the management interface associated with the
+              IP address specified by wwpLeosSSHServerListenerAddrInetAddr for this row.  When
+              zero, this indicates this row represents a generic listen address used while the
+              SSH server will accept incoming connections on all IP addresses on all interfaces."
+     ::= { wwpLeosSSHServerListenerAddrEntry 4 }
+
+ --
+ -- SSH Server Algorithm settings
+ --
+ wwpLeosSSHServerKexAlgorithmTable OBJECT-TYPE
+     SYNTAX     SEQUENCE OF WwpLeosSSHServerKexAlgorithmEntry
+     MAX-ACCESS not-accessible
+     STATUS     current
+     DESCRIPTION
+             "The (conceptual) table listing the SSH Server key-exchange (KEX) algorithms."
+    ::= { wwpLeosSSHServerAlgorithm 1 }
+
+ wwpLeosSSHServerKexAlgorithmEntry OBJECT-TYPE
+    SYNTAX     WwpLeosSSHServerKexAlgorithmEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "An entry (conceptual row) in the wwpLeosSSHServerKexAlgorithmTable."
+    INDEX      { wwpLeosSSHServerKexAlgorithmIndex }
+    ::= { wwpLeosSSHServerKexAlgorithmTable 1 }
+
+ WwpLeosSSHServerKexAlgorithmEntry ::= SEQUENCE {
+    wwpLeosSSHServerKexAlgorithmIndex         Unsigned32,
+    wwpLeosSSHServerKexAlgorithmName          DisplayString,
+    wwpLeosSSHServerKexAlgorithmAdminState    INTEGER,
+    wwpLeosSSHServerKexAlgorithmOperState     INTEGER,
+    wwpLeosSSHServerKexAlgorithmPriority      Unsigned32
+ }
+
+ wwpLeosSSHServerKexAlgorithmIndex OBJECT-TYPE
+     SYNTAX          Unsigned32
+     MAX-ACCESS      not-accessible
+     STATUS          current
+     DESCRIPTION
+             "An arbitrary index into the table identifying a unique algorithm as
+              identified by the value of wwpLeosSSHServerKexAlgorithmName object."
+     ::= { wwpLeosSSHServerKexAlgorithmEntry 1 }
+
+ wwpLeosSSHServerKexAlgorithmName OBJECT-TYPE
+     SYNTAX          DisplayString
+     MAX-ACCESS      read-only
+     STATUS          current
+     DESCRIPTION
+             "Name of the algorithm as used by the SSH protocol when negotiating
+              the key exchange algorithm with SSH clients."
+     ::= { wwpLeosSSHServerKexAlgorithmEntry 2 }
+
+ wwpLeosSSHServerKexAlgorithmAdminState OBJECT-TYPE
+     SYNTAX          INTEGER {
+                        disabled(1),
+                        enabled(2)
+                     }
+     MAX-ACCESS      read-write
+     STATUS          current
+     DESCRIPTION
+             "The administrative state of the algorithm, indicating whether the
+              administrative settings are set to allow the inclusion of the
+              specified algorithm in the key exchange algorithm negotiation process.
+              Such inclusion or exclusion of the algorithm is indicated by the
+              corresponding value of wwpLeosSSHServerKexAlgorithmOperState."
+     ::= { wwpLeosSSHServerKexAlgorithmEntry 3 }
+
+ wwpLeosSSHServerKexAlgorithmOperState OBJECT-TYPE
+     SYNTAX          INTEGER {
+                        disabled(1),
+                        enabled(2)
+                     }
+     MAX-ACCESS      read-only
+     STATUS          current
+     DESCRIPTION
+             "The operational state of the algorithm, indicating whether the
+              specified algorithm will be included in the key exchange algorithm
+              negotiation process.  The operational state is determined based on
+              the corresponding value of wwpLeosSSHServerKexAlgorithmAdminState
+              as well as other system attributes which may limit the allowable
+              algorithms that may be used."
+     ::= { wwpLeosSSHServerKexAlgorithmEntry 4 }
+
+ wwpLeosSSHServerKexAlgorithmPriority OBJECT-TYPE
+     SYNTAX          Unsigned32 (1..8)
+     MAX-ACCESS      read-write
+     STATUS          current
+     DESCRIPTION
+             "The priority, or importance, of the specified algorithm amongst
+              the other algorithms in this table.  Value 1 is highest priority.
+              During the key exchange algorithm negotiation, SSH protocol will consider
+              all operationally enabled algorithms in order or priority, as part
+              of the algorithm negotiation process.  When the priority of one
+              algorithm is set to a new value, it will necessarily cause the
+              priority of other algorithms to adjust in order to make room
+              for the new set priority of the algorithm."
+     ::= { wwpLeosSSHServerKexAlgorithmEntry 5 }
+
+ wwpLeosSSHServerEncryptionAlgorithmTable OBJECT-TYPE
+     SYNTAX     SEQUENCE OF WwpLeosSSHServerEncryptionAlgorithmEntry
+     MAX-ACCESS not-accessible
+     STATUS     current
+     DESCRIPTION
+             "The (conceptual) table listing the SSH Server encryption algorithms."
+    ::= { wwpLeosSSHServerAlgorithm 2 }
+
+ wwpLeosSSHServerEncryptionAlgorithmEntry OBJECT-TYPE
+    SYNTAX     WwpLeosSSHServerEncryptionAlgorithmEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "An entry (conceptual row) in the wwpLeosSSHServerEncryptionAlgorithmTable."
+    INDEX      { wwpLeosSSHServerEncryptionAlgorithmIndex }
+    ::= { wwpLeosSSHServerEncryptionAlgorithmTable 1 }
+
+ WwpLeosSSHServerEncryptionAlgorithmEntry ::= SEQUENCE {
+    wwpLeosSSHServerEncryptionAlgorithmIndex         Unsigned32,
+    wwpLeosSSHServerEncryptionAlgorithmName          DisplayString,
+    wwpLeosSSHServerEncryptionAlgorithmAdminState    INTEGER,
+    wwpLeosSSHServerEncryptionAlgorithmOperState     INTEGER,
+    wwpLeosSSHServerEncryptionAlgorithmPriority      Unsigned32
+ }
+
+ wwpLeosSSHServerEncryptionAlgorithmIndex OBJECT-TYPE
+     SYNTAX          Unsigned32
+     MAX-ACCESS      not-accessible
+     STATUS          current
+     DESCRIPTION
+             "An arbitrary index into the table identifying a unique algorithm as
+              identified by the value of wwpLeosSSHServerEncryptionAlgorithmName object."
+     ::= { wwpLeosSSHServerEncryptionAlgorithmEntry 1 }
+
+ wwpLeosSSHServerEncryptionAlgorithmName OBJECT-TYPE
+     SYNTAX          DisplayString
+     MAX-ACCESS      read-only
+     STATUS          current
+     DESCRIPTION
+             "Name of the algorithm as used by the SSH protocol when negotiating
+              the encryption algorithm with SSH clients."
+     ::= { wwpLeosSSHServerEncryptionAlgorithmEntry 2 }
+
+ wwpLeosSSHServerEncryptionAlgorithmAdminState OBJECT-TYPE
+     SYNTAX          INTEGER {
+                        disabled(1),
+                        enabled(2)
+                     }
+     MAX-ACCESS      read-write
+     STATUS          current
+     DESCRIPTION
+             "The administrative state of the algorithm, indicating whether the
+              administrative settings are set to allow the inclusion of the
+              specified algorithm in the encryption algorithm negotiation process.
+              Such inclusion or exclusion of the algorithm is indicated by the
+              corresponding value of wwpLeosSSHServerEncryptionAlgorithmOperState."
+     ::= { wwpLeosSSHServerEncryptionAlgorithmEntry 3 }
+
+ wwpLeosSSHServerEncryptionAlgorithmOperState OBJECT-TYPE
+     SYNTAX          INTEGER {
+                        disabled(1),
+                        enabled(2)
+                     }
+     MAX-ACCESS      read-only
+     STATUS          current
+     DESCRIPTION
+             "The operational state of the algorithm, indicating whether the
+              specified algorithm will be included in the encryption algorithm
+              negotiation process.  The operational state is determined based on
+              the corresponding value of wwpLeosSSHServerEncryptionAlgorithmAdminState
+              as well as other system attributes which may limit the allowable
+              algorithms that may be used."
+     ::= { wwpLeosSSHServerEncryptionAlgorithmEntry 4 }
+
+ wwpLeosSSHServerEncryptionAlgorithmPriority OBJECT-TYPE
+     SYNTAX          Unsigned32 (1..16)
+     MAX-ACCESS      read-write
+     STATUS          current
+     DESCRIPTION
+             "The priority, or importance, of the specified algorithm amongst
+              the other algorithms in this table.  Value 1 is highest priority.
+              During the encryption algorithm negotiation, SSH protocol will consider
+              all operationally enabled algorithms in order or priority, as part
+              of the algorithm negotiation process.  When the priority of one
+              algorithm is set to a new value, it will necessarily cause the
+              priority of other algorithms to adjust in order to make room
+              for the new set priority of the algorithm."
+     ::= { wwpLeosSSHServerEncryptionAlgorithmEntry 5 }
+
+ wwpLeosSSHServerMacAlgorithmTable OBJECT-TYPE
+     SYNTAX     SEQUENCE OF WwpLeosSSHServerMacAlgorithmEntry
+     MAX-ACCESS not-accessible
+     STATUS     current
+     DESCRIPTION
+             "The (conceptual) table listing the SSH Server message authentication code (MAC)
+              algorithms."
+    ::= { wwpLeosSSHServerAlgorithm 3 }
+
+ wwpLeosSSHServerMacAlgorithmEntry OBJECT-TYPE
+    SYNTAX     WwpLeosSSHServerMacAlgorithmEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "An entry (conceptual row) in the wwpLeosSSHServerMacAlgorithmTable."
+    INDEX      { wwpLeosSSHServerMacAlgorithmIndex }
+    ::= { wwpLeosSSHServerMacAlgorithmTable 1 }
+
+ WwpLeosSSHServerMacAlgorithmEntry ::= SEQUENCE {
+    wwpLeosSSHServerMacAlgorithmIndex         Unsigned32,
+    wwpLeosSSHServerMacAlgorithmName          DisplayString,
+    wwpLeosSSHServerMacAlgorithmAdminState    INTEGER,
+    wwpLeosSSHServerMacAlgorithmOperState     INTEGER,
+    wwpLeosSSHServerMacAlgorithmPriority      Unsigned32
+ }
+
+ wwpLeosSSHServerMacAlgorithmIndex OBJECT-TYPE
+     SYNTAX          Unsigned32
+     MAX-ACCESS      not-accessible
+     STATUS          current
+     DESCRIPTION
+             "An arbitrary index into the table identifying a unique algorithm as
+              identified by the value of wwpLeosSSHServerMacAlgorithmName object."
+     ::= { wwpLeosSSHServerMacAlgorithmEntry 1 }
+
+ wwpLeosSSHServerMacAlgorithmName OBJECT-TYPE
+     SYNTAX          DisplayString
+     MAX-ACCESS      read-only
+     STATUS          current
+     DESCRIPTION
+             "Name of the algorithm as used by the SSH protocol when negotiating
+              the message authentication code algorithm with SSH clients."
+     ::= { wwpLeosSSHServerMacAlgorithmEntry 2 }
+
+ wwpLeosSSHServerMacAlgorithmAdminState OBJECT-TYPE
+     SYNTAX          INTEGER {
+                        disabled(1),
+                        enabled(2)
+                     }
+     MAX-ACCESS      read-write
+     STATUS          current
+     DESCRIPTION
+             "The administrative state of the algorithm, indicating whether the
+              administrative settings are set to allow the inclusion of the
+              specified algorithm in the message authentication code algorithm
+              negotiation process.  Such inclusion or exclusion of the algorithm is
+              indicated by the corresponding value of wwpLeosSSHServerMacAlgorithmOperState."
+     ::= { wwpLeosSSHServerMacAlgorithmEntry 3 }
+
+ wwpLeosSSHServerMacAlgorithmOperState OBJECT-TYPE
+     SYNTAX          INTEGER {
+                        disabled(1),
+                        enabled(2)
+                     }
+     MAX-ACCESS      read-only
+     STATUS          current
+     DESCRIPTION
+             "The operational state of the algorithm, indicating whether the
+              specified algorithm will be included in the message authentication code
+              algorithm negotiation process.  The operational state is determined based on
+              the corresponding value of wwpLeosSSHServerMacAlgorithmAdminState
+              as well as other system attributes which may limit the allowable
+              algorithms that may be used."
+     ::= { wwpLeosSSHServerMacAlgorithmEntry 4 }
+
+ wwpLeosSSHServerMacAlgorithmPriority OBJECT-TYPE
+     SYNTAX          Unsigned32 (1..19)
+     MAX-ACCESS      read-write
+     STATUS          current
+     DESCRIPTION
+             "The priority, or importance, of the specified algorithm amongst
+              the other algorithms in this table.  Value 1 is highest priority.
+              During the message authentication code algorithm negotiation, SSH
+              protocol will consider all operationally enabled algorithms in
+              order or priority, as part of the algorithm negotiation process.
+              When the priority of an algorithm is set to a new value, it will
+              necessarily cause the priority of other algorithms to adjust in
+              order to make room for the new set priority of the algorithm."
+     ::= { wwpLeosSSHServerMacAlgorithmEntry 5 }
+
+ wwpLeosSSHServerPublicKeyAuthAlgorithmTable OBJECT-TYPE
+     SYNTAX     SEQUENCE OF WwpLeosSSHServerPublicKeyAuthAlgorithmEntry
+     MAX-ACCESS not-accessible
+     STATUS     current
+     DESCRIPTION
+             "The (conceptual) table listing the SSH Server public key authentication
+              algorithms."
+    ::= { wwpLeosSSHServerAlgorithm 4 }
+
+ wwpLeosSSHServerPublicKeyAuthAlgorithmEntry OBJECT-TYPE
+    SYNTAX     WwpLeosSSHServerPublicKeyAuthAlgorithmEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "An entry (conceptual row) in the wwpLeosSSHServerPublicKeyAuthAlgorithmTable."
+    INDEX      { wwpLeosSSHServerPublicKeyAuthAlgorithmIndex }
+    ::= { wwpLeosSSHServerPublicKeyAuthAlgorithmTable 1 }
+
+ WwpLeosSSHServerPublicKeyAuthAlgorithmEntry ::= SEQUENCE {
+    wwpLeosSSHServerPublicKeyAuthAlgorithmIndex         Unsigned32,
+    wwpLeosSSHServerPublicKeyAuthAlgorithmName          DisplayString,
+    wwpLeosSSHServerPublicKeyAuthAlgorithmAdminState    INTEGER,
+    wwpLeosSSHServerPublicKeyAuthAlgorithmOperState     INTEGER
+ }
+
+ wwpLeosSSHServerPublicKeyAuthAlgorithmIndex OBJECT-TYPE
+     SYNTAX          Unsigned32
+     MAX-ACCESS      not-accessible
+     STATUS          current
+     DESCRIPTION
+             "An arbitrary index into the table identifying a unique algorithm as
+              identified by the value of wwpLeosSSHServerPublicKeyAuthAlgorithmName
+              object."
+     ::= { wwpLeosSSHServerPublicKeyAuthAlgorithmEntry 1 }
+
+ wwpLeosSSHServerPublicKeyAuthAlgorithmName OBJECT-TYPE
+     SYNTAX          DisplayString
+     MAX-ACCESS      read-only
+     STATUS          current
+     DESCRIPTION
+             "Name of the algorithm as used by the SSH protocol when identifying the
+              encryption algorithm used to encrypt a public key authentication key."
+     ::= { wwpLeosSSHServerPublicKeyAuthAlgorithmEntry 2 }
+
+ wwpLeosSSHServerPublicKeyAuthAlgorithmAdminState OBJECT-TYPE
+     SYNTAX          INTEGER {
+                        disabled(1),
+                        enabled(2)
+                     }
+     MAX-ACCESS      read-write
+     STATUS          current
+     DESCRIPTION
+             "The administrative state of the algorithm, indicating whether the
+              administrative settings are set to allow the authentication of SSH
+              sessions attempting to authenticate using public key authentication
+              using a key encrypted with the algorithm identified by this row.
+              Refer to the value of wwpLeosSSHServerPublicKeyAuthAlgorithmOperState
+              for the operational behavior related to this parameter."
+     ::= { wwpLeosSSHServerPublicKeyAuthAlgorithmEntry 3 }
+
+ wwpLeosSSHServerPublicKeyAuthAlgorithmOperState OBJECT-TYPE
+     SYNTAX          INTEGER {
+                        disabled(1),
+                        enabled(2)
+                     }
+     MAX-ACCESS      read-only
+     STATUS          current
+     DESCRIPTION
+             "The operational state of the algorithm, indicating whether the
+              specified algorithm will be allowed during public key authentication.
+              The operational state is determined based on the corresponding value
+              of wwpLeosSSHServerPublicKeyAuthAlgorithmAdminState and may be gated
+              by other system attributes which limit the allowable algorithms that
+              may be used."
+     ::= { wwpLeosSSHServerPublicKeyAuthAlgorithmEntry 4 }
+
+ --
+ -- SSH Client Algorithm settings
+ --
+ wwpLeosSSHClientKexAlgorithmTable OBJECT-TYPE
+     SYNTAX     SEQUENCE OF WwpLeosSSHClientKexAlgorithmEntry
+     MAX-ACCESS not-accessible
+     STATUS     current
+     DESCRIPTION
+             "The (conceptual) table listing the SSH Client key-exchange (KEX) algorithms."
+    ::= { wwpLeosSSHClientAlgorithm 1 }
+
+ wwpLeosSSHClientKexAlgorithmEntry OBJECT-TYPE
+    SYNTAX     WwpLeosSSHClientKexAlgorithmEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "An entry (conceptual row) in the wwpLeosSSHClientKexAlgorithmTable."
+    INDEX      { wwpLeosSSHClientKexAlgorithmIndex }
+    ::= { wwpLeosSSHClientKexAlgorithmTable 1 }
+
+ WwpLeosSSHClientKexAlgorithmEntry ::= SEQUENCE {
+    wwpLeosSSHClientKexAlgorithmIndex         Unsigned32,
+    wwpLeosSSHClientKexAlgorithmName          DisplayString,
+    wwpLeosSSHClientKexAlgorithmAdminState    INTEGER,
+    wwpLeosSSHClientKexAlgorithmOperState     INTEGER,
+    wwpLeosSSHClientKexAlgorithmPriority      Unsigned32
+ }
+
+ wwpLeosSSHClientKexAlgorithmIndex OBJECT-TYPE
+     SYNTAX          Unsigned32
+     MAX-ACCESS      not-accessible
+     STATUS          current
+     DESCRIPTION
+             "An arbitrary index into the table identifying a unique algorithm as
+              identified by the value of wwpLeosSSHClientKexAlgorithmName object."
+     ::= { wwpLeosSSHClientKexAlgorithmEntry 1 }
+
+ wwpLeosSSHClientKexAlgorithmName OBJECT-TYPE
+     SYNTAX          DisplayString
+     MAX-ACCESS      read-only
+     STATUS          current
+     DESCRIPTION
+             "Name of the algorithm as used by the SSH protocol when negotiating
+              the key exchange algorithm with SSH clients."
+     ::= { wwpLeosSSHClientKexAlgorithmEntry 2 }
+
+ wwpLeosSSHClientKexAlgorithmAdminState OBJECT-TYPE
+     SYNTAX          INTEGER {
+                        disabled(1),
+                        enabled(2)
+                     }
+     MAX-ACCESS      read-write
+     STATUS          current
+     DESCRIPTION
+             "The administrative state of the algorithm, indicating whether the
+              administrative settings are set to allow the inclusion of the
+              specified algorithm in the key exchange algorithm negotiation process.
+              Such inclusion or exclusion of the algorithm is indicated by the
+              corresponding value of wwpLeosSSHClientKexAlgorithmOperState."
+     ::= { wwpLeosSSHClientKexAlgorithmEntry 3 }
+
+ wwpLeosSSHClientKexAlgorithmOperState OBJECT-TYPE
+     SYNTAX          INTEGER {
+                        disabled(1),
+                        enabled(2)
+                     }
+     MAX-ACCESS      read-only
+     STATUS          current
+     DESCRIPTION
+             "The operational state of the algorithm, indicating whether the
+              specified algorithm will be included in the key exchange algorithm
+              negotiation process.  The operational state is determined based on
+              the corresponding value of wwpLeosSSHClientKexAlgorithmAdminState
+              as well as other system attributes which may limit the allowable
+              algorithms that may be used."
+     ::= { wwpLeosSSHClientKexAlgorithmEntry 4 }
+
+ wwpLeosSSHClientKexAlgorithmPriority OBJECT-TYPE
+     SYNTAX          Unsigned32 (1..8)
+     MAX-ACCESS      read-write
+     STATUS          current
+     DESCRIPTION
+             "The priority, or importance, of the specified algorithm amongst
+              the other algorithms in this table.  Value 1 is highest priority.
+              During the key exchange algorithm negotiation, SSH protocol will consider
+              all operationally enabled algorithms in order or priority, as part
+              of the algorithm negotiation process.  When the priority of one
+              algorithm is set to a new value, it will necessarily cause the
+              priority of other algorithms to adjust in order to make room
+              for the new set priority of the algorithm."
+     ::= { wwpLeosSSHClientKexAlgorithmEntry 5 }
+
+ wwpLeosSSHClientEncryptionAlgorithmTable OBJECT-TYPE
+     SYNTAX     SEQUENCE OF WwpLeosSSHClientEncryptionAlgorithmEntry
+     MAX-ACCESS not-accessible
+     STATUS     current
+     DESCRIPTION
+             "The (conceptual) table listing the SSH Client encryption algorithms."
+    ::= { wwpLeosSSHClientAlgorithm 2 }
+
+ wwpLeosSSHClientEncryptionAlgorithmEntry OBJECT-TYPE
+    SYNTAX     WwpLeosSSHClientEncryptionAlgorithmEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "An entry (conceptual row) in the wwpLeosSSHClientEncryptionAlgorithmTable."
+    INDEX      { wwpLeosSSHClientEncryptionAlgorithmIndex }
+    ::= { wwpLeosSSHClientEncryptionAlgorithmTable 1 }
+
+ WwpLeosSSHClientEncryptionAlgorithmEntry ::= SEQUENCE {
+    wwpLeosSSHClientEncryptionAlgorithmIndex         Unsigned32,
+    wwpLeosSSHClientEncryptionAlgorithmName          DisplayString,
+    wwpLeosSSHClientEncryptionAlgorithmAdminState    INTEGER,
+    wwpLeosSSHClientEncryptionAlgorithmOperState     INTEGER,
+    wwpLeosSSHClientEncryptionAlgorithmPriority      Unsigned32
+ }
+
+ wwpLeosSSHClientEncryptionAlgorithmIndex OBJECT-TYPE
+     SYNTAX          Unsigned32
+     MAX-ACCESS      not-accessible
+     STATUS          current
+     DESCRIPTION
+             "An arbitrary index into the table identifying a unique algorithm as
+              identified by the value of wwpLeosSSHClientEncryptionAlgorithmName object."
+     ::= { wwpLeosSSHClientEncryptionAlgorithmEntry 1 }
+
+ wwpLeosSSHClientEncryptionAlgorithmName OBJECT-TYPE
+     SYNTAX          DisplayString
+     MAX-ACCESS      read-only
+     STATUS          current
+     DESCRIPTION
+             "Name of the algorithm as used by the SSH protocol when negotiating
+              the encryption algorithm with SSH clients."
+     ::= { wwpLeosSSHClientEncryptionAlgorithmEntry 2 }
+
+ wwpLeosSSHClientEncryptionAlgorithmAdminState OBJECT-TYPE
+     SYNTAX          INTEGER {
+                        disabled(1),
+                        enabled(2)
+                     }
+     MAX-ACCESS      read-write
+     STATUS          current
+     DESCRIPTION
+             "The administrative state of the algorithm, indicating whether the
+              administrative settings are set to allow the inclusion of the
+              specified algorithm in the encryption algorithm negotiation process.
+              Such inclusion or exclusion of the algorithm is indicated by the
+              corresponding value of wwpLeosSSHClientEncryptionAlgorithmOperState."
+     ::= { wwpLeosSSHClientEncryptionAlgorithmEntry 3 }
+
+ wwpLeosSSHClientEncryptionAlgorithmOperState OBJECT-TYPE
+     SYNTAX          INTEGER {
+                        disabled(1),
+                        enabled(2)
+                     }
+     MAX-ACCESS      read-only
+     STATUS          current
+     DESCRIPTION
+             "The operational state of the algorithm, indicating whether the
+              specified algorithm will be included in the encryption algorithm
+              negotiation process.  The operational state is determined based on
+              the corresponding value of wwpLeosSSHClientEncryptionAlgorithmAdminState
+              as well as other system attributes which may limit the allowable
+              algorithms that may be used."
+     ::= { wwpLeosSSHClientEncryptionAlgorithmEntry 4 }
+
+ wwpLeosSSHClientEncryptionAlgorithmPriority OBJECT-TYPE
+     SYNTAX          Unsigned32 (1..16)
+     MAX-ACCESS      read-write
+     STATUS          current
+     DESCRIPTION
+             "The priority, or importance, of the specified algorithm amongst
+              the other algorithms in this table.  Value 1 is highest priority.
+              During the encryption algorithm negotiation, SSH protocol will consider
+              all operationally enabled algorithms in order or priority, as part
+              of the algorithm negotiation process.  When the priority of one
+              algorithm is set to a new value, it will necessarily cause the
+              priority of other algorithms to adjust in order to make room
+              for the new set priority of the algorithm."
+     ::= { wwpLeosSSHClientEncryptionAlgorithmEntry 5 }
+
+ wwpLeosSSHClientMacAlgorithmTable OBJECT-TYPE
+     SYNTAX     SEQUENCE OF WwpLeosSSHClientMacAlgorithmEntry
+     MAX-ACCESS not-accessible
+     STATUS     current
+     DESCRIPTION
+             "The (conceptual) table listing the SSH Client message authentication code (MAC)
+              algorithms."
+    ::= { wwpLeosSSHClientAlgorithm 3 }
+
+ wwpLeosSSHClientMacAlgorithmEntry OBJECT-TYPE
+    SYNTAX     WwpLeosSSHClientMacAlgorithmEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "An entry (conceptual row) in the wwpLeosSSHClientMacAlgorithmTable."
+    INDEX      { wwpLeosSSHClientMacAlgorithmIndex }
+    ::= { wwpLeosSSHClientMacAlgorithmTable 1 }
+
+ WwpLeosSSHClientMacAlgorithmEntry ::= SEQUENCE {
+    wwpLeosSSHClientMacAlgorithmIndex         Unsigned32,
+    wwpLeosSSHClientMacAlgorithmName          DisplayString,
+    wwpLeosSSHClientMacAlgorithmAdminState    INTEGER,
+    wwpLeosSSHClientMacAlgorithmOperState     INTEGER,
+    wwpLeosSSHClientMacAlgorithmPriority      Unsigned32
+ }
+
+ wwpLeosSSHClientMacAlgorithmIndex OBJECT-TYPE
+     SYNTAX          Unsigned32
+     MAX-ACCESS      not-accessible
+     STATUS          current
+     DESCRIPTION
+             "An arbitrary index into the table identifying a unique algorithm as
+              identified by the value of wwpLeosSSHClientMacAlgorithmName object."
+     ::= { wwpLeosSSHClientMacAlgorithmEntry 1 }
+
+ wwpLeosSSHClientMacAlgorithmName OBJECT-TYPE
+     SYNTAX          DisplayString
+     MAX-ACCESS      read-only
+     STATUS          current
+     DESCRIPTION
+             "Name of the algorithm as used by the SSH protocol when negotiating
+              the message authentication code algorithm with SSH clients."
+     ::= { wwpLeosSSHClientMacAlgorithmEntry 2 }
+
+ wwpLeosSSHClientMacAlgorithmAdminState OBJECT-TYPE
+     SYNTAX          INTEGER {
+                        disabled(1),
+                        enabled(2)
+                     }
+     MAX-ACCESS      read-write
+     STATUS          current
+     DESCRIPTION
+             "The administrative state of the algorithm, indicating whether the
+              administrative settings are set to allow the inclusion of the
+              specified algorithm in the message authentication code algorithm
+              negotiation process.  Such inclusion or exclusion of the algorithm is
+              indicated by the corresponding value of wwpLeosSSHClientMacAlgorithmOperState."
+     ::= { wwpLeosSSHClientMacAlgorithmEntry 3 }
+
+ wwpLeosSSHClientMacAlgorithmOperState OBJECT-TYPE
+     SYNTAX          INTEGER {
+                        disabled(1),
+                        enabled(2)
+                     }
+     MAX-ACCESS      read-only
+     STATUS          current
+     DESCRIPTION
+             "The operational state of the algorithm, indicating whether the
+              specified algorithm will be included in the message authentication code
+              algorithm negotiation process.  The operational state is determined based on
+              the corresponding value of wwpLeosSSHClientMacAlgorithmAdminState
+              as well as other system attributes which may limit the allowable
+              algorithms that may be used."
+     ::= { wwpLeosSSHClientMacAlgorithmEntry 4 }
+
+ wwpLeosSSHClientMacAlgorithmPriority OBJECT-TYPE
+     SYNTAX          Unsigned32 (1..19)
+     MAX-ACCESS      read-write
+     STATUS          current
+     DESCRIPTION
+             "The priority, or importance, of the specified algorithm amongst
+              the other algorithms in this table.  Value 1 is highest priority.
+              During the message authentication code algorithm negotiation, SSH
+              protocol will consider all operationally enabled algorithms in
+              order or priority, as part of the algorithm negotiation process.
+              When the priority of an algorithm is set to a new value, it will
+              necessarily cause the priority of other algorithms to adjust in
+              order to make room for the new set priority of the algorithm."
+     ::= { wwpLeosSSHClientMacAlgorithmEntry 5 }
+
+
+ --
+ -- module compliance
+ --
+ wwpLeosSSHServerClientCompliance MODULE-COMPLIANCE
+       STATUS  current
+       DESCRIPTION
+           "The compliance statement of WWP-LEOS-SSH-MIB MIB."
+       MODULE
+
+       GROUP    wwpLeosSSHServerClientIPv6Group
+       DESCRIPTION
+           "This group is mandatory when IPv6 addresses are supported."
+
+       OBJECT  wwpLeosSSHServerClientInetAddrType
+       SYNTAX  InetAddressType { ipv4(1), ipv6(2), dns(16) }
+       DESCRIPTION
+           "An implementation is required to support IPv4
+            and IPv6 addresses without zone indices.  An
+            implementation may use dns to specify a hostname
+            which resolves to an IPv4 or an IPv6 address."
+       ::= { wwpLeosSSHMIBCompliances 1 }
+
+ wwpLeosSSHServerClientIPv6Group OBJECT-GROUP
+       OBJECTS { wwpLeosSSHServerClientInetAddrType,
+                 wwpLeosSSHServerClientInetAddr,
+                 wwpLeosSSHServerClientInetAddrPrefixLength,
+                 wwpLeosSSHServerClientResolvedInetAddrType,
+                 wwpLeosSSHServerClientResolvedInetAddr,
+                 wwpLeosSSHServerClientOperState }
+       STATUS  current
+       DESCRIPTION "SSH server client objects for IPv6 address."
+       ::= { wwpLeosSSHMIBGroups 1 }
+END

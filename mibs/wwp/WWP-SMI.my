@@ -1,0 +1,87 @@
+-- This file was included in WWP MIB release 04-21-05-0007
+--
+-- WWP-SMI.my
+--
+--
+
+	WWP-SMI DEFINITIONS ::= BEGIN
+
+		IMPORTS 
+			enterprises, MODULE-IDENTITY, OBJECT-IDENTITY			
+				FROM SNMPv2-SMI;
+	
+	
+		wwp MODULE-IDENTITY
+			LAST-UPDATED "201711150000Z"
+			ORGANIZATION "Ciena Corp."
+			CONTACT-INFO
+				"   Mib Meister
+				    7035 Ridge Road
+				    Hanover, Maryland 21076
+				    USA
+				    Phone:  +1 800 921 1144
+				    Email:  support@ciena.com"
+
+			DESCRIPTION
+				"Top-level WWP node definitions."
+
+			REVISION     "201711150000Z"
+			DESCRIPTION
+				"Updated contact info."
+
+			REVISION    "201304230000Z"
+			DESCRIPTION
+				"Miscellaneous spelling and description corrections."
+
+			REVISION "201212260000Z"
+			DESCRIPTION
+				"Fixed the initial creation revision date.  
+				 Changed from erroneous 202510091759Z to the actual date."
+
+			REVISION "200507280000Z"
+			DESCRIPTION
+				"Initial Creation.
+				 MIB Version: 04-21-05-0007"
+			::= { enterprises 6141 }
+		
+	
+--
+-- Node definitions
+--
+	
+		wwpProducts OBJECT-IDENTITY
+			STATUS current
+			DESCRIPTION
+				"wwpProducts is the root OBJECT-IDENTIFIER for all
+				Ciena Packet Networking products. sysObjectID values are assigned the OID
+				representing the product specified in WWP-PRODUCTS-MIB.my."
+			::= { wwp 1 }
+		
+		wwpModules OBJECT-IDENTITY
+			STATUS current
+			DESCRIPTION
+				"wwpModules provides a root object identifier that can be
+				used to assign MODULE-IDENTIFY values."
+			::= { wwp 2 }
+  
+  
+		wwpModulesLeos OBJECT-IDENTITY
+			STATUS current
+			DESCRIPTION
+				"wwpModulesLeos provides a root object identifier for leos that can be
+				  used to assign MODULE-IDENTIFY values."
+			::= { wwpModules 60 }
+		
+		wwpModulesLeosTce OBJECT-IDENTITY
+			STATUS current
+			DESCRIPTION
+				"wwpModulesLeosTce provides a root object identifier for leos TCE that can be
+				  used to assign MODULE-IDENTIFY values."
+			::= { wwpModules 61 }
+		
+	
+	END
+
+--
+-- WWP-SMI.my
+--

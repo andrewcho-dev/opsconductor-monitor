@@ -96,6 +96,13 @@ const moduleNavigation = {
         items: [
           { id: 'mcp-services', label: 'Services & Rings', icon: Circle, path: '/monitor/mcp-services' },
         ]
+      },
+      {
+        title: 'SNMP Live',
+        items: [
+          { id: 'snmp-live', label: 'Device Monitor', icon: Activity, path: '/monitor/snmp-live' },
+          { id: 'snmp-alarms', label: 'Active Alarms', icon: AlertTriangle, path: '/monitor/snmp-alarms' },
+        ]
       }
     ]
   },

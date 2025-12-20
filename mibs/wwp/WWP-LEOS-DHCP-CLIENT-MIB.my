@@ -1,0 +1,1915 @@
+-- This file was included in WWP MIB release 04-21-05-0007
+ --
+ -- WWP-LEOS-DHCP-CLIENT-MIB.my
+ --
+
+ WWP-LEOS-DHCP-CLIENT-MIB DEFINITIONS ::= BEGIN
+
+ IMPORTS
+   Integer32, Unsigned32, Counter32, IpAddress, OBJECT-TYPE, MODULE-IDENTITY, NOTIFICATION-TYPE
+        FROM SNMPv2-SMI
+   DisplayString, TruthValue, RowStatus
+        FROM SNMPv2-TC
+   wwpModulesLeos
+        FROM WWP-SMI;
+
+
+ wwpLeosDhcpClientMIB MODULE-IDENTITY
+        LAST-UPDATED "202105210000Z"
+        ORGANIZATION "Ciena Corp."
+        CONTACT-INFO
+                "   Mib Meister
+                    7035 Ridge Road
+                    Hanover, Maryland 21076
+                    USA
+                    Phone:  +1 800 921 1144
+                    Email:  support@ciena.com"
+        DESCRIPTION
+                "The MIB module to manage DHCP client on WWP LEOS products."
+
+        REVISION     "202105210000Z"
+        DESCRIPTION
+                "Updated DisplayString length of OID wwpLeosDhcpRelayAgentVsName
+                 WwpLeosDhcpRelayAgentVsStateEntry table to allow VS name length
+                 up to 47 characters.
+                 Updated DisplayString length of OID wwpLeosDhcpRelayAgentMplsName
+                 WwpLeosDhcpRelayAgentMplsStateEntry table to allow VS name length
+                 up to 47 characters."
+
+        REVISION     "201711150000Z"
+        DESCRIPTION
+                "Updated contact info."
+
+        REVISION "201704180000Z"
+        DESCRIPTION
+                "Added new object, wwpLeosDhcpTpidRotationState to allow TPID
+                 Rotation to be turned off, and objects
+                 wwpLeosDhcpTpidRotationInterval and
+                 wwpLeosDhcpTpidRotationLastTpid to allow the TPID Rotation
+                 operational state to be read."
+
+        REVISION "201606210000Z"
+        DESCRIPTION
+                "updated wwpLeosDhcpRelayAgentMplsVcName to allow the VC name length up to 31 characters."
+
+        REVISION "201601190000Z"
+        DESCRIPTION
+                "updated wwpLeosDhcpRelayAgentMplsName to allow the VS name length up to 31 char."
+
+        REVISION "201512310000Z"
+        DESCRIPTION
+                "updated wwpLeosDhcpRelayAgentVsName to allow the VS name length up to 31 characters."
+
+        REVISION "201511020000Z"
+        DESCRIPTION
+                "L2 Relay - Added missing stats for DHCP relay global stats and for
+                L2, VS and MPLS relay stats."
+
+        REVISION "201508060000Z"
+        DESCRIPTION
+                "L2 Relay - added support for Q-in-Q VS and MPLS VS relay
+                agents."
+
+        REVISION "201310170000Z"
+        DESCRIPTION
+                "L2 Relay - added new global statistics, ability to clear global stats."
+
+        REVISION "201309240000Z"
+        DESCRIPTION
+                "L2 Relay - added new statistic, RID/CID length check, improved stats descriptions."
+
+        REVISION "201304230000Z"
+        DESCRIPTION
+                "Miscellaneous spelling and description corrections."
+
+        REVISION "200604181700Z"
+        DESCRIPTION
+                "Add new tables to support DHCP relay agent functionality.
+                 Range of wwpLeosDhcpRelayAgentInterfaceIpAddr limited to 1..15."
+
+        REVISION "200211011700Z"
+        DESCRIPTION
+                "Initial creation."
+
+        ::= { wwpModulesLeos 17 }
+
+ --
+ -- Node definitions
+ --
+
+ wwpLeosDhcpClientMIBObjects OBJECT IDENTIFIER ::= { wwpLeosDhcpClientMIB 1 }
+
+ wwpLeosDhcpClient OBJECT IDENTIFIER ::= { wwpLeosDhcpClientMIBObjects 1 }
+
+ wwpLeosDhcpRelayAgent OBJECT IDENTIFIER ::= { wwpLeosDhcpClientMIBObjects 2 }
+
+ wwpLeosDhcpRelayAgentGlobalAttrs OBJECT IDENTIFIER ::= { wwpLeosDhcpRelayAgent 1 }
+
+ -- Notifications
+
+ wwpLeosDhcpClientMIBNotificationPrefix  OBJECT IDENTIFIER ::= { wwpLeosDhcpClientMIB 2 }
+ wwpLeosDhcpClientMIBNotifications       OBJECT IDENTIFIER ::= { wwpLeosDhcpClientMIBNotificationPrefix 0 }
+
+ -- Conformance information
+
+ wwpLeosDhcpClientMIBConformance OBJECT IDENTIFIER ::= { wwpLeosDhcpClientMIB 3 }
+ wwpLeosDhcpClientMIBCompliances OBJECT IDENTIFIER ::= { wwpLeosDhcpClientMIBConformance 1 }
+ wwpLeosDhcpClientMIBGroups      OBJECT IDENTIFIER ::= { wwpLeosDhcpClientMIBConformance 2 }
+
+ -- the DHCP client table
+
+ wwpLeosDhcpIfName   OBJECT-TYPE
+     SYNTAX         DisplayString(SIZE (0..32))
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+             "The ifDesc associated with the DHCP client.
+              It can be set to 'remote' or 'local'."
+     ::= { wwpLeosDhcpClient 1 }
+
+ wwpLeosDhcpStatus     OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        enable(1),
+                        disable(2)
+                    }
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+             "Setting this object to 'enable' enables the
+              DHCP client on this interface."
+     ::= { wwpLeosDhcpClient 2 }
+
+ wwpLeosDhcpState     OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        bound(1),
+                        disabled(2),
+                        inform(3),
+                        init(4),
+                        rebinding(5),
+                        renewing(6),
+                        requesting(7),
+                        selecting(8),
+                        unknown(9)
+                    }
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "The current state of the DHCP client on this
+              interface as per RFC2131."
+     ::= { wwpLeosDhcpClient 3 }
+
+ wwpLeosDhcpLeaseOffered  OBJECT-TYPE
+     SYNTAX         Integer32(0..2147483647)
+     UNITS          "seconds"
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "The lease time authorized by the server."
+     ::= { wwpLeosDhcpClient 5 }
+
+ wwpLeosDhcpLeaseRemaining  OBJECT-TYPE
+     SYNTAX         Integer32(0..2147483647)
+     UNITS          "seconds"
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "The time remaining for the lease to expire."
+     ::= { wwpLeosDhcpClient 6 }
+
+ wwpLeosDhcpDiscoveryMsgInterval  OBJECT-TYPE
+     SYNTAX         Integer32(0..2147483647)
+     UNITS          "seconds"
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+             "The time interval for discovery messages issued
+              before the client receives the first reply."
+     DEFVAL         { 30 }
+     ::= { wwpLeosDhcpClient 7 }
+
+ wwpLeosDhcpRenewalTime  OBJECT-TYPE
+     SYNTAX         Integer32(0..2147483647)
+     UNITS          "seconds"
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "The number of seconds before the client begins to renew its
+              address lease with the DHCP server. This time is a function typically
+              50% of the full configured duration (or lease time) for a client lease.
+              Referred to as T1 in RFC2131."
+     ::= { wwpLeosDhcpClient 8 }
+
+ wwpLeosDhcpRebindingTime  OBJECT-TYPE
+     SYNTAX         Integer32(0..2147483647)
+     UNITS          "seconds"
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "The number of seconds before the client enters the rebinding state
+              if it has not renewed its current address lease with the DHCP server.
+              This time is a function (typically, 87.5%) of the full configured
+              duration (or lease time) for a client lease.
+              Referred to as T2 in RFC2131."
+     ::= { wwpLeosDhcpClient 9 }
+
+ wwpLeosDhcpServerAddress  OBJECT-TYPE
+     SYNTAX         IpAddress
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "The IP address that identifies the DHCP server."
+     ::= { wwpLeosDhcpClient 10 }
+
+ wwpLeosDhcpRenewLease   OBJECT-TYPE
+     SYNTAX         TruthValue
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+             "Setting this object to true forces the DHCP
+              client to renew its lease."
+     DEFVAL         { false }
+     ::= { wwpLeosDhcpClient 11 }
+
+ wwpLeosDhcpReleaseLease OBJECT-TYPE
+     SYNTAX         TruthValue
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+             "Setting this object to true forces the DHCP
+              client to release its lease, if the client DHCP
+              is in the bound state."
+     DEFVAL         { false }
+     ::= { wwpLeosDhcpClient 12 }
+
+ --
+ -- DHCPOption List
+ --
+ -- the Multi DHCP client Table
+
+ wwpLeosDhcpClientOptionTable OBJECT-TYPE
+     SYNTAX      SEQUENCE OF WwpLeosDhcpClientOptionEntry
+     MAX-ACCESS  not-accessible
+     STATUS      current
+     DESCRIPTION
+             "List of options supported by the DHCP client."
+     ::= { wwpLeosDhcpClient 13 }
+
+ wwpLeosDhcpClientOptionEntry OBJECT-TYPE
+     SYNTAX      WwpLeosDhcpClientOptionEntry
+     MAX-ACCESS  not-accessible
+     STATUS      current
+     DESCRIPTION
+             "An entry containing list of options supported by DHCP client."
+     INDEX   { wwpLeosDhcpOptionCodeIndex }
+     ::= { wwpLeosDhcpClientOptionTable 1 }
+
+ WwpLeosDhcpClientOptionEntry ::=
+     SEQUENCE {
+         wwpLeosDhcpOptionCodeIndex     INTEGER,
+         wwpLeosDhcpOptionDesc          DisplayString,
+         wwpLeosDhcpOptionCode          INTEGER,
+         wwpLeosDhcpOptionState         INTEGER
+     }
+
+ wwpLeosDhcpOptionCodeIndex OBJECT-TYPE
+     SYNTAX         INTEGER (1..65535)
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "Specifies the index used for this entry."
+     ::= { wwpLeosDhcpClientOptionEntry 1 }
+
+ wwpLeosDhcpOptionDesc OBJECT-TYPE
+     SYNTAX         DisplayString
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "Specifies the description for the given DHCP option code."
+     ::= { wwpLeosDhcpClientOptionEntry 2 }
+
+ wwpLeosDhcpOptionCode OBJECT-TYPE
+     SYNTAX         INTEGER (0..2147483647)
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "Specifies the option code specified by RFC specification."
+     ::= { wwpLeosDhcpClientOptionEntry 3 }
+
+ wwpLeosDhcpOptionState OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        disabled(1),
+                        enabled(2)
+                    }
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+             "Specifies if the given option is enabled/disabled."
+     ::= { wwpLeosDhcpClientOptionEntry 4 }
+
+ wwpLeosDhcpTpidRotationState OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        on(1),
+                        off(2)
+                    }
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+        "The state of the TPID rotation controller.  When 'on', the egress
+         TPID used by the DHCP and DHCPv6 clients while searching for an
+         appropriate server on the remote interface is periodically rotated to
+         the next TPID value in the sequence 0x8100, 0x88a8, 0x9100, and
+         untagged.  The state is set to 'on' automatically at start-up if no
+         configuration file is found.  It is set to 'off' automatically when
+         a lease is received from a DHCP or DHCPv6 server on the remote
+         interface, or when any change is made to either client or the remote
+         interface.  The user is not allowed to set the state to 'on'."
+     ::= { wwpLeosDhcpClient 14 }
+
+ wwpLeosDhcpTpidRotationLastTpid OBJECT-TYPE
+     SYNTAX         INTEGER {
+                          tpid8100(1),
+                          tpid9100(2),
+                          tpid88A8(3),
+                          untagged(4),
+                          none(99)
+                    }
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "The last TPID configuration set by the DHCP TPID rotation
+         controller."
+     ::= { wwpLeosDhcpClient 15 }
+
+ wwpLeosDhcpTpidRotationInterval OBJECT-TYPE
+     SYNTAX         Unsigned32
+     UNITS          "seconds"
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+        "The DHCP TPID rotation interval."
+     ::= { wwpLeosDhcpClient 16 }
+ --
+ -- DHCP Relay Agent Functionality
+ --
+ wwpLeosDhcpRelayAgentCircuitId OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        slotAndPort(1),
+                        slotAndPortAndVlan(2),
+                        cidString(3)
+                    }
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+             "Specifies the circuit ID that should be used by the DHCP relay agent."
+     ::= { wwpLeosDhcpRelayAgentGlobalAttrs 1 }
+
+ wwpLeosDhcpRelayAgentRemoteId OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        macAddress(1),
+                        hostName(2),
+                        ridString(3)
+                    }
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+             "This object specifies the remote agent ID that is used by the
+              DHCP relay agent. It can be set to macAddress, hostName or
+              ridString."
+     ::= { wwpLeosDhcpRelayAgentGlobalAttrs 2 }
+
+ wwpLeosDhcpRelayAgentL2State OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        disabled(1),
+                        enabled(2)
+                    }
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+             "Specifies the global state of DHCP L2 relay agent."
+     ::= { wwpLeosDhcpRelayAgentGlobalAttrs 3 }
+
+ wwpLeosDhcpRelayAgentL3State OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        disabled(1),
+                        enabled(2)
+                    }
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+             "Specifies the global state of DHCP L3 relay agent."
+     ::= { wwpLeosDhcpRelayAgentGlobalAttrs 4 }
+
+ wwpLeosDhcpRelayAgentL2Forward   OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object specifies the number of DHCPv4 packets forwarded rather than relayed.
+             These are valid DHCPv4 frames that didn't need to be processed by the relay."
+     ::= { wwpLeosDhcpRelayAgentGlobalAttrs 5 }
+
+ wwpLeosDhcpRelayAgentL2Relayed   OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object specifies the number of DHCPv4 packets that passed through the
+             L2 relays (processed and not dropped)."
+     ::= { wwpLeosDhcpRelayAgentGlobalAttrs 6 }
+
+ wwpLeosDhcpRelayAgentL2Dropped   OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object specifies the number of DHCPv4 packets dropped by the relay.
+             Inspect the detailed statistic on each relay for more details related to dropped frames."
+     ::= { wwpLeosDhcpRelayAgentGlobalAttrs 7 }
+
+ wwpLeosDhcpRelayAgentL2GlobalStatsClear OBJECT-TYPE
+     SYNTAX         TruthValue
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+             "This object, when set to 'true', clears the global statistics for the L2 DHCP relay."
+     ::= { wwpLeosDhcpRelayAgentGlobalAttrs 8 }
+
+ wwpLeosDhcpRelayAgentL2ReplaceOption82 OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        on(1),
+                        off(2)
+                    }
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+             "Specifies whether or not the relay agent should replace an existing option 82."
+     ::= { wwpLeosDhcpRelayAgentGlobalAttrs 9 }
+
+ wwpLeosDhcpRelayAgentL2NotForRelay   OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object specifies the number of DHCPv4 packets passed to the relay,
+             but were determined to not belong to the relay. The packets are dropped."
+     ::= { wwpLeosDhcpRelayAgentGlobalAttrs 10 }
+
+
+ --
+ -- Table to control DHCP relay agent functionality on each L2 VLAN
+ --
+ wwpLeosDhcpRelayAgentL2StateTable OBJECT-TYPE
+     SYNTAX             SEQUENCE OF WwpLeosDhcpRelayAgentL2StateEntry
+     MAX-ACCESS         not-accessible
+     STATUS             current
+     DESCRIPTION
+             "Table allows changing configuration of DHCP relay agent functionality for
+              each wwpLeosDhcpRelayAgentVlan."
+     ::= { wwpLeosDhcpRelayAgent 2 }
+
+ wwpLeosDhcpRelayAgentL2StateEntry OBJECT-TYPE
+     SYNTAX             WwpLeosDhcpRelayAgentL2StateEntry
+     MAX-ACCESS         not-accessible
+     STATUS             current
+     DESCRIPTION
+             "Entry in the table to configure DHCP relay agent functionality."
+     INDEX { wwpLeosDhcpRelayAgentVlan }
+     ::= { wwpLeosDhcpRelayAgentL2StateTable 1 }
+
+ WwpLeosDhcpRelayAgentL2StateEntry ::= SEQUENCE {
+     wwpLeosDhcpRelayAgentVlan                  INTEGER,
+     wwpLeosDhcpRelayAgentL2AdminState          INTEGER,
+     wwpLeosDhcpRelayAgentL2OperState           INTEGER,
+     wwpLeosDhcpRelayAgentL2StatsClear          TruthValue,
+     wwpLeosDhcpRelayAgentL2RowStatus           RowStatus
+ }
+
+ wwpLeosDhcpRelayAgentVlan   OBJECT-TYPE
+     SYNTAX         INTEGER (1..24576)
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object specifies the VLAN on which DHCP relay agent is configured."
+     ::= { wwpLeosDhcpRelayAgentL2StateEntry 1 }
+
+ wwpLeosDhcpRelayAgentL2AdminState   OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        disabled(1),
+                        enabled(2)
+                    }
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+             "This object allows the user to disable or enable DHCP relay agent functionality on
+              the given VLAN specified by wwpLeosDhcpRelayAgentVlan."
+     ::= { wwpLeosDhcpRelayAgentL2StateEntry 2 }
+
+ wwpLeosDhcpRelayAgentL2OperState   OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        disabled(1),
+                        enabled(2)
+                    }
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object shows the operational status of the DHCP relay agent on given VLAN."
+     ::= { wwpLeosDhcpRelayAgentL2StateEntry 3 }
+
+ wwpLeosDhcpRelayAgentL2StatsClear OBJECT-TYPE
+     SYNTAX         TruthValue
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+             "This object when set to 'true', clears DHCP relay agent statistics for given VLAN."
+     ::= { wwpLeosDhcpRelayAgentL2StateEntry 4 }
+
+ wwpLeosDhcpRelayAgentL2RowStatus   OBJECT-TYPE
+     SYNTAX         RowStatus
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+             "Set this object to 'Destroy' to terminate DHCP L2 Relaying
+              on the VLAN specified by wwpLeosDhcpRelayAgentVlan.
+
+              Set this object to 'CreateAndGo' to enable DHCP L2 Relaying
+              on the VLAN specified by wwpLeosDhcpRelayAgentVlan."
+     ::= { wwpLeosDhcpRelayAgentL2StateEntry 5 }
+
+ --
+ -- L3 State Table
+ --
+ wwpLeosDhcpRelayAgentL3StateTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosDhcpRelayAgentL3StateEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "Table allows changing configuration
+              of DHCP relay agent functionality for
+              each wwpLeosDhcpRelayAgentInterfaceIndex."
+     ::= { wwpLeosDhcpRelayAgent 3 }
+
+ wwpLeosDhcpRelayAgentL3StateEntry OBJECT-TYPE
+     SYNTAX       WwpLeosDhcpRelayAgentL3StateEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "Entry in the table to configure DHCP relay agent functionality."
+     INDEX { wwpLeosDhcpRelayAgentInterfaceIndex }
+     ::= { wwpLeosDhcpRelayAgentL3StateTable 1 }
+
+ WwpLeosDhcpRelayAgentL3StateEntry ::= SEQUENCE {
+     wwpLeosDhcpRelayAgentInterfaceIndex        INTEGER,
+     wwpLeosDhcpRelayAgentL3AdminState          INTEGER,
+     wwpLeosDhcpRelayAgentL3OperState           INTEGER,
+     wwpLeosDhcpRelayAgentL3RowStatus           RowStatus
+ }
+
+ wwpLeosDhcpRelayAgentInterfaceIndex   OBJECT-TYPE
+     SYNTAX         INTEGER (1..65535)
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object specifies the value of the object wwpLeosDhcpRelayAgentIndexType.
+              So if wwpLeosDhcpRelayAgentIndexType = interface then this object represents the interface index.
+              If it is set to VLAN then this object represents the VLAN id and so on."
+     ::= { wwpLeosDhcpRelayAgentL3StateEntry 1 }
+
+ wwpLeosDhcpRelayAgentL3AdminState   OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        disabled(1),
+                        enabled(2)
+                    }
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+             "This object allows the user to disable or enable DHCP relay agent functionality
+              for each wwpLeosDhcpRelayAgentIndexType."
+     ::= { wwpLeosDhcpRelayAgentL3StateEntry 2 }
+
+ wwpLeosDhcpRelayAgentL3OperState   OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        disabled(1),
+                        enabled(2)
+                    }
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object shows the operational status of the DHCP relay agent on the given interface."
+     ::= { wwpLeosDhcpRelayAgentL3StateEntry 3 }
+
+ wwpLeosDhcpRelayAgentL3RowStatus   OBJECT-TYPE
+     SYNTAX         RowStatus
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+             "Set this object to 'Destroy' to terminate DHCP L3 Relaying
+              on the VLAN specified by wwpLeosDhcpRelayAgentInterfaceIndex.
+
+              Set this object to 'CreateAndGo' to enable DHCP L3 Relaying
+              on the VLAN specified by wwpLeosDhcpRelayAgentInterfaceIndex."
+     ::= { wwpLeosDhcpRelayAgentL3StateEntry 4 }
+
+ --
+ -- DHCP Relay Agent Interface IP Table
+ --
+ wwpLeosDhcpRelayAgentInterfaceIpTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosDhcpRelayAgentInterfaceIpEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "This table is used to add the trusted IP addresses
+              or host names on each interface."
+     ::= { wwpLeosDhcpRelayAgent 4 }
+
+ wwpLeosDhcpRelayAgentInterfaceIpEntry OBJECT-TYPE
+     SYNTAX       WwpLeosDhcpRelayAgentInterfaceIpEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "Each entry in this table represents the trusted DHCP server IP address
+              on each interface.              "
+     INDEX { wwpLeosDhcpRelayAgentInterfaceIpIndex }
+     ::= { wwpLeosDhcpRelayAgentInterfaceIpTable 1 }
+
+ WwpLeosDhcpRelayAgentInterfaceIpEntry ::= SEQUENCE {
+     wwpLeosDhcpRelayAgentInterfaceIpIndex          INTEGER,
+     wwpLeosDhcpRelayAgentInterfaceIpAddr           IpAddress,
+     wwpLeosDhcpRelayAgentInterfaceIpRowStatus      RowStatus
+ }
+
+ wwpLeosDhcpRelayAgentInterfaceIpIndex   OBJECT-TYPE
+     SYNTAX         INTEGER (1..10)
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object is used as an index in the table
+              and represents the unique index of the IP address
+              for a given wwpLeosDhcpRelayAgentInterfaceIndex."
+     ::= { wwpLeosDhcpRelayAgentInterfaceIpEntry 1 }
+
+ wwpLeosDhcpRelayAgentInterfaceIpAddr   OBJECT-TYPE
+     SYNTAX         IpAddress
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+             "This object is used to specify the IP address of the DHCP server which is the trusted IP
+              address. This object cannot be modified once entry is created with some IP."
+     ::= { wwpLeosDhcpRelayAgentInterfaceIpEntry 2 }
+
+ wwpLeosDhcpRelayAgentInterfaceIpRowStatus   OBJECT-TYPE
+     SYNTAX         RowStatus
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+             "Used to manage the creation and deletion of the conceptual rows in this table.
+              To create a row in this table set this object to 'createAndGo'.
+              To delete a row in this table set this object to 'destroy'."
+     ::= { wwpLeosDhcpRelayAgentInterfaceIpEntry 3 }
+
+ --
+ -- DHCP Relay Agent Trust Table
+ --
+ wwpLeosDhcpRelayAgentTrustTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosDhcpRelayAgentTrustEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION
+             "This table is used to specify the slot / ports and VLANs
+              that the DHCP relay agent can trust.
+              
+              This table has been deprecated in favor of the
+              wwpLeosDhcpRelayAgentExtTrustTable which adds a column for port
+              status."
+     ::= { wwpLeosDhcpRelayAgent 5 }
+
+ wwpLeosDhcpRelayAgentTrustEntry OBJECT-TYPE
+     SYNTAX       WwpLeosDhcpRelayAgentTrustEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION
+             "Each entry in this table is used to specify the slot / port and VLAN to be trusted."
+     INDEX { wwpLeosDhcpRelayAgentVlan, wwpLeosDhcpRelayAgentPort }
+     ::= { wwpLeosDhcpRelayAgentTrustTable 1 }
+
+ WwpLeosDhcpRelayAgentTrustEntry ::= SEQUENCE {
+     wwpLeosDhcpRelayAgentPort          INTEGER,
+     wwpLeosDhcpRelayAgentTrustMode     INTEGER
+ }
+
+ wwpLeosDhcpRelayAgentPort   OBJECT-TYPE
+     SYNTAX         INTEGER (1..65535)
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object is used as an index in the table and is used to specify the port."
+     ::= { wwpLeosDhcpRelayAgentTrustEntry 1 }
+
+ wwpLeosDhcpRelayAgentTrustMode   OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        clientTrust(1),
+                        serverTrust(2),
+                        dualRoleTrust(3),
+                        unTrust(4)
+                    }
+     MAX-ACCESS     read-create
+     STATUS         deprecated
+     DESCRIPTION
+             "This object is used to set the port as client trusted, server trusted or not trusted."
+     ::= { wwpLeosDhcpRelayAgentTrustEntry 2 }
+
+ --
+ -- DHCP Relay Agent L2 Statistics
+ --
+ wwpLeosDhcpRelayAgentL2StatsTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosDhcpRelayAgentL2StatsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "Table to display L2 statistics for each wwpLeosDhcpRelayAgentVlan."
+     ::= { wwpLeosDhcpRelayAgent 6 }
+
+ wwpLeosDhcpRelayAgentL2StatsEntry OBJECT-TYPE
+     SYNTAX       WwpLeosDhcpRelayAgentL2StatsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "Entry in the table to display L2 statistics."
+     INDEX { wwpLeosDhcpRelayAgentVlan }
+     ::= { wwpLeosDhcpRelayAgentL2StatsTable 1 }
+
+ WwpLeosDhcpRelayAgentL2StatsEntry ::= SEQUENCE {
+     wwpLeosDhcpRelayAgentL2IpSecHeaders              Counter32,
+     wwpLeosDhcpRelayAgentL2Option82Added             Counter32,
+     wwpLeosDhcpRelayAgentL2Option82Removed           Counter32,
+     wwpLeosDhcpRelayAgentL2UntrustedClientPortPktsRx Counter32,
+     wwpLeosDhcpRelayAgentL2UntrustedServerPortPktsRx Counter32,
+     wwpLeosDhcpRelayAgentL2SpoofedDhcpPkts           Counter32,
+     wwpLeosDhcpRelayAgentL2Option82ExceedMTU         Counter32,
+     wwpLeosDhcpRelayAgentL2NoTrustedServerPktDrop    Counter32,
+     wwpLeosDhcpRelayAgentL2NoTrustedClientPktDrop    Counter32,
+     wwpLeosDhcpRelayAgentL2InvalidConfigPktDrop      Counter32,
+     wwpLeosDhcpRelayAgentL2GeneralErrors             Counter32,
+     wwpLeosDhcpRelayAgentL2PktsForRelay              Counter32,
+     wwpLeosDhcpRelayAgentL2RelayedClient             Counter32,
+     wwpLeosDhcpRelayAgentL2RelayedServer             Counter32,
+     wwpLeosDhcpRelayAgentL2Option82Replaced          Counter32
+ }
+
+ wwpLeosDhcpRelayAgentL2IpSecHeaders   OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object specifies the number of packets that include IP Sec Headers."
+     ::= { wwpLeosDhcpRelayAgentL2StatsEntry 1 }
+
+ wwpLeosDhcpRelayAgentL2Option82Added   OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object specifies the number of packets that have had option 82 added."
+     ::= { wwpLeosDhcpRelayAgentL2StatsEntry 2 }
+
+ wwpLeosDhcpRelayAgentL2Option82Removed   OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object specifies the number of packets that have had option 82 removed."
+     ::= { wwpLeosDhcpRelayAgentL2StatsEntry 3 }
+
+ wwpLeosDhcpRelayAgentL2UntrustedClientPortPktsRx OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object specifies the number of packets dropped because they
+              were received on untrusted client ports."
+     ::= { wwpLeosDhcpRelayAgentL2StatsEntry 4 }
+
+ wwpLeosDhcpRelayAgentL2UntrustedServerPortPktsRx OBJECT-TYPE
+     SYNTAX     Counter32
+     MAX-ACCESS read-only
+     STATUS     current
+     DESCRIPTION
+             "This object specifies the number of packets dropped because they
+              were received on untrusted server ports."
+     ::= { wwpLeosDhcpRelayAgentL2StatsEntry 5 }
+
+ wwpLeosDhcpRelayAgentL2SpoofedDhcpPkts OBJECT-TYPE
+     SYNTAX     Counter32
+     MAX-ACCESS read-only
+     STATUS     current
+     DESCRIPTION
+             "This object specifies the number of packets dropped because they
+              were determined to be spoofed DHCP packets."
+     ::= { wwpLeosDhcpRelayAgentL2StatsEntry 6 }
+
+ wwpLeosDhcpRelayAgentL2Option82ExceedMTU OBJECT-TYPE
+     SYNTAX     Counter32
+     MAX-ACCESS read-only
+     STATUS     current
+     DESCRIPTION
+             "This object specifies the number of packets with DHCP option 82 that would exceed the MTU.
+              The option 82 is not added and the original DHCP packet is forwarded."
+     ::= { wwpLeosDhcpRelayAgentL2StatsEntry 7 }
+
+ wwpLeosDhcpRelayAgentL2NoTrustedServerPktDrop OBJECT-TYPE
+     SYNTAX     Counter32
+     MAX-ACCESS read-only
+     STATUS     current
+     DESCRIPTION
+             "This object specifies the number of DHCP packets dropped because
+              there were no server trusted ports configured."
+     ::= { wwpLeosDhcpRelayAgentL2StatsEntry 8 }
+
+ wwpLeosDhcpRelayAgentL2NoTrustedClientPktDrop OBJECT-TYPE
+     SYNTAX     Counter32
+     MAX-ACCESS read-only
+     STATUS     current
+     DESCRIPTION
+             "This object specifies the number of DHCP packets dropped because
+              there were no client trusted ports configured."
+     ::= { wwpLeosDhcpRelayAgentL2StatsEntry 9 }
+
+ wwpLeosDhcpRelayAgentL2InvalidConfigPktDrop OBJECT-TYPE
+     SYNTAX     Counter32
+     MAX-ACCESS read-only
+     STATUS     current
+     DESCRIPTION
+             "This object specifies the number of DHCP packets dropped because
+              the relay was not configured properly. The most common issue is
+              a missing CID/RID string value when configured to use a CID/RID
+              string."
+     ::= { wwpLeosDhcpRelayAgentL2StatsEntry 10 }
+
+ wwpLeosDhcpRelayAgentL2GeneralErrors OBJECT-TYPE
+     SYNTAX     Counter32
+     MAX-ACCESS read-only
+     STATUS     current
+     DESCRIPTION
+             "This object reports the number of general errors encountered by
+              the L2 relay agent."
+     ::= { wwpLeosDhcpRelayAgentL2StatsEntry 11 }
+
+ wwpLeosDhcpRelayAgentL2PktsForRelay OBJECT-TYPE
+     SYNTAX     Counter32
+     MAX-ACCESS read-only
+     STATUS     current
+     DESCRIPTION
+             "This object reports the number of packets processed by the specific relay agent."
+     ::= { wwpLeosDhcpRelayAgentL2StatsEntry 12 }
+
+ wwpLeosDhcpRelayAgentL2RelayedClient OBJECT-TYPE
+     SYNTAX     Counter32
+     MAX-ACCESS read-only
+     STATUS     current
+     DESCRIPTION
+             "This object reports the number of DHCP client messages relayed by the
+             specific relay agent."
+     ::= { wwpLeosDhcpRelayAgentL2StatsEntry 13 }
+
+ wwpLeosDhcpRelayAgentL2RelayedServer OBJECT-TYPE
+     SYNTAX     Counter32
+     MAX-ACCESS read-only
+     STATUS     current
+     DESCRIPTION
+             "This object reports the number of DHCP server messages relayed by the
+              specific relay agent."
+     ::= { wwpLeosDhcpRelayAgentL2StatsEntry 14 }
+
+ wwpLeosDhcpRelayAgentL2Option82Replaced OBJECT-TYPE
+     SYNTAX     Counter32
+     MAX-ACCESS read-only
+     STATUS     current
+     DESCRIPTION
+             "This object reports the number of relayed DHCP client messages that had
+              their Option82 values replaced by the specific relay agent."
+     ::= { wwpLeosDhcpRelayAgentL2StatsEntry 15 }
+
+
+ --
+ -- DHCP Relay Agent CID String Table
+ --
+ wwpLeosDhcpRelayAgentCidStringTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosDhcpRelayAgentCidStringEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "This table is used to specify CID strings for slot / ports and VLANs
+              that the DHCP relay agent can specify in Option 82 CID information."
+     ::= { wwpLeosDhcpRelayAgent 7 }
+
+ wwpLeosDhcpRelayAgentCidStringEntry OBJECT-TYPE
+     SYNTAX       WwpLeosDhcpRelayAgentCidStringEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "Each entry in this table is used to specify a CID string for
+             slot / port and VLAN combinations."
+     INDEX { wwpLeosDhcpRelayAgentVlan, wwpLeosDhcpRelayAgentCidStringPort }
+     ::= { wwpLeosDhcpRelayAgentCidStringTable 1 }
+
+ WwpLeosDhcpRelayAgentCidStringEntry ::= SEQUENCE {
+     wwpLeosDhcpRelayAgentCidStringPort             INTEGER,
+     wwpLeosDhcpRelayAgentCidString                 DisplayString,
+     wwpLeosDhcpRelayAgentCidStringRowStatus        RowStatus
+ }
+
+ wwpLeosDhcpRelayAgentCidStringPort   OBJECT-TYPE
+     SYNTAX         INTEGER (1..65535)
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object is used as an index in the table and is used to specify the port."
+     ::= { wwpLeosDhcpRelayAgentCidStringEntry 1 }                                            
+  
+ wwpLeosDhcpRelayAgentCidString   OBJECT-TYPE
+     SYNTAX         DisplayString (SIZE (1..64))
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+             "This object is used to get and set the CID string for the port."
+     ::= { wwpLeosDhcpRelayAgentCidStringEntry 2 }
+
+ wwpLeosDhcpRelayAgentCidStringRowStatus   OBJECT-TYPE
+     SYNTAX         RowStatus
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+             "Used to manage the creation and deletion of the conceptual rows in this table.
+              To create a row in this table set this object to 'createAndGo'.
+              To delete a row in this table set this object to 'destroy'."
+     ::= { wwpLeosDhcpRelayAgentCidStringEntry 3 }
+
+ --
+ -- DHCP Relay Agent RID String Table
+ --
+ wwpLeosDhcpRelayAgentRidStringTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosDhcpRelayAgentRidStringEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "This table is used to specify RID strings for slot / ports and VLANs
+              that the DHCP relay agent can specify in Option 82 RID information."
+     ::= { wwpLeosDhcpRelayAgent 8 }
+
+ wwpLeosDhcpRelayAgentRidStringEntry OBJECT-TYPE
+     SYNTAX       WwpLeosDhcpRelayAgentRidStringEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "Each entry in this table is used to specify an RID string for
+             slot / port and VLAN combinations."
+     INDEX { wwpLeosDhcpRelayAgentVlan, wwpLeosDhcpRelayAgentRidStringPort }
+     ::= { wwpLeosDhcpRelayAgentRidStringTable 1 }
+
+ WwpLeosDhcpRelayAgentRidStringEntry ::= SEQUENCE {
+     wwpLeosDhcpRelayAgentRidStringPort             INTEGER,
+     wwpLeosDhcpRelayAgentRidString                 DisplayString,
+     wwpLeosDhcpRelayAgentRidStringRowStatus        RowStatus
+ }
+
+ wwpLeosDhcpRelayAgentRidStringPort   OBJECT-TYPE
+     SYNTAX         INTEGER (1..65535)
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object is used as an index in the table and is used to specify the port."
+     ::= { wwpLeosDhcpRelayAgentRidStringEntry 1 }
+
+ wwpLeosDhcpRelayAgentRidString   OBJECT-TYPE
+     SYNTAX         DisplayString (SIZE (1..64))
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+             "This object is used to get and set the RID string for the port."
+     ::= { wwpLeosDhcpRelayAgentRidStringEntry 2 }
+
+ wwpLeosDhcpRelayAgentRidStringRowStatus   OBJECT-TYPE
+     SYNTAX         RowStatus
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+             "Used to manage the creation and deletion of the
+              conceptual rows in this table.
+
+              To create a row in this table set this object
+              to 'createAndGo'.
+
+              To delete a row in this table set this object
+              to 'destroy'."
+     ::= { wwpLeosDhcpRelayAgentRidStringEntry 3 }
+
+ --
+ -- DHCP Relay Agent Extended Trust Table
+ --
+ wwpLeosDhcpRelayAgentExtTrustTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosDhcpRelayAgentExtTrustEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "This table is used to specify the ports and VLANs that the DHCP
+              relay agent can trust. This table is the same as
+              wwpLeosDhcpRelayAgentTrustTable with the addition of a column
+              for the port status."
+     ::= { wwpLeosDhcpRelayAgent 9 }
+
+ wwpLeosDhcpRelayAgentExtTrustEntry OBJECT-TYPE
+     SYNTAX       WwpLeosDhcpRelayAgentExtTrustEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "Each entry in this table is used to specify the port and VLAN to
+              be trusted."
+     INDEX { wwpLeosDhcpRelayAgentVlan, wwpLeosDhcpRelayAgentPort }
+     ::= { wwpLeosDhcpRelayAgentExtTrustTable 1 }
+
+ WwpLeosDhcpRelayAgentExtTrustEntry ::= SEQUENCE {
+     wwpLeosDhcpRelayAgentExtPortState  INTEGER,
+     wwpLeosDhcpRelayAgentExtTrustMode  INTEGER
+ }
+
+ wwpLeosDhcpRelayAgentExtPortState   OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        active(1),
+                        inactive(2)
+                    }
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object reports whether the specified port is active or
+              inactive."
+     ::= { wwpLeosDhcpRelayAgentExtTrustEntry 1 }
+
+ wwpLeosDhcpRelayAgentExtTrustMode   OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        clientTrust(1),
+                        serverTrust(2),
+                        dualRoleTrust(3),
+                        unTrust(4)
+                    }
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+             "This object is used to set the port as client trusted, server
+              trusted or not trusted."
+     ::= { wwpLeosDhcpRelayAgentExtTrustEntry 2 }
+
+ --
+ -- Table to control DHCP relay agent functionality on each L2 VS
+ --
+ wwpLeosDhcpRelayAgentVsStateTable OBJECT-TYPE
+     SYNTAX         SEQUENCE OF WwpLeosDhcpRelayAgentVsStateEntry
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION
+             "Table allows changing configuration of DHCP relay agent
+              functionality for each VS."
+     ::= { wwpLeosDhcpRelayAgent 10 }
+
+ wwpLeosDhcpRelayAgentVsStateEntry OBJECT-TYPE
+     SYNTAX         WwpLeosDhcpRelayAgentVsStateEntry
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION
+             "Entry in the table to configure DHCP relay agent functionality."
+     INDEX { wwpLeosDhcpRelayAgentVsVlan }
+     ::= { wwpLeosDhcpRelayAgentVsStateTable 1 }
+
+ WwpLeosDhcpRelayAgentVsStateEntry ::= SEQUENCE {
+     wwpLeosDhcpRelayAgentVsVlan              Integer32,
+     wwpLeosDhcpRelayAgentVsName              DisplayString,
+     wwpLeosDhcpRelayAgentVsAdminState        INTEGER,
+     wwpLeosDhcpRelayAgentVsOperState         INTEGER,
+     wwpLeosDhcpRelayAgentVsStatsClear        TruthValue,
+     wwpLeosDhcpRelayAgentVsRowStatus         RowStatus
+ }
+
+ wwpLeosDhcpRelayAgentVsVlan   OBJECT-TYPE
+     SYNTAX         Integer32 (1..24576)
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION
+             "This object specifies the VS VLAN on which the DHCP relay agent is configured."
+     ::= { wwpLeosDhcpRelayAgentVsStateEntry 1 }
+
+ wwpLeosDhcpRelayAgentVsName   OBJECT-TYPE
+     SYNTAX         DisplayString (SIZE (1..47))
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object shows the name of the VS VLAN on which the DHCP relay agent is configured."
+     ::= { wwpLeosDhcpRelayAgentVsStateEntry 2 }
+
+ wwpLeosDhcpRelayAgentVsAdminState   OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        disabled(1),
+                        enabled(2)
+                    }
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+             "This object allows the user to disable or enable DHCP relay agent functionality on
+              the given VS VLAN specified by wwpLeosDhcpRelayAgentVsVlan."
+     ::= { wwpLeosDhcpRelayAgentVsStateEntry 3 }
+
+ wwpLeosDhcpRelayAgentVsOperState   OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        disabled(1),
+                        enabled(2)
+                    }
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object shows the operational status of the DHCP relay agent
+              on the given VS VLAN."
+     ::= { wwpLeosDhcpRelayAgentVsStateEntry 4 }
+
+ wwpLeosDhcpRelayAgentVsStatsClear OBJECT-TYPE
+     SYNTAX         TruthValue
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+             "This object, when set to 'true', clears DHCP relay agent
+              statistics for the given VS VLAN."
+     ::= { wwpLeosDhcpRelayAgentVsStateEntry 5 }
+
+ wwpLeosDhcpRelayAgentVsRowStatus   OBJECT-TYPE
+     SYNTAX         RowStatus
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+             "Set this object to 'Destroy' to terminate DHCP L2 Relaying
+              on the VS VLAN specified by wwpLeosDhcpRelayAgentVsVlan.
+
+              Set this object to 'CreateAndGo' to enable DHCP L2 Relaying
+              on the VS VLAN specified by wwpLeosDhcpRelayAgentVsVlan."
+     ::= { wwpLeosDhcpRelayAgentVsStateEntry 6 }
+
+ --
+ -- DHCP Relay Agent VS Trust Table
+ --
+ wwpLeosDhcpRelayAgentVsTrustTable OBJECT-TYPE
+     SYNTAX         SEQUENCE OF WwpLeosDhcpRelayAgentVsTrustEntry
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION
+             "This table is used to specify the VLANs, ports and sub-VLANs
+              that the DHCP relay agent can trust."
+     ::= { wwpLeosDhcpRelayAgent 11 }
+
+ wwpLeosDhcpRelayAgentVsTrustEntry OBJECT-TYPE
+     SYNTAX         WwpLeosDhcpRelayAgentVsTrustEntry
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION
+             "Each entry in this table is used to specify the VLAN, port and
+             sub-VLAN to be trusted."
+     INDEX { wwpLeosDhcpRelayAgentVsVlan, wwpLeosDhcpRelayAgentVsPort, wwpLeosDhcpRelayAgentVsSubVlan }
+     ::= { wwpLeosDhcpRelayAgentVsTrustTable 1 }
+
+ WwpLeosDhcpRelayAgentVsTrustEntry ::= SEQUENCE {
+     wwpLeosDhcpRelayAgentVsPort            Integer32,
+     wwpLeosDhcpRelayAgentVsSubVlan         Integer32,
+     wwpLeosDhcpRelayAgentVsPortState       INTEGER,
+     wwpLeosDhcpRelayAgentVsTrustMode       INTEGER
+ }
+
+ wwpLeosDhcpRelayAgentVsPort   OBJECT-TYPE
+     SYNTAX         Integer32 (1..65535)
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION
+             "This object is used as an index in the table and is used to specify the VS port."
+     ::= { wwpLeosDhcpRelayAgentVsTrustEntry 2 }
+
+ wwpLeosDhcpRelayAgentVsSubVlan   OBJECT-TYPE
+     SYNTAX         Integer32 (0..24576)
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION
+             "This object specifies the sub-VLAN on which the DHCP relay agent
+              is configured. Note that the special value 0 means that no
+              sub-VLAN is associated with this particular trust entry."
+     ::= { wwpLeosDhcpRelayAgentVsTrustEntry 3 }
+
+ wwpLeosDhcpRelayAgentVsPortState   OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        active(1),
+                        inactive(2)
+                    }
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object reports whether the specified port and sub-VLAN is
+              active or inactive."
+     ::= { wwpLeosDhcpRelayAgentVsTrustEntry 4 }
+
+ wwpLeosDhcpRelayAgentVsTrustMode   OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        clientTrust(1),
+                        serverTrust(2),
+                        dualRoleTrust(3),
+                        unTrust(4)
+                    }
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+             "This object is used to set the port and sub-VLAN as client
+              trusted, server trusted or not trusted."
+     ::= { wwpLeosDhcpRelayAgentVsTrustEntry 5 }
+
+ --
+ -- DHCP Relay Agent VS Statistics Table
+ --
+ wwpLeosDhcpRelayAgentVsStatsTable OBJECT-TYPE
+     SYNTAX         SEQUENCE OF WwpLeosDhcpRelayAgentVsStatsEntry
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION
+             "Table to display VS statistics for each VS relay agent."
+     ::= { wwpLeosDhcpRelayAgent 12 }
+
+ wwpLeosDhcpRelayAgentVsStatsEntry OBJECT-TYPE
+     SYNTAX         WwpLeosDhcpRelayAgentVsStatsEntry
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION
+             "Entry in the table to display VS statistics."
+     INDEX { wwpLeosDhcpRelayAgentVlan }
+     ::= { wwpLeosDhcpRelayAgentVsStatsTable 1 }
+
+ WwpLeosDhcpRelayAgentVsStatsEntry ::= SEQUENCE {
+     wwpLeosDhcpRelayAgentVsOption82Added             Counter32,
+     wwpLeosDhcpRelayAgentVsOption82Removed           Counter32,
+     wwpLeosDhcpRelayAgentVsUntrustedClientPortPktsRx Counter32,
+     wwpLeosDhcpRelayAgentVsUntrustedServerPortPktsRx Counter32,
+     wwpLeosDhcpRelayAgentVsSpoofedDhcpPkts           Counter32,
+     wwpLeosDhcpRelayAgentVsOption82ExceedMTU         Counter32,
+     wwpLeosDhcpRelayAgentVsNoTrustedServerPktDrop    Counter32,
+     wwpLeosDhcpRelayAgentVsNoTrustedClientPktDrop    Counter32,
+     wwpLeosDhcpRelayAgentVsInvalidConfigPktDrop      Counter32,
+     wwpLeosDhcpRelayAgentVsGeneralErrors             Counter32,
+     wwpLeosDhcpRelayAgentVsPktsForRelay              Counter32,
+     wwpLeosDhcpRelayAgentVsRelayedClient             Counter32,
+     wwpLeosDhcpRelayAgentVsRelayedServer             Counter32,
+     wwpLeosDhcpRelayAgentVsOption82Replaced          Counter32
+ }
+
+ wwpLeosDhcpRelayAgentVsOption82Added   OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object specifies the number of packets that have had option 82 added."
+     ::= { wwpLeosDhcpRelayAgentVsStatsEntry 1 }
+
+ wwpLeosDhcpRelayAgentVsOption82Removed   OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object specifies the number of packets that have had option 82 removed."
+     ::= { wwpLeosDhcpRelayAgentVsStatsEntry 2 }
+
+ wwpLeosDhcpRelayAgentVsUntrustedClientPortPktsRx OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object specifies the number of packets dropped because they
+              were received on untrusted client ports."
+     ::= { wwpLeosDhcpRelayAgentVsStatsEntry 3 }
+
+ wwpLeosDhcpRelayAgentVsUntrustedServerPortPktsRx OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object specifies the number of packets dropped because they
+              were received on untrusted server ports."
+     ::= { wwpLeosDhcpRelayAgentVsStatsEntry 4 }
+
+ wwpLeosDhcpRelayAgentVsSpoofedDhcpPkts OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object specifies the number of packets dropped because they
+              were determined to be spoofed DHCP packets."
+     ::= { wwpLeosDhcpRelayAgentVsStatsEntry 5 }
+
+ wwpLeosDhcpRelayAgentVsOption82ExceedMTU OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object specifies the number of packets with DHCP option 82
+              that would exceed the MTU. Option 82 is not added and the
+              original DHCP packet is forwarded."
+     ::= { wwpLeosDhcpRelayAgentVsStatsEntry 6 }
+
+ wwpLeosDhcpRelayAgentVsNoTrustedServerPktDrop OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object specifies the number of DHCP packets dropped because
+              there were no server trusted ports configured."
+     ::= { wwpLeosDhcpRelayAgentVsStatsEntry 7 }
+
+ wwpLeosDhcpRelayAgentVsNoTrustedClientPktDrop OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object specifies the number of DHCP packets dropped because
+              there were no client trusted ports configured."
+     ::= { wwpLeosDhcpRelayAgentVsStatsEntry 8 }
+
+ wwpLeosDhcpRelayAgentVsInvalidConfigPktDrop OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object specifies the number of DHCP packets dropped because
+              the relay was not configured properly. The most common issue is
+              a missing CID/RID string value when configured to use a CID/RID
+              string."
+     ::= { wwpLeosDhcpRelayAgentVsStatsEntry 9 }
+
+ wwpLeosDhcpRelayAgentVsGeneralErrors OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object reports the number of general errors encountered by
+              the L2 VS relay agent."
+     ::= { wwpLeosDhcpRelayAgentVsStatsEntry 10 }
+
+ wwpLeosDhcpRelayAgentVsPktsForRelay OBJECT-TYPE
+     SYNTAX     Counter32
+     MAX-ACCESS read-only
+     STATUS     current
+     DESCRIPTION
+             "This object reports the number of packets processed by the specific relay agent."
+     ::= { wwpLeosDhcpRelayAgentVsStatsEntry 11 }
+
+ wwpLeosDhcpRelayAgentVsRelayedClient OBJECT-TYPE
+     SYNTAX     Counter32
+     MAX-ACCESS read-only
+     STATUS     current
+     DESCRIPTION
+             "This object reports the number of DHCP client messages relayed by the
+             specific relay agent."
+     ::= { wwpLeosDhcpRelayAgentVsStatsEntry 12 }
+
+ wwpLeosDhcpRelayAgentVsRelayedServer OBJECT-TYPE
+     SYNTAX     Counter32
+     MAX-ACCESS read-only
+     STATUS     current
+     DESCRIPTION
+             "This object reports the number of DHCP server messages relayed by the
+              specific relay agent."
+     ::= { wwpLeosDhcpRelayAgentVsStatsEntry 13 }
+
+ wwpLeosDhcpRelayAgentVsOption82Replaced OBJECT-TYPE
+     SYNTAX     Counter32
+     MAX-ACCESS read-only
+     STATUS     current
+     DESCRIPTION
+             "This object reports the number of relayed DHCP client messages that had
+              their Option82 values replaced by the specific relay agent."
+     ::= { wwpLeosDhcpRelayAgentVsStatsEntry 14 }
+
+ --
+ -- DHCP Relay Agent VS CID String Table
+ --
+ wwpLeosDhcpRelayAgentVsCidStringTable OBJECT-TYPE
+     SYNTAX         SEQUENCE OF WwpLeosDhcpRelayAgentVsCidStringEntry
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION
+             "This table is used to specify CID strings for VS ports and VLANs
+              that the DHCP relay agent can specify in Option 82 CID information."
+     ::= { wwpLeosDhcpRelayAgent 13 }
+
+ wwpLeosDhcpRelayAgentVsCidStringEntry OBJECT-TYPE
+     SYNTAX         WwpLeosDhcpRelayAgentVsCidStringEntry
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION
+             "Each entry in this table is used to specify a CID string for
+              VS port and VLAN combinations."
+     INDEX { wwpLeosDhcpRelayAgentVlan, wwpLeosDhcpRelayAgentVsPort }
+     ::= { wwpLeosDhcpRelayAgentVsCidStringTable 1 }
+
+ WwpLeosDhcpRelayAgentVsCidStringEntry ::= SEQUENCE {
+     wwpLeosDhcpRelayAgentVsCidString          DisplayString,
+     wwpLeosDhcpRelayAgentVsCidStringRowStatus RowStatus
+ }
+
+ wwpLeosDhcpRelayAgentVsCidString   OBJECT-TYPE
+     SYNTAX         DisplayString (SIZE (1..64))
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+             "This object is used to get and set the CID string for the port."
+     ::= { wwpLeosDhcpRelayAgentVsCidStringEntry 1 }
+
+ wwpLeosDhcpRelayAgentVsCidStringRowStatus   OBJECT-TYPE
+     SYNTAX         RowStatus
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+             "Used to manage the creation and deletion of the conceptual rows in this table.
+              To create a row in this table set this object to 'createAndGo'.
+              To delete a row in this table set this object to 'destroy'."
+     ::= { wwpLeosDhcpRelayAgentVsCidStringEntry 2 }
+
+ --
+ -- DHCP Relay Agent VS RID String Table
+ --
+ wwpLeosDhcpRelayAgentVsRidStringTable OBJECT-TYPE
+     SYNTAX         SEQUENCE OF WwpLeosDhcpRelayAgentVsRidStringEntry
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION
+             "This table is used to specify RID strings for VS ports and VLANs
+              that the DHCP relay agent can specify in Option 82 RID information."
+     ::= { wwpLeosDhcpRelayAgent 14 }
+
+ wwpLeosDhcpRelayAgentVsRidStringEntry OBJECT-TYPE
+     SYNTAX         WwpLeosDhcpRelayAgentVsRidStringEntry
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION
+             "Each entry in this table is used to specify an RID string for
+              VS port and VLAN combinations."
+     INDEX { wwpLeosDhcpRelayAgentVlan, wwpLeosDhcpRelayAgentVsPort }
+     ::= { wwpLeosDhcpRelayAgentVsRidStringTable 1 }
+
+ WwpLeosDhcpRelayAgentVsRidStringEntry ::= SEQUENCE {
+     wwpLeosDhcpRelayAgentVsRidString          DisplayString,
+     wwpLeosDhcpRelayAgentVsRidStringRowStatus RowStatus
+ }
+
+ wwpLeosDhcpRelayAgentVsRidString   OBJECT-TYPE
+     SYNTAX         DisplayString (SIZE (1..64))
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+             "This object is used to get and set the RID string for the port."
+     ::= { wwpLeosDhcpRelayAgentVsRidStringEntry 1 }
+
+ wwpLeosDhcpRelayAgentVsRidStringRowStatus   OBJECT-TYPE
+     SYNTAX         RowStatus
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+             "Used to manage the creation and deletion of the conceptual rows in this table.
+              To create a row in this table set this object to 'createAndGo'.
+              To delete a row in this table set this object to 'destroy'."
+     ::= { wwpLeosDhcpRelayAgentVsRidStringEntry 2 }
+
+ --
+ -- Table to control DHCP relay agent functionality on MPLS
+ --
+ wwpLeosDhcpRelayAgentMplsStateTable OBJECT-TYPE
+     SYNTAX         SEQUENCE OF WwpLeosDhcpRelayAgentMplsStateEntry
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION
+             "Table allows changing configuration of DHCP relay agent
+              functionality for each MPLS VS."
+     ::= { wwpLeosDhcpRelayAgent 15 }
+
+ wwpLeosDhcpRelayAgentMplsStateEntry OBJECT-TYPE
+     SYNTAX         WwpLeosDhcpRelayAgentMplsStateEntry
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION
+             "Entry in the table to configure DHCP relay agent functionality
+              for the given MPLS VS."
+     INDEX { wwpLeosDhcpRelayAgentMplsId }
+     ::= { wwpLeosDhcpRelayAgentMplsStateTable 1 }
+
+ WwpLeosDhcpRelayAgentMplsStateEntry ::= SEQUENCE {
+     wwpLeosDhcpRelayAgentMplsId                Unsigned32,
+     wwpLeosDhcpRelayAgentMplsName              DisplayString,
+     wwpLeosDhcpRelayAgentMplsAdminState        INTEGER,
+     wwpLeosDhcpRelayAgentMplsOperState         INTEGER,
+     wwpLeosDhcpRelayAgentMplsStatsClear        TruthValue,
+     wwpLeosDhcpRelayAgentMplsRowStatus         RowStatus
+ }
+
+ wwpLeosDhcpRelayAgentMplsId   OBJECT-TYPE
+     SYNTAX         Unsigned32 (1..1677215)
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION
+             "This object specifies the MPLS VS on which the DHCP relay agent is configured."
+     ::= { wwpLeosDhcpRelayAgentMplsStateEntry 1 }
+
+ wwpLeosDhcpRelayAgentMplsName   OBJECT-TYPE
+     SYNTAX         DisplayString (SIZE (1..47))
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object shows the name of the MPLS VS on which the DHCP
+              relay agent is configured."
+     ::= { wwpLeosDhcpRelayAgentMplsStateEntry 2 }
+
+ wwpLeosDhcpRelayAgentMplsAdminState   OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        disabled(1),
+                        enabled(2)
+                    }
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+             "This object allows the user to disable or enable DHCP relay
+              agent functionality on the given MPLS VS specified by
+              wwpLeosDhcpRelayAgentMplsId."
+     ::= { wwpLeosDhcpRelayAgentMplsStateEntry 3 }
+
+ wwpLeosDhcpRelayAgentMplsOperState   OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        disabled(1),
+                        enabled(2)
+                    }
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object shows the operational status of the DHCP relay agent on the given MPLS VS."
+     ::= { wwpLeosDhcpRelayAgentMplsStateEntry 4 }
+
+ wwpLeosDhcpRelayAgentMplsStatsClear OBJECT-TYPE
+     SYNTAX         TruthValue
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+             "This object, when set to 'true', clears DHCP relay agent statistics for the given MPLS VS."
+     ::= { wwpLeosDhcpRelayAgentMplsStateEntry 5 }
+
+ wwpLeosDhcpRelayAgentMplsRowStatus   OBJECT-TYPE
+     SYNTAX         RowStatus
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+             "Set this object to 'Destroy' to terminate DHCP L2 Relaying
+              on the MPLS VS specified by wwpLeosDhcpRelayAgentMplsId.
+
+              Set this object to 'CreateAndGo' to enable DHCP L2 Relaying
+              on the MPLS VS specified by wwpLeosDhcpRelayAgentMplsId."
+     ::= { wwpLeosDhcpRelayAgentMplsStateEntry 6 }
+
+ --
+ -- DHCP Relay Agent MPLS Trust Table
+ --
+ wwpLeosDhcpRelayAgentMplsTrustTable OBJECT-TYPE
+     SYNTAX         SEQUENCE OF WwpLeosDhcpRelayAgentMplsTrustEntry
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION
+             "This table is used to specify the MPLS VSs and interfaces that
+              the DHCP relay agent can trust."
+     ::= { wwpLeosDhcpRelayAgent 16 }
+
+ wwpLeosDhcpRelayAgentMplsTrustEntry OBJECT-TYPE
+     SYNTAX         WwpLeosDhcpRelayAgentMplsTrustEntry
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION
+             "Each entry in this table is used to specify the MPLS VS and
+              interface to be trusted."
+     INDEX { wwpLeosDhcpRelayAgentMplsId, wwpLeosDhcpRelayAgentMplsInterface }
+     ::= { wwpLeosDhcpRelayAgentMplsTrustTable 1 }
+
+ WwpLeosDhcpRelayAgentMplsTrustEntry ::= SEQUENCE {
+     wwpLeosDhcpRelayAgentMplsInterface         Unsigned32,
+     wwpLeosDhcpRelayAgentMplsVcName            DisplayString,
+     wwpLeosDhcpRelayAgentMplsInterfaceState    INTEGER,
+     wwpLeosDhcpRelayAgentMplsTrustMode         INTEGER
+ }
+
+ wwpLeosDhcpRelayAgentMplsInterface   OBJECT-TYPE
+     SYNTAX         Unsigned32 (1..4294967295)
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION
+             "This object is used as an index in the table and is used to
+              specify the MPLS interface."
+     ::= { wwpLeosDhcpRelayAgentMplsTrustEntry 1 }
+
+ wwpLeosDhcpRelayAgentMplsVcName   OBJECT-TYPE
+     SYNTAX         DisplayString (SIZE (1..31))
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object shows the name of the MPLS VC."
+     ::= { wwpLeosDhcpRelayAgentMplsTrustEntry 2 }
+
+ wwpLeosDhcpRelayAgentMplsInterfaceState   OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        active(1),
+                        inactive(2)
+                    }
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object reports whether the specified interface is active or
+              inactive."
+     ::= { wwpLeosDhcpRelayAgentMplsTrustEntry 3 }
+
+ wwpLeosDhcpRelayAgentMplsTrustMode   OBJECT-TYPE
+     SYNTAX         INTEGER {
+                        clientTrust(1),
+                        serverTrust(2),
+                        dualRoleTrust(3),
+                        unTrust(4)
+                    }
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+             "This object is used to set the interface as client trusted,
+              server trusted or not trusted."
+     ::= { wwpLeosDhcpRelayAgentMplsTrustEntry 5 }
+
+ --
+ -- DHCP Relay Agent MPLS Statistics Table
+ --
+ wwpLeosDhcpRelayAgentMplsStatsTable OBJECT-TYPE
+     SYNTAX         SEQUENCE OF WwpLeosDhcpRelayAgentMplsStatsEntry
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION
+             "Table to display MPLS statistics for each MPLS relay agent."
+     ::= { wwpLeosDhcpRelayAgent 17 }
+
+ wwpLeosDhcpRelayAgentMplsStatsEntry OBJECT-TYPE
+     SYNTAX         WwpLeosDhcpRelayAgentMplsStatsEntry
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION
+             "Entry in the table to display MPLS relay agent statistics."
+     INDEX { wwpLeosDhcpRelayAgentMplsId }
+     ::= { wwpLeosDhcpRelayAgentMplsStatsTable 1 }
+
+ WwpLeosDhcpRelayAgentMplsStatsEntry ::= SEQUENCE {
+     wwpLeosDhcpRelayAgentMplsOption82Added                     Counter32,
+     wwpLeosDhcpRelayAgentMplsOption82Removed                   Counter32,
+     wwpLeosDhcpRelayAgentMplsUntrustedClientInterfacePktsRx    Counter32,
+     wwpLeosDhcpRelayAgentMplsUntrustedServerInterfacePktsRx    Counter32,
+     wwpLeosDhcpRelayAgentMplsSpoofedDhcpPkts                   Counter32,
+     wwpLeosDhcpRelayAgentMplsOption82ExceedMTU                 Counter32,
+     wwpLeosDhcpRelayAgentMplsNoTrustedServerPktDrop            Counter32,
+     wwpLeosDhcpRelayAgentMplsNoTrustedClientPktDrop            Counter32,
+     wwpLeosDhcpRelayAgentMplsInvalidConfigPktDrop              Counter32,
+     wwpLeosDhcpRelayAgentMplsGeneralErrors                     Counter32,
+     wwpLeosDhcpRelayAgentMplsPktsForRelay                      Counter32,
+     wwpLeosDhcpRelayAgentMplsRelayedClient                     Counter32,
+     wwpLeosDhcpRelayAgentMplsRelayedServer                     Counter32,
+     wwpLeosDhcpRelayAgentMplsOption82Replaced                  Counter32
+ }
+
+ wwpLeosDhcpRelayAgentMplsOption82Added   OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object specifies the number of packets that have had option 82 added."
+     ::= { wwpLeosDhcpRelayAgentMplsStatsEntry 1 }
+
+ wwpLeosDhcpRelayAgentMplsOption82Removed   OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object specifies the number of packets that have had option 82 removed."
+     ::= { wwpLeosDhcpRelayAgentMplsStatsEntry 2 }
+
+ wwpLeosDhcpRelayAgentMplsUntrustedClientInterfacePktsRx OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object specifies the number of packets dropped because they
+              were received on untrusted client interfaces."
+     ::= { wwpLeosDhcpRelayAgentMplsStatsEntry 3 }
+
+ wwpLeosDhcpRelayAgentMplsUntrustedServerInterfacePktsRx OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object specifies the number of packets dropped because they
+              were received on untrusted server interfaces."
+     ::= { wwpLeosDhcpRelayAgentMplsStatsEntry 4 }
+
+ wwpLeosDhcpRelayAgentMplsSpoofedDhcpPkts OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object specifies the number of packets dropped because they
+              were determined to be spoofed DHCP packets."
+     ::= { wwpLeosDhcpRelayAgentMplsStatsEntry 5 }
+
+ wwpLeosDhcpRelayAgentMplsOption82ExceedMTU OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object specifies the number of packets with DHCP option 82
+              that would exceed the MTU. Option 82 is not added and the
+              original DHCP packet is forwarded."
+     ::= { wwpLeosDhcpRelayAgentMplsStatsEntry 6 }
+
+ wwpLeosDhcpRelayAgentMplsNoTrustedServerPktDrop OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object specifies the number of DHCP packets dropped because
+              there were no server trusted interfaces configured."
+     ::= { wwpLeosDhcpRelayAgentMplsStatsEntry 7 }
+
+ wwpLeosDhcpRelayAgentMplsNoTrustedClientPktDrop OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object specifies the number of DHCP packets dropped because
+              there were no client trusted interfaces configured."
+     ::= { wwpLeosDhcpRelayAgentMplsStatsEntry 8 }
+
+ wwpLeosDhcpRelayAgentMplsInvalidConfigPktDrop OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object specifies the number of DHCP packets dropped because
+              the relay was not configured properly. The most common issue is
+              a missing CID/RID string value when configured to use a CID/RID
+              string."
+     ::= { wwpLeosDhcpRelayAgentMplsStatsEntry 9 }
+
+ wwpLeosDhcpRelayAgentMplsGeneralErrors OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+             "This object reports the number of general errors encountered by
+              the L2 MPLS relay agent."
+     ::= { wwpLeosDhcpRelayAgentMplsStatsEntry 10 }
+
+ wwpLeosDhcpRelayAgentMplsPktsForRelay OBJECT-TYPE
+     SYNTAX     Counter32
+     MAX-ACCESS read-only
+     STATUS     current
+     DESCRIPTION
+             "This object reports the number of packets processed by the specific relay agent."
+     ::= { wwpLeosDhcpRelayAgentMplsStatsEntry 11 }
+
+ wwpLeosDhcpRelayAgentMplsRelayedClient OBJECT-TYPE
+     SYNTAX     Counter32
+     MAX-ACCESS read-only
+     STATUS     current
+     DESCRIPTION
+             "This object reports the number of DHCP client messages relayed by the
+             specific relay agent."
+     ::= { wwpLeosDhcpRelayAgentMplsStatsEntry 12 }
+
+ wwpLeosDhcpRelayAgentMplsRelayedServer OBJECT-TYPE
+     SYNTAX     Counter32
+     MAX-ACCESS read-only
+     STATUS     current
+     DESCRIPTION
+             "This object reports the number of DHCP server messages relayed by the
+              specific relay agent."
+     ::= { wwpLeosDhcpRelayAgentMplsStatsEntry 13 }
+
+ wwpLeosDhcpRelayAgentMplsOption82Replaced OBJECT-TYPE
+     SYNTAX     Counter32
+     MAX-ACCESS read-only
+     STATUS     current
+     DESCRIPTION
+             "This object reports the number of relayed DHCP client messages that had
+              their Option82 values replaced by the specific relay agent."
+     ::= { wwpLeosDhcpRelayAgentMplsStatsEntry 14 }
+
+ --
+ -- DHCP Relay Agent MPLS CID String Table
+ --
+ wwpLeosDhcpRelayAgentMplsCidStringTable OBJECT-TYPE
+     SYNTAX         SEQUENCE OF WwpLeosDhcpRelayAgentMplsCidStringEntry
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION
+             "This table is used to specify CID strings for MPLS VSs and
+              interfaces that the DHCP relay agent can specify in Option 82
+              CID information."
+     ::= { wwpLeosDhcpRelayAgent 18 }
+
+ wwpLeosDhcpRelayAgentMplsCidStringEntry OBJECT-TYPE
+     SYNTAX         WwpLeosDhcpRelayAgentMplsCidStringEntry
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION
+             "Each entry in this table is used to specify a CID string for
+              MPLS VS and interface combinations."
+     INDEX { wwpLeosDhcpRelayAgentMplsId, wwpLeosDhcpRelayAgentMplsInterface }
+     ::= { wwpLeosDhcpRelayAgentMplsCidStringTable 1 }
+
+ WwpLeosDhcpRelayAgentMplsCidStringEntry ::= SEQUENCE {
+     wwpLeosDhcpRelayAgentMplsCidString          DisplayString,
+     wwpLeosDhcpRelayAgentMplsCidStringRowStatus RowStatus
+ }
+
+ wwpLeosDhcpRelayAgentMplsCidString   OBJECT-TYPE
+     SYNTAX         DisplayString (SIZE (1..64))
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+             "This object is used to get and set the CID string for the
+              interface."
+     ::= { wwpLeosDhcpRelayAgentMplsCidStringEntry 1 }
+
+ wwpLeosDhcpRelayAgentMplsCidStringRowStatus   OBJECT-TYPE
+     SYNTAX         RowStatus
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+             "Used to manage the creation and deletion of the conceptual rows in this table.
+              To create a row in this table set this object to 'createAndGo'.
+              To delete a row in this table set this object to 'destroy'."
+     ::= { wwpLeosDhcpRelayAgentMplsCidStringEntry 2 }
+
+ --
+ -- DHCP Relay Agent MPLS RID String Table
+ --
+ wwpLeosDhcpRelayAgentMplsRidStringTable OBJECT-TYPE
+     SYNTAX         SEQUENCE OF WwpLeosDhcpRelayAgentMplsRidStringEntry
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION
+             "This table is used to specify RID strings for MPLS VSs and
+              interfaces that the DHCP relay agent can specify in Option 82
+              RID information."
+     ::= { wwpLeosDhcpRelayAgent 19 }
+
+ wwpLeosDhcpRelayAgentMplsRidStringEntry OBJECT-TYPE
+     SYNTAX         WwpLeosDhcpRelayAgentMplsRidStringEntry
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION
+             "Each entry in this table is used to specify an RID string for
+              MPLS VS and interface combinations."
+     INDEX { wwpLeosDhcpRelayAgentMplsId, wwpLeosDhcpRelayAgentMplsInterface }
+     ::= { wwpLeosDhcpRelayAgentMplsRidStringTable 1 }
+
+ WwpLeosDhcpRelayAgentMplsRidStringEntry ::= SEQUENCE {
+     wwpLeosDhcpRelayAgentMplsRidString          DisplayString,
+     wwpLeosDhcpRelayAgentMplsRidStringRowStatus RowStatus
+ }
+
+ wwpLeosDhcpRelayAgentMplsRidString   OBJECT-TYPE
+     SYNTAX         DisplayString (SIZE (1..64))
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+             "This object is used to get and set the RID string for the
+              interface."
+     ::= { wwpLeosDhcpRelayAgentMplsRidStringEntry 1 }
+
+ wwpLeosDhcpRelayAgentMplsRidStringRowStatus   OBJECT-TYPE
+     SYNTAX         RowStatus
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+             "Used to manage the creation and deletion of the conceptual rows in this table.
+              To create a row in this table set this object to 'createAndGo'.
+              To delete a row in this table set this object to 'destroy'."
+     ::= { wwpLeosDhcpRelayAgentMplsRidStringEntry 2 }
+
+ --
+ -- Notifications
+ --
+ wwpLeosDhcpClientOptionDisabledNotification NOTIFICATION-TYPE
+     OBJECTS    {
+                   wwpLeosDhcpOptionCode
+                }
+     STATUS  current
+     DESCRIPTION
+             "A wwpLeosDhcpClientOptionDisabledNotification is sent
+              whenever device receives DHCP option which is disabled
+              on the device."
+     ::= { wwpLeosDhcpClientMIBNotifications 1 }
+ END
+
+ --
+ -- WWP-LEOS-DHCP-CLIENT-MIB.my
+ --

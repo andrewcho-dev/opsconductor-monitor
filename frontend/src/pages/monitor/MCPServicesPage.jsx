@@ -26,6 +26,7 @@ export function MCPServicesPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [summary, setSummary] = useState(null);
   const [services, setServices] = useState([]);
+  const [serviceFolders, setServiceFolders] = useState([]);
   const [rings, setRings] = useState([]);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
@@ -35,6 +36,8 @@ export function MCPServicesPage() {
   const [sortField, setSortField] = useState('name');
   const [sortDir, setSortDir] = useState('asc');
   const [expandedRings, setExpandedRings] = useState({});
+  const [expandedServices, setExpandedServices] = useState({});
+  const [selectedSegment, setSelectedSegment] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -50,7 +53,10 @@ export function MCPServicesPage() {
       ]);
 
       if (summaryRes.success) setSummary(summaryRes.data);
-      if (servicesRes.success) setServices(servicesRes.data.services || []);
+      if (servicesRes.success) {
+        setServices(servicesRes.data.services || []);
+        setServiceFolders(servicesRes.data.service_folders || []);
+      }
       if (ringsRes.success) setRings(ringsRes.data.rings || []);
     } catch (err) {
       setError(err.message);
@@ -146,8 +152,9 @@ export function MCPServicesPage() {
         }
       />
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="p-6 space-y-6">
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <SummaryCard
           title="Total Services"
           value={summary?.total || 0}
@@ -208,7 +215,9 @@ export function MCPServicesPage() {
 
       {activeTab === 'services' && (
         <ServicesTab
-          services={filteredServices}
+          serviceFolders={serviceFolders}
+          expandedServices={expandedServices}
+          setExpandedServices={setExpandedServices}
           searchTerm={searchTerm}
           setSearchTerm={setSearchTerm}
           classFilter={classFilter}
@@ -216,9 +225,6 @@ export function MCPServicesPage() {
           stateFilter={stateFilter}
           setStateFilter={setStateFilter}
           serviceClasses={serviceClasses}
-          sortField={sortField}
-          sortDir={sortDir}
-          handleSort={handleSort}
         />
       )}
 
@@ -227,24 +233,27 @@ export function MCPServicesPage() {
           rings={rings}
           expandedRings={expandedRings}
           toggleRingExpanded={toggleRingExpanded}
+          selectedSegment={selectedSegment}
+          setSelectedSegment={setSelectedSegment}
         />
       )}
+      </div>
     </PageLayout>
   );
 }
 
 function SummaryCard({ title, value, icon: Icon, color, subtitle, alert }) {
   const colors = {
-    blue: 'bg-blue-50 text-blue-600',
-    green: 'bg-green-50 text-green-600',
-    red: 'bg-red-50 text-red-600',
-    purple: 'bg-purple-50 text-purple-600',
-    yellow: 'bg-yellow-50 text-yellow-600',
+    blue: 'bg-blue-100 text-blue-600',
+    green: 'bg-green-100 text-green-600',
+    red: 'bg-red-100 text-red-600',
+    purple: 'bg-purple-100 text-purple-600',
+    yellow: 'bg-yellow-100 text-yellow-600',
   };
 
   return (
     <div className={cn(
-      "bg-white rounded-xl border p-5 shadow-sm",
+      "bg-white rounded-xl border border-gray-200 shadow-sm p-4",
       alert && "border-red-300 bg-red-50/30"
     )}>
       <div className="flex items-center justify-between">
@@ -356,7 +365,9 @@ function OverviewTab({ summary, rings, services }) {
 }
 
 function ServicesTab({
-  services,
+  serviceFolders,
+  expandedServices,
+  setExpandedServices,
   searchTerm,
   setSearchTerm,
   classFilter,
@@ -364,10 +375,22 @@ function ServicesTab({
   stateFilter,
   setStateFilter,
   serviceClasses,
-  sortField,
-  sortDir,
-  handleSort
 }) {
+  // Filter folders
+  const filteredFolders = serviceFolders.filter(folder => {
+    if (searchTerm && !folder.name?.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+    if (classFilter && folder.service_class !== classFilter) return false;
+    if (stateFilter) {
+      if (stateFilter === 'up' && folder.state !== 'up') return false;
+      if (stateFilter === 'down' && folder.state !== 'down') return false;
+    }
+    return true;
+  });
+
+  const toggleService = (name) => {
+    setExpandedServices(prev => ({ ...prev, [name]: !prev[name] }));
+  };
+
   return (
     <div className="bg-white rounded-xl border shadow-sm">
       {/* Filters */}
@@ -400,138 +423,357 @@ function ServicesTab({
           <option value="">All States</option>
           <option value="up">Up</option>
           <option value="down">Down</option>
-          <option value="unknown">Unknown</option>
         </select>
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-sm">
-          <thead className="bg-gray-50">
-            <tr>
-              <SortableHeader field="name" label="Name" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
-              <SortableHeader field="service_class" label="Class" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
-              <SortableHeader field="operation_state" label="State" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
-              <SortableHeader field="admin_state" label="Admin" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
-              <th className="px-4 py-3 text-left font-semibold text-gray-700">Layer Rate</th>
-              <th className="px-4 py-3 text-right font-semibold text-gray-700">Capacity</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {services.slice(0, 100).map((svc, idx) => (
-              <tr key={svc.id || idx} className="hover:bg-gray-50">
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <ServiceClassIcon serviceClass={svc.service_class} />
-                    <span className="font-medium text-gray-900 truncate max-w-[250px]" title={svc.name}>
-                      {svc.name}
-                    </span>
-                  </div>
-                </td>
-                <td className="px-4 py-3 text-gray-600">{svc.service_class || '—'}</td>
-                <td className="px-4 py-3">
-                  <StateIndicator state={svc.operation_state} />
-                </td>
-                <td className="px-4 py-3">
-                  <span className={cn(
-                    "text-xs",
-                    svc.admin_state?.toLowerCase() === 'up' ? "text-green-600" : "text-gray-500"
-                  )}>
-                    {svc.admin_state || '—'}
+      {/* Service Folders */}
+      <div className="overflow-auto max-h-[calc(100vh-400px)]">
+        <div className="divide-y divide-gray-200">
+          {filteredFolders.map((folder) => (
+            <div key={folder.name}>
+              {/* Folder Header */}
+              <button
+                onClick={() => toggleService(folder.name)}
+                className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  {expandedServices[folder.name] ? (
+                    <ChevronDown className="h-4 w-4 text-gray-400" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 text-gray-400" />
+                  )}
+                  <ServiceClassIcon serviceClass={folder.service_class} />
+                  <span className="font-medium text-gray-900">{folder.name}</span>
+                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                    {folder.link_count} {folder.link_count === 1 ? 'link' : 'links'}
                   </span>
-                </td>
-                <td className="px-4 py-3 text-gray-600">{svc.layer_rate || '—'}</td>
-                <td className="px-4 py-3 text-right font-mono text-gray-600">
-                  {svc.total_capacity ? `${svc.total_capacity} ${svc.capacity_units || ''}` : '—'}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {services.length > 100 && (
-          <div className="p-4 text-center text-sm text-gray-500 border-t">
-            Showing 100 of {services.length} services
-          </div>
-        )}
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-gray-500">{folder.service_class || '—'}</span>
+                  <FolderStateIndicator state={folder.state} />
+                </div>
+              </button>
+
+              {/* Expanded Links */}
+              {expandedServices[folder.name] && (
+                <div className="bg-gray-50 border-t">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="px-4 py-2 pl-12 text-left text-xs font-medium text-gray-500">A-End (Device:Port)</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Z-End (Device:Port)</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">State</th>
+                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Capacity</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {folder.links.map((link, idx) => (
+                        <tr key={link.id || idx} className="hover:bg-gray-100">
+                          <td className="px-4 py-2 pl-12 text-gray-600 font-mono text-xs">
+                            {link.a_end ? `${link.a_end}${link.a_end_port ? ':' + link.a_end_port : ''}` : '—'}
+                          </td>
+                          <td className="px-4 py-2 text-gray-600 font-mono text-xs">
+                            {link.z_end ? `${link.z_end}${link.z_end_port ? ':' + link.z_end_port : ''}` : '—'}
+                          </td>
+                          <td className="px-4 py-2">
+                            <StateIndicator state={link.operation_state} />
+                          </td>
+                          <td className="px-4 py-2 text-right font-mono text-gray-600 text-xs">
+                            {link.total_capacity ? `${link.total_capacity} ${link.capacity_units || ''}` : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="p-3 text-center text-sm text-gray-500 border-t bg-gray-50">
+        {filteredFolders.length} services ({filteredFolders.reduce((sum, f) => sum + f.link_count, 0)} links)
       </div>
     </div>
   );
 }
 
-function RingsTab({ rings, expandedRings, toggleRingExpanded }) {
+function FolderStateIndicator({ state }) {
+  if (state === 'up') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+        <CheckCircle className="h-3 w-3" /> All Up
+      </span>
+    );
+  }
+  if (state === 'down') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
+        <XCircle className="h-3 w-3" /> Down
+      </span>
+    );
+  }
   return (
-    <div className="space-y-4">
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
+      <AlertTriangle className="h-3 w-3" /> Partial
+    </span>
+  );
+}
+
+function RingsTab({ rings, expandedRings, toggleRingExpanded, selectedSegment, setSelectedSegment }) {
+  return (
+    <div className="bg-white rounded-xl border shadow-sm">
       {rings.length === 0 ? (
-        <div className="bg-white rounded-xl border p-8 text-center">
+        <div className="p-8 text-center">
           <Circle className="h-12 w-12 text-gray-300 mx-auto mb-3" />
           <p className="text-gray-500">No G.8032 rings configured</p>
         </div>
       ) : (
-        rings.map(ring => (
-          <div key={ring.id} className="bg-white rounded-xl border shadow-sm overflow-hidden">
-            <button
-              onClick={() => toggleRingExpanded(ring.id)}
-              className="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
-            >
-              <div className="flex items-center gap-4">
-                <div className={cn(
-                  "w-4 h-4 rounded-full",
-                  ring.ring_state === 'OK' && ring.ring_status === 'OK'
-                    ? "bg-green-500"
-                    : "bg-red-500"
-                )} />
-                <div className="text-left">
-                  <p className="font-semibold text-gray-900">{ring.name}</p>
-                  <p className="text-sm text-gray-500">
-                    Ring ID: {ring.ring_id} • {ring.ring_type} • {ring.logical_ring}
-                  </p>
+        <div className="divide-y divide-gray-200">
+          {rings.map(ring => (
+            <div key={ring.id}>
+              {/* Ring Header */}
+              <button
+                onClick={() => toggleRingExpanded(ring.id)}
+                className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  {expandedRings[ring.id] ? (
+                    <ChevronDown className="h-4 w-4 text-gray-400" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 text-gray-400" />
+                  )}
+                  <div className={cn(
+                    "w-3 h-3 rounded-full",
+                    ring.ring_state === 'OK' && ring.ring_status === 'OK'
+                      ? "bg-green-500"
+                      : "bg-red-500"
+                  )} />
+                  <div className="text-left">
+                    <span className="font-semibold text-gray-900">{ring.name}</span>
+                    <span className="text-xs text-gray-500 ml-2">
+                      ID: {ring.ring_id} • {ring.ring_type}
+                    </span>
+                  </div>
+                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                    {ring.segment_count || 0} {ring.segment_count === 1 ? 'segment' : 'segments'}
+                  </span>
                 </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="flex gap-2">
+                <div className="flex items-center gap-3">
+                  {ring.protection_active && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
+                      <AlertTriangle className="h-3 w-3" /> Protection Active
+                    </span>
+                  )}
                   <span className={cn(
-                    "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
+                    "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
                     ring.ring_state === 'OK'
                       ? "bg-green-100 text-green-700"
                       : "bg-red-100 text-red-700"
                   )}>
-                    State: {ring.ring_state || 'Unknown'}
+                    {ring.ring_state || 'Unknown'}
                   </span>
-                  <span className={cn(
-                    "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
-                    ring.ring_status === 'OK'
-                      ? "bg-green-100 text-green-700"
-                      : "bg-red-100 text-red-700"
-                  )}>
-                    Status: {ring.ring_status || 'Unknown'}
-                  </span>
+                  <FolderStateIndicator state={ring.members_state} />
                 </div>
-                {expandedRings[ring.id] ? (
-                  <ChevronDown className="h-5 w-5 text-gray-400" />
-                ) : (
-                  <ChevronRight className="h-5 w-5 text-gray-400" />
-                )}
-              </div>
-            </button>
+              </button>
 
-            {expandedRings[ring.id] && (
-              <div className="px-5 pb-5 border-t bg-gray-50">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4">
-                  <RingDetail label="Ring ID" value={ring.ring_id} />
-                  <RingDetail label="Ring Type" value={ring.ring_type} />
-                  <RingDetail label="Logical Ring" value={ring.logical_ring} />
-                  <RingDetail label="Virtual Ring" value={ring.virtual_ring} />
-                  <RingDetail label="RAPS VID" value={ring.raps_vid} />
-                  <RingDetail label="Revertive" value={ring.revertive} />
-                  <RingDetail label="Wait to Restore" value={ring.wait_to_restore ? `${ring.wait_to_restore} min` : null} />
-                  <RingDetail label="Guard Time" value={ring.guard_time ? `${ring.guard_time} ms` : null} />
-                  <RingDetail label="Hold-off Time" value={ring.hold_off_time ? `${ring.hold_off_time} ms` : null} />
-                  <RingDetail label="Members" value={ring.ring_members} className="col-span-2 md:col-span-3" />
+              {/* Expanded Content */}
+              {expandedRings[ring.id] && (
+                <div className="bg-gray-50 border-t">
+                  {/* Ring Details */}
+                  <div className="px-4 py-3 border-b bg-gray-100">
+                    <div className="flex flex-wrap gap-4 text-xs">
+                      <span><strong>Logical Ring:</strong> {ring.logical_ring || '—'}</span>
+                      <span><strong>RAPS VID:</strong> {ring.raps_vid || '—'}</span>
+                      <span><strong>Revertive:</strong> {ring.revertive ? 'Yes' : 'No'}</span>
+                      <span><strong>Node IDs:</strong> {ring.ring_members || '—'}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-4 text-xs mt-2 pt-2 border-t border-gray-200">
+                      <span className={cn(
+                        "font-medium",
+                        ring.protection_active ? "text-orange-700" : "text-green-700"
+                      )}>
+                        <strong>RPL Block:</strong> {ring.rpl_owner_device ? `${ring.rpl_owner_device}:${ring.rpl_owner_port}` : '—'}
+                        {ring.protection_active && ' (SWITCHED!)'}
+                      </span>
+                      <span><strong>Ring State:</strong> {ring.ring_state || '—'}</span>
+                      <span><strong>Ring Status:</strong> {ring.ring_status || '—'}</span>
+                    </div>
+                  </div>
+                  
+                  {/* Ring Segments Table - actual inter-switch links */}
+                  {ring.ring_segments && ring.ring_segments.length > 0 ? (
+                    <table className="min-w-full text-sm">
+                      <thead className="bg-gray-100">
+                        <tr>
+                          <th className="px-4 py-2 pl-12 text-left text-xs font-medium text-gray-500">#</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">A-End (Device:Port)</th>
+                          <th className="px-4 py-2 text-center text-xs font-medium text-gray-500">Link</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Z-End (Device:Port)</th>
+                          <th className="px-4 py-2 text-center text-xs font-medium text-gray-500">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {ring.ring_segments.map((seg, idx) => (
+                          <tr 
+                            key={idx} 
+                            className={cn(
+                              "hover:bg-blue-50 cursor-pointer transition-colors",
+                              seg.is_rpl_block && "bg-yellow-50"
+                            )}
+                            onClick={() => setSelectedSegment({ ...seg, ring_name: ring.name, segment_number: idx + 1 })}
+                          >
+                            <td className="px-4 py-2 pl-12 text-gray-500 text-xs">
+                              {idx + 1}
+                            </td>
+                            <td className="px-4 py-2 font-mono text-xs font-medium">
+                              <span className={cn(
+                                seg.is_rpl_block && seg.rpl_blocked_port === 'a_end' 
+                                  ? "text-red-600 bg-red-100 px-1 rounded" 
+                                  : "text-gray-900"
+                              )}>
+                                {seg.a_end ? `${seg.a_end}:${seg.a_end_port || '?'}` : '—'}
+                              </span>
+                              {seg.is_rpl_block && seg.rpl_blocked_port === 'a_end' && (
+                                <span className="ml-2 text-red-600 text-xs font-bold">🔒 BLOCKED</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-2 text-center">
+                              {seg.is_rpl_block ? (
+                                <span className="text-red-500 font-bold">✕</span>
+                              ) : (
+                                <span className="text-green-500">↔</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-2 text-gray-900 font-mono text-xs font-medium">
+                              {seg.z_end ? `${seg.z_end}:${seg.z_end_port || '?'}` : '—'}
+                            </td>
+                            <td className="px-4 py-2 text-center">
+                              {seg.is_rpl_block ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
+                                  Blocked
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                                  Active
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="px-4 py-4 text-center text-sm text-gray-500">
+                      No ring segments found
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="p-3 text-center text-sm text-gray-500 border-t bg-gray-50">
+        {rings.length} rings ({rings.reduce((sum, r) => sum + (r.segment_count || 0), 0)} total segments)
+      </div>
+      
+      {/* Segment Detail Modal */}
+      {selectedSegment && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setSelectedSegment(null)}>
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full mx-4" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Ring Segment Details
+              </h3>
+              <button 
+                onClick={() => setSelectedSegment(null)}
+                className="text-gray-400 hover:text-gray-600 text-xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="text-xs text-gray-500 mb-1">Ring</div>
+                <div className="font-semibold text-gray-900">{selectedSegment.ring_name}</div>
+              </div>
+              
+              <div className="text-center text-sm text-gray-500">Segment #{selectedSegment.segment_number}</div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className={cn(
+                  "rounded-lg p-4",
+                  selectedSegment.is_rpl_block ? "bg-red-50 border-2 border-red-300" : "bg-green-50"
+                )}>
+                  <div className="text-xs text-gray-500 mb-1">A-End Device</div>
+                  <div className="font-semibold text-gray-900">{selectedSegment.a_end}</div>
+                  <div className="text-sm text-gray-600 mt-1">Port: {selectedSegment.a_end_port}</div>
+                  {selectedSegment.is_rpl_block && (
+                    <div className="mt-2 text-red-600 text-xs font-bold flex items-center gap-1">
+                      🔒 RPL BLOCKED
+                    </div>
+                  )}
+                </div>
+                
+                <div className="bg-blue-50 rounded-lg p-4">
+                  <div className="text-xs text-gray-500 mb-1">Z-End Device</div>
+                  <div className="font-semibold text-gray-900">{selectedSegment.z_end}</div>
+                  <div className="text-sm text-gray-600 mt-1">Port: {selectedSegment.z_end_port}</div>
                 </div>
               </div>
-            )}
+              
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="text-xs text-gray-500 mb-1">Link Status</div>
+                <div className="flex items-center gap-2">
+                  {selectedSegment.is_rpl_block ? (
+                    <>
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-700">
+                        Blocked
+                      </span>
+                      <span className="text-sm text-gray-600">
+                        Traffic is blocked on this segment (RPL protection)
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-700">
+                        Active
+                      </span>
+                      <span className="text-sm text-gray-600">
+                        Traffic is flowing through this segment
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
+              
+              {selectedSegment.is_rpl_block && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <div className="font-medium text-yellow-800">RPL Block Location</div>
+                      <div className="text-sm text-yellow-700 mt-1">
+                        This is the Ring Protection Link (RPL) block point. Under normal operation, 
+                        traffic is blocked here to prevent loops. If a failure occurs elsewhere in the ring, 
+                        this block will be removed to restore connectivity.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="px-6 py-4 border-t bg-gray-50 rounded-b-xl">
+              <button
+                onClick={() => setSelectedSegment(null)}
+                className="w-full px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
+              >
+                Close
+              </button>
+            </div>
           </div>
-        ))
+        </div>
       )}
     </div>
   );
@@ -579,9 +821,10 @@ function StateIndicator({ state }) {
       </span>
     );
   }
+  // For ring FTP links and other services without state, show N/A instead of Unknown
   return (
-    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-      {state || 'Unknown'}
+    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
+      —
     </span>
   );
 }

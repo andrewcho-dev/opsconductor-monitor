@@ -1,0 +1,1173 @@
+-- This file was included in WWP MIB release 04-21-05-0007
+--
+ -- WWP-LEOS-IP-INTERFACE-MIB.my
+ --
+ --
+
+ WWP-LEOS-IP-INTERFACE-MIB DEFINITIONS ::= BEGIN
+
+ IMPORTS
+   Integer32, Unsigned32, Counter32, IpAddress, OBJECT-TYPE, MODULE-IDENTITY, NOTIFICATION-TYPE
+            FROM SNMPv2-SMI
+   RowStatus, DisplayString, MacAddress, TruthValue, TEXTUAL-CONVENTION
+            FROM SNMPv2-TC
+   InetAddressType, InetAddress
+            FROM INET-ADDRESS-MIB
+   cienaGlobalSeverity, cienaGlobalMacAddress
+        FROM  CIENA-GLOBAL-MIB
+   wwpModulesLeos
+       FROM WWP-SMI;
+
+
+ wwpLeosIpInterfaceMIB MODULE-IDENTITY
+        LAST-UPDATED "201906260000Z"
+        ORGANIZATION "Ciena Corp."
+        CONTACT-INFO
+            "   Mib Meister
+                7035 Ridge Road
+                Hanover, Maryland 21076
+                USA
+                Phone:  +1 800 921 1144
+                Email:  support@ciena.com"
+        DESCRIPTION
+            "The MIB module for the WWP IpInterface IP interfaces configuration. This MIB provide
+             additional configuration to those which are provided by the standard ip group."
+
+        REVISION     "201906260000Z"
+        DESCRIPTION
+            "Added new object wwpLeosIpDataInterfaceBfdProfileName to the
+             wwpIpDataInterfaceTable."
+
+        REVISION     "201905010000Z"
+        DESCRIPTION
+            "Added new object wwpLeosIpDataInterfaceDonorInterfaceName to the
+             wwpIpDataInterfaceTable."
+
+        REVISION    "201805300000Z"
+        DESCRIPTION
+            "Added new objects wwpLeosIpDataInterfacePeerIpAddr and wwpLeosIpDataInterfaceStaticRouteCfgd to the
+             wwpIpDataInterfaceTable"
+
+        REVISION     "201711150000Z"
+        DESCRIPTION
+            "Updated contact info."
+
+        REVISION    "201705190000Z"
+        DESCRIPTION
+            "Added new objects, wwpLeosIpDataInterfaceVsIndex, wwpLeosIpDataInterfaceVsName and
+             wwpLeosIpDataInterfaceVsAssocState to the wwpIpDataInterfaceTable in order to display the Vpls Irb
+             vs index and name attached to Irb ip-interface.
+             wwpLeosIpInterfaceVsAssocState is used for vpls vs attach or detach notification with Irb interface.
+             Defines two notifications namely wwpLeosIpDataInterfaceOperSateChangeNotification and
+             wwpLeosIpDataInterfaceIrbVsAssociationNotification for interface operational state change and vs attach or
+             detach with Irb interface notifications."
+
+        REVISION    "201510200000Z"
+        DESCRIPTION
+            "Added new objects, wwpLeosIpDataInterfaceSvlanPriority and wwpLeosIpDataInterfaceCvlanPriority,
+             to the wwpIpDataInterfaceTable in order to display the S-VLAN/C-VLAN IP Interface priority/pcp values."
+
+        REVISION    "201508050000Z"
+        DESCRIPTION
+            "Added new object, wwpLeosIpDataInterfaceUnnumbered, to the wwpIpDataInterfaceTable."
+
+        REVISION    "201507020000Z"
+        DESCRIPTION
+            "Added new object wwpLeosIpDataInterfaceStaticArpDestinationIp and
+             wwpLeosIpDataInterfaceStaticArpDestinationMac to wwpLeosIpDataInterfaceEntry."
+
+        REVISION    "201506120000Z"
+        DESCRIPTION
+            "Added new object wwpLeosIpDataInterfaceIfNum in wwpLeosIpDataInterfaceEntry"
+
+        REVISION    "201504060000Z"
+        DESCRIPTION
+            "Added new object, wwpLeosIpDataInterfaceIngressAclProfId, to the wwpIpDataInterfaceTable
+             in order to display the ID of the ingress ACL profile attached to the IP interface."
+
+        REVISION    "201412010000Z"
+        DESCRIPTION
+            "Added new object wwpLeosIpv6AcceptRouterAdvertisement to display the IPv6 Accept
+             Router Advertisement status"
+
+        REVISION    "201407210000Z"
+        DESCRIPTION
+            "Added new object wwpLeosIpv6Stack to display the IPv6 Stack Status
+             (wwpLeosIpv6StackStatus) and the IP Stack Preference (wwpLeosIpStackPreference)"
+
+        REVISION    "201404150000Z"
+        DESCRIPTION
+            "Added additional MPLS information to the wwpIpDataInterfaceTable"
+
+        REVISION    "201312030000Z"
+        DESCRIPTION
+            "Added wwpLeosIpInterfaceIPv6AddressTable to show user configured IPv6
+             addresses for an ip interface.  Notifications in the event of add/remove
+             an IPv6 address to/from the interface, are also added in this version."
+
+        REVISION    "201311250000Z"
+        DESCRIPTION
+            "Added new object, wwpLeosIpInterfaceL3InterfaceBaseMac, to display the
+             base MAC address for L3 interfaces."
+
+        REVISION    "201305300000Z"
+        DESCRIPTION
+            "Marked wwpLeosIpAclClearStats to deprecated as it was illegally defined as
+             RowStatus.  A new object is created, wwpLeosIpAclStatsClear, to replace it."
+
+        REVISION    "201304230000Z"
+        DESCRIPTION
+            "Miscellaneous spelling and description corrections."
+
+        REVISION     "201212140000Z"  -- 14th Dec. 2012
+        DESCRIPTION
+            "Added the operational gateway and a trap for gateway changes"
+
+        REVISION     "200805140000Z"  -- 14nd May. 2008
+        DESCRIPTION
+            "Support for VS Member type IP Interfaces by adding a new cpuVsMember
+             type to wwpLeosIpDataInterfaceType and a new wwpLeosIpDataInterfaceCvid object
+                              to WwpLeosIpDataInterfaceEntry."
+        REVISION     "200305020000Z"  -- 2nd May. 2003
+        DESCRIPTION
+            "A new object for management packet priority is added."
+
+        REVISION    "200104031700Z"
+        DESCRIPTION
+            "Initial creation."
+       ::= { wwpModulesLeos 24 }
+
+ VlanId ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "A 12-bit VLAN ID used in the VLAN Tag header."
+    SYNTAX      Integer32 (1..4094)
+
+ --
+ -- Node definitions
+ --
+	
+ wwpLeosIpInterfaceMIBObjects OBJECT IDENTIFIER ::= { wwpLeosIpInterfaceMIB 1 }
+ 
+ 
+ --
+ -- IP Interface Node
+ --
+ wwpLeosIpInterface OBJECT IDENTIFIER ::= { wwpLeosIpInterfaceMIBObjects 1 } 
+ wwpLeosIpAclGlobal OBJECT IDENTIFIER ::= { wwpLeosIpInterfaceMIBObjects 2 }
+ wwpLeosIpAclRules OBJECT IDENTIFIER ::= { wwpLeosIpInterfaceMIBObjects 3 }
+ wwpLeosIpv6Stack OBJECT IDENTIFIER  ::= { wwpLeosIpInterfaceMIBObjects 4 }
+		
+
+ -- Notifications 
+  
+ wwpLeosIpInterfaceMIBNotificationPrefix  OBJECT IDENTIFIER ::= { wwpLeosIpInterfaceMIB 2 } 
+ wwpLeosIpInterfaceMIBNotifications       OBJECT IDENTIFIER ::=  
+                       { wwpLeosIpInterfaceMIBNotificationPrefix 0 }
+
+ -- Conformance information 
+ 
+ wwpLeosIpInterfaceMIBConformance OBJECT IDENTIFIER ::= { wwpLeosIpInterfaceMIB 3 } 
+ wwpLeosIpInterfaceMIBCompliances OBJECT IDENTIFIER ::= { wwpLeosIpInterfaceMIBConformance 1 } 		
+ wwpLeosIpInterfaceMIBGroups      OBJECT IDENTIFIER ::= { wwpLeosIpInterfaceMIBConformance 2 }
+
+
+ wwpLeosIpInterfaceTable OBJECT-TYPE
+     SYNTAX SEQUENCE OF WwpLeosIpInterfaceEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+	     "Table of IP addresses and associated subnet mask."
+     ::= { wwpLeosIpInterface 1 }
+		
+ wwpLeosIpInterfaceEntry OBJECT-TYPE
+     SYNTAX     WwpLeosIpInterfaceEntry
+     MAX-ACCESS not-accessible
+     STATUS     current
+     DESCRIPTION
+	     "Interface IP and subnet mask entry.
+	     These interfaces are used to cause the switch CPU to
+	     become involved with the IP traffic. By default, a 
+	     minimum of two interfaces must always exist, one for
+	     the local management interface, one for the remote management
+	     interface, and one or more for voice over IP."
+     INDEX { wwpLeosIpInterfaceIndex }
+	    ::= { wwpLeosIpInterfaceTable 1 }
+		
+ WwpLeosIpInterfaceEntry ::=  SEQUENCE { 
+      wwpLeosIpInterfaceIndex       Integer32,
+      wwpLeosIpInterfaceName        DisplayString,
+      wwpLeosIpInterfaceIpAddr      IpAddress,
+      wwpLeosIpInterfaceSubnet      IpAddress,
+      wwpLeosIpInterfaceIfIndexXref Integer32
+ }
+
+ wwpLeosIpInterfaceIndex OBJECT-TYPE
+      SYNTAX Integer32 (1..4096)
+      MAX-ACCESS       not-accessible
+      STATUS           current
+      DESCRIPTION
+	      "Unique index into the table."
+      ::= { wwpLeosIpInterfaceEntry 1 }
+		
+ wwpLeosIpInterfaceName OBJECT-TYPE
+     SYNTAX      DisplayString (SIZE (0..32))
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+	     "The friendly name for the IP interface."
+     ::= { wwpLeosIpInterfaceEntry 2 }
+		
+ wwpLeosIpInterfaceIpAddr OBJECT-TYPE
+     SYNTAX       IpAddress
+     MAX-ACCESS   read-write
+     STATUS       current
+     DESCRIPTION
+	     "IP address associated with this interface. "
+     ::= { wwpLeosIpInterfaceEntry 3 }
+		 
+ wwpLeosIpInterfaceSubnet OBJECT-TYPE
+     SYNTAX       IpAddress
+     MAX-ACCESS   read-write
+     STATUS       current
+     DESCRIPTION
+	     "The subnet mask associated with this ip address/interface."
+     ::= { wwpLeosIpInterfaceEntry 4 }
+		
+		
+ wwpLeosIpInterfaceIfIndexXref OBJECT-TYPE
+     SYNTAX        Integer32(1..4096)
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+	     "Cross reference to MIB-2 Interfaces ifIndex."
+     ::= { wwpLeosIpInterfaceEntry 5 }
+
+ wwpLeosIpExtInterfaceTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF WwpLeosIpExtInterfaceEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A table that contains Interface Specific
+         information maintained by each interface."
+    ::= { wwpLeosIpInterface 2 }
+
+ wwpLeosIpExtInterfaceEntry OBJECT-TYPE
+    SYNTAX      WwpLeosIpExtInterfaceEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A list of additional interface configuration parameters 
+        maintained by each interface."
+    AUGMENTS    { wwpLeosIpInterfaceEntry }
+    ::= { wwpLeosIpExtInterfaceTable 1 }
+
+ WwpLeosIpExtInterfaceEntry ::=
+    SEQUENCE {
+        wwpLeosIpInterfaceEnable             TruthValue,
+        wwpLeosIpInterfaceVlanId             VlanId,
+        wwpLeosIpInterfaceMgmtPktPriority    Integer32
+    }
+
+ wwpLeosIpInterfaceEnable  OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The status of each interface. A value of true(1) indicates 
+        that this interface is enabled and a value of 
+        false(2) indicates that this interface is disabled.
+        The device should not allow the Management Station to disable
+        all the interfaces available on the box."
+    ::= { wwpLeosIpExtInterfaceEntry 1 }
+
+ wwpLeosIpInterfaceVlanId  OBJECT-TYPE
+    SYNTAX      VlanId
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The vlanId associated with this IP interface. The vlan indicated by 
+        wwpLeosIpInterfaceVlanId should exist in the Vlan Table. If an interface
+        has no associated VLAN, then any read on this object should return
+        'noSuchInstance'."
+    ::= { wwpLeosIpExtInterfaceEntry 2 }
+
+ wwpLeosIpInterfaceMgmtPktPriority  OBJECT-TYPE
+    SYNTAX      Integer32 (0..7)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The 802.1p Priority value for the management traffic on this interface."
+    ::= { wwpLeosIpExtInterfaceEntry 3 }
+ 
+ wwpLeosIpInterfaceAddrNotifEnabled OBJECT-TYPE
+     SYNTAX      TruthValue
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+             "This variable  indicates  whether  the  system
+             generates the wwpLeosIpInterfaceAddrChgNotification.
+             A false value prevents this notifications
+             from being generated by this system."
+    DEFVAL { true }
+    ::= { wwpLeosIpInterface 3 }
+    
+ wwpLeosIpInterfaceAddrChgNotification NOTIFICATION-TYPE
+	OBJECTS	{
+	           wwpLeosIpInterfaceName,
+		   wwpLeosIpInterfaceIpAddr,
+		   wwpLeosIpInterfaceSubnet
+                }
+	STATUS	current
+	DESCRIPTION
+		"A wwpLeosIpInterfaceAddrChgNotification is sent whenever the
+		IP address of an interface changes." 
+	::= { wwpLeosIpInterfaceMIBNotifications 1 }
+ 
+ --
+ -- Data Interface MIB definitions 
+ -- 		
+ wwpLeosIpDataInterfaceTable OBJECT-TYPE
+     SYNTAX SEQUENCE OF WwpLeosIpDataInterfaceEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+	     "Data Interface IP and subnet mask entry.
+	      To create a loopback interface in this table, the following attributes must be specified:
+	       wwpLeosIpDataInterfaceIndex
+	       wwpLeosIpDataInterfaceName
+	       wwpLeosIpDataInterfaceIpAddr
+	       wwpLeosIpDataInterfaceType must be set to 'loopback'.
+           wwpLeosIpDataInterfaceVlanId defaults to 1 and cannot be set or changed.
+           No other MIB object should be set otherwise error is returned.
+                
+	      To create a regular data interface the following attributes must be specified:
+	       wwpLeosIpDataInterfaceIndex
+	       wwpLeosIpDataInterfaceName
+	       wwpLeosIpDataInterfaceIpAddr
+	       wwpLeosIpDataInterfaceMask
+	       wwpLeosIpDataInterfaceVlanId must be specified when
+                the interface is created. It cannot be changed after
+                creation.
+	       wwpLeosIpDataRowStatus must be set to 'createAndGo'."
+     ::= { wwpLeosIpInterface 4 }
+		
+ wwpLeosIpDataInterfaceEntry OBJECT-TYPE
+     SYNTAX     WwpLeosIpDataInterfaceEntry
+     MAX-ACCESS not-accessible
+     STATUS     current
+     DESCRIPTION
+	     "Each entry represents a data interface configuration parameter."
+     INDEX { wwpLeosIpDataInterfaceIndex }
+	    ::= { wwpLeosIpDataInterfaceTable 1 }
+		
+ WwpLeosIpDataInterfaceEntry ::=  SEQUENCE { 
+      wwpLeosIpDataInterfaceIndex                   Integer32,
+      wwpLeosIpDataInterfaceName                    DisplayString,
+      wwpLeosIpDataInterfaceIpAddr                  IpAddress,
+      wwpLeosIpDataInterfaceMask                    IpAddress,
+      wwpLeosIpDataInterfaceVlanId                  VlanId,
+      wwpLeosIpDataInterfaceType                    INTEGER,
+      wwpLeosIpDataInterfaceIfIndex                 Integer32,  
+      wwpLeosIpDataInterfaceMac                     MacAddress,
+      wwpLeosIpDataInterfaceIfMtu                   Integer32,
+      wwpLeosIpDataInterfaceRowStatus	            RowStatus,
+      wwpLeosIpDataInterfaceCvid                    VlanId,
+      wwpLeosIpDataInterfaceAdminState              TruthValue,
+      wwpLeosIpDataInterfaceOperState               TruthValue,
+      wwpLeosIpDataInterfaceIpForwarding            TruthValue,
+      wwpLeosIpDataInterfaceLdpEnable               TruthValue,
+      wwpLeosIpDataInterfaceRsvpEnable              TruthValue,
+      wwpLeosIpDataInterfaceTunnelDependency        TruthValue,
+      wwpLeosIpDataInterfaceL2VpnDependency         TruthValue,
+      wwpLeosIpDataInterfaceOspfEnable              TruthValue,
+      wwpLeosIpDataInterfaceIsisEnable              TruthValue,
+      wwpLeosIpDataInterfaceStaticArpEnable         TruthValue,
+      wwpLeosIpDataInterfaceVccvDependency          TruthValue,
+      wwpLeosIpDataInterfacePtpEnable               TruthValue,
+      wwpLeosIpDataInterfaceIfNum                   Unsigned32,
+      wwpLeosIpDataInterfaceStaticArpDestinationIp  IpAddress,
+      wwpLeosIpDataInterfaceStaticArpDestinationMac MacAddress,                 
+      wwpLeosIpDataInterfaceRole                    INTEGER,
+      wwpLeosIpDataInterfaceIngressAclProfId        Unsigned32,
+      wwpLeosIpDataInterfaceUnnumbered              TruthValue,
+      wwpLeosIpDataInterfaceSvlanPriority           Unsigned32,
+      wwpLeosIpDataInterfaceCvlanPriority           Unsigned32,
+      wwpLeosIpDataInterfaceVsIndex                 Integer32,
+      wwpLeosIpDataInterfaceVsName                  DisplayString,
+      wwpLeosIpDataInterfaceVsAssocState            TruthValue,
+      wwpLeosIpDataInterfacePeerIpAddr              IpAddress,
+      wwpLeosIpDataInterfaceStaticRouteCfgd         TruthValue,
+      wwpLeosIpDataInterfaceDonorInterfaceName      DisplayString,
+      wwpLeosIpDataInterfaceBfdProfileName          DisplayString
+ }
+ 
+ wwpLeosIpDataInterfaceIndex OBJECT-TYPE
+      SYNTAX      Integer32 (1..4096)
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION                                                                     
+	      "Unique index into the table."
+      ::= { wwpLeosIpDataInterfaceEntry 1 }
+		
+ wwpLeosIpDataInterfaceName OBJECT-TYPE
+     SYNTAX       DisplayString (SIZE (0..15))
+     MAX-ACCESS   read-create
+     STATUS       current
+     DESCRIPTION
+	     "The name for this Data IP interface."
+     ::= { wwpLeosIpDataInterfaceEntry 2 }
+		
+ wwpLeosIpDataInterfaceIpAddr OBJECT-TYPE
+     SYNTAX       IpAddress
+     MAX-ACCESS   read-create
+     STATUS       current
+     DESCRIPTION
+	     "IP address associated with this interface. "
+     ::= { wwpLeosIpDataInterfaceEntry 3 }
+		 
+ wwpLeosIpDataInterfaceMask OBJECT-TYPE
+     SYNTAX       IpAddress
+     MAX-ACCESS   read-create
+     STATUS       current
+     DESCRIPTION
+	     "The subnet mask associated with this ip address/interface."
+     ::= { wwpLeosIpDataInterfaceEntry 4 }
+		
+ wwpLeosIpDataInterfaceVlanId  OBJECT-TYPE
+    SYNTAX        VlanId
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+        "The vlanId associated with this Data IP interface. This vlan must already
+         exist on the device. The vlanId must be specified when the interface is
+         created. It cannot be set after creation. The vlanId cannot be specified
+         and defaults to 1 for a loopback interface."
+    ::= { wwpLeosIpDataInterfaceEntry 5 }
+
+ wwpLeosIpDataInterfaceType OBJECT-TYPE
+     SYNTAX       INTEGER {
+                           broadcast(1),
+                           pointToPoint(2),
+                           loopBack(3),
+                           cpuVsMember(4),
+                           vplsIrb(5) 
+                          }
+     MAX-ACCESS   read-create
+     STATUS       current
+     DESCRIPTION
+        "The type of Data IP interface."
+     DEFVAL      { broadcast }
+     ::= { wwpLeosIpDataInterfaceEntry 6 }
+
+ wwpLeosIpDataInterfaceIfIndex OBJECT-TYPE
+     SYNTAX       Integer32
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "The unique interface index assigned by INET."
+     ::= { wwpLeosIpDataInterfaceEntry 7 }
+
+ wwpLeosIpDataInterfaceMac OBJECT-TYPE
+     SYNTAX       MacAddress
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "MAC address assigned by the device to this Data interface."
+     ::= { wwpLeosIpDataInterfaceEntry 8 }    
+ 
+ wwpLeosIpDataInterfaceIfMtu OBJECT-TYPE
+     SYNTAX      Integer32
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION
+        "The size of the largest packet which can be
+         sent/received on the interface, specified in octets.
+         For interfaces that are used for transmitting network
+         datagrams, this is the size of the largest network
+         datagram that can be sent on the interface."
+     DEFVAL      { 1500 }
+     ::= { wwpLeosIpDataInterfaceEntry 9 }
+ 
+ wwpLeosIpDataInterfaceRowStatus OBJECT-TYPE
+     SYNTAX       RowStatus
+     MAX-ACCESS   read-create
+     STATUS       current
+     DESCRIPTION
+        "Used to manage the creation and deletion of the conceptual rows in this table.
+         To create a row in this table, set this object to 'createAndGo'.
+         To delete a row in this table, set this object to 'destroy'.
+         If the entry exists, it is displayed as 'active'."
+     ::= { wwpLeosIpDataInterfaceEntry 10 }
+     
+ wwpLeosIpDataInterfaceCvid  OBJECT-TYPE
+     SYNTAX        VlanId
+     MAX-ACCESS    read-create
+     STATUS        current
+     DESCRIPTION
+        "The customer VlanId associated with this Data IP interface.
+         This is only applicable to VS Member type IP Interfaces and
+         defaults to 0 on all other IP Interface types."
+     ::= { wwpLeosIpDataInterfaceEntry 11 }
+
+ wwpLeosIpDataInterfaceAdminState OBJECT-TYPE
+     SYNTAX       TruthValue 
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "The Admin State of Data IP interface."
+     ::= { wwpLeosIpDataInterfaceEntry 12 }
+
+ wwpLeosIpDataInterfaceOperState OBJECT-TYPE
+     SYNTAX       TruthValue 
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "The Oper State of Data IP interface."
+     DEFVAL      { 1 }
+     ::= { wwpLeosIpDataInterfaceEntry 13 }
+
+ wwpLeosIpDataInterfaceIpForwarding OBJECT-TYPE
+     SYNTAX       TruthValue 
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "The Ip Forwarding State of Data IP interface."
+     DEFVAL      { 1 }
+     ::= { wwpLeosIpDataInterfaceEntry 14 }
+
+ wwpLeosIpDataInterfaceLdpEnable OBJECT-TYPE
+     SYNTAX       TruthValue 
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "Determines if LDP is enabled on the  Data IP interface."
+     ::= { wwpLeosIpDataInterfaceEntry 15 }
+
+ wwpLeosIpDataInterfaceRsvpEnable OBJECT-TYPE
+     SYNTAX        TruthValue 
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "Determines if RSVP is enabled on the  Data IP interface."
+     ::= { wwpLeosIpDataInterfaceEntry 16 }
+
+ wwpLeosIpDataInterfaceTunnelDependency OBJECT-TYPE
+     SYNTAX        TruthValue 
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "Determines if Tunnel entities using the interface."
+     ::= { wwpLeosIpDataInterfaceEntry 17 }
+
+ wwpLeosIpDataInterfaceL2VpnDependency OBJECT-TYPE
+     SYNTAX        TruthValue 
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "The L2Vpn association of the interface."
+     ::= { wwpLeosIpDataInterfaceEntry 18 }
+
+ wwpLeosIpDataInterfaceOspfEnable OBJECT-TYPE
+     SYNTAX        TruthValue 
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "The OSPF attachment to the Data interface."
+     ::= { wwpLeosIpDataInterfaceEntry 19 }
+
+ wwpLeosIpDataInterfaceIsisEnable OBJECT-TYPE
+     SYNTAX        TruthValue 
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "The ISIS attachment to the Data interface."
+     ::= { wwpLeosIpDataInterfaceEntry 20 }
+
+ wwpLeosIpDataInterfaceStaticArpEnable OBJECT-TYPE
+     SYNTAX        TruthValue 
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "The Static ARP attachment to the Data interface."
+     ::= { wwpLeosIpDataInterfaceEntry 21 }
+
+ wwpLeosIpDataInterfaceVccvDependency OBJECT-TYPE
+     SYNTAX        TruthValue 
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "The VCCV Profile association to the Data interface."
+     ::= { wwpLeosIpDataInterfaceEntry 22 }
+
+ wwpLeosIpDataInterfacePtpEnable OBJECT-TYPE
+     SYNTAX        TruthValue 
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "The PTP attachment to the Data interface."
+     ::= { wwpLeosIpDataInterfaceEntry 23 }
+
+ wwpLeosIpDataInterfaceIfNum OBJECT-TYPE
+     SYNTAX      Unsigned32 
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION                                                                     
+         "This represent interface number."
+     ::= { wwpLeosIpDataInterfaceEntry 24 }
+         
+ wwpLeosIpDataInterfaceStaticArpDestinationIp OBJECT-TYPE
+     SYNTAX       IpAddress
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "The static ARP attachment destination IP address to the data interface.
+         IpAddress value returned is only valid if wwpLeosIpDataInterfaceStaticArpEnable
+         is true, otherwise all zeros address is returned."
+     ::= { wwpLeosIpDataInterfaceEntry 25 }
+
+ wwpLeosIpDataInterfaceStaticArpDestinationMac OBJECT-TYPE
+     SYNTAX       MacAddress
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "The static ARP attachment destination MAC address to the data interface.
+         MacAddress value returned is only valid if wwpLeosIpDataInterfaceStaticArpEnable
+         is true, otherwise all zeros address is returned."
+     ::= { wwpLeosIpDataInterfaceEntry 26 }
+
+ wwpLeosIpDataInterfaceRole OBJECT-TYPE
+     SYNTAX       INTEGER {
+                            none(0),
+                            evcPing(1),
+                            deviceMgmt(2),
+                            auxiliary(3)
+                          }
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "The IP interface Role."
+     DEFVAL      { evcPing }
+     ::= { wwpLeosIpDataInterfaceEntry 27 }
+     
+ wwpLeosIpDataInterfaceIngressAclProfId OBJECT-TYPE
+     SYNTAX       Unsigned32 (0..65535)
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "The ID of the ingress ACL profile attached to the Data interface.
+         A non-zero value refers to the ACL profile as defined by the cienaCesAclProfileId object
+         in the cienaCesAccessListMIB module.        
+         A value of 0 means no ingress ACL profile is attached to this interface."
+     ::= { wwpLeosIpDataInterfaceEntry 28 }
+
+wwpLeosIpDataInterfaceUnnumbered OBJECT-TYPE
+     SYNTAX       TruthValue 
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "If the value is true, the interface has no ip address and mask assigned. Instead
+         it shares the ip address with a ip numbered or loopback interface; the subnet
+         mask is fixed at /32. The wwpLeosIpDataInterfaceType is pointToPoint. If the
+         value is false, the interface has an assigned ip address and subnet mask."
+     DEFVAL      { false }
+     ::= { wwpLeosIpDataInterfaceEntry 29 }
+
+ wwpLeosIpDataInterfaceSvlanPriority OBJECT-TYPE
+     SYNTAX       Unsigned32 (0..7)
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "The egress S-VLAN priority (pcp) value on packets egressing this IP Interface."
+     DEFVAL      { 7 }         
+     ::= { wwpLeosIpDataInterfaceEntry 30 }
+
+ wwpLeosIpDataInterfaceCvlanPriority OBJECT-TYPE
+     SYNTAX       Unsigned32 (0..7)
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "The egress C-VLAN priority (pcp) value on packets egressing this interface.
+         Note that this value is only applicable to double-tagged IP Interfaces."
+     DEFVAL      { 0 }         
+     ::= { wwpLeosIpDataInterfaceEntry 31 }
+
+ wwpLeosIpDataInterfaceVsIndex  OBJECT-TYPE
+     SYNTAX        Integer32 (0..65535)
+     MAX-ACCESS    read-create
+     STATUS        current
+     DESCRIPTION
+        "The MPLS virtual-switch index associated with this Data IP interface.
+         This is only applicable to VPLS IRB type IP Interfaces and
+         defaults to 0 on all other IP Interface types."
+     ::= { wwpLeosIpDataInterfaceEntry 32 }
+
+ wwpLeosIpDataInterfaceVsName OBJECT-TYPE
+     SYNTAX       DisplayString (SIZE (0..31))
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "This object specifies the MPLS virtual-switch name."
+     ::= { wwpLeosIpDataInterfaceEntry 33 }
+
+ wwpLeosIpDataInterfaceVsAssocState OBJECT-TYPE
+     SYNTAX       TruthValue
+     MAX-ACCESS   accessible-for-notify
+     STATUS       current
+     DESCRIPTION
+        "VPLS VS attach / detach state with IRB ip-interface.
+         True indicates VPLS VS attached with IRB interface and
+         False indicates VPLS VS detached from IRB interface."
+     ::= { wwpLeosIpDataInterfaceEntry 34 }
+
+ wwpLeosIpDataInterfacePeerIpAddr OBJECT-TYPE
+     SYNTAX       IpAddress
+     MAX-ACCESS   read-create
+     STATUS       current
+     DESCRIPTION
+        "Set/unset Peer-ip-address for the Unnumberd interface"
+     ::= { wwpLeosIpDataInterfaceEntry 35 }
+
+ wwpLeosIpDataInterfaceStaticRouteCfgd OBJECT-TYPE
+     SYNTAX       TruthValue 
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "Determines if static routes are configured using this interface."
+     ::= { wwpLeosIpDataInterfaceEntry 36 }
+
+ wwpLeosIpDataInterfaceDonorInterfaceName OBJECT-TYPE
+     SYNTAX       DisplayString (SIZE (0..15))
+     MAX-ACCESS   read-create
+     STATUS       current
+     DESCRIPTION
+        "The name of Donor-interface for unnumbered-interface."
+     ::= { wwpLeosIpDataInterfaceEntry 37 }
+
+ wwpLeosIpDataInterfaceBfdProfileName OBJECT-TYPE
+     SYNTAX       DisplayString (SIZE (0..32))
+     MAX-ACCESS   read-create
+     STATUS       current
+     DESCRIPTION
+        "The name of BFD Profile that is used for BFD session Creation."
+     ::= { wwpLeosIpDataInterfaceEntry 38 }
+
+ wwpLeosIpDataInterfaceIrbVsAssociationNotification NOTIFICATION-TYPE
+     OBJECTS {
+               cienaGlobalSeverity,
+               cienaGlobalMacAddress,
+               wwpLeosIpDataInterfaceName,
+               wwpLeosIpDataInterfaceVsName,
+               wwpLeosIpDataInterfaceVsAssocState
+             }
+     STATUS  current
+     DESCRIPTION
+        "A wwpLeosIpDataInterfaceIrbVsAssociationNotification is sent whenever
+         the IRB ip-interface is attached / detached to /from a VPLS VS." 
+     ::= { wwpLeosIpInterfaceMIBNotifications 5 }
+ 
+ wwpLeosIpDataInterfaceOperStateChangeNotification NOTIFICATION-TYPE
+     OBJECTS {
+               cienaGlobalSeverity,
+               cienaGlobalMacAddress,
+               wwpLeosIpDataInterfaceName,
+               wwpLeosIpDataInterfaceOperState
+             }
+     STATUS  current
+     DESCRIPTION
+        "A wwpLeosIpDataInterfaceOperSateChangeNotification is sent whenever
+         the ip-interface oper state is changed." 
+     ::= { wwpLeosIpInterfaceMIBNotifications 6 }
+         
+--
+-- Gateway
+--
+ wwpLeosIpInterfaceOperationalGateway OBJECT-TYPE
+     SYNTAX      IpAddress
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+        "Operational gateway IP address."
+     ::= { wwpLeosIpInterface  5 }
+
+
+ wwpLeosIpInterfaceOperationalGatewayChgNotification  NOTIFICATION-TYPE
+     OBJECTS   {  wwpLeosIpInterfaceOperationalGateway  }
+     STATUS    current
+     DESCRIPTION  
+        "A wwpLeosIpOperationalGatewayChgNotification notification is sent out whenever the operational gateway is changed."  
+     ::= { wwpLeosIpInterfaceMIBNotifications 2 }
+
+--
+-- L3 Interface Base MAC
+--
+ wwpLeosIpInterfaceL3InterfaceBaseMac OBJECT-TYPE
+     SYNTAX      MacAddress
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+         "The base MAC address for L3 interfaces."
+     ::= { wwpLeosIpInterface  6 }
+
+ --
+ -- Interface IPv6 Addresses
+ --
+ wwpLeosIpInterfaceIPv6AddressTable OBJECT-TYPE
+     SYNTAX SEQUENCE OF WwpLeosIpInterfaceIPv6AddressEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "Table of IPv6 addresses and subnet masks associated to an IP Interface."
+     ::= { wwpLeosIpInterface 7 }
+
+ wwpLeosIpInterfaceIPv6AddressEntry OBJECT-TYPE
+     SYNTAX     WwpLeosIpInterfaceIPv6AddressEntry
+     MAX-ACCESS not-accessible
+     STATUS     current
+     DESCRIPTION
+             "IPv6 address and subnet mask associated with an IP Interface."
+     INDEX { wwpLeosIpDataInterfaceIndex, wwpLeosIpInterfaceIPv6AddressIndex }
+     ::= { wwpLeosIpInterfaceIPv6AddressTable 1 }
+
+ WwpLeosIpInterfaceIPv6AddressEntry ::=  SEQUENCE { 
+      wwpLeosIpInterfaceIPv6AddressIndex      Integer32,
+      wwpLeosIpInterfaceIpInetAddrType        InetAddressType,
+      wwpLeosIpInterfaceIpInetAddr            InetAddress,
+      wwpLeosIpInterfaceSubnetInetAddrType    InetAddressType,
+      wwpLeosIpInterfaceSubnetInetAddr        InetAddress
+ }
+
+ wwpLeosIpInterfaceIPv6AddressIndex OBJECT-TYPE
+     SYNTAX       Integer32 (1..4096)
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+             "Index into the table."
+     ::= { wwpLeosIpInterfaceIPv6AddressEntry 1 }
+
+ wwpLeosIpInterfaceIpInetAddrType OBJECT-TYPE
+     SYNTAX       InetAddressType
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "The type of address wwpLeosIpInterfaceIpInetAddr belongs to.
+         When set to:
+         ipv4 : wwpLeosIpInterfaceIpInetAddr should be compliant with 
+                InetAddressIPv4 from RFC 4001
+         ipv6 : wwpLeosIpInterfaceIpInetAddr should be compliant with
+                InetAddressIPv6 from RFC 4001."
+     ::= { wwpLeosIpInterfaceIPv6AddressEntry 2 }
+
+ wwpLeosIpInterfaceIpInetAddr OBJECT-TYPE
+     SYNTAX       InetAddress
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "IP address associated with this interface. This address should be
+         compliant with RFC 4001."
+     ::= { wwpLeosIpInterfaceIPv6AddressEntry 3 }
+
+ wwpLeosIpInterfaceSubnetInetAddrType OBJECT-TYPE
+     SYNTAX       InetAddressType
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "Specifies the type of address wwpLeosIpInterfaceSubnetInetAddr belongs to.
+         When set to:
+         ipv4 : wwpLeosIpInterfaceSubnetInetAddr should be compliant with 
+                InetAddressIPv4 from RFC 4001
+         ipv6 : wwpLeosIpInterfaceSubnetInetAddr should be compliant with
+                InetAddressIPv6 from RFC 4001."
+     ::= { wwpLeosIpInterfaceIPv6AddressEntry 4 }
+
+ wwpLeosIpInterfaceSubnetInetAddr OBJECT-TYPE
+     SYNTAX       InetAddress
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+        "The subnet mask associated with the ip address/interface. 
+         This address should be compliant with RFC 4001."
+     ::= { wwpLeosIpInterfaceIPv6AddressEntry 5 }
+
+ wwpLeosIpInterfaceIPv6AddrAddedNotification NOTIFICATION-TYPE
+     OBJECTS {
+                  cienaGlobalSeverity,
+                  cienaGlobalMacAddress,
+                  wwpLeosIpDataInterfaceName,
+                  wwpLeosIpInterfaceIpInetAddrType,
+                  wwpLeosIpInterfaceIpInetAddr,
+                  wwpLeosIpInterfaceSubnetInetAddrType,
+                  wwpLeosIpInterfaceSubnetInetAddr
+             }
+     STATUS       current
+     DESCRIPTION
+             "A wwpLeosIpInterfaceIPv6AddrAddedNotification is sent when an
+              IPv6 address is added to the interface." 
+     ::= { wwpLeosIpInterfaceMIBNotifications 3 }
+ 
+ wwpLeosIpInterfaceIPv6AddrRemovedNotification NOTIFICATION-TYPE
+     OBJECTS {
+                  cienaGlobalSeverity,
+                  cienaGlobalMacAddress,
+                  wwpLeosIpDataInterfaceName,
+                  wwpLeosIpInterfaceIpInetAddrType,
+                  wwpLeosIpInterfaceIpInetAddr,
+                  wwpLeosIpInterfaceSubnetInetAddrType,
+                  wwpLeosIpInterfaceSubnetInetAddr
+             }
+     STATUS       current
+     DESCRIPTION
+             "A wwpLeosIpInterfaceIPv6AddrRemovedNotification is sent when an
+              IPv6 address is removed from the interface." 
+     ::= { wwpLeosIpInterfaceMIBNotifications 4 }
+ 
+
+ --
+ -- IP ACL Items
+ --
+ 
+  wwpLeosIpAclState OBJECT-TYPE
+    SYNTAX      INTEGER {
+                     		disabled(1),
+                            enabled(2)
+                        }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object allows the user to globally configure IP ACL state."
+    ::= { wwpLeosIpAclGlobal 1 } 
+    
+  wwpLeosIpAclCacheHit OBJECT-TYPE
+  	SYNTAX		Counter32
+  	MAX-ACCESS	read-only
+  	STATUS		current
+  	DESCRIPTION
+  		"This object provides a count of the number of lookups satisfied by a cache hit."
+  	::= { wwpLeosIpAclGlobal 2 }
+  	
+  wwpLeosIpAclNoHit OBJECT-TYPE
+  	SYNTAX		Counter32
+  	MAX-ACCESS	read-only
+  	STATUS		current
+  	DESCRIPTION
+  		"This object provides a count of the number of lookups that failed because the source
+  		IP address did not match a table entry."
+  	::= { wwpLeosIpAclGlobal 3 }
+  	
+  wwpLeosIpAclBadPort OBJECT-TYPE
+  	SYNTAX		Counter32
+  	MAX-ACCESS	read-only
+  	STATUS		current
+  	DESCRIPTION
+  		"This object provides a count of the number of lookups that failed because the ingress
+  		port was disallowed by a table entry."
+  	::= { wwpLeosIpAclGlobal 4 }
+  	
+  wwpLeosIpAclClearStats OBJECT-TYPE
+   	SYNTAX		RowStatus
+   	MAX-ACCESS	read-write
+   	STATUS		deprecated
+   	DESCRIPTION
+   		"Set this object to 'destroy' to clear the global and table entry statistics counters."
+   	::= { wwpLeosIpAclGlobal 5 }
+                                   
+  wwpLeosIpAclBadDscp OBJECT-TYPE
+  	SYNTAX		Counter32
+  	MAX-ACCESS	read-only
+  	STATUS		current
+  	DESCRIPTION
+  		"Count of the number of lookups that failed because the ingress
+  		DSCP value was disallowed by a table entry."
+  	::= { wwpLeosIpAclGlobal 6 }
+  	
+   wwpLeosIpAclOperState OBJECT-TYPE
+    SYNTAX      INTEGER {
+                     		disabled(1),
+                            enabled(2)
+                        }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The current operational state of the IP ACL system."
+    ::= { wwpLeosIpAclGlobal 7 } 
+ 
+   wwpLeosIpAclInUseEntries OBJECT-TYPE
+  	SYNTAX		Counter32
+  	MAX-ACCESS	read-only
+  	STATUS		current
+  	DESCRIPTION
+  		"This object provides a count of the number of IP ACL rules that are currently configured."
+  	::= { wwpLeosIpAclGlobal 8 }
+  
+  wwpLeosIpAclMaxEntries OBJECT-TYPE
+  	SYNTAX		Counter32
+  	MAX-ACCESS	read-only
+  	STATUS		current
+  	DESCRIPTION
+  		"This object provides a count of the max number of IP ACL rules that can be configured."
+  	::= { wwpLeosIpAclGlobal 9 }
+
+  wwpLeosIpAclStatsClear OBJECT-TYPE
+   	SYNTAX		TruthValue
+   	MAX-ACCESS	read-write
+   	STATUS		current
+   	DESCRIPTION
+   		"Set this object to true(1) to clear the global and table entry statistics counters."
+        DEFVAL          { false }
+   	::= { wwpLeosIpAclGlobal 10 }
+                                  
+  --
+  --  IP ACL Table
+  --                                   
+  wwpLeosIpAclTable OBJECT-TYPE
+     SYNTAX     SEQUENCE OF WwpLeosIpAclEntry
+     MAX-ACCESS not-accessible
+     STATUS     current
+     DESCRIPTION
+            "The (conceptual) table listing the display 
+             parameters for the IP ACL table."  
+     ::= { wwpLeosIpAclRules 1 }
+                
+  wwpLeosIpAclEntry OBJECT-TYPE
+     SYNTAX      WwpLeosIpAclEntry
+     MAX-ACCESS  not-accessible
+     STATUS      current
+     DESCRIPTION
+           "An entry (conceptual row) in the wwpLeosIpAclTable."
+     INDEX {wwpLeosIpAclEntryIpAddr, wwpLeosIpAclEntryIpMask}
+     ::= { wwpLeosIpAclTable 1 }
+                
+  WwpLeosIpAclEntry ::=  SEQUENCE { 
+     wwpLeosIpAclEntryIpAddr					IpAddress,
+     wwpLeosIpAclEntryIpMask					IpAddress,
+     wwpLeosIpAclEntryPortMask					Unsigned32,
+     wwpLeosIpAclEntryHits				        Counter32,
+     wwpLeosIpAclEntryBadPort					Counter32,
+     wwpLeosIpAclEntryStatus					RowStatus,
+     wwpLeosIpAclEntryDscpMask					OCTET STRING,
+     wwpLeosIpAclEntryBadDscp					Counter32,
+     wwpLeosIpAclEntryPortBitMask                               OCTET STRING
+  }
+
+  wwpLeosIpAclEntryIpAddr OBJECT-TYPE
+     SYNTAX      IpAddress
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION
+             "This object is the IP network that is authorized."
+     ::= { wwpLeosIpAclEntry 1 }
+  
+  wwpLeosIpAclEntryIpMask OBJECT-TYPE
+     SYNTAX      IpAddress
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION
+             "This object is the netmask for the IP network that is authorized."
+     ::= { wwpLeosIpAclEntry 2 }
+     
+  wwpLeosIpAclEntryPortMask OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  read-create
+     STATUS      deprecated 
+     DESCRIPTION
+             "This object is used to specify the physical ports which frames are
+	     allowed to ingress from.  The mask is big endian and each bit,
+             numbered from 0 to 27, represents a physical port numbered from
+             1 to 28.  A value of 0xFFFFFFFF may be used to specify all ports."
+     ::= { wwpLeosIpAclEntry 3 }        
+     
+  wwpLeosIpAclEntryHits OBJECT-TYPE
+  	SYNTAX		Counter32
+  	MAX-ACCESS	read-only
+  	STATUS		current
+  	DESCRIPTION
+  		"Count of the number of lookups that matched the table entry."
+  	::= { wwpLeosIpAclEntry 4 }
+
+  wwpLeosIpAclEntryBadPort OBJECT-TYPE
+  	SYNTAX		Counter32
+  	MAX-ACCESS	read-only
+  	STATUS		current
+  	DESCRIPTION
+  		"Count of the number of lookups that failed because the ingress
+  		port was disallowed by the table entry."
+  	::= { wwpLeosIpAclEntry 5 }
+
+  wwpLeosIpAclEntryStatus OBJECT-TYPE
+  	SYNTAX		RowStatus
+  	MAX-ACCESS	read-create
+  	STATUS		current
+  	DESCRIPTION
+  		"Set this object to 'CreateAndGo' to create a new table entry.
+		Set it to 'destroy' to remove an existing entry."
+    ::= { wwpLeosIpAclEntry 6 }
+  	
+  wwpLeosIpAclEntryDscpMask OBJECT-TYPE
+     SYNTAX      OCTET STRING(SIZE(8))
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION
+             "This object is used to specify the DSCP values for which IP packets
+             are allowed to ingress.  The mask is big endian and each bit,
+             numbered from 0 to 63, represents a DSCP value numbered from
+             0 to 63.  A value of 0xFFFFFFFFFFFFFFFF may be used to specify all."
+     ::= { wwpLeosIpAclEntry 7 }        
+     
+  wwpLeosIpAclEntryBadDscp OBJECT-TYPE
+  	SYNTAX		Counter32
+  	MAX-ACCESS	read-only
+  	STATUS		current
+  	DESCRIPTION
+  		"Count of the number of lookups that failed because the ingress
+  		DSCP value was disallowed by the table entry."
+  	::= { wwpLeosIpAclEntry 8 }
+
+  wwpLeosIpAclEntryPortBitMask OBJECT-TYPE
+     SYNTAX      OCTET STRING (SIZE(8)) 
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION
+             "This object is used to specify the physical ports that frames
+             are allowed to ingress from.  The mask is big endian and each bit,
+             numbered from 0 to 63, represents a physical port numbered from
+             1 to 64.  A value of 0xFFFFFFFFFFFFFFFF may be used to specify all ports."
+     ::= { wwpLeosIpAclEntry 9 }
+
+ --
+ -- IPv6 Stack Items
+ --
+   
+  wwpLeosIpv6StackStatus OBJECT-TYPE
+    SYNTAX      INTEGER {
+                            enabled(1),
+                            disabled(2)
+                        }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object allows the user to enable/disable the IPv6 Stack."
+    ::= { wwpLeosIpv6Stack 1 } 
+    
+  wwpLeosIpStackPreference OBJECT-TYPE
+    SYNTAX      INTEGER {
+                     	    ipv4(1),
+                            ipv6(2)
+                        }
+    MAX-ACCESS  read-only
+  	STATUS	current
+  	DESCRIPTION
+  		"This object provides the IP stack preference."
+  	::= { wwpLeosIpv6Stack 2 }
+
+  wwpLeosIpv6AcceptRouterAdvertisement OBJECT-TYPE
+    SYNTAX      INTEGER {
+                     	    on(1),
+                            off(2)
+                        }
+    MAX-ACCESS  read-only
+  	STATUS	current
+  	DESCRIPTION
+  		"This object provides the IP stack Accept Router Advertisement status."
+  	::= { wwpLeosIpv6Stack 3 }
+
+ END

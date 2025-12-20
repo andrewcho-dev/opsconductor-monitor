@@ -1,0 +1,3906 @@
+-- This file was included in WWP MIB release 04-21-05-0007
+ --
+ -- WWP-LEOS-BENCHMARK-MIB.my
+ --
+ --
+
+ WWP-LEOS-BENCHMARK-MIB DEFINITIONS ::= BEGIN
+
+ IMPORTS 		
+     Unsigned32, Integer32, Counter64, IpAddress, OBJECT-TYPE, 
+     MODULE-IDENTITY, NOTIFICATION-TYPE
+	    FROM SNMPv2-SMI
+     RowStatus, TruthValue, DisplayString, MacAddress, TEXTUAL-CONVENTION,
+     DateAndTime
+	    FROM SNMPv2-TC
+     wwpModulesLeos		
+	    FROM WWP-SMI
+     InetAddressType, InetAddress ,InetAddressPrefixLength
+	    FROM INET-ADDRESS-MIB
+     sysName, sysLocation FROM RFC1213-MIB;
+
+ wwpLeosBenchmarkMIB MODULE-IDENTITY
+            LAST-UPDATED "201711150000Z"
+            ORGANIZATION "Ciena Corp."
+            CONTACT-INFO
+                "   Mib Meister
+                    7035 Ridge Road
+                    Hanover, Maryland 21076
+                    USA
+                    Phone:  +1 800 921 1144
+                    Email:  support@ciena.com"
+            DESCRIPTION  "The MIB module for monitoring benchmark testing."
+
+            REVISION     "201711150000Z"
+            DESCRIPTION  "Updated contact info."
+
+            REVISION     "201610110000Z"
+            DESCRIPTION  "WWP-LEOS-BENCHMARK-MIB is now superseded by CIENA-CES-BENCHMARK-MIB.
+                          Deprecating all 'current' object-types."
+
+            REVISION     "201609300000Z"
+            DESCRIPTION  "Setting wwpLeosBenchmarkPortStats objects as obsolete,
+                          Setting previously deprecated objects as obsolete as no data is returned,
+                          Updating default values for various objects to help with 'createAndGo' operations."
+
+            REVISION     "201606030000Z"
+            DESCRIPTION  "Add new reflector MAC Validation attribute,
+                          wwpLeosBenchmarkReflectorMacValidation."
+
+            REVISION     "201604200000Z"
+            DESCRIPTION  "In wwpLeosBenchmarkProfileEntryFrameLossStartBw:
+                          INTEGER {
+                            profileBandwidth(1),
+                            maximumThroughput(2),
+                            maximumLineRate(3)
+                          }
+                          became:
+                          INTEGER {
+                              profileBandwidth(1),
+                              maximumThroughput(2)
+                          }"
+
+            REVISION     "201604190000Z"
+            DESCRIPTION  "Change the description for
+                          wwpLeosBenchmarkProfileEntryPduType, from:
+                          Vlan tag protocol identifier to use for the generated packets.
+                          to:
+                          Type of test packets to generate. Supported types are 
+                          ethernet, IP or UDP echo.
+                          Changed the work classifier to classify in the 
+                          description for wwpLeosBenchmarkProfileEntryColorValidation.
+                          Changed the description for
+                          wwpLeosBenchmarkProfileEntryPcpValidation, from:
+                          Used to indicate whether the PCP value of the
+                          test packet should be used to classifier the reflected
+                          packets or not. When color remarking is used, this should
+                          be set to Falso. Default is True.
+                          to:
+                          Used to indicate whether the PCP value of the
+                          test packet should be used to classify the reflected
+                          packets or not. When the PCP of the test packet is 
+                          changed (COS re-mapped) as it travels between the 
+                          Generator and the Reflector nodes, this attribute 
+                          should be set to False. Default is True."
+
+            REVISION     "201412180000Z"
+            DESCRIPTION  "Changed range of ProfileEntryBandwidth from 1..1000 to
+                          1..10000. Added a range to ProfileEntryExcessBandwidth
+                          at 0..10000"
+
+            REVISION     "201410270000Z"
+            DESCRIPTION  "Added new test profile attribute
+                          wwpLeosBenchmarkProfileEntryPcpValidation"
+
+            REVISION     "201410230000Z"
+            DESCRIPTION  "Added new test profile attribute
+                          wwpLeosBenchmarkProfileEntryColorValidation"
+
+            REVISION     "201410100000Z"
+            DESCRIPTION  "Change the term inetAddr to InetAddress is the 
+                          description for the following item
+                             wwpLeosBenchmarkProfileEntrySrcInetAddrType
+                             wwpLeosBenchmarkProfileEntrySrcInetAddr
+                             wwpLeosBenchmarkProfileEntryDstInetAddrType
+                             wwpLeosBenchmarkProfileEntryDstInetAddr"
+
+            REVISION     "201409250000Z"
+            DESCRIPTION  "Add new Frame loss stats result attribute
+                            wwpLeosBenchmarkHwSessionFramelossStatsResult."
+
+            REVISION     "201409240000Z"
+            DESCRIPTION  "Add the wwpLeosBenchmarkGeneratorAvailableHwSessions and
+                          wwpLeosBenchmarkGeneratorAllocatedHwSessions."
+
+            REVISION     "201409180000Z"
+            DESCRIPTION  "Change the MIBS description to ensure the following snmpset 
+                          command description includes the Addr and AddrType attributes
+                          when being set
+                             wwpLeosBenchmarkProfileEntrySrcInetAddrType
+                             wwpLeosBenchmarkProfileEntrySrcInetAddr
+                             wwpLeosBenchmarkProfileEntryDstInetAddrType
+                             wwpLeosBenchmarkProfileEntryDstInetAddr"
+                             
+            REVISION     "201406300000Z"
+            DESCRIPTION  "Changes for Y.1564, support for simultaneous sessions.
+                          Changes include
+                            New attributes in the profile table
+                               wwpLeosBenchmarkProfileEntryCurrentIteration
+                               wwpLeosBenchmarkProfileEntryTotalIterations
+                               wwpLeosBenchmarkProfileEntryKpiProfileId
+                               wwpLeosBenchmarkProfileEntryPcpBwDistProfileId
+                               wwpLeosBenchmarkProfileEntryEmixSequenceId
+                               wwpLeosBenchmarkProfileEntryColor
+                               wwpLeosBenchmarkProfileEntryY1564Test
+                               wwpLeosBenchmarkProfileEntryHwSessionsRequired
+                               wwpLeosBenchmarkProfileEntryLastTestRun
+                            New hardware session table
+                               wwpLeosBenchmarkHwSessionAllocationTable
+                            New bandwidth distribution profile table
+                               wwpLeosBenchmarkPcpBwDistProfileTable
+                            New EMIX sequence table
+                               wwpLeosBenchmarkEmixSequenceTable
+                            New KPI (Key Performance Indicator) profile table
+                               wwpLeosBenchmarkKpiProfileTable
+                            Deprecated profile statistics tables due to changes
+                            in the index
+                               wwpLeosBenchmarkProfileThroughutStatisticsTable
+                               wwpLeosBenchmarkProfileFramelossStatisticsTable
+                               wwpLeosBenchmarkProfileLatencyStatisticsTable
+                               wwpLeosBenchmarkProfilePdvStatisticsTable
+                            wwpLeosBenchmarkFpgaStatsXXXX can now only be
+                            retrieved in reflector role. When in generator role,
+                            the user has to query FPGA stats via
+                            wwpLeosBenchmarkFpgaHwSessionStatsTable which is
+                            indexed by profileId, pcp and color.
+                            New hardware session statistics tables indexed
+                            by profile Id, pcp and color which replace the
+                            deprecated profile stats table above
+                               wwpLeosBenchmarkHwSessionThroughutStatisticsTable
+                               wwpLeosBenchmarkHwSessionFramelossStatisticsTable
+                               wwpLeosBenchmarkHwSessionLatencyStatisticsTable
+                               wwpLeosBenchmarkHwSessionPdvStatisticsTable
+                            Introducing notifications for profile test start, stopped
+                            by user and test completed."
+                              
+            REVISION     "201406180000Z"
+            DESCRIPTION  "Increased size of wwpLeosBenchmarkProfileEntryName from 15
+                          to 45 characters."
+
+            REVISION     "201311220000Z"
+	    DESCRIPTION  "Added new objects for clearing statistics data. Deprecated the 
+                          wwpLeosBenchmarkProfileFrameSizeTable and replaced it with 
+                          wwpLeosBenchmarkProfileTestFrameSizeTable."
+
+            REVISION     "201310160000Z"
+            DESCRIPTION  "Added new IPv6 FPGA counters
+                                wwpLeosBenchmarkFpgaStatsRxIpv6Pkts
+                                wwpLeosBenchmarkFpgaStatsRxIpv6UdpPkts
+                          and updated definitions for 
+                                wwpLeosBenchmarkFpgaStatsRxIpPkts and 
+                                wwpLeosBenchmarkFpgaStatsRxUdpPkts
+                          to indicate they are IPv4 counters."
+  
+            REVISION     "201309200000Z"
+            DESCRIPTION  "Added new Inet Address attributes to the profile table
+                          in order to support IPv6 packet generation. Depricated
+                          the IPv4 only attributes.
+                          The new attributes are:
+                                wwpLeosBenchmarkProfileEntrySrcInetAddrType
+                                wwpLeosBenchmarkProfileEntrySrcInetAddr
+                                wwpLeosBenchmarkProfileEntryDstInetAddrType
+                                wwpLeosBenchmarkProfileEntryDstInetAddr
+                          The deprecated attributes:
+                                wwpLeosBenchmarkProfileEntrySrcIpAddr
+                                wwpLeosBenchmarkProfileEntryDstIpAddr"
+
+            REVISION     "201307250000Z"
+	    DESCRIPTION  "Added support for Set command."
+
+            REVISION     "201304290000Z"
+	    DESCRIPTION
+			 "Deprecated wwpLeosBenchmarkFpgaStatsOO0Pkts.  Added new OIDS
+			 wpLeosBenchmarkFpgaStatsRxIpPkts,  wwpLeosBenchmarkFpgaStatsRxUdpPkts,
+			 wwpLeosBenchmarkFpgaStatsRxNonIpPkts, wwpLeosBenchmarkFpgaStatsRxUnrecognizedPkts.
+			 Miscellaneous spelling and description corrections."
+
+            REVISION     "201301220800Z"
+            DESCRIPTION  "Added vidOutOfService value for benchmark mode"
+
+            REVISION     "201202130800Z"
+            DESCRIPTION  "Added active vid and dst mac address associated
+                          with latest version of results"
+
+            REVISION     "201202030800Z"
+            DESCRIPTION  "Added new attribute to the profile table
+                          for max searches during throughput test,
+                          max samples for latency, sampling interval
+                          for latency, vid validation switch and
+                          frame loss start bandwidth.
+                          Added new frame size table indexed by profile Id
+                          and frame size index representing the list
+                          of frame sizes used when running tests for the
+                          profile."
+
+	    REVISION     "201012140800Z"
+            DESCRIPTION  "Added bandwidth parameter to profile table
+                          Modified generator module to report iteration
+                          and total number of iteration"
+
+            REVISION     "201011250800Z"
+            DESCRIPTION  "Added RateIndex field to frameloss stats
+                          table index."
+
+            REVISION     "201011150800Z"
+	    DESCRIPTION  "Initial creation."
+	    ::= { wwpModulesLeos 43 }
+
+ --
+ -- Textual convention
+ --
+ BenchmarkLatencyPdvTestState ::= TEXTUAL-CONVENTION
+     STATUS       deprecated
+     DESCRIPTION  "Test state for latency and packet delay variation tests."
+     SYNTAX       INTEGER {
+                      idle(1),
+                      sendingTraffic(2),
+                      waitingForTimestampData(3),
+                      waitingForResidualPackets(4),
+                      processingResults(5),
+                      stoppedByIntervalTimer(6),
+                      stoppedByDurationTimer(7),
+                      stoppedByUser(8),
+                      done(9)
+                  }
+
+ BenchmarkThroughputTestState ::= TEXTUAL-CONVENTION
+     STATUS       deprecated
+     DESCRIPTION  "Throughput test states" 
+     SYNTAX       INTEGER {
+                      idle(1),
+                      running(2),
+                      waitingForResidualPackets(3),
+                      processingResults(4),
+                      stoppedByIntervalTimer(5),
+                      stoppedByDurationTimer(6),
+                      stoppedByUser(7),
+                      done(8)
+                   }
+
+BenchmarkFramelossTestState ::= TEXTUAL-CONVENTION
+     STATUS       deprecated
+     DESCRIPTION  "Frame loss test states"
+     SYNTAX       INTEGER {
+                      idle(1),
+                      runningFirstTest(2),
+                      waitingForResidualFirstPackets(3),
+                      processingFirstResults(4),
+                      runningSecondTest(5),
+                      waitingForResidualSecondPackets(6),
+                      processingSecondResults(7),
+                      stoppedByIntervalTimer(8),
+                      stoppedByDurationTimer(9),
+                      stoppedByUser(10),
+                      done(11)
+                  }
+
+ BenchmarkRfc2544TestState ::= TEXTUAL-CONVENTION
+     STATUS       deprecated
+     DESCRIPTION  "RFC 2544 test suite state."
+     SYNTAX       INTEGER {
+                      idle(1),
+                      running(2),
+                      stoppedByIntervalTimer(3),
+                      stoppedByDurationTimer(4),
+                      stoppedByUser(5),
+                      done(6)
+                  }
+
+ BenchmarkY1564TestState ::= TEXTUAL-CONVENTION
+     STATUS       deprecated
+     DESCRIPTION  "Y1564 test suite state."
+     SYNTAX       INTEGER {
+                      idle(1),
+                      running(2),
+                      stoppedByIntervalTimer(3),
+                      stoppedByDurationTimer(4),
+                      stoppedByUser(5),
+                      done(6)
+                  }
+
+BenchmarkColorTest ::= TEXTUAL-CONVENTION
+     STATUS       deprecated
+     DESCRIPTION  "Defines which traffic color need to be tested. Green 
+                   test traffic is generated with DEI bit set to 0 and
+                   using the profile bandwidth parameter as the starting
+                   bandwidth; yellow test traffic is generated with DEI bit
+                   set to 1 and using the profile excess-bandwidth paramter
+                   as the starting bandwidth. When testing for red, the test
+                   stream has its DEI bit set to 1 and the starting bandwidth
+                   is (excess-bandwidth * 1.25)"
+     SYNTAX       INTEGER {
+                      green(1),
+                      yellow(2),
+                      greenYellow(3),
+                      greenYellowRed(4)
+                  }
+
+BenchmarkKpiResult ::= TEXTUAL-CONVENTION
+     STATUS       deprecated
+     DESCRIPTION  "Provides a pass or fail for the test results compared to
+                   the selected KPI profile's pass crieteria for the test."
+     SYNTAX       INTEGER {
+                      notAvailable(1),
+                      pass(2),
+                      fail(3)
+                  }
+
+BenchmarkThroughputKpiPercent ::= TEXTUAL-CONVENTION
+     DISPLAY-HINT "d-4"
+     STATUS       deprecated
+     DESCRIPTION  "Percent of bandwidth that the maximum throughput result
+                   shouldn't go below for the test to be considered a pass.
+                   The value is given as an integer but represent a 4 decimal
+                   point percent. Ex: 0.2000 is reported as 2000."
+     SYNTAX        Unsigned32
+
+BenchmarkFramelossKpiPercent ::= TEXTUAL-CONVENTION
+     DISPLAY-HINT "d-4"
+     STATUS       deprecated
+     DESCRIPTION  "Percent of the frameloss test staring bandwidth, the frame
+                   loss shouldn't exceed for the test to be considered a pass.
+                   The value is given as an integer but represent a 4 decimal
+                   point percent. Ex: 0.2000 is reported as 2000."
+     SYNTAX        Unsigned32
+
+BenchmarkThroughputResult ::= TEXTUAL-CONVENTION
+     DISPLAY-HINT "d-2"
+     STATUS       deprecated
+     DESCRIPTION  "Throughput results in Mbps are sent as unsigned integer
+                   mulitplied by 100 to provide a 2 decimal point accuracy.
+                   If result is 123.45 Mbps, it is sent as 12345 and should
+                   be divided by 100 by the SNMP application retrieving the
+                   data."
+     SYNTAX        Unsigned32
+
+BenchmarkFramelossResult ::= TEXTUAL-CONVENTION
+     DISPLAY-HINT "d-2"
+     STATUS       deprecated
+     DESCRIPTION  "Frame loss results in Percent of frame loss start bandwidth
+                   are sent as unsigned integer mulitplied by 100 to provide a
+                   2 decimal point accuracy.
+                   If result is 12.34 %, it is sent as 1234 and should
+                   be divided by 100 by the SNMP application retrieving the
+                   data."
+     SYNTAX        Unsigned32
+
+BenchmarkPcpBwDistPercent ::= TEXTUAL-CONVENTION
+     DISPLAY-HINT "d-2"
+     STATUS       deprecated
+     DESCRIPTION  "Percent of bandwidth to allocate to the test session
+                   for a given PCP. It is sent as an uint32 with the value
+                   * 100 to provide 2 decimal point granularity. Ex:
+                   12.25% is sent as 1225 and should therefore be
+                   interpreted appropriately by the management system."
+     SYNTAX        Unsigned32 (0..10000)
+
+BenchmarkPcpBitmap ::= TEXTUAL-CONVENTION
+     DISPLAY-HINT "x"
+     STATUS       deprecated
+     DESCRIPTION  "Bitmap of the VLAN PCP (Priority Code ) value to test
+                   with. When The RFC2544 test is selected in the profile,
+                   only 1 PCP bit can be set. For other tests, a test 
+                   session will be run simultaneously for each PCP set
+                   in the bitmap. In the later case, the bandwidth will
+                   be distributed amonst the set PCPs according to the
+                   selected PCP Bandwidth distribution profile. If no
+                   such profile is configured, the bandwidth will evenly
+                   be distributed amongst all set PCPs."
+     SYNTAX        Unsigned32 (0..255)
+
+ wwpLeosBenchmarkMIBObjects OBJECT IDENTIFIER ::= { wwpLeosBenchmarkMIB 1 }
+
+ wwpLeosBenchmarkModule OBJECT IDENTIFIER ::= { wwpLeosBenchmarkMIBObjects 1 } 
+
+ wwpLeosBenchmarkReflectorModule OBJECT IDENTIFIER 
+     ::= { wwpLeosBenchmarkMIBObjects 2 }
+
+ wwpLeosBenchmarkGeneratorModule OBJECT IDENTIFIER 
+     ::= { wwpLeosBenchmarkMIBObjects 3 }
+
+ wwpLeosBenchmarkFpgaStats OBJECT IDENTIFIER 
+     ::= { wwpLeosBenchmarkMIBObjects 4 }
+
+ wwpLeosBenchmarkPortStats OBJECT IDENTIFIER 
+     ::= { wwpLeosBenchmarkMIBObjects 5 }
+
+ wwpLeosBenchmarkProfileObjects OBJECT IDENTIFIER 
+     ::= { wwpLeosBenchmarkMIBObjects 6 }
+
+ wwpLeosBenchmarkNotifications OBJECT IDENTIFIER
+     ::= { wwpLeosBenchmarkMIBObjects 7 }
+
+ --
+ -- the Benchmark Module 
+ --
+ wwpLeosBenchmarkRole OBJECT-TYPE
+     SYNTAX             INTEGER {
+                            none(1),
+                            reflector(2),
+                            generator(3)
+                        }
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION
+                "System level benchmark role"
+     ::= { wwpLeosBenchmarkModule 1 }   
+
+ wwpLeosBenchmarkPort OBJECT-TYPE
+     SYNTAX             Integer32 (1..64)
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION
+                "System level port under test"
+     ::= { wwpLeosBenchmarkModule 2 }   
+     
+ wwpLeosBenchmarkMode OBJECT-TYPE
+     SYNTAX             INTEGER {
+                            none(1),
+                            inService(2),
+                            outOfService(3),
+                            vidOutOfService(4)
+                        }
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION
+                "System level benchmark mode"
+     ::= { wwpLeosBenchmarkModule 3 }   
+
+ wwpLeosBenchmarkEnable OBJECT-TYPE
+     SYNTAX             TruthValue
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION
+                "System level benchmark enable/disable."
+     ::= { wwpLeosBenchmarkModule 4 }   
+
+ wwpLeosBenchmarkOperEnable OBJECT-TYPE
+     SYNTAX             TruthValue
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "System level benchmark operation enable/disable."
+     ::= { wwpLeosBenchmarkModule 5 }   
+
+ wwpLeosBenchmarkLocalFpgaMac OBJECT-TYPE
+     SYNTAX             MacAddress
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "The RFC2544 internal test port assigned mac address."
+     ::= { wwpLeosBenchmarkModule 6 }
+
+ --
+ -- BENCHMARK Reflector Module
+ --
+ wwpLeosBenchmarkReflectorEnable OBJECT-TYPE
+     SYNTAX             TruthValue
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION
+                "Reflector enable/disable."
+     ::= { wwpLeosBenchmarkReflectorModule 1 }
+
+ wwpLeosBenchmarkReflectorVid    OBJECT-TYPE
+     SYNTAX             Integer32 (-1..4095)
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION
+                "VLAN ID to match on in order for packet to be reflected.
+                 A value of -1 instructs the reflector to ignore VLAN ID."
+     ::= { wwpLeosBenchmarkReflectorModule 2 }
+
+ wwpLeosBenchmarkReflectorVendorType  OBJECT-TYPE
+     SYNTAX             INTEGER {
+                           other(1),
+                           ciena(2)
+                        }
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION
+                "Indicator as to what type of equipment is generating the 
+                 test traffic on the remote end."
+     ::= { wwpLeosBenchmarkReflectorModule 3 }
+
+ wwpLeosBenchmarkReflectorClearStats  OBJECT-TYPE
+     SYNTAX             TruthValue
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION
+                "Set to True to clear all port and fpga statistics.
+                 wwpLeosBenchmarkReflectorEnable must be disabled, false,
+                 before setting this attribute.
+                 The value is reset to False once the transaction is completed."
+     ::= { wwpLeosBenchmarkReflectorModule 4 }
+
+ wwpLeosBenchmarkReflectorMacValidation OBJECT-TYPE
+     SYNTAX             TruthValue
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION
+                "Set to true to enable MAC validation on to reflected traffic;
+                 and to false to disable it. When true the DA MAC of the test
+                 traffic has to be matching the benchmark MAC address of the
+                 reflector node, otherwise the DA MAC can be any unicast 
+                 MAC address. MAC validation is only available when the reflector
+                 is set in mode out-of-service or vid-out-of-service."
+     ::= { wwpLeosBenchmarkReflectorModule 5 }
+
+ --
+ -- BENCHMARK Generator Module
+ --
+ wwpLeosBenchmarkGeneratorEnable OBJECT-TYPE
+     SYNTAX             TruthValue
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION
+                "Generator enable/disable."
+     ::= { wwpLeosBenchmarkGeneratorModule 1 }
+
+ wwpLeosBenchmarkGeneratorprofileUnderTest     OBJECT-TYPE
+     SYNTAX             DisplayString (SIZE(0..16))
+     MAX-ACCESS         read-only
+     STATUS             obsolete
+     DESCRIPTION
+                "Profile currently under test or for which testing was last
+                 completed."
+     ::= { wwpLeosBenchmarkGeneratorModule 2 }
+
+ wwpLeosBenchmarkGeneratorThroughputTestState  OBJECT-TYPE
+     SYNTAX             BenchmarkThroughputTestState
+     MAX-ACCESS         read-only
+     STATUS             obsolete
+     DESCRIPTION
+                "Throughput test state."
+     ::= { wwpLeosBenchmarkGeneratorModule 3 }
+
+ wwpLeosBenchmarkGeneratorFramelossTestState  OBJECT-TYPE
+     SYNTAX             BenchmarkFramelossTestState
+     MAX-ACCESS         read-only
+     STATUS             obsolete
+     DESCRIPTION
+                "Frameloss test state."
+     ::= { wwpLeosBenchmarkGeneratorModule 4 }
+
+ wwpLeosBenchmarkGeneratorLatencyTestState   OBJECT-TYPE
+     SYNTAX             BenchmarkLatencyPdvTestState
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "Latency test state."
+     ::= { wwpLeosBenchmarkGeneratorModule 5 }
+
+ wwpLeosBenchmarkGeneratorPdvTestState       OBJECT-TYPE
+     SYNTAX             BenchmarkLatencyPdvTestState
+     MAX-ACCESS         read-only
+     STATUS             obsolete
+     DESCRIPTION
+                "Packet delay variation test state."
+     ::= { wwpLeosBenchmarkGeneratorModule 6 }
+
+ wwpLeosBenchmarkGeneratorRfc2544State       OBJECT-TYPE
+     SYNTAX             INTEGER {
+                            idle(1),
+                            running(2),
+                            stoppedByIntervalTimer(3),
+                            stoppedByDurationTimer(4),
+                            stoppedByUser(5),
+                            done(6)
+                        }
+     MAX-ACCESS         read-only
+     STATUS             obsolete
+     DESCRIPTION
+                "RFC 2544 test suite state."
+     ::= { wwpLeosBenchmarkGeneratorModule 7 }
+
+ wwpLeosBenchmarkGeneratorCurrentPktSize     OBJECT-TYPE
+     SYNTAX             Integer32
+     MAX-ACCESS         read-only
+     STATUS             obsolete
+     DESCRIPTION
+                "Packet size in bytes currently used by the running test."
+     ::= { wwpLeosBenchmarkGeneratorModule 8 }
+
+ wwpLeosBenchmarkGeneratorCurrentRate        OBJECT-TYPE
+     SYNTAX             Integer32
+     MAX-ACCESS         read-only
+     STATUS             obsolete
+     DESCRIPTION
+                "Traffic rate currently used to generate packets as percent
+                 of the line rate"
+     ::= { wwpLeosBenchmarkGeneratorModule 9 }
+
+ wwpLeosBenchmarkGeneratorSamplesCompleted   OBJECT-TYPE
+     SYNTAX             Integer32
+     MAX-ACCESS         read-only
+     STATUS             obsolete
+     DESCRIPTION
+                "When latency and/or pdv is running, this indicates how 
+                 many samples have been gathered so far."
+     ::= { wwpLeosBenchmarkGeneratorModule 10 }
+
+ wwpLeosBenchmarkGeneratorCurrentIteration   OBJECT-TYPE
+     SYNTAX             Integer32
+     MAX-ACCESS         read-only
+     STATUS             obsolete
+     DESCRIPTION
+                "Indicates which iteration of the test suite is
+                 currently running for the profile under test."
+     ::= { wwpLeosBenchmarkGeneratorModule 11 }
+
+ wwpLeosBenchmarkGeneratorTotalIterations    OBJECT-TYPE
+     SYNTAX             Integer32
+     MAX-ACCESS         read-only
+     STATUS             obsolete
+     DESCRIPTION
+                "Indicates the total number of iterations that will
+                 be run in accordance to the interval and duration settings
+                 of the profile under test. A value of -1 indicates
+                 indefinite number of iterations; test traffic stops
+                 when the user manually stops the profile under test."
+     ::= { wwpLeosBenchmarkGeneratorModule 12 }
+
+wwpLeosBenchmarkGeneratorBwUsedByRunningProfiles  OBJECT-TYPE
+     SYNTAX             Integer32
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION       "Bandwidth currently used by test profiles 
+                        currently running, in Mbps."
+     ::= { wwpLeosBenchmarkGeneratorModule 13 }
+
+wwpLeosBenchmarkGeneratorNumProfilesEnable        OBJECT-TYPE
+     SYNTAX             Integer32
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION       "Number of test profiles currently running."
+     ::= { wwpLeosBenchmarkGeneratorModule 14 }
+
+wwpLeosBenchmarkGeneratorNumProfilesRunning       OBJECT-TYPE
+     SYNTAX             Integer32
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION       "Number of test profiles currently enabled."
+     ::= { wwpLeosBenchmarkGeneratorModule 15 }
+
+wwpLeosBenchmarkGeneratorDefaultKpiProfileId      OBJECT-TYPE
+     SYNTAX             Integer32 (0..32)
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION       "Id of the KPI profile currently used as the default
+                        if not specified in the test profile. A value of 0 
+                        indicates that no default KPI profile is configured."
+     ::= { wwpLeosBenchmarkGeneratorModule 16 }
+
+wwpLeosBenchmarkGeneratorDefaultPcpBwDistProfileId    OBJECT-TYPE
+     SYNTAX             Integer32 (0..32)
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION       "Id of the PCP bandwidth distribution profile
+                        currently used as the default if not specified in 
+                        the test profile. A value of 0 indicates that no
+                        default PCP BW distribution profile is configured."
+     ::= { wwpLeosBenchmarkGeneratorModule 17 }
+
+wwpLeosBenchmarkGeneratorDefaultEmixSequenceId    OBJECT-TYPE
+     SYNTAX             Integer32 (0..32)
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION       "Id of the EMIX sequence currently used as the default
+                        if not specified in the test profile. A value of 0 
+                        indicates that no default EMIX sequence is configured."
+     ::= { wwpLeosBenchmarkGeneratorModule 18 }
+
+wwpLeosBenchmarkGeneratorAvailableHwSessions    OBJECT-TYPE
+     SYNTAX             Integer32 (0..32)
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION       "Maximum number of simultaneous hardware sessions available 
+                        on this platform."
+     ::= { wwpLeosBenchmarkGeneratorModule 25 }
+     
+wwpLeosBenchmarkGeneratorAllocatedHwSessions    OBJECT-TYPE
+     SYNTAX             Integer32 (0..32)
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION       "The number of allocated hardware sessions"
+     ::= { wwpLeosBenchmarkGeneratorModule 26 }     
+ --
+ -- BENCHMARK Profile table
+ --
+ wwpLeosBenchmarkProfileTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosBenchmarkProfileEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION
+             "Table of profile entries."
+     ::= { wwpLeosBenchmarkProfileObjects 1 }
+                
+ wwpLeosBenchmarkProfileEntry OBJECT-TYPE
+     SYNTAX       WwpLeosBenchmarkProfileEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION
+             "BENCHMARK Profile characteristics."
+     INDEX { wwpLeosBenchmarkProfileEntryId }
+     ::= { wwpLeosBenchmarkProfileTable 1 } 
+
+ WwpLeosBenchmarkProfileEntry ::= SEQUENCE {
+     wwpLeosBenchmarkProfileEntryId                  Integer32,
+     wwpLeosBenchmarkProfileEntryName                DisplayString,     
+     wwpLeosBenchmarkProfileEntryEnabled             TruthValue,
+     wwpLeosBenchmarkProfileEntryStarted             TruthValue,     
+     wwpLeosBenchmarkProfileEntryInterval            INTEGER,
+     wwpLeosBenchmarkProfileEntryDuration            INTEGER,
+     wwpLeosBenchmarkProfileEntryThroughputTest      TruthValue,
+     wwpLeosBenchmarkProfileEntryFramelossTest       TruthValue,
+     wwpLeosBenchmarkProfileEntryLatencyTest         TruthValue,
+     wwpLeosBenchmarkProfileEntryPdvTest             TruthValue,
+     wwpLeosBenchmarkProfileEntryRfc2544Suite        TruthValue,
+     wwpLeosBenchmarkProfileEntryDstmac              MacAddress,
+     wwpLeosBenchmarkProfileEntryEncapType           INTEGER,
+     wwpLeosBenchmarkProfileEntryVid                 Integer32,
+     wwpLeosBenchmarkProfileEntryPcp                 BenchmarkPcpBitmap,
+     wwpLeosBenchmarkProfileEntryCfi                 Integer32,
+     wwpLeosBenchmarkProfileEntryTpid                Integer32,
+     wwpLeosBenchmarkProfileEntryPduType             INTEGER,
+     wwpLeosBenchmarkProfileEntrySrcIpAddr           IpAddress,
+     wwpLeosBenchmarkProfileEntryDstIpAddr           IpAddress,
+     wwpLeosBenchmarkProfileEntryDscp                Integer32, 
+     wwpLeosBenchmarkProfileEntryCustomPayload       OCTET STRING,
+     wwpLeosBenchmarkProfileEntryBandwidth           Integer32,
+     wwpLeosBenchmarkProfileEntryVidValidation       TruthValue,
+     wwpLeosBenchmarkProfileEntryMaxSearches         Integer32,
+     wwpLeosBenchmarkProfileEntryMaxSamples          Integer32,
+     wwpLeosBenchmarkProfileEntrySamplingInterval    Integer32,
+     wwpLeosBenchmarkProfileEntryFrameLossStartBw    INTEGER,
+     wwpLeosBenchmarkProfileEntrySrcInetAddrType     InetAddressType,
+     wwpLeosBenchmarkProfileEntrySrcInetAddr         InetAddress,
+     wwpLeosBenchmarkProfileEntryDstInetAddrType     InetAddressType,
+     wwpLeosBenchmarkProfileEntryDstInetAddr         InetAddress,
+     wwpLeosBenchmarkProfileEntryClearStats          TruthValue,
+     wwpLeosBenchmarkProfileEntrySetFrameSizeList    DisplayString,
+     wwpLeosBenchmarkProfileEntryRowStatus           RowStatus,
+     wwpLeosBenchmarkProfileEntryCurrentIteration    Integer32,
+     wwpLeosBenchmarkProfileEntryTotalIterations     Integer32,
+     wwpLeosBenchmarkProfileEntryExcessBandwidth     Integer32,
+     wwpLeosBenchmarkProfileEntryKpiProfileId        Integer32,
+     wwpLeosBenchmarkProfileEntryPcpBwDistProfileId  Integer32,
+     wwpLeosBenchmarkProfileEntryEmixSequenceId      Integer32,
+     wwpLeosBenchmarkProfileEntryColor               BenchmarkColorTest,
+     wwpLeosBenchmarkProfileEntryY1564Test           TruthValue,
+     wwpLeosBenchmarkProfileEntryHwSessionsRequired  Integer32,
+     wwpLeosBenchmarkProfileEntryLastTestRun         DateAndTime,
+     wwpLeosBenchmarkProfileEntryColorValidation     TruthValue,
+     wwpLeosBenchmarkProfileEntryPcpValidation       TruthValue
+ } 
+
+ wwpLeosBenchmarkProfileEntryId     OBJECT-TYPE
+     SYNTAX             Integer32 (1..128)
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "Index for BENCHMARK profile records."
+     ::= { wwpLeosBenchmarkProfileEntry 1 }   
+     
+ wwpLeosBenchmarkProfileEntryName   OBJECT-TYPE
+     SYNTAX             DisplayString (SIZE (1..46))
+     MAX-ACCESS         read-create
+     STATUS             deprecated
+     DESCRIPTION
+                "Name of the profile as entered when created."
+     ::= { wwpLeosBenchmarkProfileEntry 2 }
+
+ wwpLeosBenchmarkProfileEntryEnabled    OBJECT-TYPE
+     SYNTAX             TruthValue
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION
+                "Profile enable/disable"
+     ::= { wwpLeosBenchmarkProfileEntry 3 }   
+     
+ wwpLeosBenchmarkProfileEntryStarted   OBJECT-TYPE
+     SYNTAX             TruthValue
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION
+                "Profile start/stop"
+     ::= { wwpLeosBenchmarkProfileEntry 4 }   
+     
+ wwpLeosBenchmarkProfileEntryInterval OBJECT-TYPE
+     SYNTAX             INTEGER {
+                            t15min(1),
+                            t1hr(2),
+                            t6hr(3),
+                            tCompletion(4),
+                            t2hr(5)
+                        }
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION
+                "Interval between the start of one test group to the start
+                 of the next test group."
+     DEFVAL             { tCompletion }
+     ::= { wwpLeosBenchmarkProfileEntry 5 }
+
+ wwpLeosBenchmarkProfileEntryDuration OBJECT-TYPE    
+     SYNTAX             INTEGER {
+                            t15min(1),
+                            t1hr(2),
+                            t6hr(3),
+                            t24hr(4),
+                            tIndefinite(5),
+                            tOnce(6)
+                        }
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION
+                "Duration of the testing. The test group is repeated until
+                 the duration ends. When indefinite is set, test group is
+                 run only once to completion"
+     DEFVAL             { tOnce }
+     ::= { wwpLeosBenchmarkProfileEntry 6 }
+
+ wwpLeosBenchmarkProfileEntryThroughputTest OBJECT-TYPE
+     SYNTAX             TruthValue
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION
+                "Run throughput test"
+     DEFVAL             { false }
+     ::= { wwpLeosBenchmarkProfileEntry 7 }
+
+ wwpLeosBenchmarkProfileEntryFramelossTest OBJECT-TYPE
+     SYNTAX             TruthValue
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION
+                "Run frame loss test"
+     DEFVAL             { false }
+     ::= { wwpLeosBenchmarkProfileEntry 8 }
+
+ wwpLeosBenchmarkProfileEntryLatencyTest OBJECT-TYPE
+     SYNTAX             TruthValue
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION
+                "Run latency test"
+     DEFVAL             { false }
+     ::= { wwpLeosBenchmarkProfileEntry 9 }
+
+ wwpLeosBenchmarkProfileEntryPdvTest OBJECT-TYPE
+     SYNTAX             TruthValue
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION
+                "Run packet delay variation test"
+     DEFVAL             { false }
+     ::= { wwpLeosBenchmarkProfileEntry 10 }
+
+ wwpLeosBenchmarkProfileEntryRfc2544Suite OBJECT-TYPE
+     SYNTAX             TruthValue
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION
+                "Run RFC2544 test suite which includes throughput, frame
+                 loss and latency tests"
+     DEFVAL             { false }
+     ::= { wwpLeosBenchmarkProfileEntry 11 }
+
+ wwpLeosBenchmarkProfileEntryDstmac   OBJECT-TYPE
+     SYNTAX             MacAddress
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION
+                "MAC address to use as the destination MAC address on
+                 the generated packets."
+     ::= { wwpLeosBenchmarkProfileEntry 12 }
+
+ wwpLeosBenchmarkProfileEntryEncapType OBJECT-TYPE
+     SYNTAX             INTEGER {
+                            untagged(1),
+                            dot1q(2)
+                        }
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION
+                "Encapsulation type to use for generated packets."
+     DEFVAL             { untagged }
+     ::= { wwpLeosBenchmarkProfileEntry 13 }
+
+ wwpLeosBenchmarkProfileEntryVid       OBJECT-TYPE
+     SYNTAX             Integer32 (0..4095)
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION
+                "VLAN ID to used for generated packets."
+     ::= { wwpLeosBenchmarkProfileEntry 14 }
+
+ wwpLeosBenchmarkProfileEntryPcp       OBJECT-TYPE
+     SYNTAX             BenchmarkPcpBitmap
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION
+                "Bitmap of the vlan PCP (Priority Code Point) value to 
+                 test with. When RFC2544 test is enabled, only one 
+                 PCP can be set in the mask. Otherwise, a test session
+                 will be run for each PCP bit set."
+     DEFVAL            { 1 }
+     ::= { wwpLeosBenchmarkProfileEntry 15 }
+
+ wwpLeosBenchmarkProfileEntryCfi       OBJECT-TYPE
+     SYNTAX             Integer32 (0..1)
+     MAX-ACCESS         read-write
+     STATUS             obsolete
+     DESCRIPTION
+                "Vlan canonical format indicator to use for the generated
+                 packets."
+     ::= { wwpLeosBenchmarkProfileEntry 16 }
+
+ wwpLeosBenchmarkProfileEntryTpid      OBJECT-TYPE
+     SYNTAX             Integer32 (0..65535)
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION
+                "Vlan tag protocol identifier to use for the generated packets."
+     DEFVAL             { 33024 }
+     ::= { wwpLeosBenchmarkProfileEntry 17 }
+
+ wwpLeosBenchmarkProfileEntryPduType   OBJECT-TYPE
+     SYNTAX             INTEGER {
+                           ethernet(1),
+                           ip(2),
+                           udpecho(3)
+                        }
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION
+                "Type of test packets to generate. Supported types are 
+                 ethernet, IP or UDP echo."
+     DEFVAL             { ethernet }
+     ::= { wwpLeosBenchmarkProfileEntry 18 }
+
+ wwpLeosBenchmarkProfileEntrySrcIpAddr OBJECT-TYPE
+     SYNTAX             IpAddress
+     MAX-ACCESS         read-write
+     STATUS             obsolete
+     DESCRIPTION
+                "Source IP address to use for the generated packets."
+     ::= { wwpLeosBenchmarkProfileEntry 19 }
+
+ wwpLeosBenchmarkProfileEntryDstIpAddr OBJECT-TYPE
+     SYNTAX             IpAddress
+     MAX-ACCESS         read-write
+     STATUS             obsolete
+     DESCRIPTION
+                "Destination IP address to use for the generated packets."
+     ::= { wwpLeosBenchmarkProfileEntry 20 }
+
+ wwpLeosBenchmarkProfileEntryDscp      OBJECT-TYPE
+     SYNTAX             Integer32 (0..63)
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION
+                "IP DSCP value to use for the generated packets."
+     DEFVAL             { 0 }
+     ::= { wwpLeosBenchmarkProfileEntry 21 }
+
+ wwpLeosBenchmarkProfileEntryCustomPayload  OBJECT-TYPE 
+     SYNTAX             OCTET STRING (SIZE (256))
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION
+                "Custom payload to be used on the generated packets."
+     ::= { wwpLeosBenchmarkProfileEntry 22 }
+
+ wwpLeosBenchmarkProfileEntryBandwidth      OBJECT-TYPE
+     SYNTAX             Integer32 (1..10000)
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION
+                "Maximum bandwidth to use when generating green test
+                 traffic for the profile."
+     ::= { wwpLeosBenchmarkProfileEntry 23 }
+
+ wwpLeosBenchmarkProfileEntryVidValidation  OBJECT-TYPE
+     SYNTAX             TruthValue
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION
+                "Indicates whether VID validation is performed in 
+                 the classifier or not on the returning packet."
+     DEFVAL             { true }
+     ::= { wwpLeosBenchmarkProfileEntry 24 }
+
+ wwpLeosBenchmarkProfileEntryMaxSearches    OBJECT-TYPE
+     SYNTAX             Integer32 (1..16)
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION
+                "For the throughput test, this is the maximum number of
+                 searches to find a transmit rate without drops for a
+                 given frame size."
+     DEFVAL             { 7 }
+     ::= { wwpLeosBenchmarkProfileEntry 25 }
+
+ wwpLeosBenchmarkProfileEntryMaxSamples     OBJECT-TYPE
+     SYNTAX             Integer32 (2..20)
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION
+                "For the latency and PDV tests, this is the number of
+                 samples to take in order to determine the min, avg
+                 and max latency and avg PDV."
+     DEFVAL             { 10 }
+     ::= { wwpLeosBenchmarkProfileEntry 26 }
+
+ wwpLeosBenchmarkProfileEntrySamplingInterval  OBJECT-TYPE
+     SYNTAX             Integer32 (1..600)
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION
+                "For the latency and PDV tests, this is the interval,
+                 in 100ms, to wait between samples."
+     DEFVAL             { 1 } 
+     ::= { wwpLeosBenchmarkProfileEntry 27 }
+
+ wwpLeosBenchmarkProfileEntryFrameLossStartBw OBJECT-TYPE
+     SYNTAX             INTEGER {
+                            profileBandwidth(1),
+                            maximumThroughput(2)
+                        }
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION
+                "For the frame loss test, this indicates which bandwidth
+                 value to use as the starting bandwidth; the maximum
+                 bandwidth determined via the throughput test and the
+                 bandwidth parameter configured in the profile."
+     DEFVAL             { maximumThroughput }
+     ::= { wwpLeosBenchmarkProfileEntry 28 }
+
+ wwpLeosBenchmarkProfileEntrySrcInetAddrType OBJECT-TYPE
+     SYNTAX       InetAddressType
+     MAX-ACCESS   read-write
+     STATUS       deprecated
+     DESCRIPTION
+             "Specifies the type of address wwpLeosBenchmarkProfileEntrySrcInetAddr belongs to.
+              When set to:
+                ipv4 : wwpLeosBenchmarkProfileEntrySrcInetAddr should be compliant with 
+                       InetAddressIPv4 from RFC 4001
+                ipv6 : wwpLeosBenchmarkProfileEntrySrcInetAddr should be compliant with
+                       InetAddressIPv6 from RFC 4001.
+              The InetAddressType and the InetAddress must be set as part of the same SNMP 
+              SET request."
+     ::= { wwpLeosBenchmarkProfileEntry 29 }
+
+ wwpLeosBenchmarkProfileEntrySrcInetAddr OBJECT-TYPE
+     SYNTAX       InetAddress
+     MAX-ACCESS   read-write
+     STATUS       deprecated
+     DESCRIPTION
+             "Specifies the unicast source IP address to use in IP test packet.
+              The InetAddress specified here is compliant with RFC 4001.
+              The InetAddressType and the InetAddress must be set as part of the same SNMP 
+              SET request."              
+     ::= { wwpLeosBenchmarkProfileEntry 30 }
+
+ wwpLeosBenchmarkProfileEntryDstInetAddrType OBJECT-TYPE
+     SYNTAX       InetAddressType
+     MAX-ACCESS   read-write
+     STATUS       deprecated
+     DESCRIPTION
+             "Specifies the type of address wwpLeosBenchmarkProfileEntryDstInetAddr belongs to.
+              When set to:
+                ipv4 : wwpLeosBenchmarkProfileEntrySrcInetAddr should be compliant with 
+                       InetAddressIPv4 from RFC 4001
+                ipv6 : wwpLeosBenchmarkProfileEntrySrcInetAddr should be compliant with
+                       InetAddressIPv6 from RFC 4001.
+              The InetAddressType and the InetAddress must be set as part of the same SNMP 
+              SET request."                       
+     ::= { wwpLeosBenchmarkProfileEntry 31 }
+
+ wwpLeosBenchmarkProfileEntryDstInetAddr OBJECT-TYPE
+     SYNTAX       InetAddress
+     MAX-ACCESS   read-write
+     STATUS       deprecated
+     DESCRIPTION
+             "Specifies the unicast destination IP address to use in IP test packet.
+              The InetAddress specified here is compliant with RFC 4001.
+              The InetAddressType and the InetAddress must be set as part of the same SNMP 
+              SET request."              
+     ::= { wwpLeosBenchmarkProfileEntry 32 }
+
+ wwpLeosBenchmarkProfileEntryClearStats  OBJECT-TYPE
+     SYNTAX             TruthValue
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION
+                "Set to True to clear all port and fpga statistics, required that
+                 no test is in progress.  The value is reset to False once the 
+                 transaction is completed."
+     ::= { wwpLeosBenchmarkProfileEntry 33 }
+
+ wwpLeosBenchmarkProfileEntrySetFrameSizeList  OBJECT-TYPE
+     SYNTAX             DisplayString (SIZE (0..255))
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION
+                "Used to replace the existing frame size table with the specified list.
+                 More than one values can be listed and are separated by commas."
+     ::= { wwpLeosBenchmarkProfileEntry 34 }
+
+ wwpLeosBenchmarkProfileEntryRowStatus  OBJECT-TYPE
+     SYNTAX             RowStatus
+     MAX-ACCESS         read-create
+     STATUS             deprecated
+     DESCRIPTION       "Used to manage the creation and deletion of the 
+                        conceptual rows in this table.  To create a row in
+                        this table, set this object to 'createAndGo'.
+	                To delete a row in this table, set this object to 
+                        'destroy'.  If the entry exists, it is displayed 
+                        as 'active'."
+     ::= { wwpLeosBenchmarkProfileEntry 35 }
+
+wwpLeosBenchmarkProfileEntryCurrentIteration    OBJECT-TYPE
+     SYNTAX             Integer32
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION       "Indicates how many times the selected tests have 
+                        currently run so far, including the currently running
+                        iteration."
+     ::= { wwpLeosBenchmarkProfileEntry 36 }
+
+wwpLeosBenchmarkProfileEntryTotalIterations     OBJECT-TYPE
+     SYNTAX             Integer32
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION       "Indicates the total number of times the selected set
+                        of tests will be run in accordance to the interval
+                        and duration settings of the profile. A value of -1
+                        indicates indefinite number of iterations; test 
+                        traffic stops when the user manually stops the profile 
+                        under test."
+     ::= { wwpLeosBenchmarkProfileEntry 37 }
+
+wwpLeosBenchmarkProfileEntryExcessBandwidth     OBJECT-TYPE
+     SYNTAX             Integer32 (0..10000)
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION       "Maximum bandwidth to use when generating yellow test
+                        traffic for the profile. When testing for red color,
+                        this bandwidth is multipled by 1.25"
+     DEFVAL            { 0 }
+     ::= { wwpLeosBenchmarkProfileEntry 38 }
+
+wwpLeosBenchmarkProfileEntryKpiProfileId        OBJECT-TYPE
+     SYNTAX             Integer32 (0..32)
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION       "Name of a valid KPI profile, from the 
+                        wwpLeosBenchmarkKpiProfileTable, to use when
+                        analysing the test results for this profile."
+     ::= { wwpLeosBenchmarkProfileEntry 39 }
+
+wwpLeosBenchmarkProfileEntryPcpBwDistProfileId   OBJECT-TYPE
+     SYNTAX             Integer32 (0..32)
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION       "Id of a valid PCP Bandwidth Distribution profile,
+                        from the wwpLeosBenchmarkPcpBwDistProfileTable,
+                        used for distributing the profile bandwidth amongst
+                        the configured PCP values for this profile when running
+                        tests."
+     ::= { wwpLeosBenchmarkProfileEntry 40 }
+
+wwpLeosBenchmarkProfileEntryEmixSequenceId      OBJECT-TYPE
+     SYNTAX             Integer32 (0..32)
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION       "Id of a valid EMIX sequence configured in the
+                        wwpLeosBenchmarkEmixSequenceTable, to use when y1564
+                        is selected. The EMIX sequence is used instead of the
+                        frame size list if and only if y1564 is selected."
+     ::= { wwpLeosBenchmarkProfileEntry 41 }
+
+wwpLeosBenchmarkProfileEntryColor               OBJECT-TYPE
+     SYNTAX             BenchmarkColorTest
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION       "Color of the test traffic to generator. This is 
+                        directly related to the value of the DEI bit 
+                        configured in the VLAN tag of the test traffic. Green
+                        traffic will have its DEI bit set to 0 while Yellow
+                        traffic will have its DEI bit set to 1.
+                        Green test traffic is generated based on the bandwidth
+                        configured in the test profile. Yellow traffic is
+                        generated based on the excess-bandwidth parameter.
+                        Finally, if the user selects green-yellow-red, the
+                        yellow traffic is generated at 1.25 * excess-bandwidth."
+     DEFVAL             { green }
+     ::= { wwpLeosBenchmarkProfileEntry 42 }
+
+wwpLeosBenchmarkProfileEntryY1564Test           OBJECT-TYPE
+     SYNTAX             TruthValue
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION       "The Y1564 test includes the throughput, frameloss,
+                        latency and PDV tests are is run using the configured
+                        EMIX sequence. If the profile's EMIX sequence is
+                        not configured, the default generator EMIX sequence is
+                        used. Y1564 and RFC2544 are mutually exclusive."
+     DEFVAL             { false }
+     ::= { wwpLeosBenchmarkProfileEntry 43 }
+
+wwpLeosBenchmarkProfileEntryHwSessionsRequired  OBJECT-TYPE
+     SYNTAX             Integer32
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION       "When the profile is enabled, this represents the number
+                        of hardware sessions allocated to this profile in order
+                        to run the profile tests as configured. If the profile
+                        is not enabled, the represents the number of hardware
+                        sessions that would be required. A hardware session
+                        is required for each PCP configured color configured
+                        in the green and yellow subset."
+     ::= { wwpLeosBenchmarkProfileEntry 44 }
+
+wwpLeosBenchmarkProfileEntryLastTestRun         OBJECT-TYPE
+     SYNTAX             DateAndTime
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION       "Date and time of the last completed test iteration for
+                        this profile."
+     ::= { wwpLeosBenchmarkProfileEntry 45 }
+
+wwpLeosBenchmarkProfileEntryColorValidation     OBJECT-TYPE
+     SYNTAX             TruthValue
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION       "Used to indicate whether the color bit of the
+                        test packet should be used to classify the reflected
+                        packets or not. In color unaware testing, this should
+                        be set to Falso. Default is True."
+     DEFVAL             { true }
+     ::= { wwpLeosBenchmarkProfileEntry 46 }
+ 
+wwpLeosBenchmarkProfileEntryPcpValidation       OBJECT-TYPE
+     SYNTAX             TruthValue
+     MAX-ACCESS         read-write
+     STATUS             deprecated
+     DESCRIPTION       "Used to indicate whether the PCP value of the
+                        test packet should be used to classify the reflected
+                        packets or not. When the PCP of the test packet is 
+                        changed (COS re-mapped) as it travels between the 
+                        Generator and the Reflector nodes, this attribute 
+                        should be set to False. Default is True."
+     DEFVAL             { true }
+     ::= { wwpLeosBenchmarkProfileEntry 47 }
+ 
+ --
+ -- Benchmark Profile Throughput Stats
+ --
+ wwpLeosBenchmarkProfileThroughputStatisticsTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosBenchmarkProfileThroughputStatsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       obsolete
+     DESCRIPTION
+             "Table of BENCHMARK profile throughput statistics in Mbps."
+     ::= { wwpLeosBenchmarkProfileObjects 2 }
+                
+ wwpLeosBenchmarkProfileThroughputStatsEntry OBJECT-TYPE
+     SYNTAX       WwpLeosBenchmarkProfileThroughputStatsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       obsolete
+     DESCRIPTION
+             "BENCHMARK profile throughput statistics."
+     INDEX { wwpLeosBenchmarkProfileThroughputStatsProfileId,
+             wwpLeosBenchmarkProfileThroughputStatsFrameSizeIndex }
+     ::= { wwpLeosBenchmarkProfileThroughputStatisticsTable 1 } 
+
+ WwpLeosBenchmarkProfileThroughputStatsEntry ::= SEQUENCE { 
+     wwpLeosBenchmarkProfileThroughputStatsProfileId       Integer32,
+     wwpLeosBenchmarkProfileThroughputStatsFrameSizeIndex  Integer32,
+     wwpLeosBenchmarkProfileThroughputStatsFrameSize       Integer32,
+     wwpLeosBenchmarkProfileThroughputStatsMin             Unsigned32,
+     wwpLeosBenchmarkProfileThroughputStatsMax             Unsigned32,
+     wwpLeosBenchmarkProfileThroughputStatsAvg             Unsigned32,
+     wwpLeosBenchmarkProfileThroughputStatsIterations      Integer32,
+     wwpLeosBenchmarkProfileThroughputStatsActiveVid       Integer32,
+     wwpLeosBenchmarkProfileThroughputStatsActiveDstMac    MacAddress
+ } 
+
+ wwpLeosBenchmarkProfileThroughputStatsProfileId  OBJECT-TYPE
+     SYNTAX             Integer32 (1..128)
+     MAX-ACCESS         not-accessible
+     STATUS             obsolete
+     DESCRIPTION
+                "Profile ID for which those throughput statistics are associated."
+     ::= { wwpLeosBenchmarkProfileThroughputStatsEntry 1 }   
+     
+ wwpLeosBenchmarkProfileThroughputStatsFrameSizeIndex  OBJECT-TYPE
+     SYNTAX             Integer32 (0..9)
+     MAX-ACCESS         not-accessible
+     STATUS             obsolete 
+     DESCRIPTION
+                "Frame size index for which those throughput statistics are
+                 associated."
+     ::= { wwpLeosBenchmarkProfileThroughputStatsEntry 2 }
+
+  wwpLeosBenchmarkProfileThroughputStatsFrameSize  OBJECT-TYPE
+     SYNTAX             Integer32
+     MAX-ACCESS         read-only
+     STATUS             obsolete
+     DESCRIPTION
+                "Packet size in bytes."
+     ::= { wwpLeosBenchmarkProfileThroughputStatsEntry 3 }
+
+ wwpLeosBenchmarkProfileThroughputStatsMin     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             obsolete
+     DESCRIPTION
+                "Minimum throughput recorded for the given packet size."
+     ::= { wwpLeosBenchmarkProfileThroughputStatsEntry 4 }
+
+ wwpLeosBenchmarkProfileThroughputStatsMax     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             obsolete
+     DESCRIPTION
+                "Maximum throughput recorded for the given packet size."
+     ::= { wwpLeosBenchmarkProfileThroughputStatsEntry 5 }
+
+ wwpLeosBenchmarkProfileThroughputStatsAvg     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             obsolete
+     DESCRIPTION
+                "Average throughput recorded for the given packet size."
+     ::= { wwpLeosBenchmarkProfileThroughputStatsEntry 6 }
+
+ wwpLeosBenchmarkProfileThroughputStatsIterations OBJECT-TYPE
+     SYNTAX             Integer32
+     MAX-ACCESS         read-only
+     STATUS             obsolete
+     DESCRIPTION
+                "Number of times the test has been run for this packet size."
+     ::= { wwpLeosBenchmarkProfileThroughputStatsEntry 7 }
+
+ wwpLeosBenchmarkProfileThroughputStatsActiveVid  OBJECT-TYPE
+     SYNTAX             Integer32 (0..4095)
+     MAX-ACCESS         read-only
+     STATUS             obsolete
+     DESCRIPTION
+                "Active VLAN Id. Either the value configured in the profile or
+                 the one specified with the start command."
+     ::= { wwpLeosBenchmarkProfileThroughputStatsEntry 8 }
+
+ wwpLeosBenchmarkProfileThroughputStatsActiveDstMac  OBJECT-TYPE
+     SYNTAX             MacAddress
+     MAX-ACCESS         read-only
+     STATUS             obsolete
+     DESCRIPTION
+                "Active destination MAC address. Either the value configured
+                 in the profile or the value specified with the start command."
+     ::= { wwpLeosBenchmarkProfileThroughputStatsEntry 9 }
+
+ --
+ -- Benchmark Profile FrameLoss Stats
+ --
+ wwpLeosBenchmarkProfileFramelossStatisticsTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosBenchmarkProfileFramelossStatsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       obsolete
+     DESCRIPTION
+             "Table of BENCHMARK profile frameloss statistics."
+     ::= { wwpLeosBenchmarkProfileObjects 3 }
+                
+ wwpLeosBenchmarkProfileFramelossStatsEntry OBJECT-TYPE
+     SYNTAX       WwpLeosBenchmarkProfileFramelossStatsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       obsolete
+     DESCRIPTION
+             "BENCHMARK profile frameloss statistics."
+     INDEX { wwpLeosBenchmarkProfileFramelossStatsProfileId,
+             wwpLeosBenchmarkProfileFramelossStatsFrameSizeIndex,
+             wwpLeosBenchmarkProfileFramelossStatsRateIndex }
+     ::= { wwpLeosBenchmarkProfileFramelossStatisticsTable 1 } 
+
+ WwpLeosBenchmarkProfileFramelossStatsEntry ::= SEQUENCE { 
+     wwpLeosBenchmarkProfileFramelossStatsProfileId        Integer32,
+     wwpLeosBenchmarkProfileFramelossStatsFrameSizeIndex   Integer32,
+     wwpLeosBenchmarkProfileFramelossStatsRateIndex        Integer32,
+     wwpLeosBenchmarkProfileFramelossStatsFrameSize        Integer32,
+     wwpLeosBenchmarkProfileFramelossStatsRate             Integer32,
+     wwpLeosBenchmarkProfileFramelossStatsFirst            Unsigned32,
+     wwpLeosBenchmarkProfileFramelossStatsSecond           Unsigned32,
+     wwpLeosBenchmarkProfileFramelossStatsActiveVid        Integer32,
+     wwpLeosBenchmarkProfileFramelossStatsActiveDstMac     MacAddress
+ } 
+
+ wwpLeosBenchmarkProfileFramelossStatsProfileId  OBJECT-TYPE
+     SYNTAX             Integer32 (1..128)
+     MAX-ACCESS         not-accessible
+     STATUS             obsolete
+     DESCRIPTION
+                "Profile Id."
+     ::= { wwpLeosBenchmarkProfileFramelossStatsEntry 1 }   
+     
+ wwpLeosBenchmarkProfileFramelossStatsFrameSizeIndex  OBJECT-TYPE
+     SYNTAX             Integer32 (0..9)
+     MAX-ACCESS         not-accessible
+     STATUS             obsolete
+     DESCRIPTION
+                "Frame size index."
+     ::= { wwpLeosBenchmarkProfileFramelossStatsEntry 2 }
+
+ wwpLeosBenchmarkProfileFramelossStatsRateIndex  OBJECT-TYPE
+     SYNTAX             Integer32 (0..9)
+     MAX-ACCESS         not-accessible
+     STATUS             obsolete
+     DESCRIPTION
+                "Rate index."
+     ::= { wwpLeosBenchmarkProfileFramelossStatsEntry 3 }
+ 
+ wwpLeosBenchmarkProfileFramelossStatsFrameSize  OBJECT-TYPE
+     SYNTAX             Integer32
+     MAX-ACCESS         read-only
+     STATUS             obsolete
+     DESCRIPTION
+                "Packet size in bytes."
+     ::= { wwpLeosBenchmarkProfileFramelossStatsEntry 4 }
+
+ wwpLeosBenchmarkProfileFramelossStatsRate       OBJECT-TYPE
+     SYNTAX             Integer32
+     MAX-ACCESS         read-only
+     STATUS             obsolete
+     DESCRIPTION
+                "Rate in percent of line rate."
+     ::= { wwpLeosBenchmarkProfileFramelossStatsEntry 5 }
+
+ wwpLeosBenchmarkProfileFramelossStatsFirst     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             obsolete
+     DESCRIPTION
+                "Number of frames lost on first test sequence."
+     ::= { wwpLeosBenchmarkProfileFramelossStatsEntry 6 }
+
+ wwpLeosBenchmarkProfileFramelossStatsSecond    OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             obsolete
+     DESCRIPTION
+                "Number of frames lost on second test sequence."
+     ::= { wwpLeosBenchmarkProfileFramelossStatsEntry 7 }
+
+ wwpLeosBenchmarkProfileFramelossStatsActiveVid  OBJECT-TYPE
+     SYNTAX             Integer32 (0..4095)
+     MAX-ACCESS         read-only
+     STATUS             obsolete
+     DESCRIPTION
+                "Active VLAN Id. Either the value configured in the profile or
+                 the one specified with the start command."
+     ::= { wwpLeosBenchmarkProfileFramelossStatsEntry 8 }
+
+ wwpLeosBenchmarkProfileFramelossStatsActiveDstMac  OBJECT-TYPE
+     SYNTAX             MacAddress
+     MAX-ACCESS         read-only
+     STATUS             obsolete
+     DESCRIPTION
+                "Active destination MAC address. Either the value configured
+                 in the profile or the value specified with the start command."
+     ::= { wwpLeosBenchmarkProfileFramelossStatsEntry 9 }
+
+ --
+ -- Benchmark Profile Latency Stats
+ --
+ wwpLeosBenchmarkProfileLatencyStatisticsTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosBenchmarkProfileLatencyStatsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       obsolete
+     DESCRIPTION
+             "Table of BENCHMARK profile latency statistics in usec."
+     ::= { wwpLeosBenchmarkProfileObjects 4 }
+                
+ wwpLeosBenchmarkProfileLatencyStatsEntry OBJECT-TYPE
+     SYNTAX       WwpLeosBenchmarkProfileLatencyStatsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       obsolete
+     DESCRIPTION
+             "BENCHMARK profile latency statistics."
+     INDEX { wwpLeosBenchmarkProfileLatencyStatsProfileId,
+             wwpLeosBenchmarkProfileLatencyStatsFrameSizeIndex }
+     ::= { wwpLeosBenchmarkProfileLatencyStatisticsTable 1 } 
+
+ WwpLeosBenchmarkProfileLatencyStatsEntry ::= SEQUENCE { 
+     wwpLeosBenchmarkProfileLatencyStatsProfileId       Integer32,
+     wwpLeosBenchmarkProfileLatencyStatsFrameSizeIndex  Integer32,
+     wwpLeosBenchmarkProfileLatencyStatsFrameSize       Integer32,
+     wwpLeosBenchmarkProfileLatencyStatsMin             Unsigned32,
+     wwpLeosBenchmarkProfileLatencyStatsMax             Unsigned32,
+     wwpLeosBenchmarkProfileLatencyStatsAvg             Unsigned32,
+     wwpLeosBenchmarkProfileLatencyStatsSamples         Integer32,
+     wwpLeosBenchmarkProfileLatencyStatsActiveVid       Integer32,
+     wwpLeosBenchmarkProfileLatencyStatsActiveDstMac    MacAddress
+ } 
+
+ wwpLeosBenchmarkProfileLatencyStatsProfileId  OBJECT-TYPE
+     SYNTAX             Integer32 (1..128)
+     MAX-ACCESS         not-accessible
+     STATUS             obsolete
+     DESCRIPTION
+                "Profile Id for which those latency stats are associated."
+     ::= { wwpLeosBenchmarkProfileLatencyStatsEntry 1 }   
+     
+ wwpLeosBenchmarkProfileLatencyStatsFrameSizeIndex  OBJECT-TYPE
+     SYNTAX             Integer32 (0..9)
+     MAX-ACCESS         not-accessible
+     STATUS             obsolete
+     DESCRIPTION
+                "Frame size index."
+     ::= { wwpLeosBenchmarkProfileLatencyStatsEntry 2 }
+
+ wwpLeosBenchmarkProfileLatencyStatsFrameSize  OBJECT-TYPE
+     SYNTAX             Integer32
+     MAX-ACCESS         read-only
+     STATUS             obsolete
+     DESCRIPTION
+                "Packet size in bytes."
+     ::= { wwpLeosBenchmarkProfileLatencyStatsEntry 3 }
+
+ wwpLeosBenchmarkProfileLatencyStatsMin     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             obsolete
+     DESCRIPTION
+                "Minimum latency recorded for the given packet size."
+     ::= { wwpLeosBenchmarkProfileLatencyStatsEntry 4 }
+
+ wwpLeosBenchmarkProfileLatencyStatsMax     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             obsolete
+     DESCRIPTION
+                "Maximum latency recorded for the given packet size."
+     ::= { wwpLeosBenchmarkProfileLatencyStatsEntry 5 }
+
+ wwpLeosBenchmarkProfileLatencyStatsAvg     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             obsolete
+     DESCRIPTION
+                "Average latency recorded for the given packet size."
+     ::= { wwpLeosBenchmarkProfileLatencyStatsEntry 6 }
+
+ wwpLeosBenchmarkProfileLatencyStatsSamples OBJECT-TYPE
+     SYNTAX             Integer32
+     MAX-ACCESS         read-only
+     STATUS             obsolete
+     DESCRIPTION
+                "Number of samples taken during the test."
+     ::= { wwpLeosBenchmarkProfileLatencyStatsEntry 7 }
+
+ wwpLeosBenchmarkProfileLatencyStatsActiveVid  OBJECT-TYPE
+     SYNTAX             Integer32 (0..4095)
+     MAX-ACCESS         read-only
+     STATUS             obsolete
+     DESCRIPTION
+                "Active VLAN Id. Either the value configured in the profile or
+                 the one specified with the start command."
+     ::= { wwpLeosBenchmarkProfileLatencyStatsEntry 8 }
+
+ wwpLeosBenchmarkProfileLatencyStatsActiveDstMac  OBJECT-TYPE
+     SYNTAX             MacAddress
+     MAX-ACCESS         read-only
+     STATUS             obsolete
+     DESCRIPTION
+                "Active destination MAC address. Either the value configured
+                 in the profile or the value specified with the start command."
+     ::= { wwpLeosBenchmarkProfileLatencyStatsEntry 9 }
+
+ --
+ -- Benchmark Profile Packet Delay Variation Stats
+ --
+ wwpLeosBenchmarkProfilePdvStatisticsTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosBenchmarkProfilePdvStatsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       obsolete
+     DESCRIPTION
+             "Table of BENCHMARK profile packet delay variation statistics
+              in usec."
+     ::= { wwpLeosBenchmarkProfileObjects 5 }
+                
+ wwpLeosBenchmarkProfilePdvStatsEntry OBJECT-TYPE
+     SYNTAX       WwpLeosBenchmarkProfilePdvStatsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       obsolete
+     DESCRIPTION
+             "BENCHMARK profile packet delay variation statistics."
+     INDEX { wwpLeosBenchmarkProfilePdvStatsProfileId,
+             wwpLeosBenchmarkProfilePdvStatsFrameSizeIndex }
+     ::= { wwpLeosBenchmarkProfilePdvStatisticsTable 1 } 
+
+ WwpLeosBenchmarkProfilePdvStatsEntry ::= SEQUENCE { 
+     wwpLeosBenchmarkProfilePdvStatsProfileId       Integer32,
+     wwpLeosBenchmarkProfilePdvStatsFrameSizeIndex  Integer32,
+     wwpLeosBenchmarkProfilePdvStatsFrameSize       Integer32,
+     wwpLeosBenchmarkProfilePdvStatsAvg             Unsigned32,
+     wwpLeosBenchmarkProfilePdvStatsSamples         Integer32,
+     wwpLeosBenchmarkProfilePdvStatsActiveVid       Integer32,
+     wwpLeosBenchmarkProfilePdvStatsActiveDstMac    MacAddress
+ } 
+
+ wwpLeosBenchmarkProfilePdvStatsProfileId  OBJECT-TYPE
+     SYNTAX             Integer32 (1..128)
+     MAX-ACCESS         not-accessible
+     STATUS             obsolete
+     DESCRIPTION
+                "Profile Id associated to those PDV stats."
+     ::= { wwpLeosBenchmarkProfilePdvStatsEntry 1 }   
+     
+ wwpLeosBenchmarkProfilePdvStatsFrameSizeIndex  OBJECT-TYPE
+     SYNTAX             Integer32 (0..9)
+     MAX-ACCESS         not-accessible
+     STATUS             obsolete
+     DESCRIPTION
+                "Frame size index associated to those PDV stats."
+     ::= { wwpLeosBenchmarkProfilePdvStatsEntry 2 }   
+     
+
+ wwpLeosBenchmarkProfilePdvStatsFrameSize  OBJECT-TYPE
+     SYNTAX             Integer32
+     MAX-ACCESS         read-only
+     STATUS             obsolete
+     DESCRIPTION
+                "Packet size in bytes."
+     ::= { wwpLeosBenchmarkProfilePdvStatsEntry 3 }
+
+ wwpLeosBenchmarkProfilePdvStatsAvg        OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             obsolete
+     DESCRIPTION
+                "Average PDV recorded for the given packet size."
+     ::= { wwpLeosBenchmarkProfilePdvStatsEntry 4 }
+
+ wwpLeosBenchmarkProfilePdvStatsSamples    OBJECT-TYPE
+     SYNTAX             Integer32
+     MAX-ACCESS         read-only
+     STATUS             obsolete
+     DESCRIPTION
+                "Number of samples used for the test."
+     ::= { wwpLeosBenchmarkProfilePdvStatsEntry 5 }
+
+ wwpLeosBenchmarkProfilePdvStatsActiveVid  OBJECT-TYPE
+     SYNTAX             Integer32 (0..4095)
+     MAX-ACCESS         read-only
+     STATUS             obsolete
+     DESCRIPTION
+                "Active VLAN Id. Either the value configured in the profile or
+                 the one specified with the start command."
+     ::= { wwpLeosBenchmarkProfilePdvStatsEntry 6 }
+
+ wwpLeosBenchmarkProfilePdvStatsActiveDstMac  OBJECT-TYPE
+     SYNTAX             MacAddress
+     MAX-ACCESS         read-only
+     STATUS             obsolete
+     DESCRIPTION
+                "Active destination MAC address. Either the value configured
+                 in the profile or the value specified with the start command."
+     ::= { wwpLeosBenchmarkProfilePdvStatsEntry 7 }
+
+ --
+ -- Benchmark Profile Frame Size List
+ --
+ wwpLeosBenchmarkProfileFrameSizeTable  OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosBenchmarkProfileFrameSizeEntry
+     MAX-ACCESS   not-accessible
+     STATUS       obsolete
+     DESCRIPTION
+             "Table providing the list of frame sizes used for testing
+              the profiles."
+     ::= { wwpLeosBenchmarkProfileObjects 6 }
+
+ wwpLeosBenchmarkProfileFrameSizeEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosBenchmarkProfileFrameSizeEntry
+     MAX-ACCESS   not-accessible
+     STATUS       obsolete
+     DESCRIPTION
+             "Profile frame size entry."
+     INDEX { wwpLeosBenchmarkProfileFrameSizeProfileId,
+             wwpLeosBenchmarkProfileFrameSizeIndex }
+     ::= { wwpLeosBenchmarkProfileFrameSizeTable 1 }
+
+ WwpLeosBenchmarkProfileFrameSizeEntry ::= SEQUENCE {
+     wwpLeosBenchmarkProfileFrameSizeProfileId      Integer32,
+     wwpLeosBenchmarkProfileFrameSizeIndex          Integer32,
+     wwpLeosBenchmarkProfileFrameSize               Integer32
+ }
+
+ wwpLeosBenchmarkProfileFrameSizeProfileId    OBJECT-TYPE
+     SYNTAX             Integer32 (1..128)
+     MAX-ACCESS         not-accessible
+     STATUS             obsolete
+     DESCRIPTION
+            "Profile Id this frame size entry is associated with."
+     ::= { wwpLeosBenchmarkProfileFrameSizeEntry 1 }   
+     
+ wwpLeosBenchmarkProfileFrameSizeIndex        OBJECT-TYPE
+     SYNTAX             Integer32 (0..9)
+     MAX-ACCESS         not-accessible
+     STATUS             obsolete
+     DESCRIPTION
+            "Frame size index into the targeted profile's frame size
+             list."
+     ::= { wwpLeosBenchmarkProfileFrameSizeEntry 2 }
+
+  wwpLeosBenchmarkProfileFrameSize            OBJECT-TYPE
+     SYNTAX             Integer32 (64..9216)
+     MAX-ACCESS         read-only
+     STATUS             obsolete
+     DESCRIPTION
+            "Frame size in bytes."
+     ::= { wwpLeosBenchmarkProfileFrameSizeEntry 3 }
+
+ --
+ -- Benchmark Profile Test Frame Size List
+ --
+ wwpLeosBenchmarkProfileTestFrameSizeTable  OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosBenchmarkProfileTestFrameSizeEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION
+             "Table providing the list of frame sizes used for testing
+              the profiles."
+     ::= { wwpLeosBenchmarkProfileObjects 7 }
+
+ wwpLeosBenchmarkProfileTestFrameSizeEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosBenchmarkProfileTestFrameSizeEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION
+             "Profile frame size entry."
+     INDEX { wwpLeosBenchmarkProfileEntryId,
+             wwpLeosBenchmarkProfileTestFrameSizeIndex }
+     ::= { wwpLeosBenchmarkProfileTestFrameSizeTable 1 }
+
+ WwpLeosBenchmarkProfileTestFrameSizeEntry ::= SEQUENCE {
+     wwpLeosBenchmarkProfileTestFrameSizeIndex          Integer32,
+     wwpLeosBenchmarkProfileTestFrameSize               Integer32,
+     wwpLeosBenchmarkProfileTestFrameSizeEntryRowStatus RowStatus
+ }
+
+  wwpLeosBenchmarkProfileTestFrameSizeIndex        OBJECT-TYPE
+     SYNTAX             Integer32 (64..9216)
+     MAX-ACCESS         not-accessible
+     STATUS             deprecated
+     DESCRIPTION
+            "Frame size value in bytes, using as the index into the targeted 
+             profile's frame size list."
+     ::= { wwpLeosBenchmarkProfileTestFrameSizeEntry 1 }
+
+  wwpLeosBenchmarkProfileTestFrameSize            OBJECT-TYPE
+     SYNTAX             Integer32 (64..9216)
+     MAX-ACCESS         read-create
+     STATUS             deprecated
+     DESCRIPTION
+            "Frame size in bytes, the value itself."
+     ::= { wwpLeosBenchmarkProfileTestFrameSizeEntry 2 }
+
+  wwpLeosBenchmarkProfileTestFrameSizeEntryRowStatus    OBJECT-TYPE
+     SYNTAX             RowStatus
+     MAX-ACCESS         read-create
+     STATUS             deprecated
+     DESCRIPTION
+            "Used to manage the creation and deletion of the conceptual rows in this table.
+             To create a row in this table, set this object to 'createAndGo'.
+	     To delete a row in this table, set this object to 'destroy'.
+             If the entry exists, it is displayed as 'active'."
+     ::= { wwpLeosBenchmarkProfileTestFrameSizeEntry 3 }
+
+ --
+ -- Benchmark Reflector FPGA stats
+ --
+ wwpLeosBenchmarkFpgaStatsRxPkts          OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION
+             "BENCHMARK reflector FPGA stats received packets"
+     ::= { wwpLeosBenchmarkFpgaStats 1 }
+
+ wwpLeosBenchmarkFpgaStatsCrcPkts         OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION
+             "BENCHMARK reflector FPGA stats packets received with CRC errors"
+     ::= { wwpLeosBenchmarkFpgaStats 2 }
+
+ wwpLeosBenchmarkFpgaStatsUdpChecksumPkts OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION
+             "BENCHMARK reflector FPGA stats packets received with CRC errors"
+     ::= { wwpLeosBenchmarkFpgaStats 3 }
+
+ wwpLeosBenchmarkFpgaStatsDiscardPkts     OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION
+             "BENCHMARK reflector FPGA stats packets received which don't match any 
+              active/enabled profile(s)."
+     ::= { wwpLeosBenchmarkFpgaStats 4 }
+
+ wwpLeosBenchmarkFpgaStatsDuplicatePkts   OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "BENCHMARK reflector FPGA stats packets received with a duplicate sequence 
+              number."
+     ::= { wwpLeosBenchmarkFpgaStats 5 }
+ 
+ wwpLeosBenchmarkFpgaStatsOOSeqPkts       OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "BENCHMARK reflector FPGA stats packets received out of sequence"
+     ::= { wwpLeosBenchmarkFpgaStats 6 }
+
+ wwpLeosBenchmarkFpgaStatsTxPkts          OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION
+             "BENCHMARK reflector FPGA stats packets transmitted"
+     ::= { wwpLeosBenchmarkFpgaStats 7 }
+
+ wwpLeosBenchmarkFpgaStatsOOOPkts         OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "BENCHMARK reflector FPGA stats packets received with an out of order sequence number"
+     ::= { wwpLeosBenchmarkFpgaStats 8 }
+
+ wwpLeosBenchmarkFpgaStatsDiscSeqNumPkts  OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "BENCHMARK reflector FPGA stats packets received with a discontinued sequence number"
+     ::= { wwpLeosBenchmarkFpgaStats 9 }
+
+ wwpLeosBenchmarkFpgaStatsRxIpPkts  OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "BENCHMARK reflector FPGA stats packets received IPv4"
+     ::= { wwpLeosBenchmarkFpgaStats 10 }
+
+ wwpLeosBenchmarkFpgaStatsRxUdpPkts  OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "BENCHMARK reflector FPGA stats packets received IPv4 UDP"
+     ::= { wwpLeosBenchmarkFpgaStats 11 }
+
+ wwpLeosBenchmarkFpgaStatsRxNonIpPkts  OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "BENCHMARK reflector FPGA stats packets received non IP"
+     ::= { wwpLeosBenchmarkFpgaStats 12 }
+
+ wwpLeosBenchmarkFpgaStatsRxUnrecognizedPkts  OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "BENCHMARK reflector FPGA stats packets received unrecognized"
+     ::= { wwpLeosBenchmarkFpgaStats 13 }
+
+ wwpLeosBenchmarkFpgaStatsRxIpv6Pkts  OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "BENCHMARK reflector FPGA stats packets received IPv6"
+     ::= { wwpLeosBenchmarkFpgaStats 14 }
+
+ wwpLeosBenchmarkFpgaStatsRxIpv6UdpPkts  OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "BENCHMARK reflector FPGA stats packets received IPv6 UDP"
+     ::= { wwpLeosBenchmarkFpgaStats 15 }
+
+ --
+ -- FPGA per Hardware Session statistics
+ --
+ wwpLeosBenchmarkFpgaHwSessionStatsTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosBenchmarkFpgaHwSessionStatsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION
+             "Table of FPGA HW session statistics entries."
+     ::= { wwpLeosBenchmarkProfileObjects 8 }
+
+ wwpLeosBenchmarkFpgaHwSessionStatsEntry OBJECT-TYPE
+     SYNTAX       WwpLeosBenchmarkFpgaHwSessionStatsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION
+             "BENCHMARK FPGA statistics per HW session ID."
+     INDEX { wwpLeosBenchmarkProfileEntryId,
+             wwpLeosBenchmarkFpgaHwSessionStatsPcpIndex,
+             wwpLeosBenchmarkFpgaHwSessionStatsColorIndex }
+     ::= { wwpLeosBenchmarkFpgaHwSessionStatsTable 1 }
+
+ WwpLeosBenchmarkFpgaHwSessionStatsEntry ::= SEQUENCE {
+     wwpLeosBenchmarkFpgaHwSessionStatsPcpIndex           Integer32,
+     wwpLeosBenchmarkFpgaHwSessionStatsColorIndex         Integer32,
+     wwpLeosBenchmarkFpgaHwSessionStatsHwSessionId        Integer32,
+     wwpLeosBenchmarkFpgaHwSessionStatsRxPkts             Counter64,
+     wwpLeosBenchmarkFpgaHwSessionStatsCrcPkts            Counter64,
+     wwpLeosBenchmarkFpgaHwSessionStatsUdpChecksumPkts    Counter64,
+     wwpLeosBenchmarkFpgaHwSessionStatsDiscardPkts        Counter64,
+     wwpLeosBenchmarkFpgaHwSessionStatsDuplicatePkts      Counter64,
+     wwpLeosBenchmarkFpgaHwSessionStatsTxPkts             Counter64,
+     wwpLeosBenchmarkFpgaHwSessionStatsOOOPkts            Counter64,
+     wwpLeosBenchmarkFpgaHwSessionStatsDiscSeqNumPkts     Counter64,
+     wwpLeosBenchmarkFpgaHwSessionStatsRxIpv4Pkts         Counter64,
+     wwpLeosBenchmarkFpgaHwSessionStatsRxIpv4UdpPkts      Counter64,
+     wwpLeosBenchmarkFpgaHwSessionStatsRxNonIpPkts        Counter64,
+     wwpLeosBenchmarkFpgaHwSessionStatsRxUnrecognizedPkts Counter64,
+     wwpLeosBenchmarkFpgaHwSessionStatsRxIpv6Pkts         Counter64,
+     wwpLeosBenchmarkFpgaHwSessionStatsRxIpv6UdpPkts      Counter64
+ }
+
+ wwpLeosBenchmarkFpgaHwSessionStatsPcpIndex        OBJECT-TYPE
+     SYNTAX       Integer32 (1..8)
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION  "Index of the PCP value associated with the Hw Session
+                   these stats belong to."
+     ::= { wwpLeosBenchmarkFpgaHwSessionStatsEntry 1 }
+
+ wwpLeosBenchmarkFpgaHwSessionStatsColorIndex      OBJECT-TYPE
+     SYNTAX       Integer32 (1..2)
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION  "Index of the color value associated with the Hw Session
+                   these stats belong to."
+     ::= { wwpLeosBenchmarkFpgaHwSessionStatsEntry 2 }
+
+ wwpLeosBenchmarkFpgaHwSessionStatsHwSessionId     OBJECT-TYPE
+     SYNTAX       Integer32
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION  "ID of the hw session used in the FPGA for this
+                   profile Id, PCP index and Color index associated
+                   with these stats."
+     ::= { wwpLeosBenchmarkFpgaHwSessionStatsEntry 3 }
+
+ wwpLeosBenchmarkFpgaHwSessionStatsRxPkts          OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION
+             "BENCHMARK FPGA stats received packets"
+     ::= { wwpLeosBenchmarkFpgaHwSessionStatsEntry 4 }
+
+ wwpLeosBenchmarkFpgaHwSessionStatsCrcPkts         OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION
+             "BENCHMARK FPGA stats packets received with CRC errors"
+     ::= { wwpLeosBenchmarkFpgaHwSessionStatsEntry 5 }
+
+ wwpLeosBenchmarkFpgaHwSessionStatsUdpChecksumPkts OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION
+             "BENCHMARK FPGA stats packets received with CRC errors"
+     ::= { wwpLeosBenchmarkFpgaHwSessionStatsEntry 6 }
+
+ wwpLeosBenchmarkFpgaHwSessionStatsDiscardPkts     OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION
+             "BENCHMARK FPGA stats packets received which don't match any 
+              active/enabled profile(s)."
+     ::= { wwpLeosBenchmarkFpgaHwSessionStatsEntry 7 }
+
+ wwpLeosBenchmarkFpgaHwSessionStatsDuplicatePkts   OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION
+             "BENCHMARK FPGA stats packets received with a duplicate sequence 
+              number."
+     ::= { wwpLeosBenchmarkFpgaHwSessionStatsEntry 8 }
+ 
+ wwpLeosBenchmarkFpgaHwSessionStatsTxPkts          OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION
+             "BENCHMARK FPGA stats packets transmitted"
+     ::= { wwpLeosBenchmarkFpgaHwSessionStatsEntry 9 }
+
+ wwpLeosBenchmarkFpgaHwSessionStatsOOOPkts         OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION
+             "BENCHMARK FPGA stats packets received with an out of order sequence number"
+     ::= { wwpLeosBenchmarkFpgaHwSessionStatsEntry 10 }
+
+ wwpLeosBenchmarkFpgaHwSessionStatsDiscSeqNumPkts  OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION
+             "BENCHMARK FPGA stats packets received with a discontinued sequence number"
+     ::= { wwpLeosBenchmarkFpgaHwSessionStatsEntry 11 }
+
+ wwpLeosBenchmarkFpgaHwSessionStatsRxIpv4Pkts  OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION
+             "BENCHMARK FPGA stats packets received IPv4"
+     ::= { wwpLeosBenchmarkFpgaHwSessionStatsEntry 12 }
+
+ wwpLeosBenchmarkFpgaHwSessionStatsRxIpv4UdpPkts  OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       deprecated 
+     DESCRIPTION
+             "BENCHMARK FPGA stats packets received IPv4 UDP"
+     ::= { wwpLeosBenchmarkFpgaHwSessionStatsEntry 13 }
+
+ wwpLeosBenchmarkFpgaHwSessionStatsRxNonIpPkts  OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       deprecated 
+     DESCRIPTION
+             "BENCHMARK FPGA stats packets received non IP"
+     ::= { wwpLeosBenchmarkFpgaHwSessionStatsEntry 14 }
+
+ wwpLeosBenchmarkFpgaHwSessionStatsRxUnrecognizedPkts  OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION
+             "BENCHMARK FPGA stats packets received unrecognized"
+     ::= { wwpLeosBenchmarkFpgaHwSessionStatsEntry 15 }
+
+ wwpLeosBenchmarkFpgaHwSessionStatsRxIpv6Pkts  OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION
+             "BENCHMARK FPGA stats packets received IPv6"
+     ::= { wwpLeosBenchmarkFpgaHwSessionStatsEntry 16 }
+
+ wwpLeosBenchmarkFpgaHwSessionStatsRxIpv6UdpPkts  OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION
+             "BENCHMARK FPGA stats packets received IPv6 UDP"
+     ::= { wwpLeosBenchmarkFpgaHwSessionStatsEntry 17 }
+
+ --
+ -- Benchmark Port stats
+ --
+ wwpLeosBenchmarkPortStatsTxBytes            OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "Number of bytes transmitted by the benchmark port"
+     ::= { wwpLeosBenchmarkPortStats 1 }
+
+ wwpLeosBenchmarkPortStatsTxPkts             OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "Number of packets transmitted by the benchmark port"
+     ::= { wwpLeosBenchmarkPortStats 2 }
+
+ wwpLeosBenchmarkPortStatsCrcErrorPkts       OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "Number of packets with CRC errors" 
+     ::= { wwpLeosBenchmarkPortStats 3 }
+
+ wwpLeosBenchmarkPortStatsUcastPkts          OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "Number of unicast packets transmitted by the benchmark port"
+     ::= { wwpLeosBenchmarkPortStats 4 }
+
+ wwpLeosBenchmarkPortStatsMcastPkts          OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "Number of multicast packets transmitted by the benchmark port"
+     ::= { wwpLeosBenchmarkPortStats 5 }
+
+ wwpLeosBenchmarkPortStatsBcastPkts          OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "Number of broadcast packets transmitted by the benchmark port"
+     ::= { wwpLeosBenchmarkPortStats 6 }
+
+ wwpLeosBenchmarkPortStatsUndersizePkts      OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "The total number of packets received that were
+              less than 64 octets long (excluding framing bits,
+              but including FCS octets) and were otherwise well
+              formed."
+     ::= { wwpLeosBenchmarkPortStats 7 }
+
+ wwpLeosBenchmarkPortStatsOversizePkts       OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "The total number of packets received that were
+              longer than 1518 octets (excluding framing bits,
+              but including FCS octets) and were otherwise
+              well formed."
+     ::= { wwpLeosBenchmarkPortStats 8 }
+
+ wwpLeosBenchmarkPortStatsFragmentsPkts      OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "The total number of packets received that were less
+              than 64 octets in length (excluding framing bits but
+              including FCS octets) and had either a bad Frame
+              Check Sequence (FCS) with an integral number of
+              octets (FCS Error) or a bad FCS with a non-integral
+              number of octets (Alignment Error)."
+     ::= { wwpLeosBenchmarkPortStats 9 }
+
+ wwpLeosBenchmarkPortStatsJabbersPkts        OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "The total number of packets received that were
+              longer than 1518 octets (excluding framing bits,
+              but including FCS octets), and had either a bad
+              Frame Check Sequence (FCS) with an integral number
+              of octets (FCS Error) or a bad FCS with a
+              non-integral number of octets (Alignment Error)."
+     ::= { wwpLeosBenchmarkPortStats 10 }
+
+ wwpLeosBenchmarkPortStatsTxPausePkts       OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "The transmit pause packets for the port."
+    ::= { wwpLeosBenchmarkPortStats 11 }
+
+ wwpLeosBenchmarkPortStatsTxDropPkts        OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "The total number of dropped packets on the benchmark port when
+              traffic profiles are enabled (311v only)."
+    ::= { wwpLeosBenchmarkPortStats 12 }
+
+ wwpLeosBenchmarkPortStatsTxDiscardPkts     OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "The total number of discarded packets."
+    ::= { wwpLeosBenchmarkPortStats 13 }
+
+ wwpLeosBenchmarkPortStatsTxLOutRangePkts   OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "The transmit length out of range packet count."
+    ::= { wwpLeosBenchmarkPortStats 14 }
+
+ wwpLeosBenchmarkPortStatsTx64OctsPkts      OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "Number of 64-byte packets transmitted on the benchmark port."
+    ::= { wwpLeosBenchmarkPortStats 15 }
+
+ wwpLeosBenchmarkPortStatsTx65To127Pkts     OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "Number of 64 to 127-byte packets transmitted on the
+              benchmark port."
+    ::= { wwpLeosBenchmarkPortStats 16 }
+
+ wwpLeosBenchmarkPortStatsTx128To255Pkts    OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "Number of 128 to 255-byte packets transmitted on the
+              benchmark port."
+    ::= { wwpLeosBenchmarkPortStats 17 }
+
+ wwpLeosBenchmarkPortStatsTx256To511Pkts    OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "Number of 256 to 511-byte packets transmitted on the
+              benchmark port."
+    ::= { wwpLeosBenchmarkPortStats 18 }
+
+ wwpLeosBenchmarkPortStatsTx512To1023Pkts   OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "Number of 512 to 1023-byte packets transmitted on the
+              benchmark port."
+    ::= { wwpLeosBenchmarkPortStats 19 }
+
+ wwpLeosBenchmarkPortStatsTx1024To1518Pkts  OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "Number of 1024 to 1518-byte packets transmitted on the
+              benchmark port."
+    ::= { wwpLeosBenchmarkPortStats 20 }
+
+ wwpLeosBenchmarkPortStatsTx1519To2047Pkts  OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "Number of 1519 to 2047-byte packets transmitted on the
+              benchmark port."
+    ::= { wwpLeosBenchmarkPortStats 21 }
+
+ wwpLeosBenchmarkPortStatsTx2048To4095Pkts OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "Number of 2048 to 4095-byte packets transmitted on the
+              benchmark port."
+    ::= { wwpLeosBenchmarkPortStats 22 }
+
+ wwpLeosBenchmarkPortStatsTx4096To9216Pkts  OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "Number of 4096 to 9216-byte packets transmitted on the
+              benchmark port."
+    ::= { wwpLeosBenchmarkPortStats 23 }
+
+ wwpLeosBenchmarkPortStatsRxBytes           OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "Number of bytes received on the benchmark port."
+    ::= { wwpLeosBenchmarkPortStats 24 }
+
+ wwpLeosBenchmarkPortStatsRxPkts            OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "Number of packets received on the benchmark port."
+    ::= { wwpLeosBenchmarkPortStats 25 }
+
+ wwpLeosBenchmarkPortStatsRxExDeferPkts     OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "Number of excessive deferred packets."
+    ::= { wwpLeosBenchmarkPortStats 26 }
+
+ wwpLeosBenchmarkPortStatsRxDeferPkts       OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "Number of deferred packets."
+    ::= { wwpLeosBenchmarkPortStats 27 }
+
+ wwpLeosBenchmarkPortStatsRxGiantPkts       OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "Number of too big packets."
+    ::= { wwpLeosBenchmarkPortStats 28 }
+
+ wwpLeosBenchmarkPortStatsRxUnderRunPkts    OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "Underrun packet count for the benchmark port."
+    ::= { wwpLeosBenchmarkPortStats 29 }
+
+ wwpLeosBenchmarkPortStatsRxCrcErrorPkts    OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "Number of packets received with CRC errors."
+    ::= { wwpLeosBenchmarkPortStats 30 }
+
+ wwpLeosBenchmarkPortStatsRxLCheckErrorPkts OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "Number of packets with length check errors."
+    ::= { wwpLeosBenchmarkPortStats 31 }
+
+ wwpLeosBenchmarkPortStatsRxLOutRangePkts   OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "The number of frames received by the benchmark port
+              that exceeded the maximum permitted frame size."
+    ::= { wwpLeosBenchmarkPortStats 32 }
+
+ wwpLeosBenchmarkPortStatsRxPausePkts       OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "The total receive pause packets for the port."
+    ::= { wwpLeosBenchmarkPortStats 33 }
+
+ wwpLeosBenchmarkPortStatsRxUcastPkts       OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "The total number of unicast packets received by benchmark port."
+    ::= { wwpLeosBenchmarkPortStats 34 }
+
+ wwpLeosBenchmarkPortStatsRxMcastPkts       OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "The total number of multicast packets received by benchmark port."
+    ::= { wwpLeosBenchmarkPortStats 35 }
+
+ wwpLeosBenchmarkPortStatsRxBcastPkts       OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "The total number of broadcast packets received by benchmark port."
+    ::= { wwpLeosBenchmarkPortStats 36 }
+
+ wwpLeosBenchmarkPortStatsRx64Pkts          OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "The total number of 64-byte packets received by benchmark port."
+    ::= { wwpLeosBenchmarkPortStats 37 }
+
+ wwpLeosBenchmarkPortStatsRx65To127Pkts     OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "The total number of 65 to 127-byte packets received by
+              benchmark port."
+    ::= { wwpLeosBenchmarkPortStats 38 }
+
+ wwpLeosBenchmarkPortStatsRx128To255Pkts    OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "The total number of 128 to 255-byte packets received by
+              benchmark port."
+    ::= { wwpLeosBenchmarkPortStats 39 }
+
+ wwpLeosBenchmarkPortStatsRx256To511Pkts    OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "The total number of 256 to 511-byte packets received by
+              benchmark port."
+    ::= { wwpLeosBenchmarkPortStats 40 }
+
+ wwpLeosBenchmarkPortStatsRx512To1023Pkts   OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "The total number of 512 to 1023-byte packets received by
+              benchmark port."
+    ::= { wwpLeosBenchmarkPortStats 41 }
+
+ wwpLeosBenchmarkPortStatsRx1024To1518Pkts  OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "The total number of 1024 to 1518-byte packets received by
+              benchmark port."
+    ::= { wwpLeosBenchmarkPortStats 42 }
+
+ wwpLeosBenchmarkPortStatsRx1519To2047Pkts  OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "The total number of 1519 to 2047-byte packets received by
+              benchmark port."
+    ::= { wwpLeosBenchmarkPortStats 43 }
+
+ wwpLeosBenchmarkPortStatsRx2048To4095Pkts  OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "The total number of 2048 to 4095-byte packets received by
+              benchmark port."
+    ::= { wwpLeosBenchmarkPortStats 44 }
+
+ wwpLeosBenchmarkPortStatsRx4096To9216Pkts  OBJECT-TYPE
+     SYNTAX       Counter64
+     MAX-ACCESS   read-only
+     STATUS       obsolete
+     DESCRIPTION
+             "The total number of 4096 to 9216-byte packets received by
+              benchmark port."
+    ::= { wwpLeosBenchmarkPortStats 45 }
+
+ ---
+ --- Hardware Session Table
+ --- 
+ wwpLeosBenchmarkHwSessionAllocationTable   OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosBenchmarkHwSessionAllocationEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION
+             "Table providing the allocation of hw session for 
+              given profile Id, PCP and color."
+     ::= { wwpLeosBenchmarkProfileObjects 9 }
+
+ wwpLeosBenchmarkHwSessionAllocationEntry   OBJECT-TYPE
+     SYNTAX       WwpLeosBenchmarkHwSessionAllocationEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION
+             "Hw session allocation entry."
+     INDEX { wwpLeosBenchmarkProfileEntryId,
+             wwpLeosBenchmarkHwSessionPcpIndex,
+             wwpLeosBenchmarkHwSessionColorIndex }
+     ::= { wwpLeosBenchmarkHwSessionAllocationTable 1 }
+
+ WwpLeosBenchmarkHwSessionAllocationEntry ::= SEQUENCE {
+     wwpLeosBenchmarkHwSessionPcpIndex      Integer32,
+     wwpLeosBenchmarkHwSessionColorIndex    Integer32,
+     wwpLeosBenchmarkHwSessionPcp           Integer32,
+     wwpLeosBenchmarkHwSessionColor         BenchmarkColorTest,
+     wwpLeosBenchmarkHwSessionId            Integer32,
+     wwpLeosBenchmarkHwSessionThroughputTestState BenchmarkThroughputTestState,
+     wwpLeosBenchmarkHwSessionFramelossTestState  BenchmarkFramelossTestState,
+     wwpLeosBenchmarkHwSessionLatencyTestState    BenchmarkLatencyPdvTestState,
+     wwpLeosBenchmarkHwSessionPdvTestState        BenchmarkLatencyPdvTestState,
+     wwpLeosBenchmarkHwSessionCurrentPktSize      Integer32,
+     wwpLeosBenchmarkHwSessionEmixSequenceId      Integer32,
+     wwpLeosBenchmarkHwSessionCurrentRate         Integer32,
+     wwpLeosBenchmarkHwSessionSamplesCompleted    Integer32,
+     wwpLeosBenchmarkHwSessionRfc2544TestState    BenchmarkRfc2544TestState,
+     wwpLeosBenchmarkHwSessionY1564TestState      BenchmarkY1564TestState
+ }
+
+ wwpLeosBenchmarkHwSessionPcpIndex          OBJECT-TYPE
+     SYNTAX       Integer32 (1..8)
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION "PCP Index."
+     ::= { wwpLeosBenchmarkHwSessionAllocationEntry 1 }
+
+ wwpLeosBenchmarkHwSessionColorIndex        OBJECT-TYPE
+     SYNTAX       Integer32 (1..2)
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION "Color Index."
+     ::= { wwpLeosBenchmarkHwSessionAllocationEntry 2 }
+
+ wwpLeosBenchmarkHwSessionPcp               OBJECT-TYPE
+     SYNTAX       Integer32 (0..7)
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION "PCP value associated with this hw session"
+     ::= { wwpLeosBenchmarkHwSessionAllocationEntry 3 }
+
+ wwpLeosBenchmarkHwSessionColor             OBJECT-TYPE
+     SYNTAX       BenchmarkColorTest
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION "Color of test traffic associated with this hardware
+                  session"
+     ::= { wwpLeosBenchmarkHwSessionAllocationEntry 4 }
+
+wwpLeosBenchmarkHwSessionId                 OBJECT-TYPE
+     SYNTAX       Integer32 (0..127)
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION "Id of the hardware session allocated to the given
+                  profile id, pcp and color"
+     ::= { wwpLeosBenchmarkHwSessionAllocationEntry 5 }
+
+wwpLeosBenchmarkHwSessionThroughputTestState OBJECT-TYPE
+     SYNTAX       BenchmarkThroughputTestState
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION "State of the throughput test for this hardware session
+                  defined by the profile id, pcp and color"
+     ::= { wwpLeosBenchmarkHwSessionAllocationEntry 6 }
+
+wwpLeosBenchmarkHwSessionFramelossTestState OBJECT-TYPE
+     SYNTAX       BenchmarkFramelossTestState
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION "State of the frameloss test for this hardware session
+                  defined by the profile id, pcp and color"
+     ::= { wwpLeosBenchmarkHwSessionAllocationEntry 7 }
+
+wwpLeosBenchmarkHwSessionLatencyTestState   OBJECT-TYPE
+     SYNTAX       BenchmarkLatencyPdvTestState
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION "State of the latency test for this hardware session
+                  defined by the profile id, pcp and color"
+     ::= { wwpLeosBenchmarkHwSessionAllocationEntry 8 }
+
+wwpLeosBenchmarkHwSessionPdvTestState       OBJECT-TYPE
+     SYNTAX       BenchmarkLatencyPdvTestState
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION "State of the PDV test for this hardware session
+                  defined by the profile id, pcp and color"
+     ::= { wwpLeosBenchmarkHwSessionAllocationEntry 9 }
+
+wwpLeosBenchmarkHwSessionCurrentPktSize     OBJECT-TYPE
+     SYNTAX       Integer32
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION "Packet size in bytes currently used by the running test."
+     ::= { wwpLeosBenchmarkHwSessionAllocationEntry 10 }
+
+ wwpLeosBenchmarkHwSessionEmixSequenceId    OBJECT-TYPE
+     SYNTAX       Integer32
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION "EMIX sequence Id used with this session. If zero, 
+                  it indicates that the the frame size list is being used
+                  for the test and wwpLeosBenchmarkHwSessionCurrentPktSize
+                  indicates which packet size is currently being tested."
+     ::= { wwpLeosBenchmarkHwSessionAllocationEntry 11 }
+
+ wwpLeosBenchmarkHwSessionCurrentRate       OBJECT-TYPE
+     SYNTAX       Integer32
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION "Traffic rate currently used to generate packets as percent
+                  of the line rate"
+     ::= { wwpLeosBenchmarkHwSessionAllocationEntry 12 }
+
+ wwpLeosBenchmarkHwSessionSamplesCompleted  OBJECT-TYPE
+     SYNTAX       Integer32
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION "When latency and/or pdv is running, this indicates how 
+                  many samples have been gathered so far."
+     ::= { wwpLeosBenchmarkHwSessionAllocationEntry 13 }
+
+wwpLeosBenchmarkHwSessionRfc2544TestState       OBJECT-TYPE
+     SYNTAX       BenchmarkRfc2544TestState
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION "State of the RFC2544 test for this hardware session
+                  defined by the profile id, pcp and color"
+     ::= { wwpLeosBenchmarkHwSessionAllocationEntry 14 }
+
+wwpLeosBenchmarkHwSessionY1564TestState       OBJECT-TYPE
+     SYNTAX       BenchmarkY1564TestState
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION "State of the Y1564 test for this hardware session
+                  defined by the profile id, pcp and color"
+     ::= { wwpLeosBenchmarkHwSessionAllocationEntry 15 }
+
+ ---
+ --- KPI Profile Table
+ ---
+ wwpLeosBenchmarkKpiProfileTable   OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosBenchmarkKpiProfileEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION
+             "Table providing the list of configured Key Performance
+              Indicator profiles on this node."
+     ::= { wwpLeosBenchmarkGeneratorModule 19 }
+
+ wwpLeosBenchmarkKpiProfileEntry   OBJECT-TYPE
+     SYNTAX       WwpLeosBenchmarkKpiProfileEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION
+             "Hw session allocation entry."
+     INDEX { wwpLeosBenchmarkKpiProfileId }
+     ::= { wwpLeosBenchmarkKpiProfileTable 1 }
+
+ WwpLeosBenchmarkKpiProfileEntry ::= SEQUENCE {
+     wwpLeosBenchmarkKpiProfileId            Integer32,
+     wwpLeosBenchmarkKpiProfileName          DisplayString,
+     wwpLeosBenchmarkKpiProfileNumOfRef      Integer32,
+     wwpLeosBenchmarkKpiProfileRowStatus     RowStatus
+ }
+
+wwpLeosBenchmarkKpiProfileId             OBJECT-TYPE
+     SYNTAX       Integer32 (1..32)
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION "Unique Id of the KPI profile entry"
+     ::= { wwpLeosBenchmarkKpiProfileEntry 1 }
+
+wwpLeosBenchmarkKpiProfileName           OBJECT-TYPE
+     SYNTAX       DisplayString (SIZE (1..46))
+     MAX-ACCESS   read-create
+     STATUS       deprecated
+     DESCRIPTION  "Name of a the KPI profile"
+     ::= { wwpLeosBenchmarkKpiProfileEntry 2 }
+
+wwpLeosBenchmarkKpiProfileNumOfRef       OBJECT-TYPE
+     SYNTAX       Integer32
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION  "Number of generator test profiles currently
+                   using this KPI profile for results analysis.
+                   If this is the default KPI profile set in
+                   the generator, that also count as one reference."
+     ::= { wwpLeosBenchmarkKpiProfileEntry 3 }
+
+ wwpLeosBenchmarkKpiProfileRowStatus    OBJECT-TYPE
+     SYNTAX             RowStatus
+     MAX-ACCESS         read-create
+     STATUS             deprecated
+     DESCRIPTION       "Used to manage the creation and deletion of the 
+                        conceptual rows in this table.  To create a row in
+                        this table, set this object to 'createAndGo'.
+                        To delete a row in this table, set this object to 
+                        'destroy'.  If the entry exists, it is displayed 
+                        as 'active'."
+     ::= { wwpLeosBenchmarkKpiProfileEntry 4 }
+
+ ---
+ --- KPI value per PCP per Color Table
+ ---
+ wwpLeosBenchmarkKpiPcpColorTable        OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosBenchmarkKpiPcpColorEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION
+             "Table providing the list of configured Key Performance
+              Indicator per KPI profile, per PCP and per Color."
+     ::= { wwpLeosBenchmarkGeneratorModule 20 }
+
+ wwpLeosBenchmarkKpiPcpColorEntry        OBJECT-TYPE
+     SYNTAX       WwpLeosBenchmarkKpiPcpColorEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION "Entry for the KPI values for the given KPI profile,
+                  PCP and color."
+     INDEX { wwpLeosBenchmarkKpiProfileId,
+             wwpLeosBenchmarkKpiPcpIndex,
+             wwpLeosBenchmarkKpiColorIndex }
+     ::= { wwpLeosBenchmarkKpiPcpColorTable 1 }
+
+ WwpLeosBenchmarkKpiPcpColorEntry ::= SEQUENCE {
+     wwpLeosBenchmarkKpiPcpIndex      Integer32,
+     wwpLeosBenchmarkKpiColorIndex    Integer32,
+     wwpLeosBenchmarkKpiPcp           Integer32,
+     wwpLeosBenchmarkKpiColor         BenchmarkColorTest,
+     wwpLeosBenchmarkKpiThroughput    BenchmarkThroughputKpiPercent,
+     wwpLeosBenchmarkKpiFrameloss     BenchmarkFramelossKpiPercent,
+     wwpLeosBenchmarkKpiLatency       Integer32,
+     wwpLeosBenchmarkKpiPdv           Integer32
+ }
+
+ wwpLeosBenchmarkKpiPcpIndex        OBJECT-TYPE
+     SYNTAX       Integer32  (1..8)
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION "Index for the PCP"
+     ::= { wwpLeosBenchmarkKpiPcpColorEntry 1 }
+
+ wwpLeosBenchmarkKpiColorIndex      OBJECT-TYPE
+     SYNTAX       Integer32  (1..2)
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION "Index for the PCP"
+     ::= { wwpLeosBenchmarkKpiPcpColorEntry 2 }
+
+ wwpLeosBenchmarkKpiPcp             OBJECT-TYPE
+     SYNTAX       Integer32  (0..7)
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION "PCP value associated with this entry"
+     ::= { wwpLeosBenchmarkKpiPcpColorEntry 3 }
+
+ wwpLeosBenchmarkKpiColor           OBJECT-TYPE
+     SYNTAX       BenchmarkColorTest
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION "Traffic color, green or yellow, associated with these
+                  KPIs."
+     ::= { wwpLeosBenchmarkKpiPcpColorEntry 4 }
+
+ wwpLeosBenchmarkKpiThroughput      OBJECT-TYPE
+     SYNTAX       BenchmarkThroughputKpiPercent
+     MAX-ACCESS   read-write
+     STATUS       deprecated
+     DESCRIPTION "Throughput KPI for the given KPI profile, PCP and color
+                  expressed in percent of bandwith * 10000 to provide a 4
+                  decimal point value."
+     ::= { wwpLeosBenchmarkKpiPcpColorEntry 5 }
+
+ wwpLeosBenchmarkKpiFrameloss       OBJECT-TYPE
+     SYNTAX       BenchmarkFramelossKpiPercent
+     MAX-ACCESS   read-write
+     STATUS       deprecated
+     DESCRIPTION "Frameloss KPI for the given KPI profile, PCP and color
+                  expressed in percent of bandwidth * 10000 to provide a 4
+                  decimal point value."
+     ::= { wwpLeosBenchmarkKpiPcpColorEntry 6 }
+
+ wwpLeosBenchmarkKpiLatency         OBJECT-TYPE
+     SYNTAX       Integer32
+     MAX-ACCESS   read-write
+     STATUS       deprecated
+     DESCRIPTION "Maximum latency in micro-seconds that the latency result
+                  should not exceed in order for the test to be considered
+                  a pass."
+     ::= { wwpLeosBenchmarkKpiPcpColorEntry 7 }
+
+ wwpLeosBenchmarkKpiPdv             OBJECT-TYPE
+     SYNTAX       Integer32
+     MAX-ACCESS   read-write
+     STATUS       deprecated
+     DESCRIPTION "Maximum PDV in micro-seconds that the PDV test result
+                  should not exceed in order for the test to be 
+                  considered a pass."
+     ::= { wwpLeosBenchmarkKpiPcpColorEntry 8 }
+
+ ---
+ --- PCP Bandwidth Distribution Profile Table
+ ---
+ wwpLeosBenchmarkPcpBwDistProfileTable   OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosBenchmarkPcpBwDistProfileEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION
+             "Table providing the list of configured PCP bandwidth
+              distribution profiles on this node."
+     ::= { wwpLeosBenchmarkGeneratorModule 21 }
+
+ wwpLeosBenchmarkPcpBwDistProfileEntry   OBJECT-TYPE
+     SYNTAX       WwpLeosBenchmarkPcpBwDistProfileEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION
+             "PCP BW distribution profile entry"
+     INDEX { wwpLeosBenchmarkPcpBwDistProfileId }
+     ::= { wwpLeosBenchmarkPcpBwDistProfileTable 1 }
+
+ WwpLeosBenchmarkPcpBwDistProfileEntry ::= SEQUENCE {
+     wwpLeosBenchmarkPcpBwDistProfileId            Integer32,
+     wwpLeosBenchmarkPcpBwDistProfileName          DisplayString,
+     wwpLeosBenchmarkPcpBwDistProfileNumOfRef      Integer32,
+     wwpLeosBenchmarkPcpBwDistProfileValid         TruthValue,
+     wwpLeosBenchmarkPcpBwDistRowStatus            RowStatus
+ }
+
+ wwpLeosBenchmarkPcpBwDistProfileId       OBJECT-TYPE
+     SYNTAX       Integer32  (1..32)
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION "Unique Id of the PCP bandwidth distribution
+                  profile entry"
+     ::= { wwpLeosBenchmarkPcpBwDistProfileEntry 1 }
+
+ wwpLeosBenchmarkPcpBwDistProfileName     OBJECT-TYPE
+     SYNTAX       DisplayString (SIZE (1..46))
+     MAX-ACCESS   read-create
+     STATUS       deprecated
+     DESCRIPTION  "Name of a the PCP bandwidth distribution
+                   profile"
+     ::= { wwpLeosBenchmarkPcpBwDistProfileEntry 2 }
+
+ wwpLeosBenchmarkPcpBwDistProfileNumOfRef OBJECT-TYPE
+     SYNTAX       Integer32
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION  "Number of generator test profiles currently
+                   using this PCP bandwidth distribution profile
+                   for testing.
+                   If this is the default PCP BW distribution
+                   profile set in the generator, that also count
+                   as one reference."
+     ::= { wwpLeosBenchmarkPcpBwDistProfileEntry 3 }
+
+ wwpLeosBenchmarkPcpBwDistProfileValid   OBJECT-TYPE
+     SYNTAX       TruthValue
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION  "Indicates whether the profile is error free or not.
+                   To be error free, and usable, the profile's sump of
+                   PCP percent must equal 100. The list of PCP percent
+                   for a given profile are accessed via
+                   wwpLeosBenchmarkPcpBwPercentEntry."
+     ::= { wwpLeosBenchmarkPcpBwDistProfileEntry 4 }
+
+ wwpLeosBenchmarkPcpBwDistRowStatus     OBJECT-TYPE
+     SYNTAX             RowStatus
+     MAX-ACCESS         read-create
+     STATUS             deprecated
+     DESCRIPTION       "Used to manage the creation and deletion of the
+                        conceptual rows in this table.  To create a row in
+                        this table, set this object to 'createAndGo'.
+                        To delete a row in this table, set this object to
+                        'destroy'.  If the entry exists, it is displayed
+                        as 'active'."
+     ::= { wwpLeosBenchmarkPcpBwDistProfileEntry 5 }
+                  
+ ---
+ --- PCP BW distribution value per profile per PCP
+ ---
+ wwpLeosBenchmarkPcpBwPercentTable        OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosBenchmarkPcpBwPercentEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION
+             "Table providing the list of configured bandwidth
+              percentage per profile, per PCP."
+     ::= { wwpLeosBenchmarkGeneratorModule 22 }
+
+ wwpLeosBenchmarkPcpBwPercentEntry       OBJECT-TYPE
+     SYNTAX       WwpLeosBenchmarkPcpBwPercentEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION "Entry for bandwidth percent per PCP BW Distribution
+                  profile and PCP"
+     INDEX { wwpLeosBenchmarkPcpBwDistProfileId,
+             wwpLeosBenchmarkPcpBwPercentPcpIndex }
+     ::= { wwpLeosBenchmarkPcpBwPercentTable 1 }
+
+ WwpLeosBenchmarkPcpBwPercentEntry ::= SEQUENCE {
+     wwpLeosBenchmarkPcpBwPercentPcpIndex    Integer32,
+     wwpLeosBenchmarkPcpBwPercentPcp         Integer32,
+     wwpLeosBenchmarkPcpBwPercent            BenchmarkPcpBwDistPercent
+ }
+
+ wwpLeosBenchmarkPcpBwPercentPcpIndex  OBJECT-TYPE
+     SYNTAX       Integer32  (1..8)
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION "Index for the PCP"
+     ::= { wwpLeosBenchmarkPcpBwPercentEntry 1 }
+
+ wwpLeosBenchmarkPcpBwPercentPcp      OBJECT-TYPE
+     SYNTAX       Integer32  (0..7)
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION "PCP value associated with this entry."
+     ::= { wwpLeosBenchmarkPcpBwPercentEntry 2 }
+
+ wwpLeosBenchmarkPcpBwPercent         OBJECT-TYPE
+     SYNTAX       BenchmarkPcpBwDistPercent
+     MAX-ACCESS   read-write
+     STATUS       deprecated
+     DESCRIPTION "Percent of test bandwidth to allocate to the
+                  test session with this PCP value. The percent is
+                  sent as an integer representing the percent * 100
+                  to allow for 2 decimal point precision. Ex: 10.25%
+                  is sent as 1025"
+     ::= { wwpLeosBenchmarkPcpBwPercentEntry 3 }
+
+ ---
+ --- EMIX Sequence Table
+ ---
+ wwpLeosBenchmarkEmixSequenceTable   OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosBenchmarkEmixSequenceEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION
+             "Table providing the list of configured Key Performance
+              Indicator profiles on this node."
+     ::= { wwpLeosBenchmarkGeneratorModule 23 }
+
+ wwpLeosBenchmarkEmixSequenceEntry   OBJECT-TYPE
+     SYNTAX       WwpLeosBenchmarkEmixSequenceEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION
+             "Hw session allocation entry."
+     INDEX { wwpLeosBenchmarkEmixSequenceId }
+     ::= { wwpLeosBenchmarkEmixSequenceTable 1 }
+
+ WwpLeosBenchmarkEmixSequenceEntry ::= SEQUENCE {
+     wwpLeosBenchmarkEmixSequenceId            Integer32,
+     wwpLeosBenchmarkEmixSequenceName          DisplayString,
+     wwpLeosBenchmarkEmixSequence              DisplayString,
+     wwpLeosBenchmarkEmixSequenceUFrameSize    Integer32,
+     wwpLeosBenchmarkEmixSequenceNumOfRef      Integer32,
+     wwpLeosBenchmarkEmixSequenceUserCreated   TruthValue,
+     wwpLeosBenchmarkEmixSequenceRowStatus     RowStatus
+ }
+
+wwpLeosBenchmarkEmixSequenceId           OBJECT-TYPE
+     SYNTAX       Integer32  (1..32)
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION "Unique Id of the PCP bandwidth distribution
+                  profile entry"
+     ::= { wwpLeosBenchmarkEmixSequenceEntry 1 }
+
+wwpLeosBenchmarkEmixSequenceName         OBJECT-TYPE
+     SYNTAX       DisplayString (SIZE (1..46))
+     MAX-ACCESS   read-create
+     STATUS       deprecated
+     DESCRIPTION  "Name of a the PCP bandwidth distribution
+                   profile"
+     ::= { wwpLeosBenchmarkEmixSequenceEntry 2 }
+
+wwpLeosBenchmarkEmixSequence             OBJECT-TYPE
+     SYNTAX       DisplayString (SIZE (1..16))
+     MAX-ACCESS   read-write
+     STATUS       deprecated
+     DESCRIPTION  "EMIX sequence which is a sequence of up to
+                   16 letters from the following set, that can
+                   be repeated, where each letter is associated with
+                   the frame size below it:
+                        a    b    c    d    e    f    g    h    u 
+                       64   128  256  512  1024 1280 1518 MTU  custom
+                   The u frame size is user configurable via the
+                   wwpLeosBenchmarkEmixSequenceUFrameSize attribute
+                   while the h frame size is the maximum frame size
+                   set on the port under test."
+     ::= { wwpLeosBenchmarkEmixSequenceEntry 3 }
+
+wwpLeosBenchmarkEmixSequenceUFrameSize   OBJECT-TYPE
+     SYNTAX       Integer32 (64..9216)
+     MAX-ACCESS   read-write
+     STATUS       deprecated
+     DESCRIPTION  "The frame size associated with the u letter
+                   in the given sequence. The default value is
+                   594."
+     ::= { wwpLeosBenchmarkEmixSequenceEntry 4 }
+
+wwpLeosBenchmarkEmixSequenceNumOfRef     OBJECT-TYPE
+     SYNTAX       Integer32
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION  "Number of generator test profiles currently
+                   using this EMIX sequence for testing.
+                   If this is the default EMIX sequence
+                   set in the generator, that also count
+                   as one reference."
+     ::= { wwpLeosBenchmarkEmixSequenceEntry 5 }
+
+wwpLeosBenchmarkEmixSequenceUserCreated  OBJECT-TYPE
+     SYNTAX       TruthValue
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION  "Flag indicating whether this sequence was 
+                   created by the user or by the system at
+                   initialization. Only user created sequences
+                   are editable."
+     ::= { wwpLeosBenchmarkEmixSequenceEntry 6 }
+
+ wwpLeosBenchmarkEmixSequenceRowStatus   OBJECT-TYPE
+     SYNTAX             RowStatus
+     MAX-ACCESS         read-create
+     STATUS             deprecated
+     DESCRIPTION       "Used to manage the creation and deletion of the
+                        conceptual rows in this table.  To create a row in
+                        this table, set this object to 'createAndGo'.
+                        To delete a row in this table, set this object to
+                        'destroy'.  If the entry exists, it is displayed
+                        as 'active'."
+     ::= { wwpLeosBenchmarkEmixSequenceEntry 7 }
+
+ ---
+ --- EMIX Sequence Frame Size Table
+ ---
+ wwpLeosBenchmarkEmixFrameSizeTable   OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosBenchmarkEmixFrameSizeEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION
+             "Table providing the list of frame sizes associated
+              with the provided EMIX sequence Id."
+     ::= { wwpLeosBenchmarkGeneratorModule 24 }
+
+ wwpLeosBenchmarkEmixFrameSizeEntry  OBJECT-TYPE
+     SYNTAX       WwpLeosBenchmarkEmixFrameSizeEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION "Frame size associated with given EMIX 
+                  sequence ID and frame size index."
+     INDEX { wwpLeosBenchmarkEmixSequenceId,
+             wwpLeosBenchmarkEmixFrameSizeIndex }
+     ::= { wwpLeosBenchmarkEmixFrameSizeTable 1 }
+
+ WwpLeosBenchmarkEmixFrameSizeEntry ::= SEQUENCE {
+     wwpLeosBenchmarkEmixFrameSizeIndex           Integer32,
+     wwpLeosBenchmarkEmixFrameSizeEntryFrameSize  Integer32
+ }
+
+ wwpLeosBenchmarkEmixFrameSizeIndex     OBJECT-TYPE
+     SYNTAX       Integer32  (1..16)
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION "Index of frame size in array of frame sizes
+                  for the given EMIX sequence."
+     ::= { wwpLeosBenchmarkEmixFrameSizeEntry 1 }
+
+ wwpLeosBenchmarkEmixFrameSizeEntryFrameSize OBJECT-TYPE
+     SYNTAX       Integer32  (64..9216)
+     MAX-ACCESS   read-only
+     STATUS       deprecated
+     DESCRIPTION "Frame size associated with the letter at the
+                  position given by wwpLeosBenchmarkEmixFrameSizeIndex
+                  in the EMIX sequence with Id
+                  wwpLeosBenchmarkEmixSequenceId."
+     ::= { wwpLeosBenchmarkEmixFrameSizeEntry 2 }
+
+ --
+ -- Benchmark HW Session Throughput Stats
+ --
+ wwpLeosBenchmarkHwSessionThroughputStatisticsTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosBenchmarkHwSessionThroughputStatsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION
+             "Table of BENCHMARK profile throughput statistics in Mbps."
+     ::= { wwpLeosBenchmarkProfileObjects 10 }
+                
+ wwpLeosBenchmarkHwSessionThroughputStatsEntry OBJECT-TYPE
+     SYNTAX       WwpLeosBenchmarkHwSessionThroughputStatsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION
+             "BENCHMARK profile throughput statistics."
+     INDEX { wwpLeosBenchmarkProfileEntryId,
+             wwpLeosBenchmarkHwSessionThroughputStatsPcpIndex,
+             wwpLeosBenchmarkHwSessionThroughputStatsColorIndex,
+             wwpLeosBenchmarkHwSessionThroughputStatsFrameSizeIndex }
+     ::= { wwpLeosBenchmarkHwSessionThroughputStatisticsTable 1 } 
+
+ WwpLeosBenchmarkHwSessionThroughputStatsEntry ::= SEQUENCE { 
+     wwpLeosBenchmarkHwSessionThroughputStatsPcpIndex        Integer32,
+     wwpLeosBenchmarkHwSessionThroughputStatsColorIndex      Integer32,
+     wwpLeosBenchmarkHwSessionThroughputStatsFrameSizeIndex  Integer32,
+     wwpLeosBenchmarkHwSessionThroughputStatsPcp             Integer32,
+     wwpLeosBenchmarkHwSessionThroughputStatsColor           BenchmarkColorTest,
+     wwpLeosBenchmarkHwSessionThroughputStatsFrameSize       Integer32,
+     wwpLeosBenchmarkHwSessionThroughputStatsEmixSequenceId  Integer32,
+     wwpLeosBenchmarkHwSessionThroughputStatsMin             BenchmarkThroughputResult,
+     wwpLeosBenchmarkHwSessionThroughputStatsMax             BenchmarkThroughputResult,
+     wwpLeosBenchmarkHwSessionThroughputStatsAvg             BenchmarkThroughputResult,
+     wwpLeosBenchmarkHwSessionThroughputStatsIterations      Integer32,
+     wwpLeosBenchmarkHwSessionThroughputStatsActiveVid       Integer32,
+     wwpLeosBenchmarkHwSessionThroughputStatsActiveDstMac    MacAddress,
+     wwpLeosBenchmarkHwSessionThroughputStatsKpiResult       BenchmarkKpiResult
+ } 
+
+ wwpLeosBenchmarkHwSessionThroughputStatsPcpIndex   OBJECT-TYPE
+     SYNTAX             Integer32 (1..8)
+     MAX-ACCESS         not-accessible
+     STATUS             deprecated
+     DESCRIPTION       "Index of the PCP value"
+     ::= { wwpLeosBenchmarkHwSessionThroughputStatsEntry 1 }
+
+ wwpLeosBenchmarkHwSessionThroughputStatsColorIndex OBJECT-TYPE
+     SYNTAX             Integer32 (1..2)
+     MAX-ACCESS         not-accessible
+     STATUS             deprecated
+     DESCRIPTION       "Color index."
+     ::= { wwpLeosBenchmarkHwSessionThroughputStatsEntry 2 }
+
+ wwpLeosBenchmarkHwSessionThroughputStatsFrameSizeIndex  OBJECT-TYPE
+     SYNTAX             Integer32 (1..10)
+     MAX-ACCESS         not-accessible
+     STATUS             deprecated
+     DESCRIPTION
+                "Frame size index for which those throughput statistics are
+                 for. When EMIX is used, in which case 
+                 wwpLeosBenchmarkHwSessionThroughputStatsEmixSequenceId is
+                 not NULL, there is only one frame size index for
+                 the given profile Id, pcp and color. In such a case, the 
+                 frame size index will be 0 and frame size will also be 0."
+     ::= { wwpLeosBenchmarkHwSessionThroughputStatsEntry 3 }
+
+ wwpLeosBenchmarkHwSessionThroughputStatsPcp        OBJECT-TYPE
+     SYNTAX             Integer32 (0..7)
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "PCP value of the test packets associated with those
+                 results."
+     ::= { wwpLeosBenchmarkHwSessionThroughputStatsEntry 4 }
+
+ wwpLeosBenchmarkHwSessionThroughputStatsColor      OBJECT-TYPE
+     SYNTAX             BenchmarkColorTest
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "Color of the test packets associated with those
+                 results."
+     ::= { wwpLeosBenchmarkHwSessionThroughputStatsEntry 5 }
+
+  wwpLeosBenchmarkHwSessionThroughputStatsFrameSize  OBJECT-TYPE
+     SYNTAX             Integer32
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "Packet size in bytes. If 0, then the 
+                 wwpLeosBenchmarkHwSessionThroughputStatsEmixSequenceId
+                 indicates the ID of the EMIX sequence used for the test"
+     ::= { wwpLeosBenchmarkHwSessionThroughputStatsEntry 6 }
+
+ wwpLeosBenchmarkHwSessionThroughputStatsEmixSequenceId OBJECT-TYPE
+     SYNTAX             Integer32 (1..32)
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "ID of the EMIX sequence that was used for running the
+                 test which produced these results. When 0,
+                 frame size indicates the size of the test frame
+                 associated with these results."
+     ::= { wwpLeosBenchmarkHwSessionThroughputStatsEntry 7 }
+
+ wwpLeosBenchmarkHwSessionThroughputStatsMin     OBJECT-TYPE
+     SYNTAX             BenchmarkThroughputResult
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "Minimum throughput recorded for the given packet size 
+                 in Mbps * 100. The value is multplied by 100 to be able
+                 to send the results as an integer but should be divided
+                 by 100 when displayed to provide a 2 decimal point accuracy.
+                 A result of 123.45 is sent as 12345."
+     ::= { wwpLeosBenchmarkHwSessionThroughputStatsEntry 8 }
+
+ wwpLeosBenchmarkHwSessionThroughputStatsMax     OBJECT-TYPE
+     SYNTAX             BenchmarkThroughputResult
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "Maximum throughput recorded for the given packet size
+                 in Mbps * 100. The value is multplied by 100 to be able
+                 to send the results as an integer but should be divided
+                 by 100 when displayed to provide a 2 decimal point accuracy.
+                 A result of 123.45 is sent as 12345."
+     ::= { wwpLeosBenchmarkHwSessionThroughputStatsEntry 9 }
+
+ wwpLeosBenchmarkHwSessionThroughputStatsAvg     OBJECT-TYPE
+     SYNTAX             BenchmarkThroughputResult
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "Average throughput recorded for the given packet size
+                 in Mbps * 100. The value is multplied by 100 to be able
+                 to send the results as an integer but should be divided
+                 by 100 when displayed to provide a 2 decimal point accuracy.
+                 A result of 123.45 is sent as 12345."
+     ::= { wwpLeosBenchmarkHwSessionThroughputStatsEntry 10 }
+
+ wwpLeosBenchmarkHwSessionThroughputStatsIterations OBJECT-TYPE
+     SYNTAX             Integer32
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "Number of times the test has been run for this packet size."
+     ::= { wwpLeosBenchmarkHwSessionThroughputStatsEntry 11 }
+
+ wwpLeosBenchmarkHwSessionThroughputStatsActiveVid  OBJECT-TYPE
+     SYNTAX             Integer32 (0..4095)
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "Active VLAN Id. Either the value configured in the profile or
+                 the one specified with the start command."
+     ::= { wwpLeosBenchmarkHwSessionThroughputStatsEntry 12 }
+
+ wwpLeosBenchmarkHwSessionThroughputStatsActiveDstMac  OBJECT-TYPE
+     SYNTAX             MacAddress
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "Active destination MAC address. Either the value configured
+                 in the profile or the value specified with the start command."
+     ::= { wwpLeosBenchmarkHwSessionThroughputStatsEntry 13 }
+
+ wwpLeosBenchmarkHwSessionThroughputStatsKpiResult  OBJECT-TYPE
+     SYNTAX             BenchmarkKpiResult
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "Pass or fail results for the test which is determined
+                 by comparing the max throughput against the selected 
+                 KPI profile's throughput pass criteria. If no KPI profile
+                 is selected for the given profile Id, the result will
+                 be 'notApplicable'."
+     ::= { wwpLeosBenchmarkHwSessionThroughputStatsEntry 14 }
+
+ --
+ -- Benchmark HW session FrameLoss Stats
+ --
+ wwpLeosBenchmarkHwSessionFramelossStatisticsTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosBenchmarkHwSessionFramelossStatsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION
+             "Table of BENCHMARK profile frameloss statistics."
+     ::= { wwpLeosBenchmarkProfileObjects 11 }
+                
+ wwpLeosBenchmarkHwSessionFramelossStatsEntry OBJECT-TYPE
+     SYNTAX       WwpLeosBenchmarkHwSessionFramelossStatsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION
+             "BENCHMARK profile frameloss statistics."
+     INDEX { wwpLeosBenchmarkProfileEntryId,
+             wwpLeosBenchmarkHwSessionFramelossStatsPcpIndex,
+             wwpLeosBenchmarkHwSessionFramelossStatsColorIndex,
+             wwpLeosBenchmarkHwSessionFramelossStatsFrameSizeIndex,
+             wwpLeosBenchmarkHwSessionFramelossStatsRateIndex }
+     ::= { wwpLeosBenchmarkHwSessionFramelossStatisticsTable 1 } 
+
+ WwpLeosBenchmarkHwSessionFramelossStatsEntry ::= SEQUENCE {
+     wwpLeosBenchmarkHwSessionFramelossStatsPcpIndex         Integer32,
+     wwpLeosBenchmarkHwSessionFramelossStatsColorIndex       Integer32,
+     wwpLeosBenchmarkHwSessionFramelossStatsFrameSizeIndex   Integer32,
+     wwpLeosBenchmarkHwSessionFramelossStatsRateIndex        Integer32,
+     wwpLeosBenchmarkHwSessionFramelossStatsPcp              Integer32,
+     wwpLeosBenchmarkHwSessionFramelossStatsColor            BenchmarkColorTest,  
+     wwpLeosBenchmarkHwSessionFramelossStatsFrameSize        Integer32,
+     wwpLeosBenchmarkHwSessionFramelossStatsEmixSequenceId   Integer32,
+     wwpLeosBenchmarkHwSessionFramelossStatsRate             Integer32,
+     wwpLeosBenchmarkHwSessionFramelossStatsFirst            BenchmarkFramelossResult,
+     wwpLeosBenchmarkHwSessionFramelossStatsSecond           BenchmarkFramelossResult,
+     wwpLeosBenchmarkHwSessionFramelossStatsActiveVid        Integer32,
+     wwpLeosBenchmarkHwSessionFramelossStatsActiveDstMac     MacAddress,
+     wwpLeosBenchmarkHwSessionFramelossStatsKpiResult        BenchmarkKpiResult,
+     wwpLeosBenchmarkHwSessionFramelossStatsResult           BenchmarkFramelossResult
+ } 
+
+ wwpLeosBenchmarkHwSessionFramelossStatsPcpIndex   OBJECT-TYPE
+     SYNTAX             Integer32 (1..8)
+     MAX-ACCESS         not-accessible
+     STATUS             deprecated
+     DESCRIPTION
+                "PCP index."
+     ::= { wwpLeosBenchmarkHwSessionFramelossStatsEntry 1 }
+
+ wwpLeosBenchmarkHwSessionFramelossStatsColorIndex OBJECT-TYPE
+     SYNTAX             Integer32 (1..2)
+     MAX-ACCESS         not-accessible
+     STATUS             deprecated
+     DESCRIPTION
+                "Color index."
+     ::= { wwpLeosBenchmarkHwSessionFramelossStatsEntry 2 }
+
+ wwpLeosBenchmarkHwSessionFramelossStatsFrameSizeIndex  OBJECT-TYPE
+     SYNTAX             Integer32 (1..10)
+     MAX-ACCESS         not-accessible
+     STATUS             deprecated
+     DESCRIPTION
+                "Frame size index."
+     ::= { wwpLeosBenchmarkHwSessionFramelossStatsEntry 3 }
+
+ wwpLeosBenchmarkHwSessionFramelossStatsRateIndex  OBJECT-TYPE
+     SYNTAX             Integer32 (0..9)
+     MAX-ACCESS         not-accessible
+     STATUS             deprecated
+     DESCRIPTION
+                "Rate index."
+     ::= { wwpLeosBenchmarkHwSessionFramelossStatsEntry 4 }
+ 
+ wwpLeosBenchmarkHwSessionFramelossStatsPcp        OBJECT-TYPE
+     SYNTAX             Integer32 (0..7)
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "PCP value of the test packets associated with those
+                 results."
+     ::= { wwpLeosBenchmarkHwSessionFramelossStatsEntry 5 }
+
+ wwpLeosBenchmarkHwSessionFramelossStatsColor      OBJECT-TYPE
+     SYNTAX             BenchmarkColorTest
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "Color of the test packets associated with those
+                 results."
+     ::= { wwpLeosBenchmarkHwSessionFramelossStatsEntry 6 }
+
+ wwpLeosBenchmarkHwSessionFramelossStatsFrameSize  OBJECT-TYPE
+     SYNTAX             Integer32
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "Packet size in bytes. If 0, then the 
+                 wwpLeosBenchmarkHwSessionThroughputStatsEmixSequenceId
+                 indicates the ID of the EMIX sequence used for the test"
+     ::= { wwpLeosBenchmarkHwSessionFramelossStatsEntry 7 }
+
+ wwpLeosBenchmarkHwSessionFramelossStatsEmixSequenceId OBJECT-TYPE
+     SYNTAX             Integer32 (1..32)
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "ID of the EMIX sequence that was used for running the
+                 test which produced these results. When 0,
+                 frame size indicates the size of the test frame
+                 associated with these results."
+     ::= { wwpLeosBenchmarkHwSessionFramelossStatsEntry 8 }
+
+ wwpLeosBenchmarkHwSessionFramelossStatsRate       OBJECT-TYPE
+     SYNTAX             Integer32
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "Rate in percent of line rate."
+     ::= { wwpLeosBenchmarkHwSessionFramelossStatsEntry 9 }
+
+ wwpLeosBenchmarkHwSessionFramelossStatsFirst     OBJECT-TYPE
+     SYNTAX             BenchmarkFramelossResult
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "Percentage of frames lost on first test sequence."
+     ::= { wwpLeosBenchmarkHwSessionFramelossStatsEntry 10 }
+
+ wwpLeosBenchmarkHwSessionFramelossStatsSecond    OBJECT-TYPE
+     SYNTAX             BenchmarkFramelossResult
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "Percentage of frames lost on second test sequence."
+     ::= { wwpLeosBenchmarkHwSessionFramelossStatsEntry 11 }
+
+ wwpLeosBenchmarkHwSessionFramelossStatsActiveVid  OBJECT-TYPE
+     SYNTAX             Integer32 (0..4095)
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "Active VLAN Id. Either the value configured in the profile or
+                 the one specified with the start command."
+     ::= { wwpLeosBenchmarkHwSessionFramelossStatsEntry 12 }
+
+ wwpLeosBenchmarkHwSessionFramelossStatsActiveDstMac  OBJECT-TYPE
+     SYNTAX             MacAddress
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "Active destination MAC address. Either the value configured
+                 in the profile or the value specified with the start command."
+     ::= { wwpLeosBenchmarkHwSessionFramelossStatsEntry 13 }
+
+ wwpLeosBenchmarkHwSessionFramelossStatsKpiResult  OBJECT-TYPE
+     SYNTAX             BenchmarkKpiResult
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "Pass or fail results for the test which is determined
+                 by comparing the frameloss result against the selected 
+                 KPI profile's throughput pass criteria. If no KPI profile
+                 is selected for the given profile Id, the result will
+                 be 'notApplicable'."
+     ::= { wwpLeosBenchmarkHwSessionFramelossStatsEntry 14 }
+
+ wwpLeosBenchmarkHwSessionFramelossStatsResult    OBJECT-TYPE
+     SYNTAX             BenchmarkFramelossResult
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "Percentage of frames lost on the largest test sequence results."
+     ::= { wwpLeosBenchmarkHwSessionFramelossStatsEntry 15 }
+     
+ --
+ -- Benchmark Profile Latency Stats
+ --
+ wwpLeosBenchmarkHwSessionLatencyStatisticsTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosBenchmarkHwSessionLatencyStatsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION
+             "Table of BENCHMARK profile latency statistics in usec."
+     ::= { wwpLeosBenchmarkProfileObjects 12 }
+                
+ wwpLeosBenchmarkHwSessionLatencyStatsEntry OBJECT-TYPE
+     SYNTAX       WwpLeosBenchmarkHwSessionLatencyStatsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION
+             "BENCHMARK profile latency statistics."
+     INDEX { wwpLeosBenchmarkProfileEntryId,
+             wwpLeosBenchmarkHwSessionLatencyStatsPcpIndex,
+             wwpLeosBenchmarkHwSessionLatencyStatsColorIndex,
+             wwpLeosBenchmarkHwSessionLatencyStatsFrameSizeIndex }
+     ::= { wwpLeosBenchmarkHwSessionLatencyStatisticsTable 1 } 
+
+ WwpLeosBenchmarkHwSessionLatencyStatsEntry ::= SEQUENCE { 
+     wwpLeosBenchmarkHwSessionLatencyStatsPcpIndex        Integer32,
+     wwpLeosBenchmarkHwSessionLatencyStatsColorIndex      Integer32,
+     wwpLeosBenchmarkHwSessionLatencyStatsFrameSizeIndex  Integer32,
+     wwpLeosBenchmarkHwSessionLatencyStatsPcp             Integer32,
+     wwpLeosBenchmarkHwSessionLatencyStatsColor           BenchmarkColorTest,
+     wwpLeosBenchmarkHwSessionLatencyStatsFrameSize       Integer32,
+     wwpLeosBenchmarkHwSessionLatencyStatsEmixSequenceId  Integer32,
+     wwpLeosBenchmarkHwSessionLatencyStatsMin             Unsigned32,
+     wwpLeosBenchmarkHwSessionLatencyStatsMax             Unsigned32,
+     wwpLeosBenchmarkHwSessionLatencyStatsAvg             Unsigned32,
+     wwpLeosBenchmarkHwSessionLatencyStatsSamples         Integer32,
+     wwpLeosBenchmarkHwSessionLatencyStatsActiveVid       Integer32,
+     wwpLeosBenchmarkHwSessionLatencyStatsActiveDstMac    MacAddress,
+     wwpLeosBenchmarkHwSessionLatencyStatsKpiResult       BenchmarkKpiResult
+ } 
+
+ wwpLeosBenchmarkHwSessionLatencyStatsPcpIndex   OBJECT-TYPE
+     SYNTAX             Integer32 (1..8)
+     MAX-ACCESS         not-accessible
+     STATUS             deprecated
+     DESCRIPTION
+                "PCP index."
+     ::= { wwpLeosBenchmarkHwSessionLatencyStatsEntry 1 }
+
+ wwpLeosBenchmarkHwSessionLatencyStatsColorIndex OBJECT-TYPE
+     SYNTAX             Integer32 (1..2)
+     MAX-ACCESS         not-accessible
+     STATUS             deprecated
+     DESCRIPTION
+                "Color index."
+     ::= { wwpLeosBenchmarkHwSessionLatencyStatsEntry 2 }
+
+ wwpLeosBenchmarkHwSessionLatencyStatsFrameSizeIndex  OBJECT-TYPE
+     SYNTAX             Integer32 (1..10)
+     MAX-ACCESS         not-accessible
+     STATUS             deprecated
+     DESCRIPTION
+                "Frame size index."
+     ::= { wwpLeosBenchmarkHwSessionLatencyStatsEntry 3 }
+
+ wwpLeosBenchmarkHwSessionLatencyStatsPcp        OBJECT-TYPE
+     SYNTAX             Integer32 (0..7)
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "PCP value of the test packets associated with those
+                 results."
+     ::= { wwpLeosBenchmarkHwSessionLatencyStatsEntry 4 }
+
+ wwpLeosBenchmarkHwSessionLatencyStatsColor      OBJECT-TYPE
+     SYNTAX             BenchmarkColorTest
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "Color of the test packets associated with those
+                 results."
+     ::= { wwpLeosBenchmarkHwSessionLatencyStatsEntry 5 }
+
+ wwpLeosBenchmarkHwSessionLatencyStatsFrameSize  OBJECT-TYPE
+     SYNTAX             Integer32
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "Packet size in bytes."
+     ::= { wwpLeosBenchmarkHwSessionLatencyStatsEntry 6 }
+
+ wwpLeosBenchmarkHwSessionLatencyStatsEmixSequenceId OBJECT-TYPE
+     SYNTAX             Integer32 (1..32)
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "ID of the EMIX sequence that was used for running the
+                 test which produced these results. When 0,
+                 frame size indicates the size of the test frame
+                 associated with these results."
+     ::= { wwpLeosBenchmarkHwSessionLatencyStatsEntry 7 }
+
+ wwpLeosBenchmarkHwSessionLatencyStatsMin     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "Minimum latency recorded for the given packet size."
+     ::= { wwpLeosBenchmarkHwSessionLatencyStatsEntry 8 }
+
+ wwpLeosBenchmarkHwSessionLatencyStatsMax     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "Maximum latency recorded for the given packet size."
+     ::= { wwpLeosBenchmarkHwSessionLatencyStatsEntry 9 }
+
+ wwpLeosBenchmarkHwSessionLatencyStatsAvg     OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "Average latency recorded for the given packet size."
+     ::= { wwpLeosBenchmarkHwSessionLatencyStatsEntry 10 }
+
+ wwpLeosBenchmarkHwSessionLatencyStatsSamples OBJECT-TYPE
+     SYNTAX             Integer32
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "Number of samples taken during the test."
+     ::= { wwpLeosBenchmarkHwSessionLatencyStatsEntry 11 }
+
+ wwpLeosBenchmarkHwSessionLatencyStatsActiveVid  OBJECT-TYPE
+     SYNTAX             Integer32 (0..4095)
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "Active VLAN Id. Either the value configured in the profile or
+                 the one specified with the start command."
+     ::= { wwpLeosBenchmarkHwSessionLatencyStatsEntry 12 }
+
+ wwpLeosBenchmarkHwSessionLatencyStatsActiveDstMac  OBJECT-TYPE
+     SYNTAX             MacAddress
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "Active destination MAC address. Either the value configured
+                 in the profile or the value specified with the start command."
+     ::= { wwpLeosBenchmarkHwSessionLatencyStatsEntry 13 }
+
+ wwpLeosBenchmarkHwSessionLatencyStatsKpiResult  OBJECT-TYPE
+     SYNTAX             BenchmarkKpiResult
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "Pass or fail results for the test which is determined
+                 by comparing the frameloss result against the selected 
+                 KPI profile's throughput pass criteria. If no KPI profile
+                 is selected for the given profile Id, the result will
+                 be 'notApplicable'."
+     ::= { wwpLeosBenchmarkHwSessionLatencyStatsEntry 14 }
+
+ --
+ -- Benchmark Profile Packet Delay Variation Stats
+ --
+ wwpLeosBenchmarkHwSessionPdvStatisticsTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF WwpLeosBenchmarkHwSessionPdvStatsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION
+             "Table of BENCHMARK profile packet delay variation statistics
+              in usec."
+     ::= { wwpLeosBenchmarkProfileObjects 13 }
+                
+ wwpLeosBenchmarkHwSessionPdvStatsEntry OBJECT-TYPE
+     SYNTAX       WwpLeosBenchmarkHwSessionPdvStatsEntry
+     MAX-ACCESS   not-accessible
+     STATUS       deprecated
+     DESCRIPTION
+             "BENCHMARK profile packet delay variation statistics."
+     INDEX { wwpLeosBenchmarkProfileEntryId,
+             wwpLeosBenchmarkHwSessionPdvStatsPcpIndex,
+             wwpLeosBenchmarkHwSessionPdvStatsColorIndex,
+             wwpLeosBenchmarkHwSessionPdvStatsFrameSizeIndex }
+     ::= { wwpLeosBenchmarkHwSessionPdvStatisticsTable 1 } 
+
+ WwpLeosBenchmarkHwSessionPdvStatsEntry ::= SEQUENCE { 
+     wwpLeosBenchmarkHwSessionPdvStatsPcpIndex        Integer32,
+     wwpLeosBenchmarkHwSessionPdvStatsColorIndex      Integer32,
+     wwpLeosBenchmarkHwSessionPdvStatsFrameSizeIndex  Integer32,
+     wwpLeosBenchmarkHwSessionPdvStatsPcp             Integer32,
+     wwpLeosBenchmarkHwSessionPdvStatsColor           BenchmarkColorTest,
+     wwpLeosBenchmarkHwSessionPdvStatsFrameSize       Integer32,
+     wwpLeosBenchmarkHwSessionPdvStatsEmixSequenceId  Integer32,
+     wwpLeosBenchmarkHwSessionPdvStatsAvg             Unsigned32,
+     wwpLeosBenchmarkHwSessionPdvStatsSamples         Integer32,
+     wwpLeosBenchmarkHwSessionPdvStatsActiveVid       Integer32,
+     wwpLeosBenchmarkHwSessionPdvStatsActiveDstMac    MacAddress,
+     wwpLeosBenchmarkHwSessionPdvStatsKpiResult       BenchmarkKpiResult
+ } 
+
+ wwpLeosBenchmarkHwSessionPdvStatsPcpIndex   OBJECT-TYPE
+     SYNTAX             Integer32 (1..8)
+     MAX-ACCESS         not-accessible
+     STATUS             deprecated
+     DESCRIPTION
+                "PCP index."
+     ::= { wwpLeosBenchmarkHwSessionPdvStatsEntry 1 }
+
+ wwpLeosBenchmarkHwSessionPdvStatsColorIndex OBJECT-TYPE
+     SYNTAX             Integer32 (1..2)
+     MAX-ACCESS         not-accessible
+     STATUS             deprecated
+     DESCRIPTION
+                "Color index."
+     ::= { wwpLeosBenchmarkHwSessionPdvStatsEntry 2 }
+
+ wwpLeosBenchmarkHwSessionPdvStatsFrameSizeIndex  OBJECT-TYPE
+     SYNTAX             Integer32 (1..10)
+     MAX-ACCESS         not-accessible
+     STATUS             deprecated
+     DESCRIPTION
+                "Frame size index associated to those PDV stats."
+     ::= { wwpLeosBenchmarkHwSessionPdvStatsEntry 3 }   
+     
+ wwpLeosBenchmarkHwSessionPdvStatsPcp        OBJECT-TYPE
+     SYNTAX             Integer32 (0..7)
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "PCP value of the test packets associated with those
+                 results."
+     ::= { wwpLeosBenchmarkHwSessionPdvStatsEntry 4 }
+
+ wwpLeosBenchmarkHwSessionPdvStatsColor      OBJECT-TYPE
+     SYNTAX             BenchmarkColorTest
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "Color of the test packets associated with those
+                 results."
+     ::= { wwpLeosBenchmarkHwSessionPdvStatsEntry 5 }
+
+ wwpLeosBenchmarkHwSessionPdvStatsFrameSize  OBJECT-TYPE
+     SYNTAX             Integer32
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "Packet size in bytes."
+     ::= { wwpLeosBenchmarkHwSessionPdvStatsEntry 6 }
+
+ wwpLeosBenchmarkHwSessionPdvStatsEmixSequenceId OBJECT-TYPE
+     SYNTAX             Integer32 (1..32)
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "ID of the EMIX sequence that was used for running the
+                 test which produced these results. When 0,
+                 frame size indicates the size of the test frame
+                 associated with these results."
+     ::= { wwpLeosBenchmarkHwSessionPdvStatsEntry 7 }
+
+ wwpLeosBenchmarkHwSessionPdvStatsAvg        OBJECT-TYPE
+     SYNTAX             Unsigned32
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "Average PDV recorded for the given packet size."
+     ::= { wwpLeosBenchmarkHwSessionPdvStatsEntry 8 }
+
+ wwpLeosBenchmarkHwSessionPdvStatsSamples    OBJECT-TYPE
+     SYNTAX             Integer32
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "Number of samples used for the test."
+     ::= { wwpLeosBenchmarkHwSessionPdvStatsEntry 9 }
+
+ wwpLeosBenchmarkHwSessionPdvStatsActiveVid  OBJECT-TYPE
+     SYNTAX             Integer32 (0..4095)
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "Active VLAN Id. Either the value configured in the profile or
+                 the one specified with the start command."
+     ::= { wwpLeosBenchmarkHwSessionPdvStatsEntry 10 }
+
+ wwpLeosBenchmarkHwSessionPdvStatsActiveDstMac  OBJECT-TYPE
+     SYNTAX             MacAddress
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "Active destination MAC address. Either the value configured
+                 in the profile or the value specified with the start command."
+     ::= { wwpLeosBenchmarkHwSessionPdvStatsEntry 11 }
+
+ wwpLeosBenchmarkHwSessionPdvStatsKpiResult  OBJECT-TYPE
+     SYNTAX             BenchmarkKpiResult
+     MAX-ACCESS         read-only
+     STATUS             deprecated
+     DESCRIPTION
+                "Pass or fail results for the test which is determined
+                 by comparing the frameloss result against the selected 
+                 KPI profile's throughput pass criteria. If no KPI profile
+                 is selected for the given profile Id, the result will
+                 be 'notApplicable'."
+     ::= { wwpLeosBenchmarkHwSessionPdvStatsEntry 12 }
+
+---
+--- Trap definitions
+---
+wwpLeosBenchmarkProfileTestStarted   NOTIFICATION-TYPE
+     OBJECTS   { sysName,
+                 sysLocation,
+                 wwpLeosBenchmarkPort,
+                 wwpLeosBenchmarkProfileEntryId,
+                 wwpLeosBenchmarkProfileEntryName,
+                 wwpLeosBenchmarkProfileEntryVid,
+                 wwpLeosBenchmarkProfileEntryDstmac
+               }
+     STATUS    deprecated
+     DESCRIPTION
+              "The start command has been issued for the given benchmark
+               test profile, either via CLI or SNMP. The wwpLeosBenchmarkPort
+               specifies the port under test when the profile was started;
+               the active VLAN and reflector MAC address are also provided."
+     ::= { wwpLeosBenchmarkNotifications 1 }
+
+wwpLeosBenchmarkProfileTestStopped  NOTIFICATION-TYPE
+     OBJECTS   { sysName,
+                 sysLocation,
+                 wwpLeosBenchmarkProfileEntryId,
+                 wwpLeosBenchmarkProfileEntryName
+               }
+     STATUS    deprecated
+     DESCRIPTION
+              "The specificied profile has been manually stopped by
+               the user, either via CLI or SNMP, before the testing
+               completed."
+     ::= { wwpLeosBenchmarkNotifications 2 }
+   
+wwpLeosBenchmarkProfileTestCompleted NOTIFICATION-TYPE
+     OBJECTS   { sysName,
+                 sysLocation,
+                 wwpLeosBenchmarkProfileEntryId,
+                 wwpLeosBenchmarkProfileEntryName
+               }
+     STATUS    deprecated
+     DESCRIPTION
+              "The testing for the specified profile has finsihed the
+               configured number of iterations as specified by
+               interval and duration."
+     ::= { wwpLeosBenchmarkNotifications 3 }
+
+wwpLeosBenchmarkProfileTestFailedThroughputKpi NOTIFICATION-TYPE
+     OBJECTS   { sysName,
+                 sysLocation,
+                 wwpLeosBenchmarkProfileEntryId,
+                 wwpLeosBenchmarkProfileEntryName,
+                 wwpLeosBenchmarkKpiProfileId,
+                 wwpLeosBenchmarkKpiPcp,
+                 wwpLeosBenchmarkKpiColor,
+                 wwpLeosBenchmarkProfileTestFrameSize,
+                 wwpLeosBenchmarkEmixSequenceId,
+                 wwpLeosBenchmarkHwSessionThroughputStatsMax
+               }
+     STATUS    deprecated
+     DESCRIPTION
+              "The throughput test result for the specified profile
+               is below the specified throughput KPI value for
+               the given PCP and color traffic."
+     ::= { wwpLeosBenchmarkNotifications 4 }
+
+wwpLeosBenchmarkProfileTestFailedFramelossKpi NOTIFICATION-TYPE
+     OBJECTS   { sysName,
+                 sysLocation,
+                 wwpLeosBenchmarkProfileEntryId,
+                 wwpLeosBenchmarkProfileEntryName,
+                 wwpLeosBenchmarkKpiProfileId,
+                 wwpLeosBenchmarkKpiPcp,
+                 wwpLeosBenchmarkKpiColor,
+                 wwpLeosBenchmarkProfileTestFrameSize,
+                 wwpLeosBenchmarkEmixSequenceId,
+                 wwpLeosBenchmarkHwSessionFramelossStatsResult
+               }
+     STATUS    deprecated
+     DESCRIPTION
+              "The frameloss test result for the specified profile
+               exceeds the specified throughput KPI value for
+               the given PCP and color traffic."
+     ::= { wwpLeosBenchmarkNotifications 5 }
+
+wwpLeosBenchmarkProfileTestFailedLatencyKpi NOTIFICATION-TYPE
+     OBJECTS   { sysName,
+                 sysLocation,
+                 wwpLeosBenchmarkProfileEntryId,
+                 wwpLeosBenchmarkProfileEntryName,
+                 wwpLeosBenchmarkKpiProfileId,
+                 wwpLeosBenchmarkKpiPcp,
+                 wwpLeosBenchmarkKpiColor,
+                 wwpLeosBenchmarkProfileTestFrameSize,
+                 wwpLeosBenchmarkEmixSequenceId,
+                 wwpLeosBenchmarkHwSessionLatencyStatsMax
+               }
+     STATUS    deprecated
+     DESCRIPTION
+              "The latency test result for the specified profile
+               exceeds the specified throughput KPI value for
+               the given PCP and color traffic."
+     ::= { wwpLeosBenchmarkNotifications 6 }
+
+wwpLeosBenchmarkProfileTestFailedPdvKpi NOTIFICATION-TYPE
+     OBJECTS   { sysName,
+                 sysLocation,
+                 wwpLeosBenchmarkProfileEntryId,
+                 wwpLeosBenchmarkProfileEntryName,
+                 wwpLeosBenchmarkKpiProfileId,
+                 wwpLeosBenchmarkKpiPcp,
+                 wwpLeosBenchmarkKpiColor,
+                 wwpLeosBenchmarkProfileTestFrameSize,
+                 wwpLeosBenchmarkEmixSequenceId,
+                 wwpLeosBenchmarkHwSessionPdvStatsAvg
+               }
+     STATUS    deprecated
+     DESCRIPTION
+              "The throughput test result for the specified profile
+               is below the specified throughput KPI value for
+               the given PCP and color traffic."
+     ::= { wwpLeosBenchmarkNotifications 7 }
+
+ END

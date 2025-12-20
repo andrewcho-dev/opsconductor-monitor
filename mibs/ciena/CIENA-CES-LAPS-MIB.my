@@ -1,0 +1,1211 @@
+-- This file was included in WWP MIB release 04-21-05-0007
+CIENA-CES-LAPS-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY, NOTIFICATION-TYPE, OBJECT-TYPE,
+        Counter32, Unsigned32
+                FROM SNMPv2-SMI
+
+        TEXTUAL-CONVENTION, TimeStamp, TruthValue
+                FROM SNMPv2-TC
+
+        SnmpAdminString
+                FROM SNMP-FRAMEWORK-MIB
+
+        InterfaceIndex
+                FROM IF-MIB
+
+        MODULE-COMPLIANCE, OBJECT-GROUP, NOTIFICATION-GROUP
+                FROM SNMPv2-CONF
+                
+        cienaGlobalSeverity, cienaGlobalMacAddress
+                FROM CIENA-GLOBAL-MIB
+
+        cienaCesNotifications, cienaCesConfig, cienaCesStatistics
+                FROM CIENA-SMI
+                
+        CienaGlobalState
+                FROM CIENA-TC;
+         
+
+cienaCesLapsMIB MODULE-IDENTITY
+    LAST-UPDATED "201801310000Z"
+
+    ORGANIZATION "Ciena Corp."
+    CONTACT-INFO
+        "Mib Meister
+         7035 Ridge Road
+         Hanover, Maryland 21076
+         USA
+         Phone:  +1 800 921 1144
+         Email:  support@ciena.com"
+     DESCRIPTION
+        "This management information module supports the configuration
+         and management of Ciena linear APS protection groups. The
+         definitions and descriptions used in this MIB have been
+         derived from the APS MIB defined in RFC 3498 but the MIB also
+         contains proprietary definitions.
+         "
+
+    REVISION "201801310000Z"
+    DESCRIPTION
+          "Initial version of this MIB."
+        ::= { cienaCesConfig 49 }
+
+
+-- Node definitions
+
+cienaCesLapsMIBObjects OBJECT IDENTIFIER
+        ::= { cienaCesLapsMIB 1 }
+
+-- Statistics
+
+cienaCesLapsStats OBJECT IDENTIFIER
+        ::= { cienaCesStatistics 9 }
+
+-- Notifications
+
+cienaCesLapsMIBNotificationPrefix  OBJECT IDENTIFIER
+        ::= { cienaCesNotifications 47 }
+cienaCesLapsMIBNotifications OBJECT IDENTIFIER
+        ::= { cienaCesLapsMIBNotificationPrefix 0 }
+
+-- Conformance information
+
+cienaCesLapsMIBConformance OBJECT IDENTIFIER
+        ::= { cienaCesLapsMIB 3 }
+cienaCesLapsGroups      OBJECT IDENTIFIER ::= { cienaCesLapsMIBConformance 1 }
+cienaCesLapsCompliances OBJECT IDENTIFIER ::= { cienaCesLapsMIBConformance 2 }
+
+-- Textual conventions
+
+CienaCesLapsK1K2 ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION
+        "This Textual Convention describes an object that stores
+         a SONET/SDH K1 and K2 byte APS protocol field.
+
+         K1 is located in the first octet, K2 is located in
+         the second octet. Bits are numbered from left to right.
+
+         Bits 1-4 of the K1 byte indicate a request.
+
+         1111  Lockout of Protection
+         1110  Forced Switch
+         1101  SF - High Priority
+         1100  SF - Low Priority
+         1011  SD - High Priority
+         1010  SD - Low Priority
+         1001  not used
+         1000  Manual Switch
+         0111  not used
+         0110  Wait-to-Restore
+         0101  not used
+         0100  Exercise
+         0011  not used
+         0010  Reverse Request
+         0001  Do Not Revert
+         0000  No Request
+
+         Bits 5-8 of the K1 byte indicate the channel associated with
+         the request defined in bits 1-4.
+
+         0000 is the Null channel.
+         1-14 are working channels.
+         15   is the extra traffic channel
+
+         Bits 1-4 of the K2 byte indicate a channel. The channel is
+         defined with the same syntax as K1 Bits 5-8.
+
+         Bit 5 of the K2 byte indicates the
+         architecture.
+
+         0 if the architecture is 1+1
+         1 if the architecture is 1:n
+
+         Bits 6-8 of the K2 byte indicates the switching type.
+
+         000 - 011 are reserved for future use
+         100  indicates the type is unidirectional
+         101  indicates the type is bidirectional
+         110  RDI-L
+         111  AIS-L
+        "
+    REFERENCE
+        "Bellcore (Telcordia Technologies) GR-253-CORE, Issue 3,
+        September 2000, 5.3.5."
+    SYNTAX      OCTET STRING (SIZE (2))
+
+CienaCesLapsSwitchCommand ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION
+        "An APS switch command allows a user to perform protection
+         switch actions.
+         
+         The switch command values are:
+
+         noCmd
+
+         Indicates that no switchover command has been issued.
+
+         clear
+
+         Clears all of the switch commands listed below for the
+         specified channel.
+
+         lockoutOfProtection
+
+         Prevents any of the working channels from switching to the
+         protection line.
+
+         forcedSwitchWorkToProtect
+
+         Switches the specified working channel to the protection line.
+
+         forcedSwitchProtectToWork
+
+         Switches the working channel back from the protection
+         line to the working line.
+
+         manualSwitchWorkToProtect
+
+         Switches the specified working channel to the protection line.
+
+         manualSwitchProtectToWork
+
+         Switches the working channel back from the protection
+         line to the working line.
+
+         exercise
+
+         Exercises the protocol for a protection switch of the
+         specified channel by issuing an Exercise request for that
+         channel and checking the response on the APS channel. "
+    SYNTAX       INTEGER {
+                     noCmd(1),
+                     clear(2),
+                     lockoutOfProtection(3),
+                     forcedSwitchWorkToProtect(4),
+                     forcedSwitchProtectToWork(5),
+                     manualSwitchWorkToProtect(6),
+                     manualSwitchProtectToWork(7),
+                     exercise(8)
+                 }
+
+CienaCesLapsSwitchingType ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION
+       "The directional switching type of the APS group.
+
+        unidirectional
+
+        The unidirectional type provides protection in one direction.
+
+        bidirectional
+
+        The bidirectional type provides protection in both
+        directions."
+    SYNTAX       INTEGER {
+                     unidirectional(1),
+                     bidirectional(2)
+                 }
+                 
+CienaCesLapsSwitchRequest ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "The APS request derived from bits 1-4 of a K1 byte. Values are
+         as follows:
+        
+         localNoRequest
+         localDoNotRevert
+         localReverseRequest
+         localExercise
+         localWaitToRestore
+         localManualSwitch
+         localSignalDegradeLow
+         localSignalDegradeHigh
+         localSignalFailLow
+         localSignalFailHigh
+         localForcedSwitch
+         localLockoutOfProtection
+         remoteNoRequest
+         remoteDoNotRevert
+         remoteReverseRequest
+         remoteExercise
+         remoteWaitToRestore
+         remoteManualSwitch
+         remoteSignalDegradeLow
+         remoteSignalDegradeHigh
+         remoteSignalFailLow
+         remoteSignalFailHigh
+         remoteForcedSwitch
+         remoteLockoutOfProtection"
+    SYNTAX      INTEGER {
+                    localNoRequest(0),
+                    localDoNotRevert(1),
+                    localReverseRequest(2),
+                    unused1(3),
+                    localExercise(4),
+                    unused2(5),
+                    localWaitToRestore(6),
+                    unused3(7),
+                    localManualSwitch(8),
+                    unused4(9),
+                    localSignalDegradeLow(10),
+                    localSignalDegradeHigh(11),
+                    localSignalFailLow(12),
+                    localSignalFailHigh(13),
+                    localForcedSwitch(14),
+                    localLockoutOfProtection(15),
+                    remoteNoRequest(16),
+                    remoteDoNotRevert(17),
+                    remoteReverseRequest(18),
+                    unused5(19),
+                    remoteExercise(20),
+                    unused6(21),
+                    remoteWaitToRestore(22),
+                    unused7(23),
+                    remoteManualSwitch(24),
+                    unused8(25),
+                    remoteSignalDegradeLow(26),
+                    remoteSignalDegradeHigh(27),
+                    remoteSignalFailLow(28),
+                    remoteSignalFailHigh(29),
+                    remoteForcedSwitch(30),
+                    remoteLockoutOfProtection(31)
+                }
+                 
+
+--
+-- Linear APS Configuration Table
+--
+-- This table supports the retrieval of Linear APS groups.
+--
+
+cienaCesLapsConfig OBJECT IDENTIFIER ::= { cienaCesLapsMIBObjects 1 }
+
+cienaCesLapsConfigGroups OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The count of Linear APS groups."
+    ::= { cienaCesLapsConfig 1 }
+
+cienaCesLapsConfigTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF CienaCesLapsConfigEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table lists the Linear APS groups that have been
+         configured on the system."
+    ::= { cienaCesLapsConfig 2 }
+
+cienaCesLapsConfigEntry OBJECT-TYPE
+    SYNTAX      CienaCesLapsConfigEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A conceptual row in the cienaCesLapsConfigTable."
+    INDEX { cienaCesLapsConfigGroupIndex }
+    ::= { cienaCesLapsConfigTable  1 }
+
+CienaCesLapsConfigEntry ::= SEQUENCE {
+    cienaCesLapsConfigGroupIndex            Unsigned32,
+    cienaCesLapsConfigGroupName             SnmpAdminString,
+    cienaCesLapsConfigArchitecture          INTEGER,
+    cienaCesLapsConfigOperationType         INTEGER,
+    cienaCesLapsConfigSwitchingType         CienaCesLapsSwitchingType,
+    cienaCesLapsConfigWaitToRestore         Unsigned32,
+    cienaCesLapsConfigHoldoff               Unsigned32,
+    cienaCesLapsConfigAdminState            CienaGlobalState
+}
+
+cienaCesLapsConfigGroupIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..20)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The unique index of the protection group."
+    ::= { cienaCesLapsConfigEntry 1 }
+    
+cienaCesLapsConfigGroupName OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE (1..15))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "A textual name for the Linear APS group."
+    ::= { cienaCesLapsConfigEntry 2 }
+
+cienaCesLapsConfigArchitecture OBJECT-TYPE
+    SYNTAX      INTEGER {
+                        onePlusOne(1),
+                        oneToN(2),
+                        onePlusOneCompatible(3),
+                        onePlusOneOptimized(4)
+                        }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The architecture of the APS group.
+
+        onePlusOne
+
+        The 1+1 architecture permanently bridges the working
+        line to the protection line. This is the only supported
+        architecture."
+    DEFVAL { onePlusOne }
+    ::= { cienaCesLapsConfigEntry 3 }
+
+cienaCesLapsConfigOperationType OBJECT-TYPE
+    SYNTAX      INTEGER { nonrevertive(1), revertive(2) }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The revertive mode of the APS group.
+
+        nonrevertive
+
+        Traffic remains on the protection line until another switch
+        request is received.
+
+        revertive
+
+        When the condition that caused a switch to the protection
+        line has been cleared the signal is switched back to the
+        working line."
+    DEFVAL { nonrevertive }
+    ::= { cienaCesLapsConfigEntry 4 }
+
+cienaCesLapsConfigSwitchingType OBJECT-TYPE
+    SYNTAX      CienaCesLapsSwitchingType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The directional switching type of the APS group. Only
+        bidirectional is supported, however the device will operate
+        unidirectionally when the remote end is configured as such."
+    DEFVAL { bidirectional }
+    ::= { cienaCesLapsConfigEntry 5 }
+
+cienaCesLapsConfigWaitToRestore OBJECT-TYPE
+    SYNTAX      Unsigned32 (300..720)
+    UNITS       "seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The Wait To Restore period in seconds.
+
+         After clearing of a condition that necessitated an
+         automatic switch, the wait to restore period must elapse
+         before reverting. This is intended to avoid rapid switch
+         oscillations.
+
+         GR-253-CORE specifies a Wait To Restore range of 5 to 12
+         minutes. G.783 defines a 5 to 12 minute Wait To Restore
+         range in section 5.4.1.1.3, but also allows for a shorter
+         WTR period in  Table 2-1."
+    DEFVAL { 300 }
+    ::= { cienaCesLapsConfigEntry 6 }
+
+cienaCesLapsConfigHoldoff OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..10000)
+    UNITS       "milliseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The hold-off time in milliseconds.
+
+         When a condition occurs that necessitates an automatic switch,
+         the hold-off time must elapse before switching. This is
+         intended to allow the server layer protection scheme to
+         complete a switchover."
+    DEFVAL { 0 }
+    ::= { cienaCesLapsConfigEntry 7 }
+
+cienaCesLapsConfigAdminState OBJECT-TYPE
+    SYNTAX      CienaGlobalState
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The administrative state of the APS group."
+    DEFVAL { disabled }
+    ::= { cienaCesLapsConfigEntry 8 }
+
+
+--
+-- Linear APS Runtime Status Table
+--
+-- This table provides Linear APS group runtime information.
+--
+
+cienaCesLapsRuntimeTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF CienaCesLapsRuntimeEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table provides runtime status information about Linear
+         APS groups that have been configured on the system."
+        ::= { cienaCesLapsMIBObjects 2 }
+
+cienaCesLapsRuntimeEntry OBJECT-TYPE
+    SYNTAX      CienaCesLapsRuntimeEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A conceptual row in the cienaCesLapsRuntimeTable."
+    AUGMENTS { cienaCesLapsConfigEntry }
+    ::= { cienaCesLapsRuntimeTable  1 }
+
+CienaCesLapsRuntimeEntry ::= SEQUENCE {
+    cienaCesLapsRuntimeK1K2Rcv               CienaCesLapsK1K2,
+    cienaCesLapsRuntimeK1K2Trans             CienaCesLapsK1K2,
+    cienaCesLapsRuntimeSwitchedChannel       Unsigned32,
+    cienaCesLapsRuntimeLastSwitchover        TimeStamp,
+    cienaCesLapsRuntimeSwitchingType         CienaCesLapsSwitchingType,
+    cienaCesLapsRuntimeArchitectureMismatch  TruthValue,
+    cienaCesLapsRuntimeSwitchTypeMismatch    TruthValue,
+    cienaCesLapsRuntimeChannelMismatch       TruthValue,
+    cienaCesLapsRuntimeLastSwitchRequest     CienaCesLapsSwitchRequest,
+    cienaCesLapsRuntimeWtrRemaining          Unsigned32,
+    cienaCesLapsRuntimeHoldoffActive         TruthValue
+}
+
+cienaCesLapsRuntimeK1K2Rcv OBJECT-TYPE
+    SYNTAX      CienaCesLapsK1K2
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The current value of the K1 and K2 bytes received on the
+         protection channel."
+    ::= { cienaCesLapsRuntimeEntry 1 }
+
+cienaCesLapsRuntimeK1K2Trans OBJECT-TYPE
+    SYNTAX        CienaCesLapsK1K2
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The current value of the K1 and K2 bytes transmitted on the
+         protection channel."
+    ::= { cienaCesLapsRuntimeEntry 2 }
+
+cienaCesLapsRuntimeSwitchedChannel OBJECT-TYPE
+    SYNTAX     Unsigned32 (0..14)
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "This field is set to the number of the channel that is
+         currently switched to protection. The value 0 indicates no
+         channel is switched to protection. The values 1-14 indicate
+         that working channel is switched to protection."
+    ::= { cienaCesLapsRuntimeEntry 3 }
+
+cienaCesLapsRuntimeLastSwitchover OBJECT-TYPE
+    SYNTAX     TimeStamp
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The value of sysUpTime when the last protection switchover
+         event occurred."
+    ::= { cienaCesLapsRuntimeEntry 4 }
+
+cienaCesLapsRuntimeSwitchingType OBJECT-TYPE
+    SYNTAX     CienaCesLapsSwitchingType
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The runtime directional switching type of the APS group.
+         Although only bidirectional type is supported, the device will
+         operate unidirectionally when the remote end is configured as
+         such."
+    ::= { cienaCesLapsRuntimeEntry 5 }
+    
+cienaCesLapsRuntimeArchitectureMismatch OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates whether the remote architecture configuration is
+         different from the local."
+    ::= { cienaCesLapsRuntimeEntry 6 }
+    
+cienaCesLapsRuntimeSwitchTypeMismatch OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates whether the remote switching type configuration is
+         different from the local."
+    ::= { cienaCesLapsRuntimeEntry 7 }
+    
+cienaCesLapsRuntimeChannelMismatch OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates whether the configuration of remote working and
+         protection channels is different from the local."
+    ::= { cienaCesLapsRuntimeEntry 8 }
+
+cienaCesLapsRuntimeLastSwitchRequest OBJECT-TYPE
+    SYNTAX      CienaCesLapsSwitchRequest
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The most recent switch request as indicated by the highest
+         priority request from the last transmitted and received K1
+         bytes."
+    ::= { cienaCesLapsRuntimeEntry 9 }
+    
+cienaCesLapsRuntimeWtrRemaining OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..720)
+    UNITS       "seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Number of seconds remaining in the active Wait To Restore
+         period.
+         
+         After a switch trigger condition has cleared, the wait to
+         restore period must elapse before traffic is restored to
+         the working channel."
+    ::= { cienaCesLapsRuntimeEntry 10 }
+    
+cienaCesLapsRuntimeHoldoffActive OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indication of whether the hold-off timer is active.
+        
+         When a condition occurs that necessitates an
+         automatic switch, the hold-off time must elapse
+         before switching. This is intended to allow the server layer
+         protection scheme to complete a switchover."
+    ::= { cienaCesLapsRuntimeEntry 11 }
+
+
+--
+-- Linear APS Statistics Table
+--
+-- This table provides Linear APS group statistics.
+--
+cienaCesLapsStatsTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF CienaCesLapsStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table provides status information about Linear APS groups
+         that have been configured on the system."
+    ::= { cienaCesLapsStats 1 }
+
+cienaCesLapsStatsEntry OBJECT-TYPE
+    SYNTAX      CienaCesLapsStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A conceptual row in the cienaCesLapsStatsTable."
+    AUGMENTS { cienaCesLapsConfigEntry }
+    ::= { cienaCesLapsStatsTable  1 }
+
+CienaCesLapsStatsEntry ::= SEQUENCE {
+    cienaCesLapsStatsApsMismatches         Counter32,
+    cienaCesLapsStatsChannelMismatches     Counter32,
+    cienaCesLapsStatsPSBFs                 Counter32,
+    cienaCesLapsStatsFEPLFs                Counter32,
+    cienaCesLapsStatsLocalSwitchovers      Counter32,
+    cienaCesLapsStatsRemoteSwitchovers     Counter32
+}
+
+cienaCesLapsStatsApsMismatches OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "A count of APS architecture and switching type mismatch
+         conditions."
+    ::= { cienaCesLapsStatsEntry 1 }
+
+cienaCesLapsStatsChannelMismatches OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "A count of channel mismatch conditions."
+    ::= { cienaCesLapsStatsEntry 2 }
+
+cienaCesLapsStatsPSBFs OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "A count of Protection Switch Byte Failure conditions.
+         This condition occurs when either an inconsistent APS
+         byte or an invalid code is detected. An inconsistent APS
+         byte occurs when no three consecutive K1 bytes of the last
+         12 successive frames are identical, starting with the last
+         frame containing a previously consistent byte. An invalid
+         code occurs when the incoming K1 byte contains an unused
+         code or a code irrelevant for the specific switching
+         operation (e.g., Reverse Request while no switching request
+         is outstanding) in three consecutive frames. An invalid code
+         also occurs when the incoming K1 byte contains an invalid
+         channel number in three consecutive frames."
+    ::= { cienaCesLapsStatsEntry 3 }
+
+cienaCesLapsStatsFEPLFs OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "A count of Far-End Protection-Line Failure conditions.
+         This condition is declared based on receiving SF on
+         the protection line in the K1 byte."
+    ::= { cienaCesLapsStatsEntry 4 }
+
+cienaCesLapsStatsLocalSwitchovers OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "A count of locally initiated protection switchovers."
+    ::= { cienaCesLapsStatsEntry 5 }
+
+cienaCesLapsStatsRemoteSwitchovers OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "A count of remotely initiated protection switchovers."
+    ::= { cienaCesLapsStatsEntry 6 }
+
+
+--
+-- Linear APS Channel Configuration Table
+--
+-- This table supports the addition, configuration and deletion of
+-- channels in Linear APS groups.
+--
+
+cienaCesLapsChanConfigTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF CienaCesLapsChanConfigEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table lists the APS channels that have been configured
+         in APS groups."
+    ::= { cienaCesLapsMIBObjects 3 }
+
+cienaCesLapsChanConfigEntry OBJECT-TYPE
+    SYNTAX      CienaCesLapsChanConfigEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A conceptual row in the cienaCesLapsChanConfigTable."
+    INDEX {cienaCesLapsChanConfigGroupIndex, cienaCesLapsChanConfigNumber}
+    ::= { cienaCesLapsChanConfigTable  1 }
+
+CienaCesLapsChanConfigEntry ::= SEQUENCE {
+    cienaCesLapsChanConfigGroupIndex            Unsigned32,
+    cienaCesLapsChanConfigNumber                Unsigned32,
+    cienaCesLapsChanConfigGroupName             SnmpAdminString,
+    cienaCesLapsChanConfigIfIndex               InterfaceIndex
+}
+
+cienaCesLapsChanConfigGroupIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..20)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The index of the APS group that contains this channel."
+    ::= { cienaCesLapsChanConfigEntry 1 }
+
+cienaCesLapsChanConfigNumber OBJECT-TYPE
+    SYNTAX     Unsigned32 (0..14)
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "This field is set to a unique channel number within an APS
+         group.  The value 0 indicates the null channel.  The values
+         1-14 define a working channel.
+
+         This field must be assigned a unique number within the group."
+    ::= { cienaCesLapsChanConfigEntry 2 }
+
+cienaCesLapsChanConfigGroupName OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE (1..15))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "A textual name for the APS group that contains this channel."
+    ::= { cienaCesLapsChanConfigEntry 3 }
+
+cienaCesLapsChanConfigIfIndex OBJECT-TYPE
+    SYNTAX     InterfaceIndex
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The ifIndex associated with a TDM port belonging to the APS
+         group. A TDM port may only be configured in one APS group."
+    ::= { cienaCesLapsChanConfigEntry 4 }
+
+
+-- Linear APS Channel Runtime Status Table
+--
+-- This table provides Linear APS group channel runtime information.
+--
+
+cienaCesLapsChanRuntimeTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF CienaCesLapsChanRuntimeEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "This table contains runtime information for all channels
+         in an APS group."
+    ::= { cienaCesLapsMIBObjects 4 }
+    
+cienaCesLapsChanRuntimeEntry OBJECT-TYPE
+    SYNTAX     CienaCesLapsChanRuntimeEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "A conceptual row in the cienaCesLapsChanRuntimeTable."
+    AUGMENTS { cienaCesLapsChanConfigEntry }
+    ::= { cienaCesLapsChanRuntimeTable 1 }
+    
+CienaCesLapsChanRuntimeEntry ::= SEQUENCE {
+    cienaCesLapsChanRuntimeSwitched     TruthValue,
+    cienaCesLapsChanRuntimeDefect       INTEGER
+}
+
+cienaCesLapsChanRuntimeSwitched OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "Indicates whether the channel is switched to protection.
+         Applies only to working channels."
+    ::= { cienaCesLapsChanRuntimeEntry 1}
+    
+cienaCesLapsChanRuntimeDefect OBJECT-TYPE
+    SYNTAX     INTEGER {
+                   none(1),
+                   sdBer(2),
+                   sfBer(3),
+                   ais(4),
+                   lof(5),
+                   los(6),
+                   portDown(7)
+               }
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "Indicates the cause of a defect condition on the channel.
+        
+         none
+         
+         No defect condition is in effect.
+         
+         sdBer
+         
+         The signal degrade bit error ratio threshold has been
+         exceeded.
+         
+         sfBer
+         
+         The signal fail bit error ratio threshold has been exceeded.
+         
+         ais
+         
+         An alarm indication signal is active.
+         
+         lof
+         
+         A loss-of-frame condition is active.
+         
+         los
+         
+         A loss-of-signal condition is active.
+         
+         portDown
+         
+         The port is down or administratively disabled."
+    ::= { cienaCesLapsChanRuntimeEntry 2 }
+    
+
+--
+-- Linear APS Command Table
+--
+-- This table provides access to Linear APS commands.
+--
+
+cienaCesLapsCommandTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF CienaCesLapsCommandEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table provides access to commands in configured Linear
+         APS groups."
+    ::= { cienaCesLapsMIBObjects 5 }
+
+cienaCesLapsCommandEntry OBJECT-TYPE
+    SYNTAX      CienaCesLapsCommandEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A conceptual row in the cienaCesLapsCommandTable. This row
+         exists only if the associated cienaCesLapsConfigEntry is
+         active."
+    INDEX {cienaCesLapsChanConfigGroupIndex,
+           cienaCesLapsChanConfigNumber}
+    ::= { cienaCesLapsCommandTable  1 }
+
+CienaCesLapsCommandEntry ::= SEQUENCE {
+    cienaCesLapsCommandSwitch         CienaCesLapsSwitchCommand
+}
+
+cienaCesLapsCommandSwitch OBJECT-TYPE
+    SYNTAX      CienaCesLapsSwitchCommand
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the local switch command in effect on the Linear
+         APS group and channel specified by the index values.
+
+         This request may have been preempted by a higher priority
+         local or remote request. In order to determine the current
+         state of the Linear APS group it is necessary to read the
+         objects cienaCesLapsRuntimeK1K2Rcv and
+         cienaCesLapsRuntimeK1K2Trans.
+
+         The value lockoutOfProtection only applies to the protection
+         line channel since that switch command prevents any of the
+         working channels from switching to the protection line.
+         Following the same logic, forcedSwitchProtectToWork and
+         manualSwitchProtectToWork only apply to the protection line
+         channel. forcedSwitchWorkToProtect and
+         manualSwitchWorkToProtect only apply to a working channel."
+    ::= { cienaCesLapsCommandEntry 1 }
+
+
+--
+-- Linear APS Notifications
+--
+
+cienaCesLapsChanSwitchToProtectionNotification NOTIFICATION-TYPE
+    OBJECTS {
+                cienaGlobalSeverity,
+                cienaGlobalMacAddress,
+                cienaCesLapsConfigGroupName,
+                cienaCesLapsRuntimeSwitchedChannel,
+                cienaCesLapsRuntimeLastSwitchRequest
+            }
+    STATUS  current
+    DESCRIPTION
+        "A cienaCesLapsChanSwitchToProtectionNotification is sent when
+         a switchover to protection has occurred. Objects:
+         
+         cienaGlobalSeverity
+         
+         The severity of the notification.
+         
+         cienaGlobalMacAddress
+         
+         The chassis MAC address.
+         
+         cienaCesLapsConfigGroupName
+         
+         The textual name of the affected protection group.
+         
+         cienaCesLapsRuntimeSwitchedChannel
+         
+         The number of the working channel that has been switched to
+         protection.
+         
+         cienaCesLapsRuntimeLastSwitchRequest
+         
+         The highest priority switchover request indicating the reason
+         for the switchover."
+    ::= { cienaCesLapsMIBNotifications 1 }
+
+cienaCesLapsChanSwitchToWorkingNotification NOTIFICATION-TYPE
+    OBJECTS {
+                cienaGlobalSeverity,
+                cienaGlobalMacAddress,
+                cienaCesLapsConfigGroupName,
+                cienaCesLapsRuntimeSwitchedChannel,
+                cienaCesLapsRuntimeLastSwitchRequest
+            }
+    STATUS  current
+    DESCRIPTION
+        "A cienaCesLapsChanSwitchToWorkingNotification is sent when
+         traffic has been restored to a working channel. Objects:
+         
+         cienaGlobalSeverity
+         
+         The severity of the notification.
+         
+         cienaGlobalMacAddress
+         
+         The chassis MAC address.
+         
+         cienaCesLapsConfigGroupName
+         
+         The textual name of the affected protection group.
+         
+         cienaCesLapsRuntimeSwitchedChannel
+         
+         The number of the working channel on which traffic has been
+         restored.
+         
+         cienaCesLapsRuntimeLastSwitchRequest
+         
+         The highest priority switchover request indicating the reason
+         for the switchover."
+    ::= { cienaCesLapsMIBNotifications 2 }
+
+cienaCesLapsProtectionGroupFailureNotification NOTIFICATION-TYPE
+    OBJECTS {
+                cienaGlobalSeverity,
+                cienaGlobalMacAddress,
+                cienaCesLapsConfigGroupName,
+                cienaCesLapsChanRuntimeDefect,
+                cienaCesLapsChanRuntimeDefect
+            }
+    STATUS  current
+    DESCRIPTION
+        "A cienaCesLapsProtectionGroupFailureNotification is sent when
+         a failure has occurred on the protection channel as well as
+         on a working channel. Objects:
+         
+         cienaGlobalSeverity
+         
+         The severity of the notification.
+         
+         cienaGlobalMacAddress
+         
+         The chassis MAC address.
+         
+         cienaCesLapsConfigGroupName
+         
+         The textual name of the affected protection group.
+         
+         cienaCesLapsChanRuntimeDefect
+         
+         The first instance indicates the cause of the defect
+         condition on the protection channel.
+
+         cienaCesLapsChanRuntimeDefect
+         
+         The second instance indicates the cause of the defect
+         condition on the the indicated working channel."
+    ::= { cienaCesLapsMIBNotifications 3 }
+
+cienaCesLapsArchitectureMismatchNotification NOTIFICATION-TYPE
+    OBJECTS {
+                cienaGlobalSeverity,
+                cienaGlobalMacAddress,
+                cienaCesLapsConfigGroupName,
+                cienaCesLapsConfigArchitecture,
+                cienaCesLapsRuntimeK1K2Rcv,
+                cienaCesLapsRuntimeK1K2Trans
+            }
+    STATUS  current
+    DESCRIPTION
+        "A cienaCesLapsArchitectureMismatchNotification is sent when
+         the configuration of the remote architecture is different from
+         the local. Objects:
+         
+         cienaGlobalSeverity
+         
+         The severity of the notification.
+         
+         cienaGlobalMacAddress
+         
+         The chassis MAC address.
+         
+         cienaCesLapsConfigGroupName
+         
+         The textual name of the affected protection group.
+         
+         cienaCesLapsConfigArchitecture
+         
+         The local architecture.
+         
+         cienaCesLapsRuntimeK1K2Rcv
+         
+         The current value of the K1 and K2 bytes received on the
+         protection channel.
+         
+         cienaCesLapsRuntimeK1K2Trans
+         
+         The current value of the K1 and K2 bytes transmitted on the
+         protection channel."
+    ::= { cienaCesLapsMIBNotifications 4 }
+
+cienaCesLapsSwitchingTypeMismatchNotification NOTIFICATION-TYPE
+    OBJECTS {
+                cienaGlobalSeverity,
+                cienaGlobalMacAddress,
+                cienaCesLapsConfigGroupName,
+                cienaCesLapsConfigSwitchingType,
+                cienaCesLapsRuntimeK1K2Rcv,
+                cienaCesLapsRuntimeK1K2Trans
+            }
+    STATUS  current
+    DESCRIPTION
+        "A cienaCesLapsSwitchingTypeMismatchNotification is sent when
+         the configuration of the remote switching type is different
+         from the local. Objects:
+         
+         cienaGlobalSeverity
+         
+         The severity of the notification.
+         
+         cienaGlobalMacAddress
+         
+         The chassis MAC address.
+         
+         cienaCesLapsConfigGroupName
+         
+         The textual name of the affected protection group.
+         
+         cienaCesLapsConfigSwitchingType
+         
+         The local switching type.
+         
+         cienaCesLapsRuntimeK1K2Rcv
+         
+         The current value of the K1 and K2 bytes received on the
+         protection channel.
+         
+         cienaCesLapsRuntimeK1K2Trans
+         
+         The current value of the K1 and K2 bytes transmitted on the
+         protection channel."
+    ::= { cienaCesLapsMIBNotifications 5 }
+
+cienaCesLapsChannelMismatchNotification NOTIFICATION-TYPE
+    OBJECTS {
+                cienaGlobalSeverity,
+                cienaGlobalMacAddress,
+                cienaCesLapsConfigGroupName,
+                cienaCesLapsRuntimeK1K2Rcv,
+                cienaCesLapsRuntimeK1K2Trans
+            }
+    STATUS  current
+    DESCRIPTION
+        "A cienaCesLapsSwitchingTypeMismatchNotification is sent when a
+         mismatch between the transmitted K1 channel and the received
+         K2 channel has been detected. Objects:
+         
+         cienaGlobalSeverity
+         
+         The severity of the notification.
+         
+         cienaGlobalMacAddress
+         
+         The chassis MAC address.
+         
+         cienaCesLapsConfigGroupName
+         
+         The textual name of the affected protection group.
+         
+         cienaCesLapsRuntimeK1K2Rcv
+         
+         The current value of the K1 and K2 bytes received on the
+         protection channel.
+         
+         cienaCesLapsRuntimeK1K2Trans
+         
+         The current value of the K1 and K2 bytes transmitted on the
+         protection channel."
+    ::= { cienaCesLapsMIBNotifications 6 }
+
+cienaCesLapsPSBFNotification NOTIFICATION-TYPE
+    OBJECTS {
+                cienaGlobalSeverity,
+                cienaGlobalMacAddress,
+                cienaCesLapsConfigGroupName,
+                cienaCesLapsRuntimeK1K2Rcv,
+                cienaCesLapsRuntimeK1K2Trans
+            }
+    STATUS  current
+    DESCRIPTION
+        "A cienaCesLapsPSBFNotification is sent when a Protection
+         Switch Byte Failure condition occurs. Objects:
+         
+         cienaGlobalSeverity
+         
+         The severity of the notification.
+         
+         cienaGlobalMacAddress
+         
+         The chassis MAC address.
+         
+         cienaCesLapsConfigGroupName
+         
+         The textual name of the affected protection group.
+         
+         cienaCesLapsRuntimeK1K2Rcv
+         
+         The current value of the K1 and K2 bytes received on the
+         protection channel.
+         
+         cienaCesLapsRuntimeK1K2Trans
+         
+         The current value of the K1 and K2 bytes transmitted on the
+         protection channel."
+    ::= { cienaCesLapsMIBNotifications 7 }
+
+cienaCesLapsFPLFNotification NOTIFICATION-TYPE
+    OBJECTS {
+                cienaGlobalSeverity,
+                cienaGlobalMacAddress,
+                cienaCesLapsConfigGroupName,
+                cienaCesLapsRuntimeK1K2Rcv,
+                cienaCesLapsRuntimeK1K2Trans
+            }
+    STATUS  current
+    DESCRIPTION
+        "A cienaCesLapsFPLFNotification is sent when a Far-End
+         Protection Line Failure condition occurs. Objects:
+         
+         cienaGlobalSeverity
+         
+         The severity of the notification.
+         
+         cienaGlobalMacAddress
+         
+         The chassis MAC address.
+         
+         cienaCesLapsConfigGroupName
+         
+         The textual name of the affected protection group.
+         
+         cienaCesLapsRuntimeK1K2Rcv
+         
+         The current value of the K1 and K2 bytes received on the
+         protection channel.
+         
+         cienaCesLapsRuntimeK1K2Trans
+         
+         The current value of the K1 and K2 bytes transmitted on the
+         protection channel."
+    ::= { cienaCesLapsMIBNotifications 8 }
+
+cienaCesLapsEventGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { cienaCesLapsChanSwitchToProtectionNotification,
+                    cienaCesLapsChanSwitchToWorkingNotification,
+                    cienaCesLapsProtectionGroupFailureNotification,
+                    cienaCesLapsArchitectureMismatchNotification,
+                    cienaCesLapsSwitchingTypeMismatchNotification,
+                    cienaCesLapsChannelMismatchNotification,
+                    cienaCesLapsPSBFNotification,
+                    cienaCesLapsFPLFNotification }
+    STATUS    current
+    DESCRIPTION
+        "A collection of Linear APS notifications."
+    ::= { cienaCesLapsGroups 1 }
+
+END
