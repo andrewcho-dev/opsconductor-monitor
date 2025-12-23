@@ -5,13 +5,13 @@ import { LoginPage } from "./pages/auth/LoginPage";
 import { ProfilePage } from "./pages/auth/ProfilePage";
 
 // Inventory Module
-import { DevicesPage, DeviceDetailPage, GroupsPage } from "./pages/inventory";
+import { DevicesPage, DeviceDetailPage, GroupsPage, DeviceImporterPage, PRTGNetBoxImportPage } from "./pages/inventory";
 
 // Workflows Module (replaced legacy Jobs)
 import { WorkflowsListPage, WorkflowBuilderPage } from "./pages/workflows";
 
 // Monitor Module
-import { DashboardPage, TopologyPage, PowerTrendsPage, AlertsPage, ActiveJobsPage, JobHistoryPage, MCPServicesPage, SNMPLivePage, SNMPAlarmsPage } from "./pages/monitor";
+import { DashboardPage, TopologyPage, PowerTrendsPage, AlertsPage, ActiveJobsPage, JobHistoryPage, MCPServicesPage, SNMPLivePage, SNMPAlarmsPage, UPSMonitorPage } from "./pages/monitor";
 
 // System Module
 import { 
@@ -55,6 +55,8 @@ function App() {
         <Route path="/inventory/devices" element={<ProtectedRoute permission="devices.device.view"><DevicesPage /></ProtectedRoute>} />
         <Route path="/inventory/devices/:ip" element={<ProtectedRoute permission="devices.device.view"><DeviceDetailPage /></ProtectedRoute>} />
         <Route path="/inventory/groups" element={<ProtectedRoute permission="devices.group.manage"><GroupsPage /></ProtectedRoute>} />
+        <Route path="/inventory/import" element={<ProtectedRoute permission="devices.device.create"><DeviceImporterPage /></ProtectedRoute>} />
+        <Route path="/inventory/prtg-import" element={<ProtectedRoute permission="devices.device.create"><PRTGNetBoxImportPage /></ProtectedRoute>} />
 
         {/* WORKFLOWS MODULE */}
         <Route path="/workflows" element={<ProtectedRoute permission="jobs.job.view"><WorkflowsListPage /></ProtectedRoute>} />
@@ -72,6 +74,7 @@ function App() {
         <Route path="/monitor/mcp-services" element={<ProtectedRoute><MCPServicesPage /></ProtectedRoute>} />
         <Route path="/monitor/snmp-live" element={<ProtectedRoute><SNMPLivePage /></ProtectedRoute>} />
         <Route path="/monitor/snmp-alarms" element={<ProtectedRoute><SNMPAlarmsPage /></ProtectedRoute>} />
+        <Route path="/monitor/ups" element={<ProtectedRoute><UPSMonitorPage /></ProtectedRoute>} />
 
         {/* CREDENTIALS MODULE */}
         <Route path="/credentials" element={<ProtectedRoute permission="credentials.credential.view"><CredentialVaultPage /></ProtectedRoute>} />

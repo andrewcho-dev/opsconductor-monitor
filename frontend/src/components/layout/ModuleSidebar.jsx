@@ -32,7 +32,9 @@ import {
   ShieldCheck,
   AlertTriangle,
   FileKey,
-  Circle
+  Circle,
+  Battery,
+  Download
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -45,6 +47,7 @@ const moduleNavigation = {
         title: 'Devices',
         items: [
           { id: 'devices', label: 'All Devices', icon: Server, path: '/inventory/devices' },
+          { id: 'prtg-import', label: 'PRTG → NetBox Import', icon: Download, path: '/inventory/prtg-import' },
         ]
       }
     ]
@@ -74,8 +77,6 @@ const moduleNavigation = {
         title: 'Visualization',
         items: [
           { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/monitor/dashboard' },
-          { id: 'topology', label: 'Topology', icon: Network, path: '/monitor/topology' },
-          { id: 'power', label: 'Power Trends', icon: Zap, path: '/monitor/power' },
         ]
       },
       {
@@ -102,6 +103,12 @@ const moduleNavigation = {
         items: [
           { id: 'snmp-live', label: 'Device Monitor', icon: Activity, path: '/monitor/snmp-live' },
           { id: 'snmp-alarms', label: 'Active Alarms', icon: AlertTriangle, path: '/monitor/snmp-alarms' },
+        ]
+      },
+      {
+        title: 'Power',
+        items: [
+          { id: 'ups', label: 'UPS Monitor', icon: Battery, path: '/monitor/ups' },
         ]
       }
     ]

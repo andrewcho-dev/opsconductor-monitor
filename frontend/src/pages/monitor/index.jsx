@@ -7,3 +7,4 @@ export { default as JobHistoryPage } from './JobHistoryPage';
 export { MCPServicesPage } from './MCPServicesPage';
 export { SNMPLivePage } from './SNMPLivePage';
 export { SNMPAlarmsPage } from './SNMPAlarmsPage';
+export { default as UPSMonitorPage } from './UPSMonitorPage';

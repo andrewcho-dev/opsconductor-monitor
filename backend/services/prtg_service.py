@@ -152,7 +152,7 @@ class PRTGService:
         return self.test_connection()
     
     def get_devices(self, group: str = None, status: str = None, 
-                    search: str = None) -> List[Dict]:
+                    search: str = None, count: int = 50000) -> List[Dict]:
         """
         Get devices from PRTG.
         
@@ -160,10 +160,12 @@ class PRTGService:
             group: Filter by group name
             status: Filter by status (up, down, warning, paused)
             search: Search term for device name
+            count: Maximum number of devices to return (default 50000)
         """
         params = {
             'content': 'devices',
-            'columns': 'objid,device,host,group,probe,status,message,priority,tags,active,type'
+            'columns': 'objid,device,host,group,probe,status,message,priority,tags,active,type',
+            'count': count  # PRTG defaults to 500, we want all devices
         }
         
         # Add filters

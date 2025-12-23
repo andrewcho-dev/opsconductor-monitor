@@ -129,28 +129,70 @@ class GroupRepository(BaseRepository):
         """
         Get all devices in a group.
         
+        UPDATED: Now fetches device details from NetBox.
+        Group membership (IP addresses) stored locally, device info from NetBox.
+        
         Args:
             group_id: Group ID
         
         Returns:
             List of devices
         """
+        # Get IP addresses in this group
         query = """
-            SELECT 
-                sr.ip_address::text as ip_address,
-                sr.snmp_hostname,
-                sr.snmp_description,
-                sr.ping_status,
-                sr.snmp_status,
-                sr.ssh_status
-            FROM group_devices gd
-            JOIN scan_results sr ON gd.ip_address::inet = sr.ip_address
-            WHERE gd.group_id = %s
-            ORDER BY sr.ip_address
+            SELECT ip_address::text as ip_address
+            FROM group_devices
+            WHERE group_id = %s
+            ORDER BY ip_address
         """
         results = self.execute_query(query, (group_id,))
+        group_ips = set(row['ip_address'] for row in results) if results else set()
         
-        return serialize_rows(results)
+        if not group_ips:
+            return []
+        
+        # Fetch device details from NetBox
+        try:
+            from ..services.netbox_service import NetBoxService
+            from ..api.netbox import get_netbox_settings
+            
+            settings = get_netbox_settings()
+            netbox = NetBoxService(
+                url=settings.get('url', ''),
+                token=settings.get('token', ''),
+                verify_ssl=settings.get('verify_ssl', 'true').lower() == 'true'
+            )
+            
+            if not netbox.is_configured:
+                # Return just IPs if NetBox not configured
+                return [{'ip_address': ip} for ip in sorted(group_ips)]
+            
+            # Get all devices from NetBox and filter by group IPs
+            result = netbox.get_devices(limit=10000)
+            netbox_devices = result.get('results', [])
+            
+            devices = []
+            for d in netbox_devices:
+                primary_ip = d.get('primary_ip4') or d.get('primary_ip') or {}
+                ip_address = primary_ip.get('address', '').split('/')[0] if primary_ip else None
+                
+                if ip_address and ip_address in group_ips:
+                    devices.append({
+                        'ip_address': ip_address,
+                        'snmp_hostname': d.get('name', ''),
+                        'snmp_description': d.get('description', ''),
+                        'ping_status': 'online' if d.get('status', {}).get('value') == 'active' else 'offline',
+                        'snmp_status': 'YES',
+                        'ssh_status': '',
+                        'site': d.get('site', {}).get('name', '') if d.get('site') else '',
+                        'role': d.get('role', {}).get('name', '') if d.get('role') else '',
+                    })
+            
+            return sorted(devices, key=lambda x: x.get('ip_address', ''))
+            
+        except Exception as e:
+            # Fallback to just IPs on error
+            return [{'ip_address': ip} for ip in sorted(group_ips)]
     
     def add_device_to_group(self, group_id: int, ip_address: str) -> bool:
         """

@@ -80,17 +80,50 @@ export function DeviceDetail() {
   const loadDeviceData = async () => {
     try {
       setLoading(true);
-      const allDevices = await fetchApi("/data");
-      // Handle IP addresses that may have /32 suffix in database
-      const deviceData = allDevices.find((d) => {
-        const dbIp = d.ip_address?.replace(/\/\d+$/, ''); // Strip CIDR suffix
-        return dbIp === ip || d.ip_address === ip;
-      });
+      let deviceData = null;
+      
+      // NetBox is the source of truth for device inventory
+      try {
+        const netboxResponse = await fetchApi("/api/netbox/devices");
+        // API returns {success: true, data: [...]} or {success: true, data: {results: [...]}}
+        const deviceList = Array.isArray(netboxResponse.data) 
+          ? netboxResponse.data 
+          : netboxResponse.data?.results || [];
+        
+        if (netboxResponse.success && deviceList.length > 0) {
+          const netboxDevice = deviceList.find((d) => {
+            const primaryIp = d.primary_ip4?.address?.split('/')[0] || d.primary_ip?.address?.split('/')[0];
+            return primaryIp === ip;
+          });
+          
+          if (netboxDevice) {
+            // Transform NetBox device to standard format
+            deviceData = {
+              ip_address: netboxDevice.primary_ip4?.address?.split('/')[0] || netboxDevice.primary_ip?.address?.split('/')[0] || ip,
+              hostname: netboxDevice.name,
+              device_type: netboxDevice.device_type?.model || 'Unknown',
+              manufacturer: netboxDevice.device_type?.manufacturer?.name || '',
+              status: netboxDevice.status?.value || 'unknown',
+              site: netboxDevice.site?.name || '',
+              role: netboxDevice.role?.name || netboxDevice.device_role?.name || '',
+              platform: netboxDevice.platform?.name || '',
+              serial: netboxDevice.serial || '',
+              asset_tag: netboxDevice.asset_tag || '',
+              comments: netboxDevice.comments || '',
+              netbox_id: netboxDevice.id,
+              netbox_url: netboxDevice.url,
+              source: 'netbox',
+            };
+          }
+        }
+      } catch (netboxErr) {
+        console.warn("Could not fetch from NetBox:", netboxErr);
+      }
       
       if (deviceData) {
         setDevice(deviceData);
       } else {
-        setError("Device not found");
+        setError("Device not found in NetBox");
       }
     } catch (err) {
       setError("Error loading device data");
@@ -576,34 +609,38 @@ export function DeviceDetail() {
             </div>
             <div className="grid grid-cols-2 gap-2">
               <span className="font-medium text-gray-600">Hostname:</span>
-              <span className="text-gray-800">{mcpData?.device?.name || device?.snmp_hostname || "Unknown"}</span>
+              <span className="text-gray-800">{mcpData?.device?.name || device?.hostname || device?.snmp_hostname || "Unknown"}</span>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <span className="font-medium text-gray-600">Device Type:</span>
-              <span className="text-gray-800">{mcpData?.device?.device_type || device?.snmp_model || "Unknown"}</span>
+              <span className="text-gray-800">{mcpData?.device?.device_type || device?.device_type || device?.snmp_model || "Unknown"}</span>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <span className="font-medium text-gray-600">Vendor:</span>
-              <span className="text-gray-800">{mcpData?.device?.vendor || device?.snmp_vendor_name || "Unknown"}</span>
+              <span className="text-gray-800">{mcpData?.device?.vendor || device?.manufacturer || device?.snmp_vendor_name || "Unknown"}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <span className="font-medium text-gray-600">Site:</span>
+              <span className="text-gray-800">{device?.site || "Unknown"}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <span className="font-medium text-gray-600">Role:</span>
+              <span className="text-gray-800">{device?.role || "Unknown"}</span>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <span className="font-medium text-gray-600">Serial Number:</span>
-              <span className="text-gray-800 font-mono">{mcpData?.device?.serial_number || device?.snmp_serial || "Unknown"}</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <span className="font-medium text-gray-600">MAC Address:</span>
-              <span className="text-gray-800 font-mono">{mcpData?.device?.mac_address || device?.snmp_chassis_mac || "Unknown"}</span>
+              <span className="text-gray-800 font-mono">{mcpData?.device?.serial_number || device?.serial || device?.snmp_serial || "Unknown"}</span>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <span className="font-medium text-gray-600">Status:</span>
               <span className={cn(
                 "font-medium flex items-center gap-1",
-                (mcpData?.device?.association_state?.toLowerCase().includes('connect') || device?.ping_status?.includes('online')) 
+                (device?.status === 'active' || mcpData?.device?.association_state?.toLowerCase().includes('connect') || device?.ping_status?.includes('online')) 
                   ? "text-green-600" : "text-red-600"
               )}>
-                {(mcpData?.device?.association_state?.toLowerCase().includes('connect') || device?.ping_status?.includes('online')) 
-                  ? <><CheckCircle className="w-4 h-4" /> Online</> 
-                  : <><XCircle className="w-4 h-4" /> Offline</>}
+                {(device?.status === 'active' || mcpData?.device?.association_state?.toLowerCase().includes('connect') || device?.ping_status?.includes('online')) 
+                  ? <><CheckCircle className="w-4 h-4" /> {device?.status === 'active' ? 'Active' : 'Online'}</> 
+                  : <><XCircle className="w-4 h-4" /> {device?.status || 'Offline'}</>}
               </span>
             </div>
           </div>

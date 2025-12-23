@@ -54,104 +54,213 @@ def handle_app_error(error):
 
 
 # ============================================================================
-# Device Data Routes
+# Device Data Routes - NOW PROXIES TO NETBOX
 # ============================================================================
 
 @legacy_bp.route('/data', methods=['GET'])
 def get_data():
-    """Get all devices - main data endpoint."""
-    db = get_db()
-    from ..repositories.device_repo import DeviceRepository
+    """
+    Get all devices - main data endpoint.
     
-    repo = DeviceRepository(db)
-    devices = repo.get_all_devices()
-    return jsonify(devices)
+    UPDATED: Now fetches from NetBox as the source of truth.
+    Returns devices in a format compatible with legacy code.
+    """
+    try:
+        from ..services.netbox_service import NetBoxService
+        from ..api.netbox import get_netbox_settings
+        
+        settings = get_netbox_settings()
+        netbox = NetBoxService(
+            url=settings.get('url', ''),
+            token=settings.get('token', ''),
+            verify_ssl=settings.get('verify_ssl', 'true').lower() == 'true'
+        )
+        
+        if not netbox.is_configured:
+            # Fall back to empty list if NetBox not configured
+            return jsonify([])
+        
+        # Fetch all devices from NetBox
+        result = netbox.get_devices(limit=10000)
+        netbox_devices = result.get('results', [])
+        
+        # Transform to legacy format for backwards compatibility
+        devices = []
+        for d in netbox_devices:
+            primary_ip = d.get('primary_ip4') or d.get('primary_ip') or {}
+            ip_address = primary_ip.get('address', '').split('/')[0] if primary_ip else None
+            
+            if not ip_address:
+                continue  # Skip devices without IP
+            
+            devices.append({
+                'ip_address': ip_address,
+                'hostname': d.get('name', ''),
+                'snmp_hostname': d.get('name', ''),
+                'snmp_description': d.get('description', ''),
+                'snmp_model': d.get('device_type', {}).get('model', '') if d.get('device_type') else '',
+                'snmp_vendor_name': d.get('device_type', {}).get('manufacturer', {}).get('name', '') if d.get('device_type') else '',
+                'snmp_serial': d.get('serial', ''),
+                'ping_status': 'online' if d.get('status', {}).get('value') == 'active' else 'offline',
+                'snmp_status': 'YES',  # Assume SNMP if in NetBox
+                'network_range': d.get('site', {}).get('name', '') if d.get('site') else '',
+                'site': d.get('site', {}).get('name', '') if d.get('site') else '',
+                'role': d.get('role', {}).get('name', '') if d.get('role') else '',
+                'device_type': d.get('device_type', {}).get('model', '') if d.get('device_type') else '',
+                'manufacturer': d.get('device_type', {}).get('manufacturer', {}).get('name', '') if d.get('device_type') else '',
+                'status': d.get('status', {}).get('value', 'unknown'),
+                'netbox_id': d.get('id'),
+                'netbox_url': d.get('url'),
+                'source': 'netbox',
+            })
+        
+        return jsonify(devices)
+        
+    except Exception as e:
+        logger.error(f"Error fetching devices from NetBox: {e}")
+        # Return empty list on error
+        return jsonify([])
 
 
 @legacy_bp.route('/delete_selected', methods=['POST'])
 def delete_selected():
-    """Delete selected devices."""
-    data = request.get_json() or {}
-    ips = data.get('ips', [])
+    """
+    Delete selected devices.
     
-    if not ips:
-        return jsonify({'error': 'No IPs provided'}), 400
-    
-    db = get_db()
-    from ..repositories.device_repo import DeviceRepository
-    repo = DeviceRepository(db)
-    
-    deleted = 0
-    for ip in ips:
-        if repo.delete_by_ip(ip):
-            deleted += 1
-    
-    return jsonify({'deleted': deleted})
+    DEPRECATED: Devices are now managed in NetBox.
+    This endpoint is kept for backwards compatibility but returns an error.
+    """
+    return jsonify({
+        'error': 'Device deletion is now managed in NetBox. Please delete devices directly in NetBox.',
+        'deprecated': True
+    }), 400
 
 
 @legacy_bp.route('/delete_device', methods=['POST'])
 def delete_device():
-    """Delete a single device."""
-    data = request.get_json() or {}
-    ip = data.get('ip')
+    """
+    Delete a single device.
     
-    if not ip:
-        return jsonify({'error': 'No IP provided'}), 400
-    
-    db = get_db()
-    from ..repositories.device_repo import DeviceRepository
-    repo = DeviceRepository(db)
-    
-    if repo.delete_by_ip(ip):
-        return jsonify({'success': True})
-    return jsonify({'error': 'Device not found'}), 404
+    DEPRECATED: Devices are now managed in NetBox.
+    """
+    return jsonify({
+        'error': 'Device deletion is now managed in NetBox. Please delete devices directly in NetBox.',
+        'deprecated': True
+    }), 400
 
 
 @legacy_bp.route('/delete/<ip_address>', methods=['DELETE'])
 def delete_device_by_path(ip_address):
-    """Delete device by IP in path."""
-    db = get_db()
-    from ..repositories.device_repo import DeviceRepository
-    repo = DeviceRepository(db)
+    """
+    Delete device by IP in path.
     
-    if repo.delete_by_ip(ip_address):
-        return jsonify({'success': True})
-    return jsonify({'error': 'Device not found'}), 404
+    DEPRECATED: Devices are now managed in NetBox.
+    """
+    return jsonify({
+        'error': 'Device deletion is now managed in NetBox. Please delete devices directly in NetBox.',
+        'deprecated': True
+    }), 400
 
 
 # ============================================================================
-# Network Groups Routes
+# Network Groups Routes - NOW SOURCES FROM NETBOX SITES
 # ============================================================================
 
 @legacy_bp.route('/network_groups', methods=['GET'])
 def get_network_groups():
-    """Get network groups (auto-generated from scan results)."""
-    db = get_db()
-    from ..repositories.device_repo import DeviceRepository
-    repo = DeviceRepository(db)
+    """
+    Get network groups.
     
-    summary = repo.get_network_summary()
-    return jsonify(summary)
+    UPDATED: Now returns NetBox sites as network groups.
+    """
+    try:
+        from ..services.netbox_service import NetBoxService
+        from ..api.netbox import get_netbox_settings
+        
+        settings = get_netbox_settings()
+        netbox = NetBoxService(
+            url=settings.get('url', ''),
+            token=settings.get('token', ''),
+            verify_ssl=settings.get('verify_ssl', 'true').lower() == 'true'
+        )
+        
+        if not netbox.is_configured:
+            return jsonify([])
+        
+        # Get sites from NetBox
+        sites_result = netbox.get_sites(limit=1000)
+        sites = sites_result.get('results', [])
+        
+        # Get device counts per site
+        devices_result = netbox.get_devices(limit=10000)
+        devices = devices_result.get('results', [])
+        
+        # Count devices per site
+        site_counts = {}
+        for d in devices:
+            site_name = d.get('site', {}).get('name', 'Unknown') if d.get('site') else 'Unknown'
+            site_counts[site_name] = site_counts.get(site_name, 0) + 1
+        
+        # Build summary
+        summary = []
+        for site in sites:
+            site_name = site.get('name', 'Unknown')
+            summary.append({
+                'network_range': site_name,
+                'device_count': site_counts.get(site_name, 0),
+                'online_count': site_counts.get(site_name, 0),  # Assume all active
+                'snmp_count': site_counts.get(site_name, 0),
+                'ssh_count': 0,
+                'site_id': site.get('id'),
+                'site_slug': site.get('slug'),
+            })
+        
+        return jsonify(summary)
+        
+    except Exception as e:
+        logger.error(f"Error fetching network groups from NetBox: {e}")
+        return jsonify([])
 
 
 @legacy_bp.route('/api/network-ranges', methods=['GET'])
 def get_network_ranges():
-    """Get network ranges."""
-    db = get_db()
-    from ..repositories.device_repo import DeviceRepository
-    repo = DeviceRepository(db)
+    """
+    Get network ranges.
     
-    summary = repo.get_network_summary()
-    
-    # Format for frontend
-    ranges = []
-    for item in summary:
-        ranges.append({
-            'range': item.get('network_range', 'Unknown'),
-            'device_count': item.get('device_count', 0),
-        })
-    
-    return jsonify(ranges)
+    UPDATED: Now returns NetBox IP ranges.
+    """
+    try:
+        from ..services.netbox_service import NetBoxService
+        from ..api.netbox import get_netbox_settings
+        
+        settings = get_netbox_settings()
+        netbox = NetBoxService(
+            url=settings.get('url', ''),
+            token=settings.get('token', ''),
+            verify_ssl=settings.get('verify_ssl', 'true').lower() == 'true'
+        )
+        
+        if not netbox.is_configured:
+            return jsonify([])
+        
+        # Get IP ranges from NetBox
+        ranges_result = netbox._request('GET', 'ipam/ip-ranges/', params={'limit': 1000})
+        ip_ranges = ranges_result.get('results', [])
+        
+        # Format for frontend
+        ranges = []
+        for r in ip_ranges:
+            ranges.append({
+                'range': r.get('display', r.get('start_address', 'Unknown')),
+                'device_count': r.get('size', 0),
+                'id': r.get('id'),
+            })
+        
+        return jsonify(ranges)
+        
+    except Exception as e:
+        logger.error(f"Error fetching network ranges from NetBox: {e}")
+        return jsonify([])
 
 
 @legacy_bp.route('/api/network-groups', methods=['GET'])
@@ -283,30 +392,64 @@ def get_power_history():
 
 
 # ============================================================================
-# Topology Routes
+# Topology Routes - NOW SOURCES FROM NETBOX
 # ============================================================================
 
 @legacy_bp.route('/topology_data', methods=['POST'])
 def get_topology_data():
-    """Get topology data for visualization."""
+    """
+    Get topology data for visualization.
+    
+    UPDATED: Now sources devices from NetBox.
+    """
     data = request.get_json() or {}
     group_type = data.get('group_type', 'network')
     group_id = data.get('group_id')
     
     db = get_db()
     
-    # Get devices based on group
-    if group_type == 'custom' and group_id:
-        from ..repositories.group_repo import GroupRepository
-        repo = GroupRepository(db)
-        devices = repo.get_group_devices(int(group_id))
-    else:
-        from ..repositories.device_repo import DeviceRepository
-        repo = DeviceRepository(db)
-        if group_id:
-            devices = repo.get_devices_by_network(group_id)
-        else:
-            devices = repo.get_all_devices()
+    # Get devices from NetBox
+    try:
+        from ..services.netbox_service import NetBoxService
+        from ..api.netbox import get_netbox_settings
+        
+        settings = get_netbox_settings()
+        netbox = NetBoxService(
+            url=settings.get('url', ''),
+            token=settings.get('token', ''),
+            verify_ssl=settings.get('verify_ssl', 'true').lower() == 'true'
+        )
+        
+        if not netbox.is_configured:
+            return jsonify({'nodes': [], 'links': []})
+        
+        # Fetch devices from NetBox, optionally filtered by site
+        params = {'limit': 10000}
+        if group_type == 'network' and group_id:
+            # group_id is site name for network groups
+            params['site'] = group_id
+        
+        result = netbox.get_devices(**params)
+        netbox_devices = result.get('results', [])
+        
+        # Transform to format expected by topology
+        devices = []
+        for d in netbox_devices:
+            primary_ip = d.get('primary_ip4') or d.get('primary_ip') or {}
+            ip_address = primary_ip.get('address', '').split('/')[0] if primary_ip else None
+            
+            if not ip_address:
+                continue
+            
+            devices.append({
+                'ip_address': ip_address,
+                'hostname': d.get('name', ''),
+                'ping_status': 'online' if d.get('status', {}).get('value') == 'active' else 'offline',
+                'site': d.get('site', {}).get('name', '') if d.get('site') else '',
+            })
+    except Exception as e:
+        logger.error(f"Error fetching devices from NetBox for topology: {e}")
+        devices = []
     
     # Build topology nodes and links
     nodes = []

@@ -1,7 +1,22 @@
 """
 Device repository for scan_results table operations.
 
-Handles all database operations related to network devices.
+DEPRECATION NOTICE:
+==================
+This repository is DEPRECATED for device inventory purposes.
+NetBox is now the source of truth for device inventory.
+
+The scan_results table may still contain legacy data from previous scans,
+but new device data should NOT be written here. Device information should
+be queried from NetBox via the NetBoxService.
+
+This repository is kept for:
+1. Backwards compatibility with existing code
+2. Potential future use for storing scan metadata (not device inventory)
+
+For device inventory, use:
+- backend/services/netbox_service.py - NetBoxService.get_devices()
+- backend/api/netbox.py - /api/netbox/devices endpoint
 """
 
 from typing import Dict, List, Optional, Any
@@ -10,7 +25,12 @@ from ..utils.serialization import serialize_row, serialize_rows
 
 
 class DeviceRepository(BaseRepository):
-    """Repository for device (scan_results) operations."""
+    """
+    Repository for device (scan_results) operations.
+    
+    DEPRECATED: Use NetBoxService for device inventory.
+    This repository is kept for backwards compatibility only.
+    """
     
     table_name = 'scan_results'
     primary_key = 'id'

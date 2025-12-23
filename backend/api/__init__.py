@@ -20,6 +20,9 @@ from .netbox import netbox_bp
 from .prtg import prtg_bp
 from .ciena_mcp import mcp_bp
 from .ciena_snmp import snmp_bp
+from .eaton_snmp import eaton_snmp_bp
+from .device_importer import device_importer_bp
+from .prtg_netbox_import import prtg_netbox_import_bp
 
 __all__ = [
     'devices_bp',
@@ -82,3 +85,6 @@ def register_blueprints(app):
     app.register_blueprint(prtg_bp)
     app.register_blueprint(mcp_bp)
     app.register_blueprint(snmp_bp)
+    app.register_blueprint(eaton_snmp_bp)
+    app.register_blueprint(device_importer_bp)
+    app.register_blueprint(prtg_netbox_import_bp)
