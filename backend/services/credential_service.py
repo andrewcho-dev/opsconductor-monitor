@@ -570,6 +570,61 @@ class CredentialService:
             except Exception:
                 return False
     
+    def unassign_from_device(
+        self,
+        credential_id: int,
+        ip_address: str = None,
+        device_id: int = None
+    ) -> bool:
+        """Remove a credential assignment from a device."""
+        if not ip_address and not device_id:
+            raise ValueError("Either ip_address or device_id must be provided")
+        
+        db = get_db()
+        with db.cursor() as cursor:
+            try:
+                if ip_address:
+                    cursor.execute("""
+                        DELETE FROM device_credentials 
+                        WHERE credential_id = %s AND ip_address = %s
+                    """, (credential_id, ip_address))
+                else:
+                    cursor.execute("""
+                        DELETE FROM device_credentials 
+                        WHERE credential_id = %s AND device_id = %s
+                    """, (credential_id, device_id))
+                db.get_connection().commit()
+                return cursor.rowcount > 0
+            except Exception:
+                return False
+    
+    def get_devices_for_credential(self, credential_id: int) -> List[Dict[str, Any]]:
+        """
+        Get all devices associated with a credential.
+        
+        Returns list of device IPs/IDs that have this credential assigned.
+        """
+        db = get_db()
+        with db.cursor() as cursor:
+            cursor.execute("""
+                SELECT dc.ip_address, dc.device_id, dc.credential_type, dc.priority, dc.created_at
+                FROM device_credentials dc
+                WHERE dc.credential_id = %s
+                ORDER BY dc.ip_address
+            """, (credential_id,))
+            
+            results = []
+            for row in cursor.fetchall():
+                results.append({
+                    'ip_address': row['ip_address'],
+                    'device_id': row['device_id'],
+                    'credential_type': row['credential_type'],
+                    'priority': row['priority'],
+                    'assigned_at': row['created_at'].isoformat() if row['created_at'] else None,
+                })
+            
+            return results
+    
     def get_credentials_for_device(
         self,
         ip_address: str = None,

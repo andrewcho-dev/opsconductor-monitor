@@ -300,6 +300,27 @@ def list_ip_addresses():
     })
 
 
+# ==================== IP PREFIXES ====================
+
+@netbox_bp.route('/prefixes', methods=['GET'])
+def list_prefixes():
+    """List IP prefixes from NetBox IPAM."""
+    service = get_netbox_service()
+    
+    params = {
+        'limit': int(request.args.get('limit', 500)),
+        'offset': int(request.args.get('offset', 0)),
+    }
+    
+    result = service._request('GET', 'ipam/prefixes/', params=params)
+    
+    return jsonify({
+        'success': True,
+        'data': result.get('results', []),
+        'count': result.get('count', 0),
+    })
+
+
 # ==================== IP RANGES ====================
 
 @netbox_bp.route('/ip-ranges', methods=['GET'])

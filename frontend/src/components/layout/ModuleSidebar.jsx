@@ -47,7 +47,6 @@ const moduleNavigation = {
         title: 'Devices',
         items: [
           { id: 'devices', label: 'All Devices', icon: Server, path: '/inventory/devices' },
-          { id: 'prtg-import', label: 'PRTG → NetBox Import', icon: Download, path: '/inventory/prtg-import' },
         ]
       }
     ]

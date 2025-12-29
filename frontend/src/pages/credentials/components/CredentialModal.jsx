@@ -4,10 +4,262 @@
  * Modal for creating and editing credentials.
  */
 
-import React, { useState } from 'react';
-import { XCircle, Eye, EyeOff } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { XCircle, Eye, EyeOff, Server, Plus, X, Search } from 'lucide-react';
 import { fetchApi } from '../../../lib/utils';
 import { CREDENTIAL_TYPES } from './constants';
+
+function DeviceAssignmentSection({ credentialId }) {
+  const [assignedDevices, setAssignedDevices] = useState([]);
+  const [availableDevices, setAvailableDevices] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [showDevicePicker, setShowDevicePicker] = useState(false);
+  const [selectedToAdd, setSelectedToAdd] = useState(new Set());
+  const [selectedToRemove, setSelectedToRemove] = useState(new Set());
+  const [processing, setProcessing] = useState(false);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const assignedRes = await fetchApi(`/api/credentials/${credentialId}/devices`);
+        setAssignedDevices(assignedRes.data?.devices || []);
+
+        const devicesRes = await fetchApi('/api/netbox/devices?limit=1000');
+        const devices = (devicesRes.data || []).map(d => ({
+          ip_address: d.primary_ip4?.address?.split('/')[0] || '',
+          hostname: d.name,
+          site: d.site?.name || '',
+          id: d.id,
+        })).filter(d => d.ip_address);
+        setAvailableDevices(devices);
+      } catch (err) {
+        console.error('Error fetching devices:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (credentialId) fetchData();
+  }, [credentialId]);
+
+  const handleAddSelected = async () => {
+    if (selectedToAdd.size === 0) return;
+    setProcessing(true);
+    try {
+      const devicesToAdd = availableDevices.filter(d => selectedToAdd.has(d.ip_address));
+      for (const device of devicesToAdd) {
+        await fetchApi(`/api/credentials/devices/${device.ip_address}/assign`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ credential_id: credentialId }),
+        });
+      }
+      setAssignedDevices(prev => [
+        ...prev,
+        ...devicesToAdd.map(d => ({
+          ip_address: d.ip_address,
+          netbox_device: { hostname: d.hostname, site: d.site }
+        }))
+      ]);
+      setSelectedToAdd(new Set());
+      setShowDevicePicker(false);
+    } catch (err) {
+      alert('Error assigning devices: ' + err.message);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleRemoveSelected = async () => {
+    if (selectedToRemove.size === 0) return;
+    setProcessing(true);
+    try {
+      for (const ip of selectedToRemove) {
+        await fetchApi(`/api/credentials/devices/${ip}/unassign`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ credential_id: credentialId }),
+        });
+      }
+      setAssignedDevices(prev => prev.filter(d => !selectedToRemove.has(d.ip_address)));
+      setSelectedToRemove(new Set());
+    } catch (err) {
+      alert('Error removing devices: ' + err.message);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const toggleAddSelection = (ip) => {
+    setSelectedToAdd(prev => {
+      const next = new Set(prev);
+      if (next.has(ip)) next.delete(ip);
+      else next.add(ip);
+      return next;
+    });
+  };
+
+  const toggleRemoveSelection = (ip) => {
+    setSelectedToRemove(prev => {
+      const next = new Set(prev);
+      if (next.has(ip)) next.delete(ip);
+      else next.add(ip);
+      return next;
+    });
+  };
+
+  const selectAllToAdd = () => {
+    const allIps = filteredDevices.slice(0, 50).map(d => d.ip_address);
+    setSelectedToAdd(new Set(allIps));
+  };
+
+  const selectAllToRemove = () => {
+    const allIps = assignedDevices.map(d => d.ip_address);
+    setSelectedToRemove(new Set(allIps));
+  };
+
+  const assignedIps = new Set(assignedDevices.map(d => d.ip_address));
+  const filteredDevices = availableDevices.filter(d => 
+    !assignedIps.has(d.ip_address) &&
+    (d.ip_address.includes(searchTerm) || 
+     d.hostname?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+     d.site?.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
+  if (loading) {
+    return <div className="text-sm text-gray-500">Loading devices...</div>;
+  }
+
+  return (
+    <div className="border rounded-lg p-4 bg-gray-50">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-medium text-gray-700 flex items-center gap-2">
+          <Server className="w-4 h-4" />
+          Assigned Devices ({assignedDevices.length})
+        </h3>
+        <button
+          type="button"
+          onClick={() => { setShowDevicePicker(!showDevicePicker); setSelectedToAdd(new Set()); }}
+          className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-1"
+        >
+          <Plus className="w-3 h-3" />
+          Add Devices
+        </button>
+      </div>
+
+      {showDevicePicker && (
+        <div className="mb-3 p-3 bg-white border rounded-lg">
+          <div className="relative mb-2">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search by IP, hostname, or site..."
+              className="w-full pl-8 pr-3 py-1.5 text-sm border rounded"
+            />
+          </div>
+          <div className="flex items-center justify-between mb-2 text-xs">
+            <button type="button" onClick={selectAllToAdd} className="text-blue-600 hover:underline">
+              Select all ({Math.min(filteredDevices.length, 50)})
+            </button>
+            <span className="text-gray-500">{selectedToAdd.size} selected</span>
+          </div>
+          <div className="max-h-48 overflow-y-auto space-y-1 border rounded p-1">
+            {filteredDevices.length === 0 ? (
+              <div className="text-xs text-gray-500 py-2 text-center">No devices found</div>
+            ) : (
+              filteredDevices.slice(0, 50).map(device => (
+                <label
+                  key={device.ip_address}
+                  className={`flex items-center gap-2 px-2 py-1.5 text-sm rounded cursor-pointer ${
+                    selectedToAdd.has(device.ip_address) ? 'bg-blue-50' : 'hover:bg-gray-50'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedToAdd.has(device.ip_address)}
+                    onChange={() => toggleAddSelection(device.ip_address)}
+                    className="rounded text-blue-600"
+                  />
+                  <span className="font-mono text-xs flex-1">{device.ip_address}</span>
+                  <span className="text-xs text-gray-500">{device.hostname || device.site}</span>
+                </label>
+              ))
+            )}
+          </div>
+          {filteredDevices.length > 50 && (
+            <div className="text-xs text-gray-500 py-1 text-center">
+              Showing 50 of {filteredDevices.length} (refine search)
+            </div>
+          )}
+          <div className="flex justify-end gap-2 mt-2">
+            <button
+              type="button"
+              onClick={() => { setShowDevicePicker(false); setSelectedToAdd(new Set()); }}
+              className="px-3 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleAddSelected}
+              disabled={selectedToAdd.size === 0 || processing}
+              className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+            >
+              {processing ? 'Adding...' : `Add ${selectedToAdd.size} Device${selectedToAdd.size !== 1 ? 's' : ''}`}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {assignedDevices.length === 0 ? (
+        <div className="text-xs text-gray-500 py-2">No devices assigned to this credential</div>
+      ) : (
+        <>
+          <div className="flex items-center justify-between mb-2 text-xs">
+            <button type="button" onClick={selectAllToRemove} className="text-gray-600 hover:underline">
+              Select all
+            </button>
+            {selectedToRemove.size > 0 && (
+              <button
+                type="button"
+                onClick={handleRemoveSelected}
+                disabled={processing}
+                className="text-red-600 hover:underline"
+              >
+                {processing ? 'Removing...' : `Remove ${selectedToRemove.size} selected`}
+              </button>
+            )}
+          </div>
+          <div className="space-y-1 max-h-48 overflow-y-auto">
+            {assignedDevices.map((device, idx) => (
+              <label
+                key={idx}
+                className={`flex items-center gap-2 bg-white px-2 py-1.5 rounded border text-sm cursor-pointer ${
+                  selectedToRemove.has(device.ip_address) ? 'border-red-300 bg-red-50' : ''
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedToRemove.has(device.ip_address)}
+                  onChange={() => toggleRemoveSelection(device.ip_address)}
+                  className="rounded text-red-600"
+                />
+                <span className="font-mono text-xs flex-1">{device.ip_address}</span>
+                {device.netbox_device && (
+                  <span className="text-xs text-gray-500">
+                    {device.netbox_device.hostname || device.netbox_device.site}
+                  </span>
+                )}
+              </label>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 export function CredentialModal({ credential, onClose, onSave }) {
   const [formData, setFormData] = useState({

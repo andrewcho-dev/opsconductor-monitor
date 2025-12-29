@@ -550,25 +550,26 @@ class PRTGNetBoxImporter:
         
         # Ensure each tag exists in NetBox
         valid_tags = []
-        for tag_name in tag_names:
+        for tag_slug in tag_names:
             try:
-                # Check if tag exists
-                result = self.netbox._request('GET', 'extras/tags/', params={'name': tag_name})
+                # Check if tag exists by slug (more reliable than name)
+                result = self.netbox._request('GET', 'extras/tags/', params={'slug': tag_slug})
                 if result.get('results'):
-                    valid_tags.append(tag_name)
+                    valid_tags.append(tag_slug)
                 else:
                     # Create the tag following NetBox conventions
+                    # Use slug as name too (NetBox convention for programmatic tags)
                     try:
                         self.netbox._request('POST', 'extras/tags/', json={
-                            'name': tag_name,
-                            'slug': tag_name,
+                            'name': tag_slug,
+                            'slug': tag_slug,
                             'color': '2196f3'  # Blue for imported tags
                         })
-                        valid_tags.append(tag_name)
+                        valid_tags.append(tag_slug)
                     except Exception as e:
-                        logger.warning(f"Could not create tag '{tag_name}': {e}")
+                        logger.warning(f"Could not create tag '{tag_slug}': {e}")
             except Exception as e:
-                logger.warning(f"Error checking tag '{tag_name}': {e}")
+                logger.warning(f"Error checking tag '{tag_slug}': {e}")
         
         return valid_tags
     

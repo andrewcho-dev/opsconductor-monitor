@@ -1,12 +1,12 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { PageLayout, PageHeader } from "../../components/layout";
-import { useNetBoxDevices, useNetBoxStatus, useNetBoxIPRanges, useNetBoxTags } from "../../hooks/useNetBox";
+import { useNetBoxDevices, useNetBoxStatus, useNetBoxIPRanges, useNetBoxTags, useNetBoxPrefixes } from "../../hooks/useNetBox";
 import { fetchApi } from "../../lib/utils";
 import { 
   Server, RefreshCw, Database, ExternalLink, ChevronDown, ChevronRight,
   Search, Monitor, HardDrive, Eye, CheckCircle, XCircle, Filter,
-  ChevronUp, ChevronsUpDown, FolderOpen, FolderClosed, Network, Tag
+  ChevronUp, ChevronsUpDown, FolderOpen, FolderClosed, Network, Tag, Download
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 
@@ -24,19 +24,34 @@ function isIpInRange(ip, startIp, endIp) {
   return ipNum >= startNum && ipNum <= endNum;
 }
 
+// Helper to check if IP is in a CIDR prefix (e.g., 10.1.1.0/24)
+function isIpInPrefix(ip, prefix) {
+  if (!ip || !prefix) return false;
+  const [network, bits] = prefix.split('/');
+  if (!network || !bits) return false;
+  
+  const ipNum = ipToNumber(ip);
+  const networkNum = ipToNumber(network);
+  const mask = ~((1 << (32 - parseInt(bits))) - 1) >>> 0;
+  
+  return (ipNum & mask) === (networkNum & mask);
+}
+
 export function DevicesPage() {
   const navigate = useNavigate();
   
   // Check NetBox status
   const netboxStatus = useNetBoxStatus();
   
-  // NetBox devices, IP ranges, and tags
+  // NetBox devices, IP ranges, prefixes, and tags
   const { devices, loading: devicesLoading, refetch: refetchDevices } = useNetBoxDevices();
+  const { prefixes: ipPrefixes, loading: prefixesLoading, refetch: refetchPrefixes } = useNetBoxPrefixes();
   const { ranges: ipRanges, loading: rangesLoading, refetch: refetchRanges } = useNetBoxIPRanges();
   const { tags: netboxTags, loading: tagsLoading, refetch: refetchTags } = useNetBoxTags();
   
   // UI state
   const [search, setSearch] = useState("");
+  const [selectedPrefix, setSelectedPrefix] = useState(null); // null = all prefixes
   const [selectedRange, setSelectedRange] = useState(null); // null = all ranges
   const [selectedTags, setSelectedTags] = useState([]); // array for multi-select
   const [tagLogic, setTagLogic] = useState('OR'); // 'OR' or 'AND'
@@ -61,20 +76,38 @@ export function DevicesPage() {
     }
   }, [ipRanges]);
 
-  // Assign devices to IP ranges
+  // Assign devices to IP prefixes and ranges
   const devicesWithRanges = useMemo(() => {
     return devices.map(device => {
       const ip = device.ip_address;
+      
+      // Find matching prefix (most specific match - longest prefix)
+      const matchingPrefixes = ipPrefixes.filter(prefix => 
+        isIpInPrefix(ip, prefix.prefix)
+      );
+      // Sort by prefix length descending to get most specific match
+      matchingPrefixes.sort((a, b) => {
+        const aLen = parseInt(a.prefix.split('/')[1] || 0);
+        const bLen = parseInt(b.prefix.split('/')[1] || 0);
+        return bLen - aLen;
+      });
+      const matchingPrefix = matchingPrefixes[0];
+      
+      // Find matching range
       const matchingRange = ipRanges.find(range => 
         isIpInRange(ip, range.start_address, range.end_address)
       );
+      
       return {
         ...device,
+        network_prefix: matchingPrefix?.prefix || null,
+        network_prefix_id: matchingPrefix?.id || null,
+        network_prefix_display: matchingPrefix?.display || "Unassigned",
         network_range: matchingRange?.display || "Unassigned",
         network_range_id: matchingRange?.id || null,
       };
     });
-  }, [devices, ipRanges]);
+  }, [devices, ipPrefixes, ipRanges]);
 
   // Get unique values for filter dropdowns
   const filterOptions = useMemo(() => {
@@ -98,16 +131,27 @@ export function DevicesPage() {
     };
   }, [devicesWithRanges]);
 
-  // Filter devices by search, selected range, and filters
+  // Filter devices by search, selected prefix, selected range, and filters
   const filteredDevices = useMemo(() => {
     let filtered = devicesWithRanges;
     
+    // Filter by selected prefix
+    if (selectedPrefix !== null) {
+      if (selectedPrefix === 'unassigned') {
+        filtered = filtered.filter(d => d.network_prefix_id === null);
+      } else {
+        const prefixId = typeof selectedPrefix === 'string' ? parseInt(selectedPrefix) : selectedPrefix;
+        filtered = filtered.filter(d => d.network_prefix_id === prefixId);
+      }
+    }
+    
     // Filter by selected range
-    if (selectedRange) {
+    if (selectedRange !== null) {
       if (selectedRange === 'unassigned') {
         filtered = filtered.filter(d => d.network_range_id === null);
       } else {
-        filtered = filtered.filter(d => d.network_range_id === parseInt(selectedRange));
+        const rangeId = typeof selectedRange === 'string' ? parseInt(selectedRange) : selectedRange;
+        filtered = filtered.filter(d => d.network_range_id === rangeId);
       }
     }
     
@@ -154,7 +198,7 @@ export function DevicesPage() {
     }
     
     return filtered;
-  }, [devicesWithRanges, selectedRange, selectedTags, tagLogic, search, filters]);
+  }, [devicesWithRanges, selectedPrefix, selectedRange, selectedTags, tagLogic, search, filters]);
   
   // Sort devices within groups
   const sortDevices = (deviceList) => {
@@ -329,11 +373,12 @@ export function DevicesPage() {
 
   const handleRefresh = () => {
     refetchDevices();
+    refetchPrefixes();
     refetchRanges();
     refetchTags();
   };
 
-  const loading = devicesLoading || rangesLoading || tagsLoading;
+  const loading = devicesLoading || prefixesLoading || rangesLoading || tagsLoading;
 
   // Device type icon
   const DeviceTypeIcon = ({ type }) => {
@@ -357,6 +402,16 @@ export function DevicesPage() {
     );
   };
 
+  // Count devices per prefix for sidebar
+  const prefixDeviceCounts = useMemo(() => {
+    const counts = {};
+    devicesWithRanges.forEach(d => {
+      const prefixId = d.network_prefix_id || 'unassigned';
+      counts[prefixId] = (counts[prefixId] || 0) + 1;
+    });
+    return counts;
+  }, [devicesWithRanges]);
+
   // Count devices per range for sidebar
   const rangeDeviceCounts = useMemo(() => {
     const counts = {};
@@ -367,9 +422,61 @@ export function DevicesPage() {
     return counts;
   }, [devicesWithRanges]);
 
-  // Sidebar content for IP ranges and tags
+  // Sidebar content for IP prefixes, ranges, and tags
   const sidebarContent = (
     <>
+      {/* IP Prefixes */}
+      <div className="mb-4">
+        <div className="px-4 py-1">
+          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+            IP Prefixes
+          </span>
+        </div>
+        <div className="mt-1 space-y-0.5 max-h-64 overflow-y-auto">
+          {ipPrefixes.map(prefix => (
+            <button
+              key={prefix.id}
+              onClick={() => {
+                setSelectedPrefix(selectedPrefix === prefix.id ? null : prefix.id);
+                setSelectedRange(null); // Clear range filter when selecting prefix
+              }}
+              className={cn(
+                "w-full flex items-center gap-3 px-4 py-2 text-sm transition-colors",
+                selectedPrefix === prefix.id
+                  ? "bg-blue-50 text-blue-700 border-r-2 border-blue-600 font-medium"
+                  : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+              )}
+            >
+              {selectedPrefix === prefix.id ? (
+                <Network className="w-4 h-4" />
+              ) : (
+                <Network className="w-4 h-4 text-gray-400" />
+              )}
+              <span className="truncate font-mono text-xs">{prefix.prefix}</span>
+              <span className="ml-auto text-xs text-gray-400">{prefixDeviceCounts[prefix.id] || 0}</span>
+            </button>
+          ))}
+          {prefixDeviceCounts['unassigned'] > 0 && (
+            <button
+              onClick={() => {
+                setSelectedPrefix(selectedPrefix === 'unassigned' ? null : 'unassigned');
+                setSelectedRange(null);
+              }}
+              className={cn(
+                "w-full flex items-center gap-3 px-4 py-2 text-sm transition-colors",
+                selectedPrefix === 'unassigned'
+                  ? "bg-blue-50 text-blue-700 border-r-2 border-blue-600 font-medium"
+                  : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+              )}
+            >
+              <Network className="w-4 h-4 text-gray-400" />
+              <span className="truncate">No Prefix</span>
+              <span className="ml-auto text-xs text-gray-400">{prefixDeviceCounts['unassigned']}</span>
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* IP Ranges */}
       <div className="mb-4">
         <div className="px-4 py-1">
@@ -381,7 +488,10 @@ export function DevicesPage() {
           {ipRanges.map(range => (
             <button
               key={range.id}
-              onClick={() => setSelectedRange(selectedRange === range.id ? null : range.id)}
+              onClick={() => {
+                setSelectedRange(selectedRange === range.id ? null : range.id);
+                setSelectedPrefix(null); // Clear prefix filter when selecting range
+              }}
               className={cn(
                 "w-full flex items-center gap-3 px-4 py-2 text-sm transition-colors",
                 selectedRange === range.id
@@ -475,6 +585,15 @@ export function DevicesPage() {
             ? `${filteredDevices.length} devices from NetBox`
             : "NetBox not connected"
         }
+        actions={
+          <button
+            onClick={() => navigate('/inventory/prtg-import')}
+            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            title="Import from PRTG to NetBox"
+          >
+            <Download className="w-5 h-5" />
+          </button>
+        }
       />
 
       <div className="p-4 space-y-4">
@@ -506,10 +625,15 @@ export function DevicesPage() {
               </div>
               
               {/* Active filters indicator */}
-              {(selectedRange || selectedTags.length > 0 || filters.role || filters.platform || filters.site || filters.status) && (
+              {(selectedPrefix || selectedRange || selectedTags.length > 0 || filters.role || filters.platform || filters.site || filters.status) && (
                 <>
                   <div className="h-5 w-px bg-gray-300" />
                   <div className="flex items-center gap-2 flex-wrap">
+                    {selectedPrefix && (
+                      <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
+                        Prefix: {selectedPrefix === 'unassigned' ? 'No Prefix' : ipPrefixes.find(p => p.id === parseInt(selectedPrefix))?.prefix || selectedPrefix}
+                      </span>
+                    )}
                     {selectedRange && (
                       <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
                         Range: {selectedRange === 'unassigned' ? 'Unassigned' : ipRanges.find(r => r.id === parseInt(selectedRange))?.display || selectedRange}
@@ -542,6 +666,7 @@ export function DevicesPage() {
                     )}
                     <button
                       onClick={() => {
+                        setSelectedPrefix(null);
                         setSelectedRange(null);
                         setSelectedTags([]);
                         setFilters({ role: '', platform: '', site: '', status: '' });

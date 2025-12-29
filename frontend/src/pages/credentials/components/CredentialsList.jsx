@@ -4,12 +4,45 @@
  * Displays a table of credentials with actions.
  */
 
-import React from 'react';
-import { KeyRound, History, Pencil, Trash2 } from 'lucide-react';
-import { cn } from '../../../lib/utils';
+import React, { useState, useEffect } from 'react';
+import { KeyRound, History, Pencil, Trash2, Server, ChevronDown, ChevronRight } from 'lucide-react';
+import { cn, fetchApi } from '../../../lib/utils';
 import { CREDENTIAL_TYPES, STATUS_COLORS } from './constants';
 
-export function CredentialsList({ credentials, onEdit, onDelete, onViewHistory, isExpiring }) {
+function DeviceAssociations({ credentialId, onClick }) {
+  const [devices, setDevices] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDevices = async () => {
+      try {
+        const response = await fetchApi(`/api/credentials/${credentialId}/devices`);
+        setDevices(response.data?.devices || []);
+      } catch (err) {
+        console.error('Error fetching device associations:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDevices();
+  }, [credentialId]);
+
+  if (loading) {
+    return <span className="text-xs text-gray-400">...</span>;
+  }
+
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 hover:underline"
+    >
+      <Server className="w-3 h-3" />
+      <span>{devices.length}</span>
+    </button>
+  );
+}
+
+export function CredentialsList({ credentials, onEdit, onDelete, onViewHistory, onManageDevices, isExpiring }) {
   if (credentials.length === 0) {
     return (
       <div className="text-center py-12 bg-white rounded-lg border">
@@ -29,9 +62,9 @@ export function CredentialsList({ credentials, onEdit, onDelete, onViewHistory, 
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Name</th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Type</th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Username</th>
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Devices</th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Expiration</th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Last Used</th>
             <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Actions</th>
           </tr>
         </thead>
@@ -56,6 +89,9 @@ export function CredentialsList({ credentials, onEdit, onDelete, onViewHistory, 
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-600">
                   {cred.username || '-'}
+                </td>
+                <td className="px-4 py-3">
+                  <DeviceAssociations credentialId={cred.id} onClick={onManageDevices ? () => onManageDevices(cred) : undefined} />
                 </td>
                 <td className="px-4 py-3">
                   <span className={cn("px-2 py-1 rounded-full text-xs font-medium", STATUS_COLORS[cred.status] || STATUS_COLORS.active)}>
@@ -86,7 +122,7 @@ export function CredentialsList({ credentials, onEdit, onDelete, onViewHistory, 
                     ? new Date(cred.last_used_at).toLocaleDateString()
                     : 'Never'}
                 </td>
-                <td className="px-4 py-3 text-right">
+                <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center justify-end gap-1">
                     <button
                       onClick={() => onViewHistory(cred)}

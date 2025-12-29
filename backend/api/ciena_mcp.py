@@ -133,14 +133,6 @@ def test_connection():
     service = CienaMCPService(url=url, username=username, password=password, verify_ssl=verify_ssl)
     result = service.test_connection()
     
-    if result['success']:
-        # Also get summary counts
-        try:
-            summary = service.get_device_summary()
-            result['summary'] = summary
-        except:
-            pass
-    
     return jsonify(success_response(result))
 
 

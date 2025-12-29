@@ -450,6 +450,88 @@ def assign_credential_to_device(ip_address):
         return jsonify(error_response(str(e))), 500
 
 
+@credentials_bp.route('/<int:credential_id>/devices', methods=['GET'])
+def get_credential_devices(credential_id):
+    """
+    Get all devices associated with a credential.
+    
+    Returns list of device IPs that have this credential assigned,
+    enriched with NetBox device info when available.
+    """
+    try:
+        service = get_credential_service()
+        device_assignments = service.get_devices_for_credential(credential_id)
+        
+        # Enrich with NetBox device info if available
+        try:
+            from ..services.netbox_service import NetBoxService
+            from ..api.netbox import get_netbox_settings
+            
+            settings = get_netbox_settings()
+            netbox = NetBoxService(
+                url=settings.get('url', ''),
+                token=settings.get('token', ''),
+                verify_ssl=settings.get('verify_ssl', 'true').lower() == 'true'
+            )
+            
+            if netbox.is_configured:
+                # Get all NetBox devices and create IP lookup
+                result = netbox.get_devices(limit=10000)
+                netbox_devices = result.get('results', [])
+                
+                ip_to_device = {}
+                for d in netbox_devices:
+                    primary_ip = d.get('primary_ip4') or d.get('primary_ip') or {}
+                    ip = primary_ip.get('address', '').split('/')[0] if primary_ip else None
+                    if ip:
+                        ip_to_device[ip] = {
+                            'netbox_id': d.get('id'),
+                            'hostname': d.get('name', ''),
+                            'site': d.get('site', {}).get('name', '') if d.get('site') else '',
+                            'role': d.get('role', {}).get('name', '') if d.get('role') else '',
+                            'status': d.get('status', {}).get('value', 'unknown'),
+                        }
+                
+                # Enrich assignments with NetBox data
+                for assignment in device_assignments:
+                    ip = assignment.get('ip_address')
+                    if ip and ip in ip_to_device:
+                        assignment['netbox_device'] = ip_to_device[ip]
+                    else:
+                        assignment['netbox_device'] = None
+        except Exception as e:
+            logger.warning(f"Could not enrich with NetBox data: {e}")
+        
+        return jsonify(success_response(data={'devices': device_assignments}))
+    except Exception as e:
+        logger.error(f"Error getting credential devices: {e}")
+        return jsonify(error_response(str(e))), 500
+
+
+@credentials_bp.route('/devices/<ip_address>/unassign', methods=['POST'])
+def unassign_credential_from_device(ip_address):
+    """Remove a credential assignment from a device."""
+    data = request.get_json()
+    
+    if not data or not data.get('credential_id'):
+        return jsonify(error_response('credential_id is required')), 400
+    
+    try:
+        service = get_credential_service()
+        success = service.unassign_from_device(
+            credential_id=data['credential_id'],
+            ip_address=ip_address
+        )
+        
+        if not success:
+            return jsonify(error_response('Failed to unassign credential')), 400
+        
+        return jsonify(success_response(message='Credential unassigned from device'))
+    except Exception as e:
+        logger.error(f"Error unassigning credential: {e}")
+        return jsonify(error_response(str(e))), 500
+
+
 # =============================================================================
 # USAGE LOG (Legacy - use /audit for comprehensive logging)
 # =============================================================================

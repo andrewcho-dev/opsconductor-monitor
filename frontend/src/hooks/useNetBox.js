@@ -341,6 +341,50 @@ export function useNetBoxIPRanges() {
   return { ranges, loading, error, refetch: fetchRanges };
 }
 
+/**
+ * Hook to fetch IP prefixes from NetBox IPAM
+ */
+export function useNetBoxPrefixes() {
+  const [prefixes, setPrefixes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const fetchPrefixes = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await fetchApi("/api/netbox/prefixes");
+      
+      const transformedPrefixes = (response.data || []).map(prefix => ({
+        id: prefix.id,
+        prefix: prefix.prefix,
+        display: prefix.display,
+        description: prefix.description,
+        status: prefix.status?.value,
+        role: prefix.role?.name,
+        vrf: prefix.vrf?.name,
+        site: prefix.site?.name,
+        tenant: prefix.tenant?.name,
+        is_pool: prefix.is_pool,
+        _netbox: prefix,
+      }));
+      
+      setPrefixes(transformedPrefixes);
+      setError(null);
+    } catch (err) {
+      setError(err.message);
+      setPrefixes([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPrefixes();
+  }, [fetchPrefixes]);
+
+  return { prefixes, loading, error, refetch: fetchPrefixes };
+}
+
 export default {
   useNetBoxStatus,
   useNetBoxDevices,
@@ -348,4 +392,5 @@ export default {
   useNetBoxLookups,
   useNetBoxTags,
   useNetBoxIPRanges,
+  useNetBoxPrefixes,
 };

@@ -12,3 +12,4 @@ export { AuditLogView } from './AuditLogView';
 export { CredentialModal } from './CredentialModal';
 export { CredentialHistoryModal } from './CredentialHistoryModal';
 export { EnterpriseAuthConfigsList, EnterpriseAuthUsersList } from './EnterpriseAuthConfigsList';
+export { DeviceAssignmentPanel } from './DeviceAssignmentPanel';

@@ -24,6 +24,7 @@ import {
   EnterpriseAuthConfigsList,
   EnterpriseAuthUsersList,
 } from './components';
+import { DeviceSelectionModal } from '../../components/common/DeviceSelectionModal';
 
 export function CredentialVaultPage() {
   const location = useLocation();
@@ -52,6 +53,8 @@ export function CredentialVaultPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingCredential, setEditingCredential] = useState(null);
   const [selectedCredential, setSelectedCredential] = useState(null);
+  const [deviceModalCredential, setDeviceModalCredential] = useState(null);
+  const [assignedDeviceIps, setAssignedDeviceIps] = useState([]);
 
   useEffect(() => {
     setActiveView(getActiveView());
@@ -139,6 +142,49 @@ export function CredentialVaultPage() {
     } catch (err) {
       alert('Error deleting credential: ' + err.message);
     }
+  };
+
+  const openDeviceModal = async (credential) => {
+    setDeviceModalCredential(credential);
+    try {
+      const res = await fetchApi(`/api/credentials/${credential.id}/devices`);
+      const ips = (res.data?.devices || []).map(d => d.ip_address);
+      setAssignedDeviceIps(ips);
+    } catch (err) {
+      console.error('Error loading assigned devices:', err);
+      setAssignedDeviceIps([]);
+    }
+  };
+
+  const handleDeviceSave = async (selectedIps) => {
+    if (!deviceModalCredential) return;
+    
+    const currentIps = new Set(assignedDeviceIps);
+    const newIps = new Set(selectedIps);
+    
+    // Find IPs to add and remove
+    const toAdd = selectedIps.filter(ip => !currentIps.has(ip));
+    const toRemove = assignedDeviceIps.filter(ip => !newIps.has(ip));
+    
+    // Process additions
+    for (const ip of toAdd) {
+      await fetchApi(`/api/credentials/devices/${ip}/assign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential_id: deviceModalCredential.id }),
+      });
+    }
+    
+    // Process removals
+    for (const ip of toRemove) {
+      await fetchApi(`/api/credentials/devices/${ip}/unassign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential_id: deviceModalCredential.id }),
+      });
+    }
+    
+    loadData();
   };
 
   const filteredCredentials = credentials.filter(cred => {
@@ -272,6 +318,7 @@ export function CredentialVaultPage() {
             onEdit={(cred) => { setEditingCredential(cred); setShowModal(true); }}
             onDelete={handleDelete}
             onViewHistory={(cred) => setSelectedCredential(cred)}
+            onManageDevices={openDeviceModal}
             isExpiring={activeView === 'expiring'}
           />
         ) : activeView === 'groups' ? (
@@ -301,6 +348,15 @@ export function CredentialVaultPage() {
           onClose={() => setSelectedCredential(null)}
         />
       )}
+
+      {/* Device Selection Modal */}
+      <DeviceSelectionModal
+        isOpen={!!deviceModalCredential}
+        onClose={() => setDeviceModalCredential(null)}
+        onSave={handleDeviceSave}
+        initialSelected={assignedDeviceIps}
+        title={deviceModalCredential ? `Devices for ${deviceModalCredential.name}` : 'Select Devices'}
+      />
     </PageLayout>
   );
 }
