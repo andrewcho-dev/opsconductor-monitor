@@ -445,6 +445,152 @@ class CienaMCPService:
         result = self._request('GET', '/watcher/api/v1/watchers')
         return result if isinstance(result, list) else result.get('items', [])
     
+    # ==================== PERFORMANCE METRICS (Real-time PM via nmserver) ====================
+    
+    def get_management_session(self, device_id: str) -> Optional[Dict]:
+        """
+        Get management session for a device (needed for PM queries).
+        
+        Args:
+            device_id: Network construct ID
+        
+        Returns:
+            Management session data or None
+        """
+        try:
+            # First get the device to find its IP
+            device = self._request('GET', f'/nsi/api/v4/networkConstructs/{device_id}')
+            if not device or 'data' not in device:
+                return None
+            
+            attrs = device['data'].get('attributes', {})
+            ip_address = attrs.get('ipAddress')
+            
+            if not ip_address:
+                return None
+            
+            # Search for management session by IP
+            sessions = self._request('GET', f'/discovery/api/v3/managementSessions?limit=500')
+            for session in sessions.get('data', []):
+                session_attrs = session.get('attributes', {})
+                if session_attrs.get('ipAddress') == ip_address:
+                    return {
+                        'session_id': session.get('id'),
+                        'device_name': session_attrs.get('name'),
+                        'ip_address': ip_address,
+                        'type_group': session_attrs.get('typeGroup'),
+                        'resource_type': session_attrs.get('resourceType'),
+                        'software_version': attrs.get('softwareVersion'),
+                        'device_type': attrs.get('deviceType'),
+                        'nc_id': device_id,
+                    }
+            
+            return None
+            
+        except CienaMCPError as e:
+            logger.warning(f"Failed to get management session for {device_id}: {e}")
+            return None
+    
+    def get_realtime_pm(self, device_id: str, port_number: str) -> Optional[Dict]:
+        """
+        Get real-time performance metrics for a specific port.
+        
+        Args:
+            device_id: Network construct ID (e.g., 'cebcc6a3-7232-3556-8e75-0c68d82f6b05')
+            port_number: Port number (e.g., '21', '22')
+        
+        Returns:
+            Dict with traffic statistics or None
+        """
+        try:
+            # Get management session info
+            session = self.get_management_session(device_id)
+            if not session:
+                logger.warning(f"No management session found for device {device_id}")
+                return None
+            
+            # Build the PM query URL
+            from urllib.parse import quote
+            params = {
+                'instanceName': port_number,
+                'typegroup': session['type_group'],
+                'sessionid': session['session_id'],
+                'softwareVersion': session['software_version'],
+                'ncid': device_id,
+                'deviceType': session['device_type'],
+                'neName': session['device_name'],
+                'resourceType': session['resource_type'],
+            }
+            
+            query = '&'.join(f"{k}={quote(str(v))}" for k, v in params.items())
+            result = self._request('GET', f'/nmserver/api/v1/nes/pm/realtimepm/values?{query}')
+            
+            # Parse the response
+            pm_data = result.get('realtimepmfixedtablevalues', {}).get('data', [])
+            if not pm_data:
+                return None
+            
+            json_data = pm_data[0].get('attributes', {}).get('jsondata', [])
+            if not json_data:
+                return None
+            
+            # Return both current bin and 24hr bin data
+            stats = {
+                'port': port_number,
+                'device_name': session['device_name'],
+                'device_ip': session['ip_address'],
+            }
+            
+            for entry in json_data:
+                bin_type = entry.get('bin', '')
+                prefix = 'current_' if 'Current bin' == bin_type else '24hr_' if '24 hour' in bin_type else ''
+                
+                if prefix:
+                    # Parse numeric values (remove commas)
+                    def parse_num(val):
+                        if val is None:
+                            return 0
+                        return int(str(val).replace(',', '')) if val else 0
+                    
+                    stats[f'{prefix}rx_bytes'] = parse_num(entry.get('rxBytes'))
+                    stats[f'{prefix}tx_bytes'] = parse_num(entry.get('txBytes'))
+                    stats[f'{prefix}rx_pkts'] = parse_num(entry.get('rxPkts'))
+                    stats[f'{prefix}tx_pkts'] = parse_num(entry.get('txPkts'))
+                    stats[f'{prefix}rx_errors'] = parse_num(entry.get('rxInErrorPkts'))
+                    stats[f'{prefix}tx_errors'] = parse_num(entry.get('txLCheckErrorPkts'))
+                    stats[f'{prefix}rx_drops'] = parse_num(entry.get('rxDropPkts'))
+                    stats[f'{prefix}rx_discards'] = parse_num(entry.get('rxDiscardPkts'))
+                    stats[f'{prefix}collection_time'] = entry.get('collectionStartDateTime')
+                    stats[f'{prefix}datetime'] = entry.get('datetime')
+            
+            return stats
+            
+        except CienaMCPError as e:
+            logger.error(f"Failed to get real-time PM for {device_id} port {port_number}: {e}")
+            return None
+    
+    def get_all_port_stats(self, device_id: str, port_numbers: List[str] = None) -> List[Dict]:
+        """
+        Get real-time PM stats for multiple ports on a device.
+        
+        Args:
+            device_id: Network construct ID
+            port_numbers: List of port numbers to query (default: 1-24)
+        
+        Returns:
+            List of port statistics
+        """
+        if port_numbers is None:
+            port_numbers = [str(i) for i in range(1, 25)]
+        
+        stats = []
+        for port in port_numbers:
+            pm = self.get_realtime_pm(device_id, port)
+            if pm and (pm.get('current_rx_bytes', 0) > 0 or pm.get('current_tx_bytes', 0) > 0):
+                stats.append(pm)
+        
+        return stats
+    
     # ==================== SYNC TO NETBOX ====================
     
     def sync_devices_to_netbox(self, netbox_service, site_id: int = None, 

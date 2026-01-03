@@ -31,54 +31,34 @@ import { cn, fetchApi } from "../lib/utils";
 
 // Interface Metrics Panel Component
 function InterfaceMetricsPanel({ deviceIp, interfaceName, timeRange, onClose }) {
-  const [trafficMetrics, setTrafficMetrics] = useState([]);
+  const [mcpTraffic, setMcpTraffic] = useState(null);
   const [opticalMetrics, setOpticalMetrics] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Extract port number from interface name (e.g., "21" from "21" or "Port 21" or "port21")
   const portNum = interfaceName.replace(/\D/g, '');
-  // Ciena uses ifIndex = 10000 + port number for physical ports
-  const possibleIfIndexes = [
-    parseInt(portNum),           // Direct match (e.g., 21)
-    10000 + parseInt(portNum),   // Ciena format (e.g., 10021)
-  ].filter(n => !isNaN(n));
 
   useEffect(() => {
     const loadMetrics = async () => {
       setLoading(true);
       try {
-        // Load traffic metrics - match by interface_index (exact) or port number in name (fallback)
-        const trafficRes = await fetchApi(
-          `/api/metrics/interface?device_ip=${encodeURIComponent(deviceIp)}&hours=${timeRange}&limit=500`
-        );
-        const trafficData = (trafficRes.metrics || []).filter(m => {
-          // First try exact match by interface_index
-          if (m.interface_index && possibleIfIndexes.includes(parseInt(m.interface_index))) {
-            return true;
+        // Load real-time traffic from MCP (Ciena BluePlanet)
+        try {
+          const mcpRes = await fetchApi(
+            `/api/mcp/pm/by-ip/${encodeURIComponent(deviceIp)}/port/${portNum}`
+          );
+          if (mcpRes.success && mcpRes.data) {
+            setMcpTraffic(mcpRes.data);
           }
-          // Fallback: check if interface name ends with the port number
-          const mName = m.interface_name || '';
-          return mName.endsWith(` ${portNum}`) || mName === portNum || mName === `port${portNum}`;
-        });
-        setTrafficMetrics(trafficData.map(m => ({
-          timestamp: new Date(m.recorded_at).getTime(),
-          time: new Date(m.recorded_at).toLocaleString(),
-          rxBytes: parseInt(m.rx_bytes) || 0,
-          txBytes: parseInt(m.tx_bytes) || 0,
-          rxErrors: parseInt(m.rx_errors) || 0,
-          txErrors: parseInt(m.tx_errors) || 0,
-        })));
+        } catch (mcpErr) {
+          console.log("MCP PM not available for this device:", mcpErr);
+        }
 
-        // Load optical metrics - match by interface_index or port number
+        // Load optical metrics from SNMP polling
         const opticalRes = await fetchApi(
           `/api/metrics/optical?device_ip=${encodeURIComponent(deviceIp)}&hours=${timeRange}`
         );
         const opticalData = (opticalRes.metrics || []).filter(m => {
-          // First try exact match by interface_index
-          if (m.interface_index && possibleIfIndexes.includes(parseInt(m.interface_index))) {
-            return true;
-          }
-          // Fallback: check if interface name ends with the port number
           const mName = m.interface_name || '';
           return mName.endsWith(portNum) || mName === `port${portNum}`;
         });
@@ -97,41 +77,16 @@ function InterfaceMetricsPanel({ deviceIp, interfaceName, timeRange, onClose }) 
     loadMetrics();
   }, [deviceIp, portNum, timeRange]);
 
-  // Calculate port utilization % between consecutive samples
-  // Port speed: assume 1000 Mbps for copper (ports 1-20), 10000 Mbps for optical (ports 21+)
-  const portSpeed = parseInt(portNum) >= 21 ? 10000 : 1000; // Mbps
-  
-  // Sort data chronologically and calculate utilization at each poll
-  const sortedMetrics = [...trafficMetrics].sort((a, b) => a.timestamp - b.timestamp);
-  const utilizationData = sortedMetrics.length > 1 ? sortedMetrics.slice(1).map((m, i) => {
-    const prev = sortedMetrics[i];
-    const timeDiff = (m.timestamp - prev.timestamp) / 1000; // seconds
-    if (timeDiff <= 0 || timeDiff > 600) return null; // Skip if > 10 min gap
-    
-    // Calculate bytes transferred in this interval
-    let rxDelta = m.rxBytes - prev.rxBytes;
-    let txDelta = m.txBytes - prev.txBytes;
-    
-    // Skip counter wraps
-    if (rxDelta < 0 || txDelta < 0) return null;
-    
-    // Convert to Mbps: (bytes * 8) / (seconds * 1,000,000)
-    const rxMbps = (rxDelta * 8) / (timeDiff * 1000000);
-    const txMbps = (txDelta * 8) / (timeDiff * 1000000);
-    
-    // Calculate utilization as % of port speed
-    const rxUtil = Math.min(100, (rxMbps / portSpeed) * 100);
-    const txUtil = Math.min(100, (txMbps / portSpeed) * 100);
-    
-    return {
-      timestamp: m.timestamp,
-      time: m.time,
-      rxUtil: parseFloat(rxUtil.toFixed(1)),
-      txUtil: parseFloat(txUtil.toFixed(1)),
-    };
-  }).filter(Boolean) : [];
+  // Format bytes to human readable
+  const formatBytes = (bytes) => {
+    if (!bytes || bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
 
-  const hasTraffic = utilizationData.length > 0;
+  const hasTraffic = mcpTraffic !== null;
   const hasOptical = opticalMetrics.length > 0;
 
   return (
@@ -212,62 +167,88 @@ function InterfaceMetricsPanel({ deviceIp, interfaceName, timeRange, onClose }) 
             </div>
           )}
 
-          {/* Port Utilization Chart */}
+          {/* Traffic Statistics from MCP */}
           {hasTraffic && (
             <div>
-              <h3 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+              <h3 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
                 <Activity className="w-4 h-4 text-blue-500" />
-                Port Utilization ({portSpeed >= 10000 ? '10G' : '1G'} port)
+                Traffic Statistics (Real-time from MCP)
               </h3>
-              <div className="h-48">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={utilizationData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                    <XAxis 
-                      dataKey="timestamp" 
-                      type="number"
-                      domain={['dataMin', 'dataMax']}
-                      tickFormatter={(ts) => new Date(ts).toLocaleTimeString()}
-                      stroke="#9ca3af"
-                      fontSize={11}
-                    />
-                    <YAxis 
-                      stroke="#9ca3af"
-                      fontSize={11}
-                      domain={[0, 100]}
-                      tickFormatter={(v) => `${v}%`}
-                      width={50}
-                    />
-                    <Tooltip 
-                      labelFormatter={(ts) => new Date(ts).toLocaleString()}
-                      formatter={(value, name) => [`${value}%`, name === 'rxUtil' ? 'RX Utilization' : 'TX Utilization']}
-                      contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
-                    />
-                    <Legend />
-                    <Line type="linear" dataKey="rxUtil" name="RX %" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} connectNulls />
-                    <Line type="linear" dataKey="txUtil" name="TX %" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} connectNulls />
-                  </LineChart>
-                </ResponsiveContainer>
+              
+              {/* Current 15-min bin */}
+              <div className="mb-4">
+                <p className="text-xs text-gray-500 mb-2">
+                  Current 15-min bin (since {mcpTraffic.current_collection_time})
+                </p>
+                <div className="grid grid-cols-4 gap-3 text-sm">
+                  <div className="bg-green-50 rounded-lg p-3">
+                    <p className="text-gray-500 text-xs">RX Bytes</p>
+                    <p className="font-semibold text-green-700">{formatBytes(mcpTraffic.current_rx_bytes)}</p>
+                  </div>
+                  <div className="bg-blue-50 rounded-lg p-3">
+                    <p className="text-gray-500 text-xs">TX Bytes</p>
+                    <p className="font-semibold text-blue-700">{formatBytes(mcpTraffic.current_tx_bytes)}</p>
+                  </div>
+                  <div className="bg-green-50 rounded-lg p-3">
+                    <p className="text-gray-500 text-xs">RX Packets</p>
+                    <p className="font-semibold text-green-700">{mcpTraffic.current_rx_pkts?.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-blue-50 rounded-lg p-3">
+                    <p className="text-gray-500 text-xs">TX Packets</p>
+                    <p className="font-semibold text-blue-700">{mcpTraffic.current_tx_pkts?.toLocaleString()}</p>
+                  </div>
+                </div>
               </div>
-              <div className="grid grid-cols-4 gap-4 mt-2 text-sm">
-                <div className="bg-gray-50 rounded-lg p-3">
-                  <p className="text-gray-500">Total RX</p>
-                  <p className="font-semibold">{(trafficMetrics[0]?.rxBytes / 1000000).toFixed(2)} MB</p>
+
+              {/* 24-hour totals */}
+              <div className="mb-4">
+                <p className="text-xs text-gray-500 mb-2">
+                  24-hour totals (since {mcpTraffic['24hr_collection_time']})
+                </p>
+                <div className="grid grid-cols-4 gap-3 text-sm">
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <p className="text-gray-500 text-xs">RX Bytes</p>
+                    <p className="font-semibold">{formatBytes(mcpTraffic['24hr_rx_bytes'])}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <p className="text-gray-500 text-xs">TX Bytes</p>
+                    <p className="font-semibold">{formatBytes(mcpTraffic['24hr_tx_bytes'])}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <p className="text-gray-500 text-xs">RX Packets</p>
+                    <p className="font-semibold">{mcpTraffic['24hr_rx_pkts']?.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <p className="text-gray-500 text-xs">TX Packets</p>
+                    <p className="font-semibold">{mcpTraffic['24hr_tx_pkts']?.toLocaleString()}</p>
+                  </div>
                 </div>
+              </div>
+
+              {/* Errors */}
+              <div className="grid grid-cols-4 gap-3 text-sm">
                 <div className="bg-gray-50 rounded-lg p-3">
-                  <p className="text-gray-500">Total TX</p>
-                  <p className="font-semibold">{(trafficMetrics[0]?.txBytes / 1000000).toFixed(2)} MB</p>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-3">
-                  <p className="text-gray-500">RX Errors</p>
-                  <p className={cn("font-semibold", trafficMetrics[0]?.rxErrors > 0 && "text-red-600")}>
-                    {trafficMetrics[0]?.rxErrors || 0}
+                  <p className="text-gray-500 text-xs">RX Errors</p>
+                  <p className={cn("font-semibold", mcpTraffic.current_rx_errors > 0 && "text-red-600")}>
+                    {mcpTraffic.current_rx_errors || 0}
                   </p>
                 </div>
                 <div className="bg-gray-50 rounded-lg p-3">
-                  <p className="text-gray-500">TX Errors</p>
-                  <p className={cn("font-semibold", trafficMetrics[0]?.txErrors > 0 && "text-red-600")}>
-                    {trafficMetrics[0]?.txErrors || 0}
+                  <p className="text-gray-500 text-xs">TX Errors</p>
+                  <p className={cn("font-semibold", mcpTraffic.current_tx_errors > 0 && "text-red-600")}>
+                    {mcpTraffic.current_tx_errors || 0}
+                  </p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-gray-500 text-xs">RX Drops</p>
+                  <p className={cn("font-semibold", mcpTraffic.current_rx_drops > 0 && "text-amber-600")}>
+                    {mcpTraffic.current_rx_drops || 0}
+                  </p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-gray-500 text-xs">RX Discards</p>
+                  <p className={cn("font-semibold", mcpTraffic.current_rx_discards > 0 && "text-amber-600")}>
+                    {mcpTraffic.current_rx_discards || 0}
                   </p>
                 </div>
               </div>

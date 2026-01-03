@@ -927,3 +927,99 @@ def sync_equipment_to_netbox():
     stats = mcp_service.sync_equipment_to_netbox(netbox_service)
     
     return jsonify(success_response(stats))
+
+
+# ==================== PERFORMANCE METRICS ====================
+
+@mcp_bp.route('/pm/<device_id>/port/<port_number>', methods=['GET'])
+def get_port_realtime_pm(device_id, port_number):
+    """
+    Get real-time performance metrics for a specific port from MCP.
+    
+    Args:
+        device_id: MCP network construct ID
+        port_number: Port number (e.g., '21', '22')
+    
+    Returns traffic stats including rx/tx bytes, packets, errors.
+    """
+    service = get_mcp_service()
+    
+    if not service.is_configured:
+        return jsonify(error_response('NOT_CONFIGURED', 'MCP is not configured')), 400
+    
+    try:
+        stats = service.get_realtime_pm(device_id, port_number)
+        
+        if not stats:
+            return jsonify(error_response('NOT_FOUND', f'No PM data for port {port_number}')), 404
+        
+        return jsonify(success_response(stats))
+    except Exception as e:
+        return jsonify(error_response('MCP_ERROR', str(e))), 500
+
+
+@mcp_bp.route('/pm/<device_id>/ports', methods=['GET'])
+def get_all_ports_pm(device_id):
+    """
+    Get real-time PM stats for all ports on a device.
+    
+    Args:
+        device_id: MCP network construct ID
+    
+    Query params:
+        ports: Comma-separated list of port numbers (default: 1-24)
+    """
+    ports_param = request.args.get('ports')
+    port_numbers = ports_param.split(',') if ports_param else None
+    
+    service = get_mcp_service()
+    
+    if not service.is_configured:
+        return jsonify(error_response('NOT_CONFIGURED', 'MCP is not configured')), 400
+    
+    try:
+        stats = service.get_all_port_stats(device_id, port_numbers)
+        
+        return jsonify(success_response({
+            'device_id': device_id,
+            'ports': stats,
+            'count': len(stats),
+        }))
+    except Exception as e:
+        return jsonify(error_response('MCP_ERROR', str(e))), 500
+
+
+@mcp_bp.route('/pm/by-ip/<device_ip>/port/<port_number>', methods=['GET'])
+def get_port_pm_by_ip(device_ip, port_number):
+    """
+    Get real-time PM for a port by device IP address.
+    
+    This is a convenience endpoint that looks up the MCP device ID by IP.
+    """
+    service = get_mcp_service()
+    
+    if not service.is_configured:
+        return jsonify(error_response('NOT_CONFIGURED', 'MCP is not configured')), 400
+    
+    try:
+        # Find device by IP
+        all_devices = service.get_all_devices()
+        device_id = None
+        
+        for device in all_devices:
+            attrs = device.get('attributes', {})
+            if attrs.get('ipAddress') == device_ip:
+                device_id = device.get('id')
+                break
+        
+        if not device_id:
+            return jsonify(error_response('NOT_FOUND', f'Device with IP {device_ip} not found in MCP')), 404
+        
+        stats = service.get_realtime_pm(device_id, port_number)
+        
+        if not stats:
+            return jsonify(error_response('NOT_FOUND', f'No PM data for port {port_number}')), 404
+        
+        return jsonify(success_response(stats))
+    except Exception as e:
+        return jsonify(error_response('MCP_ERROR', str(e))), 500
