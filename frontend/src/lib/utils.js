@@ -5,8 +5,8 @@ export function cn(...inputs) {
   return twMerge(clsx(inputs));
 }
 
-// API base URL - direct to Flask backend
-export const API_BASE = "http://192.168.10.50:5000";
+// API base URL - use relative path so it goes through Nginx proxy
+export const API_BASE = "";
 
 /**
  * Get the browser's timezone abbreviation (e.g., "PST", "EST") or UTC offset (e.g., "UTC-08:00")
