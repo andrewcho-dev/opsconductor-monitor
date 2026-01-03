@@ -231,8 +231,8 @@ function InterfaceMetricsPanel({ deviceIp, interfaceName, timeRange, onClose }) 
                       contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
                     />
                     <Legend />
-                    <Line type="stepAfter" dataKey="rxMbps" name="RX" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} />
-                    <Line type="stepAfter" dataKey="txMbps" name="TX" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} />
+                    <Line type="linear" dataKey="rxMbps" name="RX" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} connectNulls />
+                    <Line type="linear" dataKey="txMbps" name="TX" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} connectNulls />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
