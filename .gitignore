@@ -33,3 +33,4 @@ _legacy_html/
 
 # Config files with sensitive data
 config.json
+backups/
