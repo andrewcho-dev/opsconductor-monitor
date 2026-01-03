@@ -57,35 +57,89 @@ def poll_availability(self, device_filter: Optional[Dict] = None):
     Returns:
         Dict with poll statistics
     """
-    from ..services.polling_service import PollingService
-    from ..services.netbox_service import NetBoxService
-    from ..services.credential_service import CredentialService
+    from backend.database import DatabaseConnection
+    from ..services.async_snmp_poller import AsyncSNMPPoller, SNMPTarget, CommonOIDs
     
     async def _poll():
-        # Initialize services
-        netbox = NetBoxService()
-        credentials = CredentialService()
+        # Get devices from local cache
+        db = DatabaseConnection()
+        with db.cursor() as cursor:
+            query = """
+                SELECT device_ip, device_name, role_name, site_name
+                FROM netbox_device_cache
+                WHERE device_ip IS NOT NULL
+            """
+            params = []
+            if device_filter:
+                if device_filter.get('role'):
+                    query += " AND role_name = %s"
+                    params.append(device_filter['role'])
+                if device_filter.get('site'):
+                    query += " AND site_name = %s"
+                    params.append(device_filter['site'])
+            query += " LIMIT 500"  # Limit for performance
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
         
-        service = PollingService(
-            netbox_service=netbox,
-            credential_service=credentials,
-            max_concurrent=100,
-            batch_size=50,
-        )
+        if not rows:
+            logger.warning("No devices found for polling")
+            from datetime import datetime
+            return {
+                'job_name': 'poll_availability',
+                'started_at': datetime.utcnow().isoformat(),
+                'completed_at': datetime.utcnow().isoformat(),
+                'total_devices': 0,
+                'successful': 0,
+                'failed': 0,
+                'duration_seconds': 0,
+            }
         
-        result = await service.poll_availability(device_filter)
+        # Build SNMP targets
+        targets = [
+            SNMPTarget(
+                ip=str(row['device_ip']),
+                community='public',
+                device_type=row.get('role_name', 'unknown'),
+                site=row.get('site_name', ''),
+            )
+            for row in rows
+        ]
+        
+        logger.info(f"Polling availability for {len(targets)} devices")
+        
+        # Create poller and poll
+        poller = AsyncSNMPPoller(max_concurrent=100, batch_size=50)
+        from datetime import datetime
+        started_at = datetime.utcnow()
+        
+        results = await poller.poll_devices(targets, [CommonOIDs.SYS_UPTIME])
+        
+        completed_at = datetime.utcnow()
+        successful = sum(1 for r in results if r.success)
+        failed = len(results) - successful
+        
+        # Store results in availability_metrics
+        with db.cursor() as cursor:
+            for result in results:
+                status = 'up' if result.success else 'down'
+                latency = result.duration * 1000 if result.duration else None
+                cursor.execute("""
+                    INSERT INTO availability_metrics 
+                    (device_ip, ping_status, ping_latency_ms, snmp_status, snmp_response_ms, recorded_at)
+                    VALUES (%s, %s, %s, %s, %s, NOW())
+                """, (result.target.ip, status, latency, status, latency))
+            db.get_connection().commit()
+        
+        logger.info(f"Availability poll complete: {successful}/{len(targets)} successful")
         
         return {
-            'job_name': result.job_name,
-            'started_at': result.started_at.isoformat(),
-            'completed_at': result.completed_at.isoformat(),
-            'total_devices': result.total_devices,
-            'successful': result.successful,
-            'failed': result.failed,
-            'duration_seconds': result.duration_seconds,
-            'success_rate': result.stats.success_rate,
-            'queries_per_second': result.stats.queries_per_second,
-            'avg_latency_ms': result.stats.avg_duration * 1000,
+            'job_name': 'poll_availability',
+            'started_at': started_at.isoformat(),
+            'completed_at': completed_at.isoformat(),
+            'total_devices': len(targets),
+            'successful': successful,
+            'failed': failed,
+            'duration_seconds': (completed_at - started_at).total_seconds(),
         }
     
     try:
@@ -172,32 +226,124 @@ def poll_optical_power(self, device_filter: Optional[Dict] = None):
     Returns:
         Dict with poll statistics
     """
-    from ..services.polling_service import PollingService
-    from ..services.netbox_service import NetBoxService
-    from ..services.credential_service import CredentialService
+    from backend.database import DatabaseConnection
+    from ..services.async_snmp_poller import AsyncSNMPPoller, SNMPTarget, CommonOIDs
     
     async def _poll():
-        netbox = NetBoxService()
-        credentials = CredentialService()
+        # Get backbone switches from local cache
+        db = DatabaseConnection()
+        with db.cursor() as cursor:
+            query = """
+                SELECT device_ip, device_name, role_name, site_name
+                FROM netbox_device_cache
+                WHERE device_ip IS NOT NULL
+                AND role_name IN ('Backbone Switch', 'backbone-switch', 'Core Switch', 'core-switch')
+            """
+            params = []
+            if device_filter:
+                if device_filter.get('site'):
+                    query += " AND site_name = %s"
+                    params.append(device_filter['site'])
+            query += " LIMIT 100"
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
         
-        service = PollingService(
-            netbox_service=netbox,
-            credential_service=credentials,
-            max_concurrent=50,
-            batch_size=25,
-        )
+        if not rows:
+            logger.warning("No backbone switches found for optical polling")
+            from datetime import datetime
+            return {
+                'job_name': 'poll_optical',
+                'started_at': datetime.utcnow().isoformat(),
+                'completed_at': datetime.utcnow().isoformat(),
+                'total_devices': 0,
+                'successful': 0,
+                'failed': 0,
+                'duration_seconds': 0,
+            }
         
-        result = await service.poll_optical_power(device_filter)
+        # Build SNMP targets
+        targets = [
+            SNMPTarget(
+                ip=str(row['device_ip']),
+                community='public',
+                device_type=row.get('role_name', 'unknown'),
+                site=row.get('site_name', ''),
+            )
+            for row in rows
+        ]
+        
+        logger.info(f"Polling optical power for {len(targets)} backbone switches")
+        
+        # Create poller
+        poller = AsyncSNMPPoller(max_concurrent=50, batch_size=25)
+        from datetime import datetime
+        started_at = datetime.utcnow()
+        
+        successful = 0
+        failed = 0
+        
+        # Poll each device for optical power
+        for target in targets:
+            try:
+                # Get TX and RX power using GETBULK
+                tx_result = await poller.engine.get_bulk(
+                    target, CommonOIDs.CIENA_OPT_TX_POWER, max_repetitions=50
+                )
+                rx_result = await poller.engine.get_bulk(
+                    target, CommonOIDs.CIENA_OPT_RX_POWER, max_repetitions=50
+                )
+                
+                if tx_result.success or rx_result.success:
+                    successful += 1
+                    # Store optical metrics
+                    with db.cursor() as cursor:
+                        tx_values = tx_result.values if tx_result.success else {}
+                        rx_values = rx_result.values if rx_result.success else {}
+                        
+                        # Combine TX and RX by interface index
+                        all_indexes = set()
+                        for oid in tx_values.keys():
+                            all_indexes.add(int(oid.split('.')[-1]))
+                        for oid in rx_values.keys():
+                            all_indexes.add(int(oid.split('.')[-1]))
+                        
+                        for if_index in all_indexes:
+                            tx_oid = f"{CommonOIDs.CIENA_OPT_TX_POWER}.{if_index}"
+                            rx_oid = f"{CommonOIDs.CIENA_OPT_RX_POWER}.{if_index}"
+                            
+                            tx_power = tx_values.get(tx_oid)
+                            rx_power = rx_values.get(rx_oid)
+                            
+                            if tx_power is not None or rx_power is not None:
+                                # Convert to dBm (values in 0.01 dBm)
+                                tx_dbm = float(tx_power) / 100.0 if tx_power else None
+                                rx_dbm = float(rx_power) / 100.0 if rx_power else None
+                                
+                                cursor.execute("""
+                                    INSERT INTO optical_metrics 
+                                    (device_ip, interface_name, interface_index, tx_power, rx_power, recorded_at)
+                                    VALUES (%s, %s, %s, %s, %s, NOW())
+                                """, (target.ip, f'port{if_index}', if_index, tx_dbm, rx_dbm))
+                        
+                        db.get_connection().commit()
+                else:
+                    failed += 1
+                    
+            except Exception as e:
+                logger.error(f"Optical poll failed for {target.ip}: {e}")
+                failed += 1
+        
+        completed_at = datetime.utcnow()
+        logger.info(f"Optical poll complete: {successful}/{len(targets)} successful")
         
         return {
-            'job_name': result.job_name,
-            'started_at': result.started_at.isoformat(),
-            'completed_at': result.completed_at.isoformat(),
-            'total_devices': result.total_devices,
-            'successful': result.successful,
-            'failed': result.failed,
-            'duration_seconds': result.duration_seconds,
-            'success_rate': result.stats.success_rate,
+            'job_name': 'poll_optical',
+            'started_at': started_at.isoformat(),
+            'completed_at': completed_at.isoformat(),
+            'total_devices': len(targets),
+            'successful': successful,
+            'failed': failed,
+            'duration_seconds': (completed_at - started_at).total_seconds(),
         }
     
     try:

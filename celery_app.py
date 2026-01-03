@@ -23,7 +23,7 @@ def _make_celery() -> Celery:
         "opsconductor_monitor",
         broker=broker_url,
         backend=result_backend,
-        include=["backend.tasks.job_tasks"],
+        include=["backend.tasks.job_tasks", "backend.tasks.polling_tasks"],
     )
 
     # Basic sensible defaults; we can tune later.
@@ -58,6 +58,14 @@ def _make_celery() -> Celery:
             },
             "opsconductor-alerts-evaluate": {
                 "task": "opsconductor.alerts.evaluate",
+                "schedule": 60.0,  # Every minute
+            },
+            "opsconductor-poll-optical": {
+                "task": "polling.optical",
+                "schedule": 300.0,  # Every 5 minutes
+            },
+            "opsconductor-poll-availability": {
+                "task": "polling.availability",
                 "schedule": 60.0,  # Every minute
             },
         },
