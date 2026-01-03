@@ -375,13 +375,44 @@ class PollingService:
         return targets
     
     async def _store_result(self, result: SNMPResult):
-        """Store poll result in database."""
+        """Store availability poll result in database."""
         if self.db is None:
             return
         
-        # This would store to the appropriate metrics table
-        # Implementation depends on the specific metrics being collected
-        pass
+        try:
+            # Store availability metric
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(
+                self._executor,
+                self._store_availability_sync,
+                result,
+            )
+        except Exception as e:
+            logger.error(f"Failed to store availability result for {result.target.ip}: {e}")
+    
+    def _store_availability_sync(self, result: SNMPResult):
+        """Synchronous helper to store availability metric."""
+        conn = self.db.getconn()
+        try:
+            with conn.cursor() as cur:
+                # Determine status based on result
+                ping_status = 'up' if result.success else 'down'
+                latency_ms = result.duration * 1000 if result.duration else None
+                
+                cur.execute("""
+                    INSERT INTO availability_metrics 
+                    (device_ip, ping_status, ping_latency_ms, snmp_status, snmp_latency_ms, recorded_at)
+                    VALUES (%s, %s, %s, %s, %s, NOW())
+                """, (
+                    result.target.ip,
+                    ping_status,
+                    latency_ms,
+                    ping_status,  # SNMP status same as ping for this poll
+                    latency_ms,
+                ))
+                conn.commit()
+        finally:
+            self.db.putconn(conn)
     
     async def _store_interface_metrics(
         self,
@@ -392,9 +423,71 @@ class PollingService:
         if self.db is None:
             return
         
-        # Parse interface table values and store
-        # Implementation depends on database schema
-        pass
+        try:
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(
+                self._executor,
+                self._store_interface_metrics_sync,
+                device_ip,
+                values,
+            )
+        except Exception as e:
+            logger.error(f"Failed to store interface metrics for {device_ip}: {e}")
+    
+    def _store_interface_metrics_sync(self, device_ip: str, values: Dict[str, Any]):
+        """Synchronous helper to store interface metrics."""
+        conn = self.db.getconn()
+        try:
+            with conn.cursor() as cur:
+                # Parse interface table values
+                # OIDs are like: 1.3.6.1.2.1.2.2.1.X.Y where X is column, Y is ifIndex
+                interfaces = {}
+                
+                for oid, value in values.items():
+                    parts = oid.split('.')
+                    if len(parts) >= 2:
+                        column = int(parts[-2])
+                        if_index = int(parts[-1])
+                        
+                        if if_index not in interfaces:
+                            interfaces[if_index] = {}
+                        
+                        # Map column numbers to fields
+                        # 2=ifDescr, 10=ifInOctets, 16=ifOutOctets, 14=ifInErrors, 20=ifOutErrors
+                        if column == 2:
+                            interfaces[if_index]['name'] = str(value)
+                        elif column == 10:
+                            interfaces[if_index]['in_octets'] = int(value) if value else 0
+                        elif column == 16:
+                            interfaces[if_index]['out_octets'] = int(value) if value else 0
+                        elif column == 14:
+                            interfaces[if_index]['in_errors'] = int(value) if value else 0
+                        elif column == 20:
+                            interfaces[if_index]['out_errors'] = int(value) if value else 0
+                
+                # Insert metrics for each interface
+                for if_index, data in interfaces.items():
+                    if 'name' not in data:
+                        continue
+                    
+                    cur.execute("""
+                        INSERT INTO interface_metrics 
+                        (device_ip, interface_name, interface_index, in_octets, out_octets, 
+                         in_errors, out_errors, recorded_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
+                    """, (
+                        device_ip,
+                        data.get('name', f'if{if_index}'),
+                        if_index,
+                        data.get('in_octets', 0),
+                        data.get('out_octets', 0),
+                        data.get('in_errors', 0),
+                        data.get('out_errors', 0),
+                    ))
+                
+                conn.commit()
+        finally:
+            self.db.putconn(conn)
     
     async def _store_optical_metrics(
         self,
@@ -406,9 +499,67 @@ class PollingService:
         if self.db is None:
             return
         
-        # Parse optical values and store
-        # Implementation depends on database schema
-        pass
+        try:
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(
+                self._executor,
+                self._store_optical_metrics_sync,
+                device_ip,
+                tx_values,
+                rx_values,
+            )
+        except Exception as e:
+            logger.error(f"Failed to store optical metrics for {device_ip}: {e}")
+    
+    def _store_optical_metrics_sync(
+        self, 
+        device_ip: str, 
+        tx_values: Dict[str, Any], 
+        rx_values: Dict[str, Any]
+    ):
+        """Synchronous helper to store optical metrics."""
+        conn = self.db.getconn()
+        try:
+            with conn.cursor() as cur:
+                # Parse optical power values
+                # OIDs end with interface index
+                tx_power = {}
+                rx_power = {}
+                
+                for oid, value in tx_values.items():
+                    if_index = int(oid.split('.')[-1])
+                    # Convert to dBm (value is typically in 0.01 dBm units)
+                    tx_power[if_index] = float(value) / 100.0 if value else None
+                
+                for oid, value in rx_values.items():
+                    if_index = int(oid.split('.')[-1])
+                    rx_power[if_index] = float(value) / 100.0 if value else None
+                
+                # Insert metrics for each interface with optical data
+                all_indexes = set(tx_power.keys()) | set(rx_power.keys())
+                
+                for if_index in all_indexes:
+                    tx = tx_power.get(if_index)
+                    rx = rx_power.get(if_index)
+                    
+                    if tx is None and rx is None:
+                        continue
+                    
+                    cur.execute("""
+                        INSERT INTO optical_metrics 
+                        (device_ip, interface_name, interface_index, tx_power, rx_power, recorded_at)
+                        VALUES (%s, %s, %s, %s, %s, NOW())
+                    """, (
+                        device_ip,
+                        f'port{if_index}',
+                        if_index,
+                        tx,
+                        rx,
+                    ))
+                
+                conn.commit()
+        finally:
+            self.db.putconn(conn)
 
 
 # Celery task wrapper for async polling
