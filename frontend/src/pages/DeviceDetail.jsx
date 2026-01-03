@@ -47,6 +47,10 @@ export function DeviceDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
+  // Interfaces from NetBox
+  const [interfaces, setInterfaces] = useState([]);
+  const [interfacesLoading, setInterfacesLoading] = useState(false);
+  
   // Metrics data
   const [opticalMetrics, setOpticalMetrics] = useState([]);
   const [availabilityMetrics, setAvailabilityMetrics] = useState([]);
@@ -55,6 +59,7 @@ export function DeviceDetail() {
   // UI state
   const [timeRange, setTimeRange] = useState(24);
   const [activeTab, setActiveTab] = useState("overview");
+  const [selectedInterface, setSelectedInterface] = useState(null);
 
   // Load device from NetBox cache
   const loadDevice = useCallback(async () => {
@@ -146,6 +151,30 @@ export function DeviceDetail() {
     }
   }, [ip, timeRange]);
 
+  // Load interfaces from NetBox
+  const loadInterfaces = useCallback(async () => {
+    if (!device?.id) return;
+    
+    setInterfacesLoading(true);
+    try {
+      const res = await fetchApi(`/api/netbox/devices/${device.id}/interfaces`);
+      if (res.success && res.data) {
+        // Sort interfaces by name naturally
+        const sorted = res.data.sort((a, b) => {
+          const aNum = parseInt(a.name) || 0;
+          const bNum = parseInt(b.name) || 0;
+          if (aNum && bNum) return aNum - bNum;
+          return a.name.localeCompare(b.name);
+        });
+        setInterfaces(sorted);
+      }
+    } catch (err) {
+      console.error("Failed to load interfaces:", err);
+    } finally {
+      setInterfacesLoading(false);
+    }
+  }, [device?.id]);
+
   useEffect(() => {
     loadDevice();
   }, [loadDevice]);
@@ -154,13 +183,15 @@ export function DeviceDetail() {
     if (device) {
       loadOpticalMetrics();
       loadAvailabilityMetrics();
+      loadInterfaces();
     }
-  }, [device, timeRange, loadOpticalMetrics, loadAvailabilityMetrics]);
+  }, [device, timeRange, loadOpticalMetrics, loadAvailabilityMetrics, loadInterfaces]);
 
   const handleRefresh = () => {
     loadDevice();
     loadOpticalMetrics();
     loadAvailabilityMetrics();
+    loadInterfaces();
   };
 
   const openInNetBox = () => {
@@ -316,11 +347,79 @@ export function DeviceDetail() {
               <Zap className="w-5 h-5 text-purple-600" />
             </div>
             <div>
-              <p className="text-sm text-gray-500">Optical Readings</p>
-              <p className="text-xl font-bold">{opticalMetrics.length}</p>
+              <p className="text-sm text-gray-500">Interfaces</p>
+              <p className="text-xl font-bold">{interfaces.length}</p>
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Interfaces Section */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <Server className="w-5 h-5 text-gray-500" />
+          Interfaces / Ports ({interfaces.length})
+        </h2>
+        {interfacesLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <RefreshCw className="w-6 h-6 animate-spin text-gray-400" />
+          </div>
+        ) : interfaces.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="text-left py-3 px-4 font-medium text-gray-500">Name</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-500">Type</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-500">Status</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-500">Speed</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-500">Description</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-500">Connected To</th>
+                </tr>
+              </thead>
+              <tbody>
+                {interfaces.map((iface, i) => (
+                  <tr 
+                    key={iface.id || i} 
+                    className={cn(
+                      "border-b border-gray-100 hover:bg-gray-50 cursor-pointer",
+                      selectedInterface?.id === iface.id && "bg-blue-50"
+                    )}
+                    onClick={() => setSelectedInterface(iface)}
+                  >
+                    <td className="py-3 px-4 font-medium">{iface.name}</td>
+                    <td className="py-3 px-4 text-gray-600">{iface.type?.label || iface.type?.value || '—'}</td>
+                    <td className="py-3 px-4">
+                      <span className={cn(
+                        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
+                        iface.enabled ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
+                      )}>
+                        {iface.enabled ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                        {iface.enabled ? 'Enabled' : 'Disabled'}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-gray-600">
+                      {iface.speed ? `${(iface.speed / 1000).toFixed(0)} Gbps` : '—'}
+                    </td>
+                    <td className="py-3 px-4 text-gray-500 max-w-xs truncate">
+                      {iface.description || '—'}
+                    </td>
+                    <td className="py-3 px-4 text-gray-600">
+                      {iface.connected_endpoints?.length > 0 
+                        ? iface.connected_endpoints.map(e => e.device?.name || e.name).join(', ')
+                        : iface.link_peers?.length > 0
+                          ? iface.link_peers.map(p => p.device?.name || p.name).join(', ')
+                          : '—'
+                      }
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-gray-500 text-center py-4">No interfaces found in NetBox</p>
+        )}
       </div>
 
       {/* Time Range Selector */}

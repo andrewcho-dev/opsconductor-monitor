@@ -318,6 +318,32 @@ def get_device(device_id):
     return jsonify(success_response(device))
 
 
+@netbox_bp.route('/devices/<int:device_id>/interfaces', methods=['GET'])
+def get_device_interfaces(device_id):
+    """Get all interfaces for a device from NetBox."""
+    service = get_netbox_service()
+    
+    limit = int(request.args.get('limit', 200))
+    
+    try:
+        result = service._request('GET', 'dcim/interfaces/', params={
+            'device_id': device_id,
+            'limit': limit,
+        })
+        
+        interfaces = result.get('results', [])
+        
+        return jsonify({
+            'success': True,
+            'data': interfaces,
+            'count': result.get('count', len(interfaces)),
+        })
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Failed to fetch interfaces: {e}")
+        return jsonify(error_response('NETBOX_ERROR', str(e))), 502
+
+
 @netbox_bp.route('/devices', methods=['POST'])
 def create_device():
     """Create a device in NetBox."""
