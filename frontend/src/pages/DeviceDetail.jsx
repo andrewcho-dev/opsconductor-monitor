@@ -97,16 +97,26 @@ function InterfaceMetricsPanel({ deviceIp, interfaceName, timeRange, onClose }) 
     loadMetrics();
   }, [deviceIp, portNum, timeRange]);
 
-  // Calculate traffic rates between samples
-  const trafficRates = trafficMetrics.length > 1 ? trafficMetrics.slice(0, -1).map((m, i) => {
-    const next = trafficMetrics[i + 1];
-    const timeDiff = (m.timestamp - next.timestamp) / 1000;
+  // Calculate traffic rates between consecutive samples
+  // Data is sorted DESC (newest first), so we need to reverse for rate calculation
+  const sortedMetrics = [...trafficMetrics].sort((a, b) => a.timestamp - b.timestamp);
+  const trafficRates = sortedMetrics.length > 1 ? sortedMetrics.slice(1).map((m, i) => {
+    const prev = sortedMetrics[i];
+    const timeDiff = (m.timestamp - prev.timestamp) / 1000;
     if (timeDiff <= 0) return null;
+    // Calculate delta - handle counter wraps (when current < previous)
+    let rxDelta = m.rxBytes - prev.rxBytes;
+    let txDelta = m.txBytes - prev.txBytes;
+    // If negative, counter wrapped - skip this sample
+    if (rxDelta < 0) rxDelta = 0;
+    if (txDelta < 0) txDelta = 0;
+    // Convert bytes/sec to Mbps (megabits per second)
+    // bytes * 8 / 1,000,000 = Mbps
     return {
       timestamp: m.timestamp,
       time: m.time,
-      rxBps: Math.max(0, (m.rxBytes - next.rxBytes) / timeDiff),
-      txBps: Math.max(0, (m.txBytes - next.txBytes) / timeDiff),
+      rxMbps: (rxDelta * 8 / 1000000) / timeDiff,
+      txMbps: (txDelta * 8 / 1000000) / timeDiff,
     };
   }).filter(Boolean) : [];
 
@@ -196,7 +206,7 @@ function InterfaceMetricsPanel({ deviceIp, interfaceName, timeRange, onClose }) 
             <div>
               <h3 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                 <Activity className="w-4 h-4 text-blue-500" />
-                Traffic (bytes/sec)
+                Traffic (Mbps)
               </h3>
               <div className="h-48">
                 <ResponsiveContainer width="100%" height="100%">
@@ -213,16 +223,16 @@ function InterfaceMetricsPanel({ deviceIp, interfaceName, timeRange, onClose }) 
                     <YAxis 
                       stroke="#9ca3af"
                       fontSize={11}
-                      tickFormatter={(v) => v > 1000000 ? `${(v/1000000).toFixed(1)}M` : v > 1000 ? `${(v/1000).toFixed(0)}K` : v}
+                      tickFormatter={(v) => `${v.toFixed(1)}`}
                     />
                     <Tooltip 
                       labelFormatter={(ts) => new Date(ts).toLocaleString()}
-                      formatter={(value) => [`${(value/1000).toFixed(1)} KB/s`, '']}
+                      formatter={(value) => [`${value.toFixed(2)} Mbps`, '']}
                       contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
                     />
                     <Legend />
-                    <Area type="monotone" dataKey="rxBps" name="RX" stroke="#10b981" fill="#d1fae5" strokeWidth={2} />
-                    <Area type="monotone" dataKey="txBps" name="TX" stroke="#3b82f6" fill="#dbeafe" strokeWidth={2} />
+                    <Area type="monotone" dataKey="rxMbps" name="RX" stroke="#10b981" fill="#d1fae5" strokeWidth={2} />
+                    <Area type="monotone" dataKey="txMbps" name="TX" stroke="#3b82f6" fill="#dbeafe" strokeWidth={2} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
