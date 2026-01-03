@@ -23,6 +23,8 @@ from .ciena_snmp import snmp_bp
 from .eaton_snmp import eaton_snmp_bp
 from .device_importer import device_importer_bp
 from .prtg_netbox_import import prtg_netbox_import_bp
+from .metrics import metrics_bp
+from .health import health_bp
 
 __all__ = [
     'devices_bp',
@@ -46,6 +48,8 @@ __all__ = [
     'auth_bp',
     'netbox_bp',
     'prtg_bp',
+    'metrics_bp',
+    'health_bp',
     'register_blueprints',
 ]
 
@@ -88,3 +92,7 @@ def register_blueprints(app):
     app.register_blueprint(eaton_snmp_bp)
     app.register_blueprint(device_importer_bp)
     app.register_blueprint(prtg_netbox_import_bp)
+    
+    # Metrics and health blueprints
+    app.register_blueprint(metrics_bp)
+    app.register_blueprint(health_bp)
