@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   CheckCircle,
   XCircle,
+  ChevronDown,
 } from "lucide-react";
 import { PageHeader } from "../components/layout";
 import {
@@ -32,8 +33,10 @@ import { cn, fetchApi } from "../lib/utils";
 // Interface Metrics Panel Component
 function InterfaceMetricsPanel({ deviceIp, interfaceName, timeRange, onClose }) {
   const [mcpTraffic, setMcpTraffic] = useState(null);
+  const [portStatus, setPortStatus] = useState(null);
   const [opticalMetrics, setOpticalMetrics] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [trafficExpanded, setTrafficExpanded] = useState(false);
 
   // Extract port number from interface name (e.g., "21" from "21" or "Port 21" or "port21")
   const portNum = interfaceName.replace(/\D/g, '');
@@ -42,6 +45,21 @@ function InterfaceMetricsPanel({ deviceIp, interfaceName, timeRange, onClose }) 
     const loadMetrics = async () => {
       setLoading(true);
       try {
+        // Load port operational status from MCP
+        try {
+          const statusRes = await fetchApi(
+            `/api/mcp/ports/by-ip/${encodeURIComponent(deviceIp)}/status`
+          );
+          if (statusRes.success && statusRes.data?.ports) {
+            const thisPort = statusRes.data.ports.find(p => p.port === portNum);
+            if (thisPort) {
+              setPortStatus(thisPort);
+            }
+          }
+        } catch (statusErr) {
+          console.log("MCP port status not available:", statusErr);
+        }
+
         // Load real-time traffic from MCP (Ciena BluePlanet)
         try {
           const mcpRes = await fetchApi(
@@ -108,12 +126,53 @@ function InterfaceMetricsPanel({ deviceIp, interfaceName, timeRange, onClose }) 
         <div className="flex items-center justify-center py-8">
           <RefreshCw className="w-6 h-6 animate-spin text-gray-400" />
         </div>
-      ) : !hasTraffic && !hasOptical ? (
+      ) : !hasTraffic && !hasOptical && !portStatus ? (
         <p className="text-gray-500 text-center py-4">
           No metrics collected yet for port {portNum}. Data will appear after the next polling cycle.
         </p>
       ) : (
         <div className="space-y-6">
+          {/* Port Operational Status */}
+          {portStatus && (
+            <div className="bg-gray-50 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                  <Server className="w-4 h-4 text-gray-500" />
+                  Port Status
+                </h3>
+                <span className={cn(
+                  "px-2 py-1 rounded-full text-xs font-medium",
+                  portStatus.oper_link === 'Up' ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                )}>
+                  {portStatus.oper_link}
+                </span>
+              </div>
+              <div className="grid grid-cols-4 gap-3 text-sm">
+                <div>
+                  <p className="text-gray-500 text-xs">Port Type</p>
+                  <p className="font-medium">{portStatus.port_type || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500 text-xs">Speed/Duplex</p>
+                  <p className="font-medium">{portStatus.oper_mode || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500 text-xs">STP State</p>
+                  <p className="font-medium">{portStatus.oper_stp || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500 text-xs">Link Duration</p>
+                  <p className="font-medium">{portStatus.oper_link_duration || '—'}</p>
+                </div>
+              </div>
+              {portStatus.oper_xcvr && (
+                <div className="mt-2 text-xs text-gray-500">
+                  Transceiver: <span className="font-medium text-gray-700">{portStatus.oper_xcvr}</span>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Optical Power Chart */}
           {hasOptical && (
             <div>
@@ -167,91 +226,106 @@ function InterfaceMetricsPanel({ deviceIp, interfaceName, timeRange, onClose }) 
             </div>
           )}
 
-          {/* Traffic Statistics from MCP */}
+          {/* Traffic Statistics from MCP - Collapsible */}
           {hasTraffic && (
-            <div>
-              <h3 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
-                <Activity className="w-4 h-4 text-blue-500" />
-                Traffic Statistics (Real-time from MCP)
-              </h3>
+            <div className="border border-gray-200 rounded-lg">
+              <button
+                onClick={() => setTrafficExpanded(!trafficExpanded)}
+                className="w-full flex items-center justify-between p-3 hover:bg-gray-50 transition-colors"
+              >
+                <h3 className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-blue-500" />
+                  Traffic Statistics (Real-time from MCP)
+                </h3>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-gray-500">
+                    RX: {formatBytes(mcpTraffic.current_rx_bytes)} | TX: {formatBytes(mcpTraffic.current_tx_bytes)}
+                  </span>
+                  <ChevronDown className={cn("w-4 h-4 text-gray-400 transition-transform", trafficExpanded && "rotate-180")} />
+                </div>
+              </button>
               
-              {/* Current 15-min bin */}
-              <div className="mb-4">
-                <p className="text-xs text-gray-500 mb-2">
-                  Current 15-min bin (since {mcpTraffic.current_collection_time})
-                </p>
-                <div className="grid grid-cols-4 gap-3 text-sm">
-                  <div className="bg-green-50 rounded-lg p-3">
-                    <p className="text-gray-500 text-xs">RX Bytes</p>
-                    <p className="font-semibold text-green-700">{formatBytes(mcpTraffic.current_rx_bytes)}</p>
+              {trafficExpanded && (
+                <div className="p-3 pt-0 border-t border-gray-100">
+                  {/* Current 15-min bin */}
+                  <div className="mb-4">
+                    <p className="text-xs text-gray-500 mb-2">
+                      Current 15-min bin (since {mcpTraffic.current_collection_time})
+                    </p>
+                    <div className="grid grid-cols-4 gap-3 text-sm">
+                      <div className="bg-green-50 rounded-lg p-3">
+                        <p className="text-gray-500 text-xs">RX Bytes</p>
+                        <p className="font-semibold text-green-700">{formatBytes(mcpTraffic.current_rx_bytes)}</p>
+                      </div>
+                      <div className="bg-blue-50 rounded-lg p-3">
+                        <p className="text-gray-500 text-xs">TX Bytes</p>
+                        <p className="font-semibold text-blue-700">{formatBytes(mcpTraffic.current_tx_bytes)}</p>
+                      </div>
+                      <div className="bg-green-50 rounded-lg p-3">
+                        <p className="text-gray-500 text-xs">RX Packets</p>
+                        <p className="font-semibold text-green-700">{mcpTraffic.current_rx_pkts?.toLocaleString()}</p>
+                      </div>
+                      <div className="bg-blue-50 rounded-lg p-3">
+                        <p className="text-gray-500 text-xs">TX Packets</p>
+                        <p className="font-semibold text-blue-700">{mcpTraffic.current_tx_pkts?.toLocaleString()}</p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="bg-blue-50 rounded-lg p-3">
-                    <p className="text-gray-500 text-xs">TX Bytes</p>
-                    <p className="font-semibold text-blue-700">{formatBytes(mcpTraffic.current_tx_bytes)}</p>
-                  </div>
-                  <div className="bg-green-50 rounded-lg p-3">
-                    <p className="text-gray-500 text-xs">RX Packets</p>
-                    <p className="font-semibold text-green-700">{mcpTraffic.current_rx_pkts?.toLocaleString()}</p>
-                  </div>
-                  <div className="bg-blue-50 rounded-lg p-3">
-                    <p className="text-gray-500 text-xs">TX Packets</p>
-                    <p className="font-semibold text-blue-700">{mcpTraffic.current_tx_pkts?.toLocaleString()}</p>
-                  </div>
-                </div>
-              </div>
 
-              {/* 24-hour totals */}
-              <div className="mb-4">
-                <p className="text-xs text-gray-500 mb-2">
-                  24-hour totals (since {mcpTraffic['24hr_collection_time']})
-                </p>
-                <div className="grid grid-cols-4 gap-3 text-sm">
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <p className="text-gray-500 text-xs">RX Bytes</p>
-                    <p className="font-semibold">{formatBytes(mcpTraffic['24hr_rx_bytes'])}</p>
+                  {/* 24-hour totals */}
+                  <div className="mb-4">
+                    <p className="text-xs text-gray-500 mb-2">
+                      24-hour totals (since {mcpTraffic['24hr_collection_time']})
+                    </p>
+                    <div className="grid grid-cols-4 gap-3 text-sm">
+                      <div className="bg-gray-50 rounded-lg p-3">
+                        <p className="text-gray-500 text-xs">RX Bytes</p>
+                        <p className="font-semibold">{formatBytes(mcpTraffic['24hr_rx_bytes'])}</p>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg p-3">
+                        <p className="text-gray-500 text-xs">TX Bytes</p>
+                        <p className="font-semibold">{formatBytes(mcpTraffic['24hr_tx_bytes'])}</p>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg p-3">
+                        <p className="text-gray-500 text-xs">RX Packets</p>
+                        <p className="font-semibold">{mcpTraffic['24hr_rx_pkts']?.toLocaleString()}</p>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg p-3">
+                        <p className="text-gray-500 text-xs">TX Packets</p>
+                        <p className="font-semibold">{mcpTraffic['24hr_tx_pkts']?.toLocaleString()}</p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <p className="text-gray-500 text-xs">TX Bytes</p>
-                    <p className="font-semibold">{formatBytes(mcpTraffic['24hr_tx_bytes'])}</p>
-                  </div>
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <p className="text-gray-500 text-xs">RX Packets</p>
-                    <p className="font-semibold">{mcpTraffic['24hr_rx_pkts']?.toLocaleString()}</p>
-                  </div>
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <p className="text-gray-500 text-xs">TX Packets</p>
-                    <p className="font-semibold">{mcpTraffic['24hr_tx_pkts']?.toLocaleString()}</p>
-                  </div>
-                </div>
-              </div>
 
-              {/* Errors */}
-              <div className="grid grid-cols-4 gap-3 text-sm">
-                <div className="bg-gray-50 rounded-lg p-3">
-                  <p className="text-gray-500 text-xs">RX Errors</p>
-                  <p className={cn("font-semibold", mcpTraffic.current_rx_errors > 0 && "text-red-600")}>
-                    {mcpTraffic.current_rx_errors || 0}
-                  </p>
+                  {/* Errors */}
+                  <div className="grid grid-cols-4 gap-3 text-sm">
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <p className="text-gray-500 text-xs">RX Errors</p>
+                      <p className={cn("font-semibold", mcpTraffic.current_rx_errors > 0 && "text-red-600")}>
+                        {mcpTraffic.current_rx_errors || 0}
+                      </p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <p className="text-gray-500 text-xs">TX Errors</p>
+                      <p className={cn("font-semibold", mcpTraffic.current_tx_errors > 0 && "text-red-600")}>
+                        {mcpTraffic.current_tx_errors || 0}
+                      </p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <p className="text-gray-500 text-xs">RX Drops</p>
+                      <p className={cn("font-semibold", mcpTraffic.current_rx_drops > 0 && "text-amber-600")}>
+                        {mcpTraffic.current_rx_drops || 0}
+                      </p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <p className="text-gray-500 text-xs">RX Discards</p>
+                      <p className={cn("font-semibold", mcpTraffic.current_rx_discards > 0 && "text-amber-600")}>
+                        {mcpTraffic.current_rx_discards || 0}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <div className="bg-gray-50 rounded-lg p-3">
-                  <p className="text-gray-500 text-xs">TX Errors</p>
-                  <p className={cn("font-semibold", mcpTraffic.current_tx_errors > 0 && "text-red-600")}>
-                    {mcpTraffic.current_tx_errors || 0}
-                  </p>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-3">
-                  <p className="text-gray-500 text-xs">RX Drops</p>
-                  <p className={cn("font-semibold", mcpTraffic.current_rx_drops > 0 && "text-amber-600")}>
-                    {mcpTraffic.current_rx_drops || 0}
-                  </p>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-3">
-                  <p className="text-gray-500 text-xs">RX Discards</p>
-                  <p className={cn("font-semibold", mcpTraffic.current_rx_discards > 0 && "text-amber-600")}>
-                    {mcpTraffic.current_rx_discards || 0}
-                  </p>
-                </div>
-              </div>
+              )}
             </div>
           )}
         </div>

@@ -1023,3 +1023,63 @@ def get_port_pm_by_ip(device_ip, port_number):
         return jsonify(success_response(stats))
     except Exception as e:
         return jsonify(error_response('MCP_ERROR', str(e))), 500
+
+
+@mcp_bp.route('/ports/<device_id>/status', methods=['GET'])
+def get_ethernet_port_status(device_id):
+    """
+    Get real-time Ethernet port operational status for a device.
+    
+    Returns operLink (Up/Down), operMode, operSTP, adminLink, etc. for all ports.
+    """
+    service = get_mcp_service()
+    
+    if not service.is_configured:
+        return jsonify(error_response('NOT_CONFIGURED', 'MCP is not configured')), 400
+    
+    try:
+        ports = service.get_ethernet_port_status(device_id)
+        
+        return jsonify(success_response({
+            'device_id': device_id,
+            'ports': ports,
+            'count': len(ports),
+        }))
+    except Exception as e:
+        return jsonify(error_response('MCP_ERROR', str(e))), 500
+
+
+@mcp_bp.route('/ports/by-ip/<device_ip>/status', methods=['GET'])
+def get_ethernet_port_status_by_ip(device_ip):
+    """
+    Get real-time Ethernet port status by device IP address.
+    """
+    service = get_mcp_service()
+    
+    if not service.is_configured:
+        return jsonify(error_response('NOT_CONFIGURED', 'MCP is not configured')), 400
+    
+    try:
+        # Find device by IP
+        all_devices = service.get_all_devices()
+        device_id = None
+        
+        for device in all_devices:
+            attrs = device.get('attributes', {})
+            if attrs.get('ipAddress') == device_ip:
+                device_id = device.get('id')
+                break
+        
+        if not device_id:
+            return jsonify(error_response('NOT_FOUND', f'Device with IP {device_ip} not found in MCP')), 404
+        
+        ports = service.get_ethernet_port_status(device_id)
+        
+        return jsonify(success_response({
+            'device_ip': device_ip,
+            'device_id': device_id,
+            'ports': ports,
+            'count': len(ports),
+        }))
+    except Exception as e:
+        return jsonify(error_response('MCP_ERROR', str(e))), 500

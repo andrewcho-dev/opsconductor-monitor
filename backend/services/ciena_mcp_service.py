@@ -591,6 +591,70 @@ class CienaMCPService:
         
         return stats
     
+    def get_ethernet_port_status(self, device_id: str) -> List[Dict]:
+        """
+        Get real-time Ethernet port operational status from MCP.
+        
+        Args:
+            device_id: Network construct ID
+        
+        Returns:
+            List of port status records with operLink, operMode, adminLink, etc.
+        """
+        try:
+            # Get management session info
+            session = self.get_management_session(device_id)
+            if not session:
+                logger.warning(f"No management session found for device {device_id}")
+                return []
+            
+            # Build the query URL
+            from urllib.parse import quote
+            params = {
+                'typegroup': session['type_group'],
+                'sessionid': session['session_id'],
+                'softwareVersion': session['software_version'],
+                'ncid': device_id,
+                'deviceType': session['device_type'],
+                'neName': session['device_name'],
+                'resourceType': session['resource_type'],
+                'uiAction': 'refresh',
+            }
+            
+            query = '&'.join(f"{k}={quote(str(v))}" for k, v in params.items())
+            result = self._request('GET', f'/nmserver/api/v1/nes/ethernetPortMgmt/ettp/values?{query}')
+            
+            # Parse the response
+            ettp_data = result.get('ettpfixedtablevalues', {}).get('data', [])
+            if not ettp_data:
+                return []
+            
+            json_data = ettp_data[0].get('attributes', {}).get('jsondata', [])
+            
+            ports = []
+            for entry in json_data:
+                ports.append({
+                    'port': entry.get('port'),
+                    'port_type': entry.get('portType'),
+                    'oper_link': entry.get('operLink'),
+                    'oper_link_duration': entry.get('operLinkStateDuration'),
+                    'oper_xcvr': entry.get('operXCVR'),
+                    'oper_stp': entry.get('operSTP'),
+                    'oper_mode': entry.get('operMode'),
+                    'oper_auto_neg': entry.get('operAutoNeg'),
+                    'admin_link': entry.get('adminLink'),
+                    'admin_mode': entry.get('adminMode'),
+                    'admin_auto_neg': entry.get('adminAutoNeg'),
+                    'admin_max_frame_size': entry.get('adminMaxFrameSize'),
+                    'port_descr': entry.get('portDescr'),
+                })
+            
+            return ports
+            
+        except CienaMCPError as e:
+            logger.error(f"Failed to get Ethernet port status for {device_id}: {e}")
+            return []
+    
     # ==================== SYNC TO NETBOX ====================
     
     def sync_devices_to_netbox(self, netbox_service, site_id: int = None, 
