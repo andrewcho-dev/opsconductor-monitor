@@ -223,7 +223,8 @@ function InterfaceMetricsPanel({ deviceIp, interfaceName, timeRange, onClose }) 
                     <YAxis 
                       stroke="#9ca3af"
                       fontSize={11}
-                      tickFormatter={(v) => `${v.toFixed(1)}`}
+                      tickFormatter={(v) => `${v.toFixed(1)} Mbps`}
+                      width={70}
                     />
                     <Tooltip 
                       labelFormatter={(ts) => new Date(ts).toLocaleString()}
