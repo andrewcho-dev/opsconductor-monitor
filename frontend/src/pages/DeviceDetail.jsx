@@ -37,18 +37,28 @@ function InterfaceMetricsPanel({ deviceIp, interfaceName, timeRange, onClose }) 
 
   // Extract port number from interface name (e.g., "21" from "21" or "Port 21" or "port21")
   const portNum = interfaceName.replace(/\D/g, '');
+  // Ciena uses ifIndex = 10000 + port number for physical ports
+  const possibleIfIndexes = [
+    parseInt(portNum),           // Direct match (e.g., 21)
+    10000 + parseInt(portNum),   // Ciena format (e.g., 10021)
+  ].filter(n => !isNaN(n));
 
   useEffect(() => {
     const loadMetrics = async () => {
       setLoading(true);
       try {
-        // Load traffic metrics - match by port number in interface name
+        // Load traffic metrics - match by interface_index (exact) or port number in name (fallback)
         const trafficRes = await fetchApi(
           `/api/metrics/interface?device_ip=${encodeURIComponent(deviceIp)}&hours=${timeRange}&limit=500`
         );
         const trafficData = (trafficRes.metrics || []).filter(m => {
-          const mPortNum = (m.interface_name || '').replace(/\D/g, '');
-          return mPortNum === portNum;
+          // First try exact match by interface_index
+          if (m.interface_index && possibleIfIndexes.includes(parseInt(m.interface_index))) {
+            return true;
+          }
+          // Fallback: check if interface name ends with the port number
+          const mName = m.interface_name || '';
+          return mName.endsWith(` ${portNum}`) || mName === portNum || mName === `port${portNum}`;
         });
         setTrafficMetrics(trafficData.map(m => ({
           timestamp: new Date(m.recorded_at).getTime(),
@@ -59,13 +69,18 @@ function InterfaceMetricsPanel({ deviceIp, interfaceName, timeRange, onClose }) 
           txErrors: parseInt(m.tx_errors) || 0,
         })));
 
-        // Load optical metrics - match by port number
+        // Load optical metrics - match by interface_index or port number
         const opticalRes = await fetchApi(
           `/api/metrics/optical?device_ip=${encodeURIComponent(deviceIp)}&hours=${timeRange}`
         );
         const opticalData = (opticalRes.metrics || []).filter(m => {
-          const mPortNum = (m.interface_name || '').replace(/\D/g, '');
-          return mPortNum === portNum;
+          // First try exact match by interface_index
+          if (m.interface_index && possibleIfIndexes.includes(parseInt(m.interface_index))) {
+            return true;
+          }
+          // Fallback: check if interface name ends with the port number
+          const mName = m.interface_name || '';
+          return mName.endsWith(portNum) || mName === `port${portNum}`;
         });
         setOpticalMetrics(opticalData.map(m => ({
           timestamp: new Date(m.recorded_at).getTime(),
