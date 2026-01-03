@@ -117,39 +117,20 @@ export function useNetBoxDevices(options = {}) {
     try {
       setLoading(true);
       
-      // Fetch ALL devices by paginating through results
-      let allDevices = [];
-      let offset = 0;
-      const limit = 100; // Fetch 100 at a time
-      let totalCount = 0;
+      // Use cached endpoint for fast loading (single query to local DB)
+      const queryParams = new URLSearchParams();
+      if (params.site) queryParams.set("site", params.site);
+      if (params.role) queryParams.set("role", params.role);
+      if (params.search) queryParams.set("q", params.search);
       
-      while (true) {
-        const queryParams = new URLSearchParams();
-        if (params.site) queryParams.set("site", params.site);
-        if (params.role) queryParams.set("role", params.role);
-        if (params.status) queryParams.set("status", params.status);
-        if (params.search) queryParams.set("q", params.search);
-        queryParams.set("limit", limit);
-        queryParams.set("offset", offset);
-        
-        const url = `/api/netbox/devices?${queryParams}`;
-        const response = await fetchApi(url);
-        
-        const pageDevices = (response.data || []).map(transformDevice);
-        allDevices = [...allDevices, ...pageDevices];
-        totalCount = response.count || allDevices.length;
-        
-        // Check if we have more pages
-        if (!response.next || pageDevices.length < limit) {
-          break;
-        }
-        
-        offset += limit;
-      }
+      const url = `/api/netbox/devices/cached${queryParams.toString() ? `?${queryParams}` : ""}`;
+      const response = await fetchApi(url);
+      
+      const allDevices = (response.data || []).map(transformDevice);
       
       setDevices(allDevices);
       setPagination({
-        count: totalCount,
+        count: response.count || allDevices.length,
         next: null,
         previous: null,
       });

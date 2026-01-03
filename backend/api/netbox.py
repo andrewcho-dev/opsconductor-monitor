@@ -153,6 +153,93 @@ def test_connection():
 
 # ==================== DEVICES ====================
 
+@netbox_bp.route('/devices/cached', methods=['GET'])
+def list_devices_cached():
+    """List devices from local cache (fast) - use this for inventory page."""
+    from database import DatabaseManager
+    db = DatabaseManager()
+    
+    search = request.args.get('q') or request.args.get('search')
+    site = request.args.get('site')
+    role = request.args.get('role')
+    
+    query = """
+        SELECT netbox_device_id, device_ip, device_name, device_type, manufacturer,
+               site_id, site_name, role_name, cached_at
+        FROM netbox_device_cache
+        WHERE 1=1
+    """
+    params = []
+    
+    if search:
+        query += " AND (device_name ILIKE %s OR device_ip::text ILIKE %s)"
+        params.extend([f'%{search}%', f'%{search}%'])
+    if site:
+        query += " AND site_name = %s"
+        params.append(site)
+    if role:
+        query += " AND role_name = %s"
+        params.append(role)
+    
+    query += " ORDER BY device_name"
+    
+    with db.cursor() as cursor:
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+    
+    devices = []
+    for row in rows:
+        devices.append({
+            'id': row['netbox_device_id'],
+            'name': row['device_name'],
+            'primary_ip4': {'address': f"{row['device_ip']}/32"} if row['device_ip'] else None,
+            'device_type': {'model': row['device_type'], 'manufacturer': {'name': row['manufacturer']}},
+            'site': {'id': row['site_id'], 'name': row['site_name']},
+            'role': {'name': row['role_name']},
+            'status': {'value': 'active', 'label': 'Active'},
+            '_type': 'device',
+        })
+    
+    return jsonify({
+        'success': True,
+        'data': devices,
+        'count': len(devices),
+        'cached': True,
+    })
+
+
+@netbox_bp.route('/devices/<int:device_id>/cached', methods=['GET'])
+def get_device_cached(device_id):
+    """Get a single device from local cache."""
+    from database import DatabaseManager
+    db = DatabaseManager()
+    
+    with db.cursor() as cursor:
+        cursor.execute("""
+            SELECT netbox_device_id, device_ip, device_name, device_type, manufacturer,
+                   site_id, site_name, role_name, cached_at
+            FROM netbox_device_cache
+            WHERE netbox_device_id = %s
+        """, (device_id,))
+        row = cursor.fetchone()
+    
+    if not row:
+        return jsonify(error_response('NOT_FOUND', 'Device not found in cache')), 404
+    
+    device = {
+        'id': row['netbox_device_id'],
+        'name': row['device_name'],
+        'primary_ip4': {'address': f"{row['device_ip']}/32"} if row['device_ip'] else None,
+        'device_type': {'model': row['device_type'], 'manufacturer': {'name': row['manufacturer']}},
+        'site': {'id': row['site_id'], 'name': row['site_name']},
+        'role': {'name': row['role_name']},
+        'status': {'value': 'active', 'label': 'Active'},
+        '_type': 'device',
+    }
+    
+    return jsonify(success_response(device))
+
+
 @netbox_bp.route('/devices', methods=['GET'])
 def list_devices():
     """List devices from NetBox (includes VMs by default)."""

@@ -82,13 +82,10 @@ export function DeviceDetail() {
       setLoading(true);
       let deviceData = null;
       
-      // NetBox is the source of truth for device inventory
+      // Use cached endpoint with search for fast lookup
       try {
-        const netboxResponse = await fetchApi("/api/netbox/devices");
-        // API returns {success: true, data: [...]} or {success: true, data: {results: [...]}}
-        const deviceList = Array.isArray(netboxResponse.data) 
-          ? netboxResponse.data 
-          : netboxResponse.data?.results || [];
+        const netboxResponse = await fetchApi(`/api/netbox/devices/cached?q=${encodeURIComponent(ip)}`);
+        const deviceList = netboxResponse.data || [];
         
         if (netboxResponse.success && deviceList.length > 0) {
           const netboxDevice = deviceList.find((d) => {
