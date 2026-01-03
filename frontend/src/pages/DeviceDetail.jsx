@@ -202,7 +202,7 @@ function InterfaceMetricsPanel({ deviceIp, interfaceName, timeRange, onClose }) 
           )}
 
           {/* Traffic Chart */}
-          {hasTraffic && (
+          {hasTraffic && trafficRates.length > 0 && (
             <div>
               <h3 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                 <Activity className="w-4 h-4 text-blue-500" />
@@ -210,7 +210,7 @@ function InterfaceMetricsPanel({ deviceIp, interfaceName, timeRange, onClose }) 
               </h3>
               <div className="h-48">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={trafficRates}>
+                  <LineChart data={trafficRates}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                     <XAxis 
                       dataKey="timestamp" 
@@ -231,9 +231,9 @@ function InterfaceMetricsPanel({ deviceIp, interfaceName, timeRange, onClose }) 
                       contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
                     />
                     <Legend />
-                    <Area type="monotone" dataKey="rxMbps" name="RX" stroke="#10b981" fill="#d1fae5" strokeWidth={2} />
-                    <Area type="monotone" dataKey="txMbps" name="TX" stroke="#3b82f6" fill="#dbeafe" strokeWidth={2} />
-                  </AreaChart>
+                    <Line type="stepAfter" dataKey="rxMbps" name="RX" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} />
+                    <Line type="stepAfter" dataKey="txMbps" name="TX" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} />
+                  </LineChart>
                 </ResponsiveContainer>
               </div>
               <div className="grid grid-cols-4 gap-4 mt-2 text-sm">
