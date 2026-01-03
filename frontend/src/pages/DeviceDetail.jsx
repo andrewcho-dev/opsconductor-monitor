@@ -105,13 +105,14 @@ export function DeviceDetail() {
     setMetricsLoading(true);
     try {
       const res = await fetchApi(`/api/metrics/optical?device_ip=${encodeURIComponent(ip)}&hours=${timeRange}`);
-      if (res.success) {
-        // Transform for chart
-        const data = (res.data || []).map(m => ({
+      // API returns { metrics: [...], count: N } not { success, data }
+      const metrics = res.metrics || res.data || [];
+      if (metrics.length > 0) {
+        const data = metrics.map(m => ({
           timestamp: new Date(m.recorded_at).getTime(),
           time: new Date(m.recorded_at).toLocaleString(),
-          txPower: m.tx_power,
-          rxPower: m.rx_power,
+          txPower: parseFloat(m.tx_power) || null,
+          rxPower: parseFloat(m.rx_power) || null,
           interface: m.interface_name,
         }));
         setOpticalMetrics(data);
@@ -129,12 +130,14 @@ export function DeviceDetail() {
     
     try {
       const res = await fetchApi(`/api/metrics/availability?device_ip=${encodeURIComponent(ip)}&hours=${timeRange}`);
-      if (res.success) {
-        const data = (res.data || []).map(m => ({
+      // API returns { metrics: [...], count: N } not { success, data }
+      const metrics = res.metrics || res.data || [];
+      if (metrics.length > 0) {
+        const data = metrics.map(m => ({
           timestamp: new Date(m.recorded_at).getTime(),
           time: new Date(m.recorded_at).toLocaleString(),
           status: m.ping_status === 'up' ? 1 : 0,
-          latency: m.ping_latency_ms,
+          latency: parseFloat(m.ping_latency_ms) || 0,
         }));
         setAvailabilityMetrics(data);
       }
