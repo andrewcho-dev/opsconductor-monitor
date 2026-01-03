@@ -747,9 +747,14 @@ class CommonOIDs:
     ENT_PHYSICAL_NAME = "1.3.6.1.2.1.47.1.1.1.1.7"
     
     # Optical DOM (vendor-specific examples)
-    # Ciena
-    CIENA_OPT_TX_POWER = "1.3.6.1.4.1.6141.2.60.4.1.1.1.1.7"
-    CIENA_OPT_RX_POWER = "1.3.6.1.4.1.6141.2.60.4.1.1.1.1.8"
+    # Ciena WWP-LEOS (older switches like 3930)
+    CIENA_WWP_RX_POWER = "1.3.6.1.4.1.6141.2.60.4.1.1.1.1.16"  # wwpLeosPortXcvrRxPower (uW)
+    CIENA_WWP_TX_POWER = "1.3.6.1.4.1.6141.2.60.4.1.1.1.1.24"  # wwpLeosPortXcvrTxOutputPw (uW)
+    CIENA_WWP_TEMPERATURE = "1.3.6.1.4.1.6141.2.60.4.1.1.1.1.15"  # wwpLeosPortXcvrTemperature
+    CIENA_WWP_BIAS = "1.3.6.1.4.1.6141.2.60.4.1.1.1.1.17"  # wwpLeosPortXcvrBias (mA)
+    # Ciena CES (newer switches)
+    CIENA_CES_RX_POWER = "1.3.6.1.4.1.1271.2.1.9.1.1.1.1.6"  # cienaCesPortXcvrRxPower (uW)
+    CIENA_CES_TX_POWER = "1.3.6.1.4.1.1271.2.1.9.1.1.1.1.35"  # cienaCesPortXcvrTxOutputPower
     
     # Standard optical (IF-MIB extensions)
     OPT_IF_TX_POWER = "1.3.6.1.2.1.10.133.1.1.1.1.3"

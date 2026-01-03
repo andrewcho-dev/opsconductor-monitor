@@ -369,15 +369,25 @@ def poll_optical_power(self, device_filter: Optional[Dict] = None):
         failed = 0
         
         # Poll each device for optical power
+        # Try both WWP-LEOS (older Ciena) and CES (newer Ciena) OIDs
         for target in targets:
             try:
-                # Get TX and RX power using GETBULK
+                # Try WWP-LEOS OIDs first (most common for Ciena 3930 etc)
                 tx_result = await poller.engine.get_bulk(
-                    target, CommonOIDs.CIENA_OPT_TX_POWER, max_repetitions=50
+                    target, CommonOIDs.CIENA_WWP_TX_POWER, max_repetitions=50
                 )
                 rx_result = await poller.engine.get_bulk(
-                    target, CommonOIDs.CIENA_OPT_RX_POWER, max_repetitions=50
+                    target, CommonOIDs.CIENA_WWP_RX_POWER, max_repetitions=50
                 )
+                
+                # If WWP-LEOS fails, try CES OIDs
+                if not tx_result.success and not rx_result.success:
+                    tx_result = await poller.engine.get_bulk(
+                        target, CommonOIDs.CIENA_CES_TX_POWER, max_repetitions=50
+                    )
+                    rx_result = await poller.engine.get_bulk(
+                        target, CommonOIDs.CIENA_CES_RX_POWER, max_repetitions=50
+                    )
                 
                 if tx_result.success or rx_result.success:
                     successful += 1
@@ -393,25 +403,54 @@ def poll_optical_power(self, device_filter: Optional[Dict] = None):
                         for oid in rx_values.keys():
                             all_indexes.add(int(oid.split('.')[-1]))
                         
+                        records_stored = 0
                         for if_index in all_indexes:
-                            tx_oid = f"{CommonOIDs.CIENA_OPT_TX_POWER}.{if_index}"
-                            rx_oid = f"{CommonOIDs.CIENA_OPT_RX_POWER}.{if_index}"
+                            # Check both OID formats (with and without leading dot)
+                            tx_power = None
+                            rx_power = None
+                            for base_tx in [CommonOIDs.CIENA_WWP_TX_POWER, CommonOIDs.CIENA_CES_TX_POWER]:
+                                for prefix in ['', '.']:
+                                    tx_oid = f"{prefix}{base_tx}.{if_index}"
+                                    if tx_oid in tx_values:
+                                        tx_power = tx_values[tx_oid]
+                                        break
+                                if tx_power:
+                                    break
+                            for base_rx in [CommonOIDs.CIENA_WWP_RX_POWER, CommonOIDs.CIENA_CES_RX_POWER]:
+                                for prefix in ['', '.']:
+                                    rx_oid = f"{prefix}{base_rx}.{if_index}"
+                                    if rx_oid in rx_values:
+                                        rx_power = rx_values[rx_oid]
+                                        break
+                                if rx_power:
+                                    break
                             
-                            tx_power = tx_values.get(tx_oid)
-                            rx_power = rx_values.get(rx_oid)
+                            # Only store if we have actual power readings (non-zero)
+                            tx_val = int(tx_power) if tx_power else 0
+                            rx_val = int(rx_power) if rx_power else 0
                             
-                            if tx_power is not None or rx_power is not None:
-                                # Convert to dBm (values in 0.01 dBm)
-                                tx_dbm = float(tx_power) / 100.0 if tx_power else None
-                                rx_dbm = float(rx_power) / 100.0 if rx_power else None
+                            if tx_val > 0 or rx_val > 0:
+                                # Values are in micro-watts, convert to dBm
+                                # dBm = 10 * log10(uW / 1000)
+                                import math
+                                tx_dbm = None
+                                rx_dbm = None
+                                if tx_val > 0:
+                                    tx_dbm = 10 * math.log10(tx_val / 1000.0)
+                                if rx_val > 0:
+                                    rx_dbm = 10 * math.log10(rx_val / 1000.0)
                                 
-                                cursor.execute("""
-                                    INSERT INTO optical_metrics 
-                                    (device_ip, interface_name, interface_index, tx_power, rx_power, recorded_at)
-                                    VALUES (%s, %s, %s, %s, %s, NOW())
-                                """, (target.ip, f'port{if_index}', if_index, tx_dbm, rx_dbm))
+                                if tx_dbm is not None or rx_dbm is not None:
+                                    cursor.execute("""
+                                        INSERT INTO optical_metrics 
+                                        (device_ip, interface_name, interface_index, tx_power, rx_power, recorded_at)
+                                        VALUES (%s, %s, %s, %s, %s, NOW())
+                                    """, (target.ip, f'port{if_index}', if_index, tx_dbm, rx_dbm))
+                                    records_stored += 1
                         
-                        db.get_connection().commit()
+                        if records_stored > 0:
+                            db.get_connection().commit()
+                            logger.debug(f"Stored {records_stored} optical readings for {target.ip}")
                 else:
                     failed += 1
                     
