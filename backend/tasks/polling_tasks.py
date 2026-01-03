@@ -245,15 +245,39 @@ def poll_interfaces(self, device_filter: Optional[Dict] = None):
                         for oid, if_name in if_names.values.items():
                             if_index = int(oid.split('.')[-1])
                             
-                            in_octets_oid = f"{CommonOIDs.IF_IN_OCTETS}.{if_index}"
-                            out_octets_oid = f"{CommonOIDs.IF_OUT_OCTETS}.{if_index}"
-                            in_errors_oid = f"{CommonOIDs.IF_IN_ERRORS}.{if_index}"
-                            out_errors_oid = f"{CommonOIDs.IF_OUT_ERRORS}.{if_index}"
+                            # Try both OID formats (with and without leading dot)
+                            rx_bytes = None
+                            tx_bytes = None
+                            rx_errors = None
+                            tx_errors = None
                             
-                            rx_bytes = if_in_octets.values.get(in_octets_oid) if if_in_octets.success else None
-                            tx_bytes = if_out_octets.values.get(out_octets_oid) if if_out_octets.success else None
-                            rx_errors = if_in_errors.values.get(in_errors_oid) if if_in_errors.success else None
-                            tx_errors = if_out_errors.values.get(out_errors_oid) if if_out_errors.success else None
+                            if if_in_octets.success:
+                                for prefix in ['', '.']:
+                                    key = f"{prefix}{CommonOIDs.IF_IN_OCTETS}.{if_index}"
+                                    if key in if_in_octets.values:
+                                        rx_bytes = if_in_octets.values[key]
+                                        break
+                            
+                            if if_out_octets.success:
+                                for prefix in ['', '.']:
+                                    key = f"{prefix}{CommonOIDs.IF_OUT_OCTETS}.{if_index}"
+                                    if key in if_out_octets.values:
+                                        tx_bytes = if_out_octets.values[key]
+                                        break
+                            
+                            if if_in_errors.success:
+                                for prefix in ['', '.']:
+                                    key = f"{prefix}{CommonOIDs.IF_IN_ERRORS}.{if_index}"
+                                    if key in if_in_errors.values:
+                                        rx_errors = if_in_errors.values[key]
+                                        break
+                            
+                            if if_out_errors.success:
+                                for prefix in ['', '.']:
+                                    key = f"{prefix}{CommonOIDs.IF_OUT_ERRORS}.{if_index}"
+                                    if key in if_out_errors.values:
+                                        tx_errors = if_out_errors.values[key]
+                                        break
                             
                             cursor.execute("""
                                 INSERT INTO interface_metrics 

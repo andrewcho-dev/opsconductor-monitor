@@ -31,24 +31,47 @@ import { cn, fetchApi } from "../lib/utils";
 
 // Interface Metrics Panel Component
 function InterfaceMetricsPanel({ deviceIp, interfaceName, timeRange, onClose }) {
-  const [metrics, setMetrics] = useState([]);
+  const [trafficMetrics, setTrafficMetrics] = useState([]);
+  const [opticalMetrics, setOpticalMetrics] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Extract port number from interface name (e.g., "21" from "21" or "Port 21" or "port21")
+  const portNum = interfaceName.replace(/\D/g, '');
 
   useEffect(() => {
     const loadMetrics = async () => {
       setLoading(true);
       try {
-        const res = await fetchApi(
-          `/api/metrics/interface?device_ip=${encodeURIComponent(deviceIp)}&interface_name=${encodeURIComponent(interfaceName)}&hours=${timeRange}`
+        // Load traffic metrics - match by port number in interface name
+        const trafficRes = await fetchApi(
+          `/api/metrics/interface?device_ip=${encodeURIComponent(deviceIp)}&hours=${timeRange}&limit=500`
         );
-        const data = res.metrics || [];
-        setMetrics(data.map(m => ({
+        const trafficData = (trafficRes.metrics || []).filter(m => {
+          const mPortNum = (m.interface_name || '').replace(/\D/g, '');
+          return mPortNum === portNum;
+        });
+        setTrafficMetrics(trafficData.map(m => ({
           timestamp: new Date(m.recorded_at).getTime(),
           time: new Date(m.recorded_at).toLocaleString(),
           rxBytes: parseInt(m.rx_bytes) || 0,
           txBytes: parseInt(m.tx_bytes) || 0,
           rxErrors: parseInt(m.rx_errors) || 0,
           txErrors: parseInt(m.tx_errors) || 0,
+        })));
+
+        // Load optical metrics - match by port number
+        const opticalRes = await fetchApi(
+          `/api/metrics/optical?device_ip=${encodeURIComponent(deviceIp)}&hours=${timeRange}`
+        );
+        const opticalData = (opticalRes.metrics || []).filter(m => {
+          const mPortNum = (m.interface_name || '').replace(/\D/g, '');
+          return mPortNum === portNum;
+        });
+        setOpticalMetrics(opticalData.map(m => ({
+          timestamp: new Date(m.recorded_at).getTime(),
+          time: new Date(m.recorded_at).toLocaleString(),
+          txPower: parseFloat(m.tx_power) || null,
+          rxPower: parseFloat(m.rx_power) || null,
         })));
       } catch (err) {
         console.error("Failed to load interface metrics:", err);
@@ -57,29 +80,30 @@ function InterfaceMetricsPanel({ deviceIp, interfaceName, timeRange, onClose }) 
       }
     };
     loadMetrics();
-  }, [deviceIp, interfaceName, timeRange]);
+  }, [deviceIp, portNum, timeRange]);
 
   // Calculate traffic rates between samples
-  const trafficData = metrics.length > 1 ? metrics.slice(0, -1).map((m, i) => {
-    const next = metrics[i + 1];
-    const timeDiff = (m.timestamp - next.timestamp) / 1000; // seconds
+  const trafficRates = trafficMetrics.length > 1 ? trafficMetrics.slice(0, -1).map((m, i) => {
+    const next = trafficMetrics[i + 1];
+    const timeDiff = (m.timestamp - next.timestamp) / 1000;
     if (timeDiff <= 0) return null;
     return {
       timestamp: m.timestamp,
       time: m.time,
       rxBps: Math.max(0, (m.rxBytes - next.rxBytes) / timeDiff),
       txBps: Math.max(0, (m.txBytes - next.txBytes) / timeDiff),
-      rxErrors: m.rxErrors,
-      txErrors: m.txErrors,
     };
   }).filter(Boolean) : [];
+
+  const hasTraffic = trafficMetrics.length > 0 && trafficMetrics.some(m => m.rxBytes > 0 || m.txBytes > 0);
+  const hasOptical = opticalMetrics.length > 0;
 
   return (
     <div className="bg-white rounded-xl border border-blue-200 p-6 shadow-lg">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold flex items-center gap-2">
           <Activity className="w-5 h-5 text-blue-500" />
-          Interface: {interfaceName}
+          Port {portNum} Metrics
         </h2>
         <button
           onClick={onClose}
@@ -93,66 +117,125 @@ function InterfaceMetricsPanel({ deviceIp, interfaceName, timeRange, onClose }) 
         <div className="flex items-center justify-center py-8">
           <RefreshCw className="w-6 h-6 animate-spin text-gray-400" />
         </div>
-      ) : metrics.length === 0 ? (
+      ) : !hasTraffic && !hasOptical ? (
         <p className="text-gray-500 text-center py-4">
-          No metrics collected yet for this interface. Data will appear after the next polling cycle.
+          No metrics collected yet for port {portNum}. Data will appear after the next polling cycle.
         </p>
       ) : (
-        <>
-          {/* Traffic Chart */}
-          <div className="h-64 mb-4">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={trafficData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis 
-                  dataKey="timestamp" 
-                  type="number"
-                  domain={['dataMin', 'dataMax']}
-                  tickFormatter={(ts) => new Date(ts).toLocaleTimeString()}
-                  stroke="#9ca3af"
-                  fontSize={12}
-                />
-                <YAxis 
-                  stroke="#9ca3af"
-                  fontSize={12}
-                  tickFormatter={(v) => v > 1000000 ? `${(v/1000000).toFixed(1)}M` : v > 1000 ? `${(v/1000).toFixed(0)}K` : v}
-                />
-                <Tooltip 
-                  labelFormatter={(ts) => new Date(ts).toLocaleString()}
-                  formatter={(value) => [`${(value/1000).toFixed(1)} KB/s`, '']}
-                  contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
-                />
-                <Legend />
-                <Area type="monotone" dataKey="rxBps" name="RX" stroke="#10b981" fill="#d1fae5" strokeWidth={2} />
-                <Area type="monotone" dataKey="txBps" name="TX" stroke="#3b82f6" fill="#dbeafe" strokeWidth={2} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+        <div className="space-y-6">
+          {/* Optical Power Chart */}
+          {hasOptical && (
+            <div>
+              <h3 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                <Zap className="w-4 h-4 text-purple-500" />
+                Optical Power (dBm)
+              </h3>
+              <div className="h-48">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={opticalMetrics}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis 
+                      dataKey="timestamp" 
+                      type="number"
+                      domain={['dataMin', 'dataMax']}
+                      tickFormatter={(ts) => new Date(ts).toLocaleTimeString()}
+                      stroke="#9ca3af"
+                      fontSize={11}
+                    />
+                    <YAxis 
+                      stroke="#9ca3af"
+                      fontSize={11}
+                      tickFormatter={(v) => `${v?.toFixed(1)}`}
+                      domain={['auto', 'auto']}
+                    />
+                    <Tooltip 
+                      labelFormatter={(ts) => new Date(ts).toLocaleString()}
+                      formatter={(value, name) => [`${value?.toFixed(2)} dBm`, name === 'txPower' ? 'TX' : 'RX']}
+                      contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
+                    />
+                    <Legend />
+                    <Line type="monotone" dataKey="rxPower" name="RX Power" stroke="#8b5cf6" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="txPower" name="TX Power" stroke="#f59e0b" strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="grid grid-cols-2 gap-4 mt-2 text-sm">
+                <div className="bg-purple-50 rounded-lg p-3">
+                  <p className="text-gray-500">Latest RX Power</p>
+                  <p className="font-semibold text-purple-700">
+                    {opticalMetrics[0]?.rxPower?.toFixed(2) || '—'} dBm
+                  </p>
+                </div>
+                <div className="bg-amber-50 rounded-lg p-3">
+                  <p className="text-gray-500">Latest TX Power</p>
+                  <p className="font-semibold text-amber-700">
+                    {opticalMetrics[0]?.txPower?.toFixed(2) || '—'} dBm
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
-          {/* Stats Summary */}
-          <div className="grid grid-cols-4 gap-4 text-sm">
-            <div className="bg-gray-50 rounded-lg p-3">
-              <p className="text-gray-500">Total RX</p>
-              <p className="font-semibold">{(metrics[0]?.rxBytes / 1000000).toFixed(2)} MB</p>
+          {/* Traffic Chart */}
+          {hasTraffic && (
+            <div>
+              <h3 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                <Activity className="w-4 h-4 text-blue-500" />
+                Traffic (bytes/sec)
+              </h3>
+              <div className="h-48">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={trafficRates}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis 
+                      dataKey="timestamp" 
+                      type="number"
+                      domain={['dataMin', 'dataMax']}
+                      tickFormatter={(ts) => new Date(ts).toLocaleTimeString()}
+                      stroke="#9ca3af"
+                      fontSize={11}
+                    />
+                    <YAxis 
+                      stroke="#9ca3af"
+                      fontSize={11}
+                      tickFormatter={(v) => v > 1000000 ? `${(v/1000000).toFixed(1)}M` : v > 1000 ? `${(v/1000).toFixed(0)}K` : v}
+                    />
+                    <Tooltip 
+                      labelFormatter={(ts) => new Date(ts).toLocaleString()}
+                      formatter={(value) => [`${(value/1000).toFixed(1)} KB/s`, '']}
+                      contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
+                    />
+                    <Legend />
+                    <Area type="monotone" dataKey="rxBps" name="RX" stroke="#10b981" fill="#d1fae5" strokeWidth={2} />
+                    <Area type="monotone" dataKey="txBps" name="TX" stroke="#3b82f6" fill="#dbeafe" strokeWidth={2} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="grid grid-cols-4 gap-4 mt-2 text-sm">
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-gray-500">Total RX</p>
+                  <p className="font-semibold">{(trafficMetrics[0]?.rxBytes / 1000000).toFixed(2)} MB</p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-gray-500">Total TX</p>
+                  <p className="font-semibold">{(trafficMetrics[0]?.txBytes / 1000000).toFixed(2)} MB</p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-gray-500">RX Errors</p>
+                  <p className={cn("font-semibold", trafficMetrics[0]?.rxErrors > 0 && "text-red-600")}>
+                    {trafficMetrics[0]?.rxErrors || 0}
+                  </p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-gray-500">TX Errors</p>
+                  <p className={cn("font-semibold", trafficMetrics[0]?.txErrors > 0 && "text-red-600")}>
+                    {trafficMetrics[0]?.txErrors || 0}
+                  </p>
+                </div>
+              </div>
             </div>
-            <div className="bg-gray-50 rounded-lg p-3">
-              <p className="text-gray-500">Total TX</p>
-              <p className="font-semibold">{(metrics[0]?.txBytes / 1000000).toFixed(2)} MB</p>
-            </div>
-            <div className="bg-gray-50 rounded-lg p-3">
-              <p className="text-gray-500">RX Errors</p>
-              <p className={cn("font-semibold", metrics[0]?.rxErrors > 0 && "text-red-600")}>
-                {metrics[0]?.rxErrors || 0}
-              </p>
-            </div>
-            <div className="bg-gray-50 rounded-lg p-3">
-              <p className="text-gray-500">TX Errors</p>
-              <p className={cn("font-semibold", metrics[0]?.txErrors > 0 && "text-red-600")}>
-                {metrics[0]?.txErrors || 0}
-              </p>
-            </div>
-          </div>
-        </>
+          )}
+        </div>
       )}
     </div>
   );
@@ -580,59 +663,7 @@ export function DeviceDetail() {
         ))}
       </div>
 
-      {/* Optical Power Chart */}
-      {opticalMetrics.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <Zap className="w-5 h-5 text-purple-500" />
-            Optical Power Levels
-          </h2>
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={opticalMetrics}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis 
-                  dataKey="timestamp" 
-                  type="number"
-                  domain={['dataMin', 'dataMax']}
-                  tickFormatter={(ts) => new Date(ts).toLocaleTimeString()}
-                  stroke="#9ca3af"
-                  fontSize={12}
-                />
-                <YAxis 
-                  stroke="#9ca3af"
-                  fontSize={12}
-                  tickFormatter={(v) => `${v} dBm`}
-                />
-                <Tooltip 
-                  labelFormatter={(ts) => new Date(ts).toLocaleString()}
-                  formatter={(value, name) => [`${value?.toFixed(2)} dBm`, name === 'txPower' ? 'TX Power' : 'RX Power']}
-                  contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
-                />
-                <Legend />
-                <Line 
-                  type="monotone" 
-                  dataKey="txPower" 
-                  name="TX Power"
-                  stroke="#8b5cf6" 
-                  strokeWidth={2}
-                  dot={false}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="rxPower" 
-                  name="RX Power"
-                  stroke="#06b6d4" 
-                  strokeWidth={2}
-                  dot={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
-
-      {/* Availability Chart */}
+      {/* Device Availability Chart - device level metric */}
       {availabilityMetrics.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">

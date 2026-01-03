@@ -749,7 +749,7 @@ class CommonOIDs:
     # Optical DOM (vendor-specific examples)
     # Ciena WWP-LEOS (older switches like 3930)
     CIENA_WWP_RX_POWER = "1.3.6.1.4.1.6141.2.60.4.1.1.1.1.16"  # wwpLeosPortXcvrRxPower (uW)
-    CIENA_WWP_TX_POWER = "1.3.6.1.4.1.6141.2.60.4.1.1.1.1.24"  # wwpLeosPortXcvrTxOutputPw (uW)
+    CIENA_WWP_TX_POWER = "1.3.6.1.4.1.6141.2.60.4.1.1.1.1.27"  # wwpLeosPortXcvrTxOutputPw (uW) - Entry 27
     CIENA_WWP_TEMPERATURE = "1.3.6.1.4.1.6141.2.60.4.1.1.1.1.15"  # wwpLeosPortXcvrTemperature
     CIENA_WWP_BIAS = "1.3.6.1.4.1.6141.2.60.4.1.1.1.1.17"  # wwpLeosPortXcvrBias (mA)
     # Ciena CES (newer switches)
