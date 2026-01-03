@@ -86,56 +86,72 @@ export function useNetBoxDevices(options = {}) {
   const [error, setError] = useState(null);
   const [pagination, setPagination] = useState({ count: 0, next: null, previous: null });
 
+  const transformDevice = (device) => ({
+    id: device.id,
+    ip_address: device.primary_ip4?.address?.split("/")[0] || device.name,
+    ip_with_prefix: device.primary_ip4?.address,
+    hostname: device.name,
+    name: device.name,
+    description: device.description || device.device_type?.display,
+    vendor: device.device_type?.manufacturer?.name,
+    model: device.device_type?.model,
+    serial: device.serial,
+    status: device.status?.value || "active",
+    status_label: device.status?.label || "Active",
+    site: device.site?.name,
+    site_slug: device.site?.slug,
+    role: device.role?.name || device.device_role?.name,
+    role_slug: device.role?.slug || device.device_role?.slug,
+    platform: device.platform?.name,
+    platform_slug: device.platform?.slug,
+    device_type: device._type || "device",
+    _type: device._type || "device",
+    cluster: device.cluster?.name,
+    ping_status: device.status?.value === "active" ? "online" : "unknown",
+    snmp_status: "unknown",
+    network_range: null,
+    _netbox: device,
+  });
+
   const fetchDevices = useCallback(async (params = {}) => {
     try {
       setLoading(true);
       
-      const queryParams = new URLSearchParams();
-      if (params.site) queryParams.set("site", params.site);
-      if (params.role) queryParams.set("role", params.role);
-      if (params.status) queryParams.set("status", params.status);
-      if (params.search) queryParams.set("q", params.search);
-      if (params.limit) queryParams.set("limit", params.limit);
-      if (params.offset) queryParams.set("offset", params.offset);
+      // Fetch ALL devices by paginating through results
+      let allDevices = [];
+      let offset = 0;
+      const limit = 100; // Fetch 100 at a time
+      let totalCount = 0;
       
-      const url = `/api/netbox/devices${queryParams.toString() ? `?${queryParams}` : ""}`;
-      const response = await fetchApi(url);
+      while (true) {
+        const queryParams = new URLSearchParams();
+        if (params.site) queryParams.set("site", params.site);
+        if (params.role) queryParams.set("role", params.role);
+        if (params.status) queryParams.set("status", params.status);
+        if (params.search) queryParams.set("q", params.search);
+        queryParams.set("limit", limit);
+        queryParams.set("offset", offset);
+        
+        const url = `/api/netbox/devices?${queryParams}`;
+        const response = await fetchApi(url);
+        
+        const pageDevices = (response.data || []).map(transformDevice);
+        allDevices = [...allDevices, ...pageDevices];
+        totalCount = response.count || allDevices.length;
+        
+        // Check if we have more pages
+        if (!response.next || pageDevices.length < limit) {
+          break;
+        }
+        
+        offset += limit;
+      }
       
-      // Transform NetBox device format to match our UI expectations
-      const transformedDevices = (response.data || []).map(device => ({
-        id: device.id,
-        ip_address: device.primary_ip4?.address?.split("/")[0] || device.name,
-        ip_with_prefix: device.primary_ip4?.address,
-        hostname: device.name,
-        name: device.name,
-        description: device.description || device.device_type?.display,
-        vendor: device.device_type?.manufacturer?.name,
-        model: device.device_type?.model,
-        serial: device.serial,
-        status: device.status?.value || "active",
-        status_label: device.status?.label || "Active",
-        site: device.site?.name,
-        site_slug: device.site?.slug,
-        role: device.role?.name || device.device_role?.name,
-        role_slug: device.role?.slug || device.device_role?.slug,
-        platform: device.platform?.name,
-        platform_slug: device.platform?.slug,
-        device_type: device._type || "device",  // 'device' or 'virtual_machine'
-        _type: device._type || "device",  // Preserve _type for unique keys
-        cluster: device.cluster?.name,  // For VMs
-        // For compatibility with existing UI
-        ping_status: device.status?.value === "active" ? "online" : "unknown",
-        snmp_status: "unknown",
-        network_range: null,  // Will be computed from IP ranges
-        // Keep original NetBox data
-        _netbox: device,
-      }));
-      
-      setDevices(transformedDevices);
+      setDevices(allDevices);
       setPagination({
-        count: response.count || transformedDevices.length,
-        next: response.next,
-        previous: response.previous,
+        count: totalCount,
+        next: null,
+        previous: null,
       });
       setError(null);
     } catch (err) {
