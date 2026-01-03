@@ -933,3 +933,289 @@ def reset_mcp_service():
     """Reset the global MCP service instance (for config changes)."""
     global _mcp_service
     _mcp_service = None
+
+
+def sync_ciena_interfaces_to_netbox(mcp_service, netbox_service, device_ip: str = None) -> Dict:
+    """
+    Sync Ciena switch interfaces to NetBox with correct types, speeds, and SFP modules.
+    
+    This function:
+    1. Gets port status from MCP to determine actual port types
+    2. Gets equipment (SFPs) from MCP
+    3. Updates NetBox interfaces with correct types and speeds
+    4. Creates/updates SFP modules in NetBox module bays
+    
+    Args:
+        mcp_service: CienaMCPService instance
+        netbox_service: NetBox service instance
+        device_ip: Optional - sync only this device, otherwise sync all Ciena devices
+    
+    Returns:
+        Dict with sync statistics
+    """
+    stats = {
+        'devices_processed': 0,
+        'interfaces_updated': 0,
+        'modules_created': 0,
+        'modules_updated': 0,
+        'errors': []
+    }
+    
+    # Map MCP port types to NetBox interface types
+    PORT_TYPE_MAP = {
+        '10/100/G': '1000base-t',      # Copper 1G
+        '10Gig': '10gbase-x-sfpp',      # SFP+ 10G
+        'G/10Gig': '10gbase-x-sfpp',    # Combo SFP (1G/10G)
+        '1Gig': '1000base-x-sfp',       # SFP 1G
+        '100G': '100gbase-x-qsfp28',    # QSFP28 100G
+    }
+    
+    # Map MCP oper_mode to speed in Kbps
+    SPEED_MAP = {
+        '10/FD': 10000,
+        '10/HD': 10000,
+        '100/FD': 100000,
+        '100/HD': 100000,
+        '1000/FD': 1000000,
+        '10G/FD': 10000000,
+        '100G/FD': 100000000,
+    }
+    
+    try:
+        # Get all Ciena devices from MCP
+        all_mcp_devices = mcp_service.get_all_devices()
+        
+        # Filter to specific device if requested
+        if device_ip:
+            all_mcp_devices = [d for d in all_mcp_devices 
+                              if d.get('attributes', {}).get('ipAddress') == device_ip]
+        
+        for mcp_device in all_mcp_devices:
+            attrs = mcp_device.get('attributes', {})
+            ip = attrs.get('ipAddress')
+            name = attrs.get('name') or attrs.get('displayData', {}).get('displayName')
+            device_id = mcp_device.get('id')
+            
+            if not ip or not name:
+                continue
+            
+            # Find device in NetBox
+            try:
+                nb_search = netbox_service._request('GET', f'dcim/devices/?name={name}')
+                if not nb_search.get('results'):
+                    # Try by primary IP
+                    nb_search = netbox_service._request('GET', f'dcim/devices/?primary_ip4={ip}')
+                
+                if not nb_search.get('results'):
+                    logger.debug(f"Device {name} ({ip}) not found in NetBox, skipping")
+                    continue
+                
+                nb_device = nb_search['results'][0]
+                nb_device_id = nb_device['id']
+            except Exception as e:
+                stats['errors'].append({'device': name, 'error': f'NetBox lookup failed: {e}'})
+                continue
+            
+            stats['devices_processed'] += 1
+            
+            # Get port status from MCP
+            try:
+                port_status = mcp_service.get_ethernet_port_status(device_id)
+            except Exception as e:
+                logger.warning(f"Failed to get port status for {name}: {e}")
+                port_status = []
+            
+            # Get equipment (SFPs) from MCP
+            try:
+                # Get all equipment and filter by device name
+                all_equipment = mcp_service.get_all_equipment()
+                device_equipment = [e for e in all_equipment 
+                                   if e.get('attributes', {}).get('locations', [{}])[0].get('neName') == name]
+                
+                # Extract SFPs with simplified format
+                sfps = []
+                for item in device_equipment:
+                    attrs = item.get('attributes', {})
+                    installed = attrs.get('installedSpec', {})
+                    locations = attrs.get('locations', [{}])
+                    location = locations[0] if locations else {}
+                    
+                    eq_type = installed.get('type') or attrs.get('cardType')
+                    slot = location.get('subslot')
+                    
+                    if eq_type == 'SFP' and slot:
+                        sfps.append({
+                            'slot': slot,
+                            'serial_number': installed.get('serialNumber', ''),
+                            'part_number': installed.get('partNumber', ''),
+                            'manufacturer': installed.get('manufacturer', 'Unknown'),
+                        })
+                logger.debug(f"Found {len(sfps)} SFPs for {name}: {[s['slot'] for s in sfps]}")
+            except Exception as e:
+                logger.warning(f"Failed to get equipment for {name}: {e}")
+                sfps = []
+            
+            # Get existing interfaces from NetBox
+            try:
+                nb_interfaces = netbox_service._request('GET', f'dcim/interfaces/?device_id={nb_device_id}&limit=100')
+                interface_map = {str(iface['name']): iface for iface in nb_interfaces.get('results', [])}
+            except Exception as e:
+                stats['errors'].append({'device': name, 'error': f'Failed to get interfaces: {e}'})
+                continue
+            
+            # Update interfaces based on MCP port status
+            for port in port_status:
+                port_num = port.get('port')
+                port_type = port.get('port_type')
+                oper_mode = port.get('oper_mode')
+                oper_link = port.get('oper_link')
+                
+                if not port_num:
+                    continue
+                
+                # Find matching interface in NetBox
+                nb_iface = interface_map.get(port_num)
+                if not nb_iface:
+                    continue
+                
+                # Determine correct interface type
+                nb_type = PORT_TYPE_MAP.get(port_type, '1000base-t')
+                
+                # Determine speed
+                speed = SPEED_MAP.get(oper_mode) if oper_mode else None
+                
+                # Build update data
+                update_data = {}
+                
+                if nb_iface.get('type', {}).get('value') != nb_type:
+                    update_data['type'] = nb_type
+                
+                if speed and nb_iface.get('speed') != speed:
+                    update_data['speed'] = speed
+                
+                # Update enabled status based on admin_link
+                admin_enabled = port.get('admin_link') == 'Enabled'
+                if nb_iface.get('enabled') != admin_enabled:
+                    update_data['enabled'] = admin_enabled
+                
+                if update_data:
+                    try:
+                        netbox_service._request('PATCH', f'dcim/interfaces/{nb_iface["id"]}/', json=update_data)
+                        stats['interfaces_updated'] += 1
+                        logger.debug(f"Updated interface {name}/{port_num}: {update_data}")
+                    except Exception as e:
+                        stats['errors'].append({'device': name, 'interface': port_num, 'error': str(e)})
+            
+            # Handle SFP modules
+            # Get module bays for this device
+            try:
+                nb_module_bays = netbox_service._request('GET', f'dcim/module-bays/?device_id={nb_device_id}')
+                module_bay_map = {}
+                for bay in nb_module_bays.get('results', []):
+                    bay_name = bay['name']
+                    # Map bay names to MCP slot numbers
+                    # SFP+1 -> slot 21, SFP+2 -> slot 22, etc.
+                    if 'SFP+' in bay_name:
+                        bay_num = int(bay_name.replace('SFP+', ''))
+                        mcp_slot = str(20 + bay_num)  # SFP+1 = slot 21
+                        module_bay_map[mcp_slot] = bay
+                    elif bay_name.isdigit():
+                        # Direct slot number
+                        module_bay_map[bay_name] = bay
+                logger.debug(f"Module bay map for {name}: {list(module_bay_map.keys())}")
+            except Exception as e:
+                logger.warning(f"Failed to get module bays for {name}: {e}")
+                module_bay_map = {}
+            
+            # Get existing modules
+            try:
+                nb_modules = netbox_service._request('GET', f'dcim/modules/?device_id={nb_device_id}')
+                existing_modules = {m['module_bay']['id']: m for m in nb_modules.get('results', [])}
+            except Exception as e:
+                logger.warning(f"Failed to get modules for {name}: {e}")
+                existing_modules = {}
+            
+            # Process SFPs from MCP
+            for sfp in sfps:
+                # Equipment data is already simplified from get_equipment()
+                slot = sfp.get('slot')
+                
+                if not slot:
+                    continue
+                
+                serial = sfp.get('serial_number', '')
+                part_number = sfp.get('part_number', '')
+                manufacturer = sfp.get('manufacturer', 'Unknown')
+                
+                # Find matching module bay
+                module_bay = module_bay_map.get(slot)
+                if not module_bay:
+                    continue
+                
+                # Check if module already exists
+                existing_module = existing_modules.get(module_bay['id'])
+                
+                # Get or create module type
+                module_type_id = None
+                try:
+                    # Search for existing module type
+                    mt_search = netbox_service._request('GET', f'dcim/module-types/?model__ic={part_number[:30]}')
+                    if mt_search.get('results'):
+                        module_type_id = mt_search['results'][0]['id']
+                    else:
+                        # Create module type
+                        # First get/create manufacturer
+                        mfr_search = netbox_service._request('GET', f'dcim/manufacturers/?name__ic={manufacturer}')
+                        if mfr_search.get('results'):
+                            mfr_id = mfr_search['results'][0]['id']
+                        else:
+                            # Create manufacturer
+                            mfr_data = {'name': manufacturer, 'slug': manufacturer.lower().replace(' ', '-')}
+                            mfr_result = netbox_service._request('POST', 'dcim/manufacturers/', json=mfr_data)
+                            mfr_id = mfr_result['id']
+                        
+                        # Create module type
+                        mt_data = {
+                            'manufacturer': mfr_id,
+                            'model': part_number or 'SFP',
+                        }
+                        mt_result = netbox_service._request('POST', 'dcim/module-types/', json=mt_data)
+                        module_type_id = mt_result['id']
+                except Exception as e:
+                    logger.warning(f"Failed to get/create module type for {part_number}: {e}")
+                    continue
+                
+                if existing_module:
+                    # Update existing module
+                    update_data = {'serial': serial}
+                    if existing_module.get('module_type', {}).get('id') != module_type_id:
+                        update_data['module_type'] = module_type_id
+                    try:
+                        netbox_service._request('PATCH', f'dcim/modules/{existing_module["id"]}/', json=update_data)
+                        stats['modules_updated'] += 1
+                    except Exception as e:
+                        stats['errors'].append({'device': name, 'slot': slot, 'error': str(e)})
+                else:
+                    # Create new module
+                    module_data = {
+                        'device': nb_device_id,
+                        'module_bay': module_bay['id'],
+                        'module_type': module_type_id,
+                        'serial': serial,
+                    }
+                    try:
+                        netbox_service._request('POST', 'dcim/modules/', json=module_data)
+                        stats['modules_created'] += 1
+                    except Exception as e:
+                        stats['errors'].append({'device': name, 'slot': slot, 'error': str(e)})
+        
+        logger.info(f"Ciena sync complete: {stats['devices_processed']} devices, "
+                   f"{stats['interfaces_updated']} interfaces updated, "
+                   f"{stats['modules_created']} modules created, "
+                   f"{stats['modules_updated']} modules updated")
+        
+    except Exception as e:
+        stats['errors'].append({'error': f'Sync failed: {e}'})
+        logger.error(f"Ciena sync failed: {e}")
+    
+    return stats

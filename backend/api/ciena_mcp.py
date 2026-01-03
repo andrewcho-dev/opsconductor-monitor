@@ -1083,3 +1083,39 @@ def get_ethernet_port_status_by_ip(device_ip):
         }))
     except Exception as e:
         return jsonify(error_response('MCP_ERROR', str(e))), 500
+
+
+# ==================== NETBOX SYNC ====================
+
+@mcp_bp.route('/sync/interfaces', methods=['POST'])
+def sync_ciena_interfaces():
+    """
+    Sync Ciena switch interfaces to NetBox with correct types, speeds, and SFP modules.
+    
+    This updates:
+    - Interface types based on MCP port_type (10/100/G -> 1000base-t, 10Gig -> 10gbase-x-sfpp)
+    - Interface speeds based on operational mode
+    - SFP modules in module bays
+    
+    Query params:
+        device_ip: Optional - sync only this device
+    """
+    from ..services.ciena_mcp_service import sync_ciena_interfaces_to_netbox
+    
+    device_ip = request.args.get('device_ip')
+    
+    mcp_service = get_mcp_service()
+    if not mcp_service.is_configured:
+        return jsonify(error_response('NOT_CONFIGURED', 'MCP is not configured')), 400
+    
+    from .netbox import get_netbox_service
+    netbox_service = get_netbox_service()
+    
+    if not netbox_service.is_configured:
+        return jsonify(error_response('NETBOX_ERROR', 'NetBox is not configured')), 400
+    
+    try:
+        stats = sync_ciena_interfaces_to_netbox(mcp_service, netbox_service, device_ip=device_ip)
+        return jsonify(success_response(stats))
+    except Exception as e:
+        return jsonify(error_response('SYNC_ERROR', str(e))), 500
