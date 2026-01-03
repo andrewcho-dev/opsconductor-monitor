@@ -77,7 +77,7 @@ def poll_availability(self, device_filter: Optional[Dict] = None):
                 if device_filter.get('site'):
                     query += " AND site_name = %s"
                     params.append(device_filter['site'])
-            query += " LIMIT 500"  # Limit for performance
+            query += " LIMIT 2000"  # Poll all devices
             cursor.execute(query, params)
             rows = cursor.fetchall()
         
