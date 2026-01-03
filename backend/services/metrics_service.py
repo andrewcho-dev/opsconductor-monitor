@@ -207,6 +207,42 @@ class MetricsService:
     # INTERFACE METRICS
     # =========================================================================
     
+    def get_interface_metrics(
+        self,
+        device_ip: str = None,
+        interface_name: str = None,
+        start_time: datetime = None,
+        end_time: datetime = None,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        """Get interface metrics."""
+        sql = "SELECT * FROM interface_metrics WHERE 1=1"
+        params = []
+        
+        if device_ip:
+            sql += " AND device_ip = %s"
+            params.append(device_ip)
+        
+        if interface_name:
+            sql += " AND interface_name = %s"
+            params.append(interface_name)
+        
+        if start_time:
+            sql += " AND recorded_at >= %s"
+            params.append(start_time)
+        
+        if end_time:
+            sql += " AND recorded_at <= %s"
+            params.append(end_time)
+        
+        sql += " ORDER BY recorded_at DESC LIMIT %s"
+        params.append(limit)
+        
+        with self._get_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(sql, params)
+                return [dict(row) for row in cur.fetchall()]
+    
     def store_interface_metrics(
         self,
         device_ip: str,

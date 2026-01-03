@@ -179,6 +179,51 @@ def store_availability_metrics():
         return jsonify({'error': str(e)}), 500
 
 
+@metrics_bp.route('/interface', methods=['GET'])
+def get_interface_metrics():
+    """
+    Get interface metrics.
+    
+    Query params:
+        device_ip: Required - Device IP address
+        interface_name: Optional - Interface name filter
+        hours: Optional - Hours of data (default 24)
+        limit: Optional - Max records (default 100)
+    """
+    device_ip = request.args.get('device_ip')
+    if not device_ip:
+        return jsonify({'error': 'device_ip is required'}), 400
+    
+    interface_name = request.args.get('interface_name')
+    hours = int(request.args.get('hours', 24))
+    limit = int(request.args.get('limit', 100))
+    
+    start_time = datetime.utcnow() - timedelta(hours=hours)
+    
+    try:
+        service = get_metrics_service()
+        metrics = service.get_interface_metrics(
+            device_ip=device_ip,
+            interface_name=interface_name,
+            start_time=start_time,
+            limit=limit,
+        )
+        
+        for m in metrics:
+            if 'recorded_at' in m and m['recorded_at']:
+                m['recorded_at'] = m['recorded_at'].isoformat()
+        
+        return jsonify({
+            'device_ip': device_ip,
+            'interface_name': interface_name,
+            'count': len(metrics),
+            'metrics': metrics,
+        })
+    except Exception as e:
+        logger.error(f"Error getting interface metrics: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 @metrics_bp.route('/interface', methods=['POST'])
 def store_interface_metrics():
     """Store interface metrics."""

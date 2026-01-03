@@ -68,6 +68,10 @@ def _make_celery() -> Celery:
                 "task": "polling.availability",
                 "schedule": 60.0,  # Every minute
             },
+            "opsconductor-poll-interfaces": {
+                "task": "polling.interfaces",
+                "schedule": 300.0,  # Every 5 minutes
+            },
         },
     )
 

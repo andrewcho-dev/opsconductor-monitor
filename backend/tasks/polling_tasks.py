@@ -170,32 +170,118 @@ def poll_interfaces(self, device_filter: Optional[Dict] = None):
     Returns:
         Dict with poll statistics
     """
-    from ..services.polling_service import PollingService
-    from ..services.netbox_service import NetBoxService
-    from ..services.credential_service import CredentialService
+    from backend.database import DatabaseConnection
+    from ..services.async_snmp_poller import AsyncSNMPPoller, SNMPTarget, CommonOIDs
     
     async def _poll():
-        netbox = NetBoxService()
-        credentials = CredentialService()
+        # Get switches from local cache
+        db = DatabaseConnection()
+        with db.cursor() as cursor:
+            query = """
+                SELECT device_ip, device_name, role_name, site_name
+                FROM netbox_device_cache
+                WHERE device_ip IS NOT NULL
+                AND role_name IN ('Backbone Switch', 'backbone-switch', 'Core Switch', 'core-switch', 
+                                  'Edge Switch', 'edge-switch', 'Access Switch', 'access-switch')
+            """
+            params = []
+            if device_filter:
+                if device_filter.get('site'):
+                    query += " AND site_name = %s"
+                    params.append(device_filter['site'])
+            query += " LIMIT 200"
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
         
-        service = PollingService(
-            netbox_service=netbox,
-            credential_service=credentials,
-            max_concurrent=50,  # Lower for bulk queries
-            batch_size=25,
-        )
+        if not rows:
+            logger.warning("No switches found for interface polling")
+            from datetime import datetime
+            return {
+                'job_name': 'poll_interfaces',
+                'started_at': datetime.utcnow().isoformat(),
+                'completed_at': datetime.utcnow().isoformat(),
+                'total_devices': 0,
+                'successful': 0,
+                'failed': 0,
+                'duration_seconds': 0,
+            }
         
-        result = await service.poll_interfaces(device_filter)
+        # Build SNMP targets
+        targets = [
+            SNMPTarget(
+                ip=str(row['device_ip']),
+                community='public',
+                device_type=row.get('role_name', 'unknown'),
+                site=row.get('site_name', ''),
+            )
+            for row in rows
+        ]
+        
+        logger.info(f"Polling interfaces for {len(targets)} switches")
+        
+        # Create poller
+        poller = AsyncSNMPPoller(max_concurrent=25, batch_size=10)
+        from datetime import datetime
+        started_at = datetime.utcnow()
+        
+        successful = 0
+        failed = 0
+        total_interfaces = 0
+        
+        # Poll each device for interface stats
+        for target in targets:
+            try:
+                # Get interface names, in/out octets, errors
+                if_names = await poller.engine.get_bulk(target, CommonOIDs.IF_DESCR, max_repetitions=50)
+                if_in_octets = await poller.engine.get_bulk(target, CommonOIDs.IF_IN_OCTETS, max_repetitions=50)
+                if_out_octets = await poller.engine.get_bulk(target, CommonOIDs.IF_OUT_OCTETS, max_repetitions=50)
+                if_in_errors = await poller.engine.get_bulk(target, CommonOIDs.IF_IN_ERRORS, max_repetitions=50)
+                if_out_errors = await poller.engine.get_bulk(target, CommonOIDs.IF_OUT_ERRORS, max_repetitions=50)
+                
+                if if_names.success:
+                    successful += 1
+                    # Store interface metrics
+                    with db.cursor() as cursor:
+                        for oid, if_name in if_names.values.items():
+                            if_index = int(oid.split('.')[-1])
+                            
+                            in_octets_oid = f"{CommonOIDs.IF_IN_OCTETS}.{if_index}"
+                            out_octets_oid = f"{CommonOIDs.IF_OUT_OCTETS}.{if_index}"
+                            in_errors_oid = f"{CommonOIDs.IF_IN_ERRORS}.{if_index}"
+                            out_errors_oid = f"{CommonOIDs.IF_OUT_ERRORS}.{if_index}"
+                            
+                            rx_bytes = if_in_octets.values.get(in_octets_oid) if if_in_octets.success else None
+                            tx_bytes = if_out_octets.values.get(out_octets_oid) if if_out_octets.success else None
+                            rx_errors = if_in_errors.values.get(in_errors_oid) if if_in_errors.success else None
+                            tx_errors = if_out_errors.values.get(out_errors_oid) if if_out_errors.success else None
+                            
+                            cursor.execute("""
+                                INSERT INTO interface_metrics 
+                                (device_ip, interface_name, interface_index, rx_bytes, tx_bytes, rx_errors, tx_errors, recorded_at)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
+                            """, (target.ip, str(if_name), if_index, rx_bytes, tx_bytes, rx_errors, tx_errors))
+                            total_interfaces += 1
+                        
+                        db.get_connection().commit()
+                else:
+                    failed += 1
+                    
+            except Exception as e:
+                logger.error(f"Interface poll failed for {target.ip}: {e}")
+                failed += 1
+        
+        completed_at = datetime.utcnow()
+        logger.info(f"Interface poll complete: {successful}/{len(targets)} devices, {total_interfaces} interfaces")
         
         return {
-            'job_name': result.job_name,
-            'started_at': result.started_at.isoformat(),
-            'completed_at': result.completed_at.isoformat(),
-            'total_devices': result.total_devices,
-            'successful': result.successful,
-            'failed': result.failed,
-            'duration_seconds': result.duration_seconds,
-            'success_rate': result.stats.success_rate,
+            'job_name': 'poll_interfaces',
+            'started_at': started_at.isoformat(),
+            'completed_at': completed_at.isoformat(),
+            'total_devices': len(targets),
+            'successful': successful,
+            'failed': failed,
+            'total_interfaces': total_interfaces,
+            'duration_seconds': (completed_at - started_at).total_seconds(),
         }
     
     try:

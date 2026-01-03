@@ -29,6 +29,135 @@ import {
 } from "recharts";
 import { cn, fetchApi } from "../lib/utils";
 
+// Interface Metrics Panel Component
+function InterfaceMetricsPanel({ deviceIp, interfaceName, timeRange, onClose }) {
+  const [metrics, setMetrics] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadMetrics = async () => {
+      setLoading(true);
+      try {
+        const res = await fetchApi(
+          `/api/metrics/interface?device_ip=${encodeURIComponent(deviceIp)}&interface_name=${encodeURIComponent(interfaceName)}&hours=${timeRange}`
+        );
+        const data = res.metrics || [];
+        setMetrics(data.map(m => ({
+          timestamp: new Date(m.recorded_at).getTime(),
+          time: new Date(m.recorded_at).toLocaleString(),
+          rxBytes: parseInt(m.rx_bytes) || 0,
+          txBytes: parseInt(m.tx_bytes) || 0,
+          rxErrors: parseInt(m.rx_errors) || 0,
+          txErrors: parseInt(m.tx_errors) || 0,
+        })));
+      } catch (err) {
+        console.error("Failed to load interface metrics:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadMetrics();
+  }, [deviceIp, interfaceName, timeRange]);
+
+  // Calculate traffic rates between samples
+  const trafficData = metrics.length > 1 ? metrics.slice(0, -1).map((m, i) => {
+    const next = metrics[i + 1];
+    const timeDiff = (m.timestamp - next.timestamp) / 1000; // seconds
+    if (timeDiff <= 0) return null;
+    return {
+      timestamp: m.timestamp,
+      time: m.time,
+      rxBps: Math.max(0, (m.rxBytes - next.rxBytes) / timeDiff),
+      txBps: Math.max(0, (m.txBytes - next.txBytes) / timeDiff),
+      rxErrors: m.rxErrors,
+      txErrors: m.txErrors,
+    };
+  }).filter(Boolean) : [];
+
+  return (
+    <div className="bg-white rounded-xl border border-blue-200 p-6 shadow-lg">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-semibold flex items-center gap-2">
+          <Activity className="w-5 h-5 text-blue-500" />
+          Interface: {interfaceName}
+        </h2>
+        <button
+          onClick={onClose}
+          className="p-1 hover:bg-gray-100 rounded"
+        >
+          <XCircle className="w-5 h-5 text-gray-400" />
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center py-8">
+          <RefreshCw className="w-6 h-6 animate-spin text-gray-400" />
+        </div>
+      ) : metrics.length === 0 ? (
+        <p className="text-gray-500 text-center py-4">
+          No metrics collected yet for this interface. Data will appear after the next polling cycle.
+        </p>
+      ) : (
+        <>
+          {/* Traffic Chart */}
+          <div className="h-64 mb-4">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={trafficData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis 
+                  dataKey="timestamp" 
+                  type="number"
+                  domain={['dataMin', 'dataMax']}
+                  tickFormatter={(ts) => new Date(ts).toLocaleTimeString()}
+                  stroke="#9ca3af"
+                  fontSize={12}
+                />
+                <YAxis 
+                  stroke="#9ca3af"
+                  fontSize={12}
+                  tickFormatter={(v) => v > 1000000 ? `${(v/1000000).toFixed(1)}M` : v > 1000 ? `${(v/1000).toFixed(0)}K` : v}
+                />
+                <Tooltip 
+                  labelFormatter={(ts) => new Date(ts).toLocaleString()}
+                  formatter={(value) => [`${(value/1000).toFixed(1)} KB/s`, '']}
+                  contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
+                />
+                <Legend />
+                <Area type="monotone" dataKey="rxBps" name="RX" stroke="#10b981" fill="#d1fae5" strokeWidth={2} />
+                <Area type="monotone" dataKey="txBps" name="TX" stroke="#3b82f6" fill="#dbeafe" strokeWidth={2} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Stats Summary */}
+          <div className="grid grid-cols-4 gap-4 text-sm">
+            <div className="bg-gray-50 rounded-lg p-3">
+              <p className="text-gray-500">Total RX</p>
+              <p className="font-semibold">{(metrics[0]?.rxBytes / 1000000).toFixed(2)} MB</p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3">
+              <p className="text-gray-500">Total TX</p>
+              <p className="font-semibold">{(metrics[0]?.txBytes / 1000000).toFixed(2)} MB</p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3">
+              <p className="text-gray-500">RX Errors</p>
+              <p className={cn("font-semibold", metrics[0]?.rxErrors > 0 && "text-red-600")}>
+                {metrics[0]?.rxErrors || 0}
+              </p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3">
+              <p className="text-gray-500">TX Errors</p>
+              <p className={cn("font-semibold", metrics[0]?.txErrors > 0 && "text-red-600")}>
+                {metrics[0]?.txErrors || 0}
+              </p>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // Time range options for charts
 const TIME_RANGES = [
   { label: "1h", hours: 1 },
@@ -421,6 +550,16 @@ export function DeviceDetail() {
           <p className="text-gray-500 text-center py-4">No interfaces found in NetBox</p>
         )}
       </div>
+
+      {/* Selected Interface Metrics */}
+      {selectedInterface && (
+        <InterfaceMetricsPanel 
+          deviceIp={ip} 
+          interfaceName={selectedInterface.name}
+          timeRange={timeRange}
+          onClose={() => setSelectedInterface(null)}
+        />
+      )}
 
       {/* Time Range Selector */}
       <div className="flex items-center gap-2">
