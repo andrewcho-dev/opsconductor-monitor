@@ -97,30 +97,41 @@ function InterfaceMetricsPanel({ deviceIp, interfaceName, timeRange, onClose }) 
     loadMetrics();
   }, [deviceIp, portNum, timeRange]);
 
-  // Calculate traffic rates between consecutive samples
-  // Data is sorted DESC (newest first), so we need to reverse for rate calculation
+  // Calculate port utilization % between consecutive samples
+  // Port speed: assume 1000 Mbps for copper (ports 1-20), 10000 Mbps for optical (ports 21+)
+  const portSpeed = parseInt(portNum) >= 21 ? 10000 : 1000; // Mbps
+  
+  // Sort data chronologically and calculate utilization at each poll
   const sortedMetrics = [...trafficMetrics].sort((a, b) => a.timestamp - b.timestamp);
-  const trafficRates = sortedMetrics.length > 1 ? sortedMetrics.slice(1).map((m, i) => {
+  const utilizationData = sortedMetrics.length > 1 ? sortedMetrics.slice(1).map((m, i) => {
     const prev = sortedMetrics[i];
-    const timeDiff = (m.timestamp - prev.timestamp) / 1000;
-    if (timeDiff <= 0) return null;
-    // Calculate delta - handle counter wraps (when current < previous)
+    const timeDiff = (m.timestamp - prev.timestamp) / 1000; // seconds
+    if (timeDiff <= 0 || timeDiff > 600) return null; // Skip if > 10 min gap
+    
+    // Calculate bytes transferred in this interval
     let rxDelta = m.rxBytes - prev.rxBytes;
     let txDelta = m.txBytes - prev.txBytes;
-    // If negative, counter wrapped - skip this sample
-    if (rxDelta < 0) rxDelta = 0;
-    if (txDelta < 0) txDelta = 0;
-    // Convert bytes/sec to Mbps (megabits per second)
-    // bytes * 8 / 1,000,000 = Mbps
+    
+    // Skip counter wraps
+    if (rxDelta < 0 || txDelta < 0) return null;
+    
+    // Convert to Mbps: (bytes * 8) / (seconds * 1,000,000)
+    const rxMbps = (rxDelta * 8) / (timeDiff * 1000000);
+    const txMbps = (txDelta * 8) / (timeDiff * 1000000);
+    
+    // Calculate utilization as % of port speed
+    const rxUtil = Math.min(100, (rxMbps / portSpeed) * 100);
+    const txUtil = Math.min(100, (txMbps / portSpeed) * 100);
+    
     return {
       timestamp: m.timestamp,
       time: m.time,
-      rxMbps: (rxDelta * 8 / 1000000) / timeDiff,
-      txMbps: (txDelta * 8 / 1000000) / timeDiff,
+      rxUtil: parseFloat(rxUtil.toFixed(1)),
+      txUtil: parseFloat(txUtil.toFixed(1)),
     };
   }).filter(Boolean) : [];
 
-  const hasTraffic = trafficMetrics.length > 0 && trafficMetrics.some(m => m.rxBytes > 0 || m.txBytes > 0);
+  const hasTraffic = utilizationData.length > 0;
   const hasOptical = opticalMetrics.length > 0;
 
   return (
@@ -201,16 +212,16 @@ function InterfaceMetricsPanel({ deviceIp, interfaceName, timeRange, onClose }) 
             </div>
           )}
 
-          {/* Traffic Chart */}
-          {hasTraffic && trafficRates.length > 0 && (
+          {/* Port Utilization Chart */}
+          {hasTraffic && (
             <div>
               <h3 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                 <Activity className="w-4 h-4 text-blue-500" />
-                Traffic (Mbps)
+                Port Utilization ({portSpeed >= 10000 ? '10G' : '1G'} port)
               </h3>
               <div className="h-48">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={trafficRates}>
+                  <LineChart data={utilizationData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                     <XAxis 
                       dataKey="timestamp" 
@@ -223,17 +234,18 @@ function InterfaceMetricsPanel({ deviceIp, interfaceName, timeRange, onClose }) 
                     <YAxis 
                       stroke="#9ca3af"
                       fontSize={11}
-                      tickFormatter={(v) => `${v.toFixed(1)} Mbps`}
-                      width={70}
+                      domain={[0, 100]}
+                      tickFormatter={(v) => `${v}%`}
+                      width={50}
                     />
                     <Tooltip 
                       labelFormatter={(ts) => new Date(ts).toLocaleString()}
-                      formatter={(value) => [`${value.toFixed(2)} Mbps`, '']}
+                      formatter={(value, name) => [`${value}%`, name === 'rxUtil' ? 'RX Utilization' : 'TX Utilization']}
                       contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
                     />
                     <Legend />
-                    <Line type="linear" dataKey="rxMbps" name="RX" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} connectNulls />
-                    <Line type="linear" dataKey="txMbps" name="TX" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} connectNulls />
+                    <Line type="linear" dataKey="rxUtil" name="RX %" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} connectNulls />
+                    <Line type="linear" dataKey="txUtil" name="TX %" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} connectNulls />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
