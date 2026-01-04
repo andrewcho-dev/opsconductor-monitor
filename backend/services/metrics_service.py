@@ -179,7 +179,7 @@ class MetricsService:
         """
         sql = """
             SELECT * FROM optical_metrics
-            WHERE device_ip = %s
+            WHERE device_ip = %s::inet
         """
         params = [device_ip]
         
@@ -220,7 +220,7 @@ class MetricsService:
         params = []
         
         if device_ip:
-            sql += " AND device_ip = %s"
+            sql += " AND device_ip = %s::inet"
             params.append(device_ip)
         
         if interface_name:
@@ -424,7 +424,7 @@ class MetricsService:
         params = []
         
         if device_ip:
-            sql += " AND device_ip = %s"
+            sql += " AND device_ip = %s::inet"
             params.append(device_ip)
         
         if site_id:

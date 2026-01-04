@@ -34,7 +34,8 @@ import {
   FileKey,
   Circle,
   Battery,
-  Download
+  Download,
+  Radio
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -108,6 +109,13 @@ const moduleNavigation = {
         title: 'Power',
         items: [
           { id: 'ups', label: 'UPS Monitor', icon: Battery, path: '/monitor/ups' },
+        ]
+      },
+      {
+        title: 'Polling',
+        items: [
+          { id: 'polling', label: 'Polling Management', icon: Radio, path: '/monitor/polling' },
+          { id: 'mib-mappings', label: 'MIB Mappings', icon: Database, path: '/monitor/mib-mappings' },
         ]
       }
     ]

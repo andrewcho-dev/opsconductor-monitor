@@ -258,6 +258,160 @@ def store_interface_metrics():
         return jsonify({'error': str(e)}), 500
 
 
+@metrics_bp.route('/optical/thresholds', methods=['GET'])
+def get_optical_thresholds():
+    """
+    Get optical power alarm/warning thresholds for a device interface.
+    
+    Fetches thresholds directly from the device via SNMP (on-demand, not stored).
+    
+    Query params:
+        device_ip: Required - Device IP address
+        interface_index: Optional - Interface index (port number)
+    
+    Returns:
+        Thresholds for TX and RX power (high/low alarm and warning levels)
+    """
+    import subprocess
+    
+    device_ip = request.args.get('device_ip')
+    if not device_ip:
+        return jsonify({'error': 'device_ip is required'}), 400
+    
+    interface_index = request.args.get('interface_index', type=int)
+    
+    try:
+        import math
+        
+        # OID base for Ciena optical thresholds (WWP-LEOS-PORT-XCVR-MIB)
+        WWP_XCVR_BASE = '1.3.6.1.4.1.6141.2.60.4.1.1.1.1'
+        
+        # Alarm threshold OIDs in dBm * 10000 format
+        DBM_THRESHOLD_OIDS = {
+            'tx_high_alarm': f'{WWP_XCVR_BASE}.107',
+            'tx_low_alarm': f'{WWP_XCVR_BASE}.108',
+            'rx_high_alarm': f'{WWP_XCVR_BASE}.109',
+            'rx_low_alarm': f'{WWP_XCVR_BASE}.110',
+        }
+        
+        # Warning threshold OIDs in micro-watts (µW) format - need conversion to dBm
+        # dBm = 10 * log10(µW / 1000)
+        UW_THRESHOLD_OIDS = {
+            'tx_high_warn_uw': f'{WWP_XCVR_BASE}.40',
+            'tx_low_warn_uw': f'{WWP_XCVR_BASE}.41',
+            'rx_high_warn_uw': f'{WWP_XCVR_BASE}.42',
+            'rx_low_warn_uw': f'{WWP_XCVR_BASE}.43',
+        }
+        
+        def uw_to_dbm(uw_value):
+            """Convert micro-watts to dBm."""
+            if uw_value <= 0:
+                return None
+            return 10 * math.log10(uw_value / 1000.0)
+        
+        thresholds = {}
+        
+        # Query alarm threshold OIDs (dBm * 10000 format)
+        for name, base_oid in DBM_THRESHOLD_OIDS.items():
+            try:
+                if interface_index:
+                    oid = f'{base_oid}.{interface_index}'
+                    cmd = ['snmpget', '-v2c', '-c', 'public', '-OQvn', device_ip, oid]
+                else:
+                    cmd = ['snmpbulkwalk', '-v2c', '-c', 'public', '-OQn', device_ip, base_oid]
+                
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+                
+                if result.returncode == 0 and result.stdout.strip():
+                    for line in result.stdout.strip().split('\n'):
+                        if '=' in line:
+                            parts = line.split('=', 1)
+                            oid_str = parts[0].strip()
+                            value_str = parts[1].strip()
+                            port_idx = oid_str.split('.')[-1]
+                            
+                            try:
+                                value = float(value_str) / 10000.0
+                            except ValueError:
+                                continue
+                            
+                            if port_idx not in thresholds:
+                                thresholds[port_idx] = {}
+                            thresholds[port_idx][name] = value
+                        elif interface_index:
+                            try:
+                                value = float(line.strip()) / 10000.0
+                                port_idx = str(interface_index)
+                                if port_idx not in thresholds:
+                                    thresholds[port_idx] = {}
+                                thresholds[port_idx][name] = value
+                            except ValueError:
+                                pass
+            except subprocess.TimeoutExpired:
+                logger.warning(f"SNMP timeout getting {name} for {device_ip}")
+            except Exception as e:
+                logger.warning(f"Error getting {name} for {device_ip}: {e}")
+        
+        # Query warning threshold OIDs (micro-watts format, convert to dBm)
+        for name, base_oid in UW_THRESHOLD_OIDS.items():
+            try:
+                if interface_index:
+                    oid = f'{base_oid}.{interface_index}'
+                    cmd = ['snmpget', '-v2c', '-c', 'public', '-OQvn', device_ip, oid]
+                else:
+                    cmd = ['snmpbulkwalk', '-v2c', '-c', 'public', '-OQn', device_ip, base_oid]
+                
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+                
+                if result.returncode == 0 and result.stdout.strip():
+                    for line in result.stdout.strip().split('\n'):
+                        if '=' in line:
+                            parts = line.split('=', 1)
+                            oid_str = parts[0].strip()
+                            value_str = parts[1].strip()
+                            port_idx = oid_str.split('.')[-1]
+                            
+                            try:
+                                uw_value = float(value_str)
+                                dbm_value = uw_to_dbm(uw_value)
+                                if dbm_value is None:
+                                    continue
+                            except ValueError:
+                                continue
+                            
+                            if port_idx not in thresholds:
+                                thresholds[port_idx] = {}
+                            # Convert name from _uw suffix to standard name
+                            clean_name = name.replace('_uw', '')
+                            thresholds[port_idx][clean_name] = round(dbm_value, 2)
+                        elif interface_index:
+                            try:
+                                uw_value = float(line.strip())
+                                dbm_value = uw_to_dbm(uw_value)
+                                if dbm_value is not None:
+                                    port_idx = str(interface_index)
+                                    if port_idx not in thresholds:
+                                        thresholds[port_idx] = {}
+                                    clean_name = name.replace('_uw', '')
+                                    thresholds[port_idx][clean_name] = round(dbm_value, 2)
+                            except ValueError:
+                                pass
+            except subprocess.TimeoutExpired:
+                logger.warning(f"SNMP timeout getting {name} for {device_ip}")
+            except Exception as e:
+                logger.warning(f"Error getting {name} for {device_ip}: {e}")
+        
+        return jsonify({
+            'device_ip': device_ip,
+            'interface_index': interface_index,
+            'thresholds': thresholds,
+            'count': len(thresholds),
+        })
+    except Exception as e:
+        logger.error(f"Error getting optical thresholds: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 @metrics_bp.route('/device/<device_ip>/summary', methods=['GET'])
 def get_device_summary(device_ip):
     """

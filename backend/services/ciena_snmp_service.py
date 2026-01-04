@@ -1081,17 +1081,24 @@ def poll_switch(host: str, community: str = 'public') -> Dict:
         community: SNMP community string
         
     Returns:
-        Dict with system info, rings, and alarms
+        Dict with system info, transceivers, port stats, rings, and alarms
     """
+    import time
+    start_time = time.time()
+    
     service = CienaSNMPService(host, community)
     
     result = {
         'host': host,
         'success': False,
         'system': None,
+        'transceivers': [],
+        'port_stats': [],
+        'ports': [],
         'raps_global': None,
         'virtual_rings': [],
         'active_alarms': [],
+        'chassis': None,
         'error': None,
     }
     
@@ -1102,6 +1109,25 @@ def poll_switch(host: str, community: str = 'public') -> Dict:
         result['error'] = f"System info failed: {e}"
         return result
     
+    # Transceivers (optical power) - HIGH PRIORITY
+    try:
+        result['transceivers'] = service.get_transceivers()
+    except Exception as e:
+        logger.warning(f"Transceivers failed for {host}: {e}")
+    
+    # Port statistics (traffic counters)
+    try:
+        result['port_stats'] = service.get_port_stats()
+    except Exception as e:
+        logger.warning(f"Port stats failed for {host}: {e}")
+    
+    # Port status
+    try:
+        result['ports'] = service.get_ports()
+    except Exception as e:
+        logger.warning(f"Ports failed for {host}: {e}")
+    
+    # RAPS/G.8032
     try:
         result['raps_global'] = service.get_raps_global()
     except Exception as e:
@@ -1112,10 +1138,19 @@ def poll_switch(host: str, community: str = 'public') -> Dict:
     except Exception as e:
         logger.warning(f"Virtual rings failed for {host}: {e}")
     
+    # Alarms
     try:
         result['active_alarms'] = service.get_active_alarms()
     except Exception as e:
         logger.warning(f"Active alarms failed for {host}: {e}")
+    
+    # Chassis health
+    try:
+        result['chassis'] = service.get_chassis_health()
+    except Exception as e:
+        logger.warning(f"Chassis health failed for {host}: {e}")
+    
+    result['poll_time_ms'] = int((time.time() - start_time) * 1000)
     
     return result
 

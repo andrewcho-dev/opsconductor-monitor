@@ -706,6 +706,72 @@ class AsyncSNMPPoller:
         
         return results
     
+    async def walk_devices(
+        self,
+        targets: List[SNMPTarget],
+        oids: List[str],
+    ) -> List[SNMPResult]:
+        """
+        Walk multiple OID trees on multiple devices concurrently.
+        
+        Args:
+            targets: List of SNMP targets
+            oids: List of base OIDs to walk on each device
+        
+        Returns:
+            List of SNMPResult for each target (values combined from all OID walks)
+        """
+        self.engine.reset_stats()
+        total = len(targets)
+        completed = [0]
+        
+        async def walk_target(target: SNMPTarget) -> SNMPResult:
+            """Walk all OIDs on a single target."""
+            all_values = {}
+            success = False
+            error = None
+            
+            for oid in oids:
+                try:
+                    result = await self.engine.get_bulk(target, oid)
+                    if result.success and result.values:
+                        all_values.update(result.values)
+                        success = True
+                    elif result.error and not error:
+                        error = result.error
+                except Exception as e:
+                    if not error:
+                        error = str(e)
+            
+            completed[0] += 1
+            if self.progress_callback:
+                self.progress_callback(completed[0], total)
+            
+            return SNMPResult(
+                target=target,
+                success=success,
+                values=all_values,
+                error=error if not success else None,
+            )
+        
+        # Launch all walks concurrently
+        tasks = [walk_target(target) for target in targets]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Convert exceptions to SNMPResult
+        final_results = []
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                final_results.append(SNMPResult(
+                    target=targets[i],
+                    success=False,
+                    error=str(result),
+                ))
+            else:
+                final_results.append(result)
+        
+        return final_results
+    
     @property
     def stats(self) -> PollerStats:
         """Get polling statistics."""

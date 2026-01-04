@@ -20,11 +20,14 @@ from .netbox import netbox_bp
 from .prtg import prtg_bp
 from .ciena_mcp import mcp_bp
 from .ciena_snmp import snmp_bp
+from .ciena_ssh import ssh_bp
 from .eaton_snmp import eaton_snmp_bp
 from .device_importer import device_importer_bp
 from .prtg_netbox_import import prtg_netbox_import_bp
 from .metrics import metrics_bp
 from .health import health_bp
+from .polling import polling_bp
+from .mib_mappings import mib_bp
 
 __all__ = [
     'devices_bp',
@@ -89,6 +92,7 @@ def register_blueprints(app):
     app.register_blueprint(prtg_bp)
     app.register_blueprint(mcp_bp)
     app.register_blueprint(snmp_bp)
+    app.register_blueprint(ssh_bp)
     app.register_blueprint(eaton_snmp_bp)
     app.register_blueprint(device_importer_bp)
     app.register_blueprint(prtg_netbox_import_bp)
@@ -96,3 +100,9 @@ def register_blueprints(app):
     # Metrics and health blueprints
     app.register_blueprint(metrics_bp)
     app.register_blueprint(health_bp)
+    
+    # Polling management
+    app.register_blueprint(polling_bp)
+    
+    # MIB OID Mapping system
+    app.register_blueprint(mib_bp)

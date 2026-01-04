@@ -11,6 +11,8 @@ import {
   Zap,
   Clock,
   AlertTriangle,
+  AlertCircle,
+  Bell,
   CheckCircle,
   XCircle,
   ChevronDown,
@@ -27,14 +29,17 @@ import {
   ResponsiveContainer,
   Area,
   AreaChart,
+  ReferenceArea,
+  ReferenceLine,
 } from "recharts";
 import { cn, fetchApi } from "../lib/utils";
 
 // Interface Metrics Panel Component
-function InterfaceMetricsPanel({ deviceIp, interfaceName, timeRange, onClose }) {
-  const [mcpTraffic, setMcpTraffic] = useState(null);
-  const [portStatus, setPortStatus] = useState(null);
+function InterfaceMetricsPanel({ deviceIp, interfaceName, timeRange, isOptical = false, onClose }) {
+  const [trafficMetrics, setTrafficMetrics] = useState([]);
+  const [latestTraffic, setLatestTraffic] = useState(null);
   const [opticalMetrics, setOpticalMetrics] = useState([]);
+  const [opticalThresholds, setOpticalThresholds] = useState(null);
   const [loading, setLoading] = useState(true);
   const [trafficExpanded, setTrafficExpanded] = useState(false);
 
@@ -45,47 +50,62 @@ function InterfaceMetricsPanel({ deviceIp, interfaceName, timeRange, onClose }) 
     const loadMetrics = async () => {
       setLoading(true);
       try {
-        // Load port operational status from MCP
+        // Load traffic metrics from SNMP polling
         try {
-          const statusRes = await fetchApi(
-            `/api/mcp/ports/by-ip/${encodeURIComponent(deviceIp)}/status`
+          const trafficRes = await fetchApi(
+            `/api/metrics/interface?device_ip=${encodeURIComponent(deviceIp)}&hours=${timeRange}&limit=500`
           );
-          if (statusRes.success && statusRes.data?.ports) {
-            const thisPort = statusRes.data.ports.find(p => p.port === portNum);
-            if (thisPort) {
-              setPortStatus(thisPort);
+          const trafficData = (trafficRes.metrics || []).filter(m => {
+            const mName = m.interface_name || '';
+            return mName.endsWith(portNum) || mName === `port${portNum}` || mName === portNum;
+          });
+          if (trafficData.length > 0) {
+            setLatestTraffic(trafficData[0]);
+            setTrafficMetrics(trafficData.map(m => ({
+              timestamp: new Date(m.recorded_at).getTime(),
+              time: new Date(m.recorded_at).toLocaleString(),
+              rxBytes: parseInt(m.rx_bytes) || 0,
+              txBytes: parseInt(m.tx_bytes) || 0,
+              rxBps: parseInt(m.rx_bps) || 0,
+              txBps: parseInt(m.tx_bps) || 0,
+              rxErrors: parseInt(m.rx_errors) || 0,
+              txErrors: parseInt(m.tx_errors) || 0,
+            })));
+          }
+        } catch (trafficErr) {
+          console.log("Traffic metrics not available:", trafficErr);
+        }
+
+        // Load optical metrics from SNMP polling (only for optical interfaces)
+        if (isOptical) {
+          try {
+            const opticalRes = await fetchApi(
+              `/api/metrics/optical?device_ip=${encodeURIComponent(deviceIp)}&hours=${timeRange}`
+            );
+            const opticalData = (opticalRes.metrics || []).filter(m => {
+              const mName = m.interface_name || '';
+              return mName.endsWith(portNum) || mName === `port${portNum}`;
+            });
+            setOpticalMetrics(opticalData.map(m => ({
+              timestamp: new Date(m.recorded_at).getTime(),
+              time: new Date(m.recorded_at).toLocaleString(),
+              txPower: parseFloat(m.tx_power) || null,
+              rxPower: parseFloat(m.rx_power) || null,
+            })));
+
+            // Load optical thresholds from SNMP polling data
+            const thresholdRes = await fetchApi(
+              `/api/metrics/optical/thresholds?device_ip=${encodeURIComponent(deviceIp)}&interface_index=${portNum}`
+            );
+            if (thresholdRes.thresholds && Object.keys(thresholdRes.thresholds).length > 0) {
+              const portThresholds = thresholdRes.thresholds[portNum] || 
+                                     thresholdRes.thresholds[Object.keys(thresholdRes.thresholds)[0]];
+              setOpticalThresholds(portThresholds);
             }
+          } catch (opticalErr) {
+            console.log("Optical metrics not available:", opticalErr);
           }
-        } catch (statusErr) {
-          console.log("MCP port status not available:", statusErr);
         }
-
-        // Load real-time traffic from MCP (Ciena BluePlanet)
-        try {
-          const mcpRes = await fetchApi(
-            `/api/mcp/pm/by-ip/${encodeURIComponent(deviceIp)}/port/${portNum}`
-          );
-          if (mcpRes.success && mcpRes.data) {
-            setMcpTraffic(mcpRes.data);
-          }
-        } catch (mcpErr) {
-          console.log("MCP PM not available for this device:", mcpErr);
-        }
-
-        // Load optical metrics from SNMP polling
-        const opticalRes = await fetchApi(
-          `/api/metrics/optical?device_ip=${encodeURIComponent(deviceIp)}&hours=${timeRange}`
-        );
-        const opticalData = (opticalRes.metrics || []).filter(m => {
-          const mName = m.interface_name || '';
-          return mName.endsWith(portNum) || mName === `port${portNum}`;
-        });
-        setOpticalMetrics(opticalData.map(m => ({
-          timestamp: new Date(m.recorded_at).getTime(),
-          time: new Date(m.recorded_at).toLocaleString(),
-          txPower: parseFloat(m.tx_power) || null,
-          rxPower: parseFloat(m.rx_power) || null,
-        })));
       } catch (err) {
         console.error("Failed to load interface metrics:", err);
       } finally {
@@ -93,7 +113,7 @@ function InterfaceMetricsPanel({ deviceIp, interfaceName, timeRange, onClose }) 
       }
     };
     loadMetrics();
-  }, [deviceIp, portNum, timeRange]);
+  }, [deviceIp, portNum, timeRange, isOptical]);
 
   // Format bytes to human readable
   const formatBytes = (bytes) => {
@@ -104,8 +124,38 @@ function InterfaceMetricsPanel({ deviceIp, interfaceName, timeRange, onClose }) 
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const hasTraffic = mcpTraffic !== null;
-  const hasOptical = opticalMetrics.length > 0;
+  // Format bps to Mbps
+  const formatMbps = (bps) => {
+    if (!bps || bps === 0) return '0 Mbps';
+    const mbps = bps / 1_000_000;
+    if (mbps >= 1000) {
+      return (mbps / 1000).toFixed(2) + ' Gbps';
+    } else if (mbps >= 1) {
+      return mbps.toFixed(2) + ' Mbps';
+    } else {
+      return (mbps * 1000).toFixed(2) + ' Kbps';
+    }
+  };
+
+  const hasTraffic = latestTraffic !== null;
+  const hasOptical = isOptical && opticalMetrics.length > 0;
+
+  // Calculate shared X-axis bounds for all charts
+  const allTimestamps = [
+    ...opticalMetrics.map(m => m.timestamp),
+    ...trafficMetrics.map(m => m.timestamp)
+  ].filter(t => t > 0);
+  
+  const xMin = allTimestamps.length > 0 ? Math.min(...allTimestamps) : 0;
+  const xMax = allTimestamps.length > 0 ? Math.max(...allTimestamps) : 1;
+  
+  // Generate nice 15-minute tick values (shared across all charts)
+  const FIFTEEN_MIN = 15 * 60 * 1000;
+  const tickStart = Math.ceil(xMin / FIFTEEN_MIN) * FIFTEEN_MIN;
+  const sharedTicks = [];
+  for (let t = tickStart; t <= xMax; t += FIFTEEN_MIN) {
+    sharedTicks.push(t);
+  }
 
   return (
     <div className="bg-white rounded-xl border border-blue-200 p-6 shadow-lg">
@@ -126,206 +176,267 @@ function InterfaceMetricsPanel({ deviceIp, interfaceName, timeRange, onClose }) 
         <div className="flex items-center justify-center py-8">
           <RefreshCw className="w-6 h-6 animate-spin text-gray-400" />
         </div>
-      ) : !hasTraffic && !hasOptical && !portStatus ? (
+      ) : !hasTraffic && !hasOptical ? (
         <p className="text-gray-500 text-center py-4">
           No metrics collected yet for port {portNum}. Data will appear after the next polling cycle.
         </p>
       ) : (
         <div className="space-y-6">
-          {/* Port Operational Status */}
-          {portStatus && (
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                  <Server className="w-4 h-4 text-gray-500" />
-                  Port Status
-                </h3>
-                <span className={cn(
-                  "px-2 py-1 rounded-full text-xs font-medium",
-                  portStatus.oper_link === 'Up' ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-                )}>
-                  {portStatus.oper_link}
-                </span>
-              </div>
-              <div className="grid grid-cols-4 gap-3 text-sm">
-                <div>
-                  <p className="text-gray-500 text-xs">Port Type</p>
-                  <p className="font-medium">{portStatus.port_type || '—'}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500 text-xs">Speed/Duplex</p>
-                  <p className="font-medium">{portStatus.oper_mode || '—'}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500 text-xs">STP State</p>
-                  <p className="font-medium">{portStatus.oper_stp || '—'}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500 text-xs">Link Duration</p>
-                  <p className="font-medium">{portStatus.oper_link_duration || '—'}</p>
-                </div>
-              </div>
-              {portStatus.oper_xcvr && (
-                <div className="mt-2 text-xs text-gray-500">
-                  Transceiver: <span className="font-medium text-gray-700">{portStatus.oper_xcvr}</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Optical Power Chart */}
+          {/* Optical Power Charts - Stacked RX and TX with threshold visualization */}
           {hasOptical && (
-            <div>
-              <h3 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
-                <Zap className="w-4 h-4 text-purple-500" />
-                Optical Power (dBm)
-              </h3>
-              <div className="h-48">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={opticalMetrics}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                    <XAxis 
-                      dataKey="timestamp" 
-                      type="number"
-                      domain={['dataMin', 'dataMax']}
-                      tickFormatter={(ts) => new Date(ts).toLocaleTimeString()}
-                      stroke="#9ca3af"
-                      fontSize={11}
-                    />
-                    <YAxis 
-                      stroke="#9ca3af"
-                      fontSize={11}
-                      tickFormatter={(v) => `${v?.toFixed(1)}`}
-                      domain={['auto', 'auto']}
-                    />
-                    <Tooltip 
-                      labelFormatter={(ts) => new Date(ts).toLocaleString()}
-                      formatter={(value, name) => [`${value?.toFixed(2)} dBm`, name === 'txPower' ? 'TX' : 'RX']}
-                      contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
-                    />
-                    <Legend />
-                    <Line type="monotone" dataKey="rxPower" name="RX Power" stroke="#8b5cf6" strokeWidth={2} dot={false} />
-                    <Line type="monotone" dataKey="txPower" name="TX Power" stroke="#f59e0b" strokeWidth={2} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="grid grid-cols-2 gap-4 mt-2 text-sm">
-                <div className="bg-purple-50 rounded-lg p-3">
-                  <p className="text-gray-500">Latest RX Power</p>
-                  <p className="font-semibold text-purple-700">
+            <div className="space-y-4">
+              {/* RX Power Chart */}
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-2 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Zap className="w-4 h-4 text-purple-500" />
+                    RX Optical Power
+                    {opticalThresholds?.rx_low_alarm && (
+                      <span className="text-xs text-gray-400 ml-1">
+                        (Safe: {opticalThresholds.rx_low_alarm?.toFixed(1)} to {opticalThresholds.rx_high_alarm?.toFixed(1)} dBm)
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-sm font-semibold text-purple-600">
                     {opticalMetrics[0]?.rxPower?.toFixed(2) || '—'} dBm
-                  </p>
+                  </span>
+                </h3>
+                <div className="h-40">
+                  <ResponsiveContainer width="100%" height="100%">
+                    {(() => {
+                      const yMin = opticalThresholds?.rx_low_alarm ? Math.min(opticalThresholds.rx_low_alarm - 3, -30) : -30;
+                      const yMax = opticalThresholds?.rx_high_alarm ? Math.max(opticalThresholds.rx_high_alarm + 3, 0) : 0;
+                      
+                      return (
+                        <LineChart 
+                          data={opticalMetrics}
+                          margin={{ top: 5, right: 60, left: 5, bottom: 5 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                          <XAxis 
+                            dataKey="timestamp" 
+                            type="number"
+                            domain={[xMin, xMax]}
+                            ticks={sharedTicks.length > 0 ? sharedTicks : undefined}
+                            tickFormatter={(ts) => new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            stroke="#9ca3af"
+                            fontSize={10}
+                          />
+                          <YAxis 
+                            stroke="#9ca3af"
+                            fontSize={10}
+                            tickFormatter={(v) => `${v?.toFixed(1)}`}
+                            domain={[yMin, yMax]}
+                            label={{ value: 'dBm', angle: -90, position: 'insideLeft', fontSize: 10, fill: '#9ca3af' }}
+                          />
+                          {opticalThresholds?.rx_high_alarm && (
+                            <ReferenceArea x1={xMin} x2={xMax} y1={opticalThresholds.rx_high_alarm} y2={yMax} fill="#ef4444" fillOpacity={0.3} />
+                          )}
+                          {opticalThresholds?.rx_low_alarm && (
+                            <ReferenceArea x1={xMin} x2={xMax} y1={yMin} y2={opticalThresholds.rx_low_alarm} fill="#ef4444" fillOpacity={0.3} />
+                          )}
+                          {opticalThresholds?.rx_low_alarm && (
+                            <ReferenceLine y={opticalThresholds.rx_low_alarm} stroke="#dc2626" strokeWidth={2} label={{ value: `Low: ${opticalThresholds.rx_low_alarm?.toFixed(1)}`, position: 'right', fontSize: 9, fill: '#dc2626' }} />
+                          )}
+                          {opticalThresholds?.rx_high_alarm && (
+                            <ReferenceLine y={opticalThresholds.rx_high_alarm} stroke="#dc2626" strokeWidth={2} label={{ value: `High: ${opticalThresholds.rx_high_alarm?.toFixed(1)}`, position: 'right', fontSize: 9, fill: '#dc2626' }} />
+                          )}
+                          <Tooltip 
+                            labelFormatter={(ts) => new Date(ts).toLocaleString()}
+                            formatter={(value) => [`${value?.toFixed(2)} dBm`, 'RX Power']}
+                            contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
+                          />
+                          <Line type="monotone" dataKey="rxPower" name="RX Power" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 3, fill: '#8b5cf6' }} />
+                        </LineChart>
+                      );
+                    })()}
+                  </ResponsiveContainer>
                 </div>
-                <div className="bg-amber-50 rounded-lg p-3">
-                  <p className="text-gray-500">Latest TX Power</p>
-                  <p className="font-semibold text-amber-700">
+              </div>
+
+              {/* TX Power Chart */}
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-2 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Zap className="w-4 h-4 text-amber-500" />
+                    TX Optical Power
+                    {opticalThresholds?.tx_low_alarm && (
+                      <span className="text-xs text-gray-400 ml-1">
+                        (Safe: {opticalThresholds.tx_low_alarm?.toFixed(1)} to {opticalThresholds.tx_high_alarm?.toFixed(1)} dBm)
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-sm font-semibold text-amber-600">
                     {opticalMetrics[0]?.txPower?.toFixed(2) || '—'} dBm
-                  </p>
+                  </span>
+                </h3>
+                <div className="h-40">
+                  <ResponsiveContainer width="100%" height="100%">
+                    {(() => {
+                      const yMin = opticalThresholds?.tx_low_alarm ? Math.min(opticalThresholds.tx_low_alarm - 3, -10) : -10;
+                      const yMax = opticalThresholds?.tx_high_alarm ? Math.max(opticalThresholds.tx_high_alarm + 3, 10) : 10;
+                      
+                      return (
+                        <LineChart 
+                          data={opticalMetrics}
+                          margin={{ top: 5, right: 60, left: 5, bottom: 5 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                          <XAxis 
+                            dataKey="timestamp" 
+                            type="number"
+                            domain={[xMin, xMax]}
+                            ticks={sharedTicks.length > 0 ? sharedTicks : undefined}
+                            tickFormatter={(ts) => new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            stroke="#9ca3af"
+                            fontSize={10}
+                          />
+                          <YAxis 
+                            stroke="#9ca3af"
+                            fontSize={10}
+                            tickFormatter={(v) => `${v?.toFixed(1)}`}
+                            domain={[yMin, yMax]}
+                            label={{ value: 'dBm', angle: -90, position: 'insideLeft', fontSize: 10, fill: '#9ca3af' }}
+                          />
+                          {opticalThresholds?.tx_high_alarm && (
+                            <ReferenceArea x1={xMin} x2={xMax} y1={opticalThresholds.tx_high_alarm} y2={yMax} fill="#ef4444" fillOpacity={0.3} />
+                          )}
+                          {opticalThresholds?.tx_low_alarm && (
+                            <ReferenceArea x1={xMin} x2={xMax} y1={yMin} y2={opticalThresholds.tx_low_alarm} fill="#ef4444" fillOpacity={0.3} />
+                          )}
+                          {opticalThresholds?.tx_low_alarm && (
+                            <ReferenceLine y={opticalThresholds.tx_low_alarm} stroke="#dc2626" strokeWidth={2} label={{ value: `Low: ${opticalThresholds.tx_low_alarm?.toFixed(1)}`, position: 'right', fontSize: 9, fill: '#dc2626' }} />
+                          )}
+                          {opticalThresholds?.tx_high_alarm && (
+                            <ReferenceLine y={opticalThresholds.tx_high_alarm} stroke="#dc2626" strokeWidth={2} label={{ value: `High: ${opticalThresholds.tx_high_alarm?.toFixed(1)}`, position: 'right', fontSize: 9, fill: '#dc2626' }} />
+                          )}
+                          <Tooltip 
+                            labelFormatter={(ts) => new Date(ts).toLocaleString()}
+                            formatter={(value) => [`${value?.toFixed(2)} dBm`, 'TX Power']}
+                            contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
+                          />
+                          <Line type="monotone" dataKey="txPower" name="TX Power" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3, fill: '#f59e0b' }} />
+                        </LineChart>
+                      );
+                    })()}
+                  </ResponsiveContainer>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Traffic Statistics from MCP - Collapsible */}
-          {hasTraffic && (
-            <div className="border border-gray-200 rounded-lg">
-              <button
-                onClick={() => setTrafficExpanded(!trafficExpanded)}
-                className="w-full flex items-center justify-between p-3 hover:bg-gray-50 transition-colors"
-              >
-                <h3 className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                  <Activity className="w-4 h-4 text-blue-500" />
-                  Traffic Statistics (Real-time from MCP)
-                </h3>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-gray-500">
-                    RX: {formatBytes(mcpTraffic.current_rx_bytes)} | TX: {formatBytes(mcpTraffic.current_tx_bytes)}
+          {/* Traffic Statistics Charts - RX and TX separated (showing rate in Mbps) */}
+          {hasTraffic && trafficMetrics.length > 0 && (
+            <div className="space-y-4">
+              {/* RX Traffic Rate Chart */}
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-2 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-green-500" />
+                    RX Traffic Rate
+                  </div>
+                  <span className="text-sm font-semibold text-green-600">
+                    {formatMbps(latestTraffic?.rx_bps)}
                   </span>
-                  <ChevronDown className={cn("w-4 h-4 text-gray-400 transition-transform", trafficExpanded && "rotate-180")} />
+                </h3>
+                <div className="h-40">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart 
+                      data={[...trafficMetrics].reverse().filter(m => m.rxBps > 0)}
+                      margin={{ top: 5, right: 20, left: 5, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                      <XAxis 
+                        dataKey="timestamp" 
+                        type="number"
+                        domain={[xMin, xMax]}
+                        ticks={sharedTicks.length > 0 ? sharedTicks : undefined}
+                        tickFormatter={(ts) => new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        stroke="#9ca3af"
+                        fontSize={10}
+                      />
+                      <YAxis 
+                        stroke="#9ca3af"
+                        fontSize={10}
+                        tickFormatter={(v) => formatMbps(v)}
+                      />
+                      <Tooltip 
+                        labelFormatter={(ts) => new Date(ts).toLocaleString()}
+                        formatter={(value) => [formatMbps(value), 'RX Rate']}
+                        contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
+                      />
+                      <Line type="monotone" dataKey="rxBps" name="RX Rate" stroke="#22c55e" strokeWidth={2} dot={{ r: 3, fill: '#22c55e' }} />
+                    </LineChart>
+                  </ResponsiveContainer>
                 </div>
-              </button>
-              
-              {trafficExpanded && (
-                <div className="p-3 pt-0 border-t border-gray-100">
-                  {/* Current 15-min bin */}
-                  <div className="mb-4">
-                    <p className="text-xs text-gray-500 mb-2">
-                      Current 15-min bin (since {mcpTraffic.current_collection_time})
-                    </p>
-                    <div className="grid grid-cols-4 gap-3 text-sm">
-                      <div className="bg-green-50 rounded-lg p-3">
-                        <p className="text-gray-500 text-xs">RX Bytes</p>
-                        <p className="font-semibold text-green-700">{formatBytes(mcpTraffic.current_rx_bytes)}</p>
-                      </div>
-                      <div className="bg-blue-50 rounded-lg p-3">
-                        <p className="text-gray-500 text-xs">TX Bytes</p>
-                        <p className="font-semibold text-blue-700">{formatBytes(mcpTraffic.current_tx_bytes)}</p>
-                      </div>
-                      <div className="bg-green-50 rounded-lg p-3">
-                        <p className="text-gray-500 text-xs">RX Packets</p>
-                        <p className="font-semibold text-green-700">{mcpTraffic.current_rx_pkts?.toLocaleString()}</p>
-                      </div>
-                      <div className="bg-blue-50 rounded-lg p-3">
-                        <p className="text-gray-500 text-xs">TX Packets</p>
-                        <p className="font-semibold text-blue-700">{mcpTraffic.current_tx_pkts?.toLocaleString()}</p>
-                      </div>
-                    </div>
-                  </div>
+              </div>
 
-                  {/* 24-hour totals */}
-                  <div className="mb-4">
-                    <p className="text-xs text-gray-500 mb-2">
-                      24-hour totals (since {mcpTraffic['24hr_collection_time']})
-                    </p>
-                    <div className="grid grid-cols-4 gap-3 text-sm">
-                      <div className="bg-gray-50 rounded-lg p-3">
-                        <p className="text-gray-500 text-xs">RX Bytes</p>
-                        <p className="font-semibold">{formatBytes(mcpTraffic['24hr_rx_bytes'])}</p>
-                      </div>
-                      <div className="bg-gray-50 rounded-lg p-3">
-                        <p className="text-gray-500 text-xs">TX Bytes</p>
-                        <p className="font-semibold">{formatBytes(mcpTraffic['24hr_tx_bytes'])}</p>
-                      </div>
-                      <div className="bg-gray-50 rounded-lg p-3">
-                        <p className="text-gray-500 text-xs">RX Packets</p>
-                        <p className="font-semibold">{mcpTraffic['24hr_rx_pkts']?.toLocaleString()}</p>
-                      </div>
-                      <div className="bg-gray-50 rounded-lg p-3">
-                        <p className="text-gray-500 text-xs">TX Packets</p>
-                        <p className="font-semibold">{mcpTraffic['24hr_tx_pkts']?.toLocaleString()}</p>
-                      </div>
-                    </div>
+              {/* TX Traffic Rate Chart */}
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-2 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-blue-500" />
+                    TX Traffic Rate
                   </div>
-
-                  {/* Errors */}
-                  <div className="grid grid-cols-4 gap-3 text-sm">
-                    <div className="bg-gray-50 rounded-lg p-3">
-                      <p className="text-gray-500 text-xs">RX Errors</p>
-                      <p className={cn("font-semibold", mcpTraffic.current_rx_errors > 0 && "text-red-600")}>
-                        {mcpTraffic.current_rx_errors || 0}
-                      </p>
-                    </div>
-                    <div className="bg-gray-50 rounded-lg p-3">
-                      <p className="text-gray-500 text-xs">TX Errors</p>
-                      <p className={cn("font-semibold", mcpTraffic.current_tx_errors > 0 && "text-red-600")}>
-                        {mcpTraffic.current_tx_errors || 0}
-                      </p>
-                    </div>
-                    <div className="bg-gray-50 rounded-lg p-3">
-                      <p className="text-gray-500 text-xs">RX Drops</p>
-                      <p className={cn("font-semibold", mcpTraffic.current_rx_drops > 0 && "text-amber-600")}>
-                        {mcpTraffic.current_rx_drops || 0}
-                      </p>
-                    </div>
-                    <div className="bg-gray-50 rounded-lg p-3">
-                      <p className="text-gray-500 text-xs">RX Discards</p>
-                      <p className={cn("font-semibold", mcpTraffic.current_rx_discards > 0 && "text-amber-600")}>
-                        {mcpTraffic.current_rx_discards || 0}
-                      </p>
-                    </div>
-                  </div>
+                  <span className="text-sm font-semibold text-blue-600">
+                    {formatMbps(latestTraffic?.tx_bps)}
+                  </span>
+                </h3>
+                <div className="h-40">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart 
+                      data={[...trafficMetrics].reverse().filter(m => m.txBps > 0)}
+                      margin={{ top: 5, right: 20, left: 5, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                      <XAxis 
+                        dataKey="timestamp" 
+                        type="number"
+                        domain={[xMin, xMax]}
+                        ticks={sharedTicks.length > 0 ? sharedTicks : undefined}
+                        tickFormatter={(ts) => new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        stroke="#9ca3af"
+                        fontSize={10}
+                      />
+                      <YAxis 
+                        stroke="#9ca3af"
+                        fontSize={10}
+                        tickFormatter={(v) => formatMbps(v)}
+                      />
+                      <Tooltip 
+                        labelFormatter={(ts) => new Date(ts).toLocaleString()}
+                        formatter={(value) => [formatMbps(value), 'TX Rate']}
+                        contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
+                      />
+                      <Line type="monotone" dataKey="txBps" name="TX Rate" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3, fill: '#3b82f6' }} />
+                    </LineChart>
+                  </ResponsiveContainer>
                 </div>
-              )}
+              </div>
+
+              {/* Traffic Counters & Errors - Always visible */}
+              <div className="grid grid-cols-4 gap-3 text-sm">
+                <div className="bg-green-50 rounded-lg p-3">
+                  <p className="text-gray-500 text-xs">RX Packets</p>
+                  <p className="font-semibold text-green-700">{latestTraffic?.rx_packets?.toLocaleString() || '—'}</p>
+                </div>
+                <div className="bg-blue-50 rounded-lg p-3">
+                  <p className="text-gray-500 text-xs">TX Packets</p>
+                  <p className="font-semibold text-blue-700">{latestTraffic?.tx_packets?.toLocaleString() || '—'}</p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-gray-500 text-xs">RX Errors</p>
+                  <p className={cn("font-semibold", (latestTraffic?.rx_errors || 0) > 0 && "text-red-600")}>
+                    {latestTraffic?.rx_errors?.toLocaleString() || 0}
+                  </p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-gray-500 text-xs">RX Discards</p>
+                  <p className={cn("font-semibold", (latestTraffic?.rx_discards || 0) > 0 && "text-amber-600")}>
+                    {latestTraffic?.rx_discards?.toLocaleString() || 0}
+                  </p>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -360,6 +471,10 @@ export function DeviceDetail() {
   const [opticalMetrics, setOpticalMetrics] = useState([]);
   const [availabilityMetrics, setAvailabilityMetrics] = useState([]);
   const [metricsLoading, setMetricsLoading] = useState(false);
+  
+  // Alarms
+  const [alarms, setAlarms] = useState([]);
+  const [alarmsLoading, setAlarmsLoading] = useState(false);
   
   // UI state
   const [timeRange, setTimeRange] = useState(24);
@@ -434,6 +549,32 @@ export function DeviceDetail() {
     }
   }, [ip, timeRange]);
 
+  // Check if device is Ciena (supports SNMP alarms)
+  const isCienaDevice = device?.manufacturer?.toLowerCase().includes('ciena') || 
+                        device?.deviceType?.toLowerCase().includes('3942') ||
+                        device?.deviceType?.toLowerCase().includes('5160');
+
+  // Load alarms via SNMP (only for Ciena devices)
+  const loadAlarms = useCallback(async () => {
+    if (!ip || !isCienaDevice) {
+      setAlarms([]);
+      setAlarmsLoading(false);
+      return;
+    }
+    
+    setAlarmsLoading(true);
+    try {
+      const res = await fetchApi(`/api/snmp/alarms/${encodeURIComponent(ip)}`);
+      const alarmsData = res.data?.alarms || res.alarms || [];
+      setAlarms(alarmsData);
+    } catch (err) {
+      console.error("Failed to load alarms:", err);
+      setAlarms([]);
+    } finally {
+      setAlarmsLoading(false);
+    }
+  }, [ip, isCienaDevice]);
+
   // Load availability metrics
   const loadAvailabilityMetrics = useCallback(async () => {
     if (!ip) return;
@@ -489,14 +630,16 @@ export function DeviceDetail() {
       loadOpticalMetrics();
       loadAvailabilityMetrics();
       loadInterfaces();
+      loadAlarms();
     }
-  }, [device, timeRange, loadOpticalMetrics, loadAvailabilityMetrics, loadInterfaces]);
+  }, [device, timeRange, loadOpticalMetrics, loadAvailabilityMetrics, loadInterfaces, loadAlarms]);
 
   const handleRefresh = () => {
     loadDevice();
     loadOpticalMetrics();
     loadAvailabilityMetrics();
     loadInterfaces();
+    loadAlarms();
   };
 
   const openInNetBox = () => {
@@ -574,112 +717,92 @@ export function DeviceDetail() {
         </div>
       </div>
 
-      {/* Device Identity Card */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <Server className="w-5 h-5 text-gray-500" />
-          Device Information
-        </h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-          <div>
-            <p className="text-sm text-gray-500">Site</p>
-            <p className="font-medium flex items-center gap-1">
-              <MapPin className="w-4 h-4 text-gray-400" />
-              {device.site || "—"}
-            </p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-500">Role</p>
-            <p className="font-medium flex items-center gap-1">
-              <Tag className="w-4 h-4 text-gray-400" />
-              {device.role || "—"}
-            </p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-500">Device Type</p>
-            <p className="font-medium">{device.deviceType || "—"}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-500">Manufacturer</p>
-            <p className="font-medium">{device.manufacturer || "—"}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-500">Status</p>
-            <span className={cn(
-              "inline-flex items-center gap-1 px-2 py-1 rounded-full text-sm font-medium",
-              device.status === 'active' ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"
-            )}>
-              {device.status === 'active' ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-              {device.statusLabel}
-            </span>
+      {/* Active Alarms Card - Compact single row per alarm (Ciena devices only) */}
+      {isCienaDevice && alarms.length > 0 && (
+        <div className={cn(
+          "rounded-lg border px-4 py-2",
+          alarms.some(a => a.severity === 'critical') ? "bg-red-50 border-red-300" :
+          alarms.some(a => a.severity === 'major') ? "bg-orange-50 border-orange-300" :
+          alarms.some(a => a.severity === 'minor') ? "bg-yellow-50 border-yellow-300" :
+          "bg-amber-50 border-amber-300"
+        )}>
+          <div className="flex items-center gap-3 flex-wrap">
+            <Bell className={cn(
+              "w-5 h-5",
+              alarms.some(a => a.severity === 'critical') ? "text-red-600" :
+              alarms.some(a => a.severity === 'major') ? "text-orange-600" :
+              alarms.some(a => a.severity === 'minor') ? "text-yellow-600" :
+              "text-amber-600"
+            )} />
+            <span className="font-semibold text-gray-900">Active Alarms ({alarms.length}):</span>
+            {alarms.map((alarm, idx) => (
+              <span key={idx} className={cn(
+                "inline-flex items-center gap-1 text-xs px-2 py-1 rounded",
+                alarm.severity === 'critical' ? "bg-red-200 text-red-800" :
+                alarm.severity === 'major' ? "bg-orange-200 text-orange-800" :
+                alarm.severity === 'minor' ? "bg-yellow-200 text-yellow-800" :
+                "bg-amber-200 text-amber-800"
+              )}>
+                <span className="font-semibold uppercase">{alarm.severity}</span>
+                <span>—</span>
+                <span>{alarm.description || 'Unknown'}</span>
+                {alarm.object_instance && <span className="text-gray-500">(Port {alarm.object_instance})</span>}
+              </span>
+            ))}
+            {alarmsLoading && <RefreshCw className="w-4 h-4 animate-spin text-gray-400" />}
           </div>
         </div>
+      )}
+
+      {/* No Alarms - Show green status (Ciena devices only) */}
+      {isCienaDevice && !alarmsLoading && alarms.length === 0 && (
+        <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2 flex items-center gap-2">
+          <CheckCircle className="w-5 h-5 text-green-600" />
+          <span className="text-green-800 font-medium">No Active Alarms</span>
+        </div>
+      )}
+
+      {/* Device Info - Compact single row */}
+      <div className="bg-white rounded-lg border border-gray-200 px-4 py-2 flex items-center gap-6 text-sm flex-wrap">
+        <span className="flex items-center gap-1">
+          <MapPin className="w-4 h-4 text-gray-400" />
+          <span className="text-gray-500">Site:</span>
+          <span className="font-medium">{device.site || "—"}</span>
+        </span>
+        <span className="flex items-center gap-1">
+          <Tag className="w-4 h-4 text-gray-400" />
+          <span className="text-gray-500">Role:</span>
+          <span className="font-medium">{device.role || "—"}</span>
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="text-gray-500">Type:</span>
+          <span className="font-medium">{device.manufacturer} {device.deviceType || "—"}</span>
+        </span>
+        <span className={cn(
+          "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
+          device.status === 'active' ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"
+        )}>
+          {device.status === 'active' ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+          {device.statusLabel}
+        </span>
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <div className="flex items-center gap-3">
-            <div className={cn(
-              "p-3 rounded-lg",
-              availabilityPercent >= 99 ? "bg-green-100" : availabilityPercent >= 95 ? "bg-yellow-100" : "bg-red-100"
-            )}>
-              <Activity className={cn(
-                "w-5 h-5",
-                availabilityPercent >= 99 ? "text-green-600" : availabilityPercent >= 95 ? "text-yellow-600" : "text-red-600"
-              )} />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Availability</p>
-              <p className="text-xl font-bold">{availabilityPercent ? `${availabilityPercent}%` : "—"}</p>
-            </div>
-          </div>
+      {/* Interfaces Section - Compact */}
+      <div className="bg-white rounded-lg border border-gray-200">
+        <div className="px-4 py-2 border-b border-gray-100 flex items-center justify-between">
+          <span className="font-medium text-sm">Interfaces ({interfaces.length})</span>
+          {interfacesLoading && <RefreshCw className="w-4 h-4 animate-spin text-gray-400" />}
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-lg bg-blue-100">
-              <Clock className="w-5 h-5 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Avg Latency</p>
-              <p className="text-xl font-bold">{avgLatency ? `${avgLatency} ms` : "—"}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-lg bg-purple-100">
-              <Zap className="w-5 h-5 text-purple-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Interfaces</p>
-              <p className="text-xl font-bold">{interfaces.length}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Interfaces Section */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <Server className="w-5 h-5 text-gray-500" />
-          Interfaces / Ports ({interfaces.length})
-        </h2>
-        {interfacesLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <RefreshCw className="w-6 h-6 animate-spin text-gray-400" />
-          </div>
-        ) : interfaces.length > 0 ? (
+        {interfaces.length > 0 ? (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 bg-gray-50">
                 <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 font-medium text-gray-500">Name</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-500">Type</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-500">Status</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-500">Speed</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-500">Description</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-500">Connected To</th>
+                  <th className="text-left py-1.5 px-3 font-medium text-gray-500">Port</th>
+                  <th className="text-left py-1.5 px-3 font-medium text-gray-500">Type</th>
+                  <th className="text-left py-1.5 px-3 font-medium text-gray-500">Speed</th>
+                  <th className="text-left py-1.5 px-3 font-medium text-gray-500">Description</th>
+                  <th className="text-left py-1.5 px-3 font-medium text-gray-500">Connected To</th>
                 </tr>
               </thead>
               <tbody>
@@ -687,29 +810,20 @@ export function DeviceDetail() {
                   <tr 
                     key={iface.id || i} 
                     className={cn(
-                      "border-b border-gray-100 hover:bg-gray-50 cursor-pointer",
-                      selectedInterface?.id === iface.id && "bg-blue-50"
+                      "border-b border-gray-50 hover:bg-blue-50 cursor-pointer",
+                      selectedInterface?.id === iface.id && "bg-blue-100"
                     )}
                     onClick={() => setSelectedInterface(iface)}
                   >
-                    <td className="py-3 px-4 font-medium">{iface.name}</td>
-                    <td className="py-3 px-4 text-gray-600">{iface.type?.label || iface.type?.value || '—'}</td>
-                    <td className="py-3 px-4">
-                      <span className={cn(
-                        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
-                        iface.enabled ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
-                      )}>
-                        {iface.enabled ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                        {iface.enabled ? 'Enabled' : 'Disabled'}
-                      </span>
+                    <td className="py-1 px-3 font-medium">{iface.name}</td>
+                    <td className="py-1 px-3 text-gray-600">{iface.type?.label || iface.type?.value || '—'}</td>
+                    <td className="py-1 px-3 text-gray-600">
+                      {iface.speed ? `${(iface.speed / 1000).toFixed(0)}G` : '—'}
                     </td>
-                    <td className="py-3 px-4 text-gray-600">
-                      {iface.speed ? `${(iface.speed / 1000).toFixed(0)} Gbps` : '—'}
-                    </td>
-                    <td className="py-3 px-4 text-gray-500 max-w-xs truncate">
+                    <td className="py-1 px-3 text-gray-500 max-w-xs truncate">
                       {iface.description || '—'}
                     </td>
-                    <td className="py-3 px-4 text-gray-600">
+                    <td className="py-1 px-3 text-gray-600">
                       {iface.connected_endpoints?.length > 0 
                         ? iface.connected_endpoints.map(e => e.device?.name || e.name).join(', ')
                         : iface.link_peers?.length > 0
@@ -723,7 +837,7 @@ export function DeviceDetail() {
             </table>
           </div>
         ) : (
-          <p className="text-gray-500 text-center py-4">No interfaces found in NetBox</p>
+          <p className="text-gray-500 text-center py-2 text-sm">No interfaces found</p>
         )}
       </div>
 
@@ -733,6 +847,7 @@ export function DeviceDetail() {
           deviceIp={ip} 
           interfaceName={selectedInterface.name}
           timeRange={timeRange}
+          isOptical={/sfp|xfp|qsfp|optical|fiber|1000base-x|10gbase/i.test(selectedInterface.type?.label || selectedInterface.type?.value || '')}
           onClose={() => setSelectedInterface(null)}
         />
       )}
@@ -756,86 +871,8 @@ export function DeviceDetail() {
         ))}
       </div>
 
-      {/* Device Availability Chart - device level metric */}
-      {availabilityMetrics.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <Activity className="w-5 h-5 text-green-500" />
-            Response Latency
-          </h2>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={availabilityMetrics}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis 
-                  dataKey="timestamp" 
-                  type="number"
-                  domain={['dataMin', 'dataMax']}
-                  tickFormatter={(ts) => new Date(ts).toLocaleTimeString()}
-                  stroke="#9ca3af"
-                  fontSize={12}
-                />
-                <YAxis 
-                  stroke="#9ca3af"
-                  fontSize={12}
-                  tickFormatter={(v) => `${v} ms`}
-                />
-                <Tooltip 
-                  labelFormatter={(ts) => new Date(ts).toLocaleString()}
-                  formatter={(value) => [`${value?.toFixed(1)} ms`, 'Latency']}
-                  contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="latency" 
-                  stroke="#10b981" 
-                  fill="#d1fae5"
-                  strokeWidth={2}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
-
-      {/* Metrics Data Table */}
-      {opticalMetrics.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold mb-4">Recent Optical Readings</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 font-medium text-gray-500">Time</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-500">Interface</th>
-                  <th className="text-right py-3 px-4 font-medium text-gray-500">TX Power</th>
-                  <th className="text-right py-3 px-4 font-medium text-gray-500">RX Power</th>
-                </tr>
-              </thead>
-              <tbody>
-                {opticalMetrics.slice(-20).reverse().map((m, i) => (
-                  <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-3 px-4 text-gray-600">{m.time}</td>
-                    <td className="py-3 px-4">{m.interface}</td>
-                    <td className="py-3 px-4 text-right font-mono">
-                      {m.txPower?.toFixed(2)} dBm
-                    </td>
-                    <td className={cn(
-                      "py-3 px-4 text-right font-mono",
-                      m.rxPower < -25 ? "text-red-600" : m.rxPower < -20 ? "text-yellow-600" : "text-green-600"
-                    )}>
-                      {m.rxPower?.toFixed(2)} dBm
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
       {/* No Data Message */}
-      {opticalMetrics.length === 0 && availabilityMetrics.length === 0 && !metricsLoading && (
+      {opticalMetrics.length === 0 && !metricsLoading && (
         <div className="bg-gray-50 rounded-xl border border-gray-200 p-8 text-center">
           <AlertTriangle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-700 mb-2">No Metrics Data</h3>

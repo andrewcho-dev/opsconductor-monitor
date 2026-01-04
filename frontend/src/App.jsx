@@ -12,6 +12,8 @@ import { WorkflowsListPage, WorkflowBuilderPage } from "./pages/workflows";
 
 // Monitor Module
 import { DashboardPage, TopologyPage, PowerTrendsPage, AlertsPage, ActiveJobsPage, JobHistoryPage, MCPServicesPage, SNMPLivePage, SNMPAlarmsPage, UPSMonitorPage } from "./pages/monitor";
+import PollingPage from "./pages/monitor/PollingPage";
+import MibMappingsPage from "./pages/monitor/MibMappingsPage";
 
 // System Module
 import { 
@@ -75,6 +77,8 @@ function App() {
         <Route path="/monitor/snmp-live" element={<ProtectedRoute><SNMPLivePage /></ProtectedRoute>} />
         <Route path="/monitor/snmp-alarms" element={<ProtectedRoute><SNMPAlarmsPage /></ProtectedRoute>} />
         <Route path="/monitor/ups" element={<ProtectedRoute><UPSMonitorPage /></ProtectedRoute>} />
+        <Route path="/monitor/polling" element={<ProtectedRoute><PollingPage /></ProtectedRoute>} />
+        <Route path="/monitor/mib-mappings" element={<ProtectedRoute><MibMappingsPage /></ProtectedRoute>} />
 
         {/* CREDENTIALS MODULE */}
         <Route path="/credentials" element={<ProtectedRoute permission="credentials.credential.view"><CredentialVaultPage /></ProtectedRoute>} />
