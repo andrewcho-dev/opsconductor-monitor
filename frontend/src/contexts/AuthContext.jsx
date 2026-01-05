@@ -32,16 +32,16 @@ export function AuthProvider({ children }) {
 
   const verifySession = async () => {
     try {
-      const res = await fetchApi('/api/auth/me', {
+      const res = await fetchApi('/identity/v1/auth/me', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem(TOKEN_KEY)}`
         }
       });
       
-      if (res.success) {
-        setUser(res.data.user);
-        setPermissions(res.data.user.permissions || []);
-        localStorage.setItem(USER_KEY, JSON.stringify(res.data.user));
+      if (res && !res.detail) {
+        setUser(res);
+        setPermissions(res.permissions || []);
+        localStorage.setItem(USER_KEY, JSON.stringify(res));
       } else {
         // Try to refresh token
         await refreshToken();
@@ -90,33 +90,32 @@ export function AuthProvider({ children }) {
     setError(null);
     
     try {
-      const res = await fetchApi('/api/auth/login', {
+      const res = await fetchApi('/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
       });
 
-      if (!res.success) {
-        setError(res.error?.message || 'Login failed');
-        return { success: false, error: res.error?.message };
+      if (res.detail) {
+        setError(res.detail.message || 'Login failed');
+        return { success: false, error: res.detail.message };
       }
 
-      // Check if 2FA is required
-      if (res.data.requires_2fa) {
+      // Check if 2FA is required (not implemented yet)
+      if (res.requires_2fa) {
         return {
           success: true,
           requires_2fa: true,
-          user_id: res.data.user_id,
-          two_factor_method: res.data.two_factor_method
+          user_id: res.user_id,
+          two_factor_method: res.two_factor_method
         };
       }
 
       // Login successful
-      localStorage.setItem(TOKEN_KEY, res.data.session_token);
-      localStorage.setItem(REFRESH_KEY, res.data.refresh_token);
-      localStorage.setItem(USER_KEY, JSON.stringify(res.data.user));
-      setUser(res.data.user);
-      setPermissions(res.data.user.permissions || []);
+      localStorage.setItem(TOKEN_KEY, res.access_token);
+      localStorage.setItem(USER_KEY, JSON.stringify(res.user));
+      setUser(res.user);
+      setPermissions(res.user.permissions || []);
 
       return { success: true };
     } catch (err) {
