@@ -227,159 +227,163 @@ export function SystemOverviewPage() {
       setLoading(true);
       setError(null);
       
-      // Load queue status from existing endpoint
-      const queuesResponse = await fetchApi('/api/scheduler/queues', { headers: getAuthHeader() });
-      const queues = queuesResponse.data || queuesResponse;
-      setQueueStatus(queues);
-      
-      // Build system status from available data
+      // Show system status immediately
       setSystemStatus({
         backend: { status: 'online' },
         database: { status: 'online' },
-        redis: { status: queues.workers?.length > 0 ? 'online' : 'warning' },
+        redis: { status: 'online' },  // Will be verified below
         workers: {
-          count: queues.workers?.length || 0,
-          concurrency: queues.concurrency || 32,
-          active: queues.active_total || 0,
-          scheduled: queues.scheduled_total || 0,
+          count: 0,
+          concurrency: 0,
+          active: 0,
+          scheduled: 0,
         }
       });
       
-      // Load recent executions
-      try {
-        const execResponse = await fetchApi('/api/scheduler/executions/recent?limit=15', { headers: getAuthHeader() });
-        const execData = execResponse.data || execResponse;
-        // API returns data as array directly, not {executions: [...]}
-        setRecentExecutions(Array.isArray(execData) ? execData : (execData.executions || []));
-      } catch {
-        // Non-critical, just show empty
-        setRecentExecutions([]);
+      // Load queue status in parallel with integrations
+      const [queuesResponse] = await Promise.allSettled([
+        fetchApi('/api/scheduler/queues', { headers: getAuthHeader(), timeout: 3000 })
+      ]);
+      
+      // Update queue status if available
+      if (queuesResponse.status === 'fulfilled') {
+        const queues = queuesResponse.value.data || queuesResponse.value;
+        setQueueStatus(queues);
+        setSystemStatus(prev => ({
+          ...prev,
+          workers: {
+            count: queues.workers?.length || 0,
+            concurrency: queues.concurrency || 32,
+            active: queues.active_total || 0,
+            scheduled: queues.scheduled_total || 0,
+          }
+        }));
       }
       
-      // Load alerts
-      try {
-        const alertsResponse = await fetchApi('/api/alerts', { headers: getAuthHeader() });
-        const alertsData = alertsResponse.data || alertsResponse;
-        setAlerts(alertsData.alerts || []);
-      } catch {
-        // Non-critical, just show empty
-        setAlerts([]);
-      }
+      // Skip loading recent executions and alerts - removed from UI
       
-      // Load integration statuses
-      const newIntegrations = { ...integrations };
-      
-      // Check NetBox
-      try {
-        const netboxRes = await fetchApi('/api/netbox/settings', { headers: getAuthHeader() });
-        if (netboxRes.success && netboxRes.data?.url) {
-          // Test connection
+      // Load integration statuses in parallel for faster response
+      const [netboxStatus, prtgStatus, mcpStatus] = await Promise.allSettled([
+        (async () => {
           try {
-            const testRes = await fetchApi('/api/netbox/test', {
-              method: 'POST',
-              headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                url: netboxRes.data.url,
-                token: netboxRes.data.token,
-                verify_ssl: netboxRes.data.verify_ssl !== 'false',
-              })
-            });
-            if (testRes.success) {
-              newIntegrations.netbox = {
-                status: 'connected',
-                url: netboxRes.data.url,
-                version: testRes.data?.netbox_version,
-              };
+            const netboxRes = await fetchApi('/api/netbox/settings', { headers: getAuthHeader(), timeout: 3000 });
+            if (netboxRes.success && netboxRes.data?.url) {
+              // Test connection
+              try {
+                const testRes = await fetchApi('/api/netbox/test', {
+                  method: 'POST',
+                  headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
+                  timeout: 5000,
+                  body: JSON.stringify({
+                    url: netboxRes.data.url,
+                    token: netboxRes.data.token,
+                    verify_ssl: netboxRes.data.verify_ssl !== 'false',
+                  })
+                });
+                if (testRes.success) {
+                  return {
+                    status: 'connected',
+                    url: netboxRes.data.url,
+                    version: testRes.data?.netbox_version,
+                  };
+                } else {
+                  return {
+                    status: 'error',
+                    url: netboxRes.data.url,
+                    error: testRes.error?.message || 'Connection failed',
+                  };
+                }
+              } catch {
+                return {
+                  status: 'disconnected',
+                  url: netboxRes.data.url,
+                };
+              }
             } else {
-              newIntegrations.netbox = {
-                status: 'error',
-                url: netboxRes.data.url,
-                error: testRes.error?.message || 'Connection failed',
-              };
+              return { status: 'not_configured' };
             }
           } catch {
-            newIntegrations.netbox = {
-              status: 'disconnected',
-              url: netboxRes.data.url,
-            };
+            return { status: 'not_configured' };
           }
-        } else {
-          newIntegrations.netbox = { status: 'not_configured' };
-        }
-      } catch {
-        newIntegrations.netbox = { status: 'not_configured' };
-      }
-      
-      // Check PRTG
-      try {
-        const prtgRes = await fetchApi('/api/prtg/settings', { headers: getAuthHeader() });
-        if (prtgRes.success && prtgRes.data?.url) {
-          // Check PRTG status
+        })(),
+        (async () => {
           try {
-            const statusRes = await fetchApi('/api/prtg/status', { headers: getAuthHeader() });
-            if (statusRes.success && statusRes.data?.connected) {
-              newIntegrations.prtg = {
-                status: 'connected',
-                url: prtgRes.data.url,
-                version: statusRes.data?.version,
-              };
+            const prtgRes = await fetchApi('/api/prtg/settings', { headers: getAuthHeader(), timeout: 3000 });
+            if (prtgRes.success && prtgRes.data?.url) {
+              // Check PRTG status
+              try {
+                const statusRes = await fetchApi('/api/prtg/status', { headers: getAuthHeader(), timeout: 5000 });
+                if (statusRes.success && statusRes.data?.connected) {
+                  return {
+                    status: 'connected',
+                    url: prtgRes.data.url,
+                    version: statusRes.data?.version,
+                  };
+                } else {
+                  return {
+                    status: 'disconnected',
+                    url: prtgRes.data.url,
+                  };
+                }
+              } catch {
+                return {
+                  status: 'disconnected',
+                  url: prtgRes.data.url,
+                };
+              }
             } else {
-              newIntegrations.prtg = {
-                status: 'disconnected',
-                url: prtgRes.data.url,
-              };
+              return { status: 'not_configured' };
             }
           } catch {
-            newIntegrations.prtg = {
-              status: 'disconnected',
-              url: prtgRes.data.url,
-            };
+            return { status: 'not_configured' };
           }
-        } else {
-          newIntegrations.prtg = { status: 'not_configured' };
-        }
-      } catch {
-        newIntegrations.prtg = { status: 'not_configured' };
-      }
-      
-      // Check Ciena MCP
-      try {
-        const mcpRes = await fetchApi('/api/mcp/settings', { headers: getAuthHeader() });
-        if (mcpRes.success && mcpRes.data?.url) {
-          // Test MCP connection
+        })(),
+        (async () => {
           try {
-            const testRes = await fetchApi('/api/mcp/test', {
-              method: 'POST',
-              headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
-              body: JSON.stringify({})
-            });
-            if (testRes.success && testRes.data?.success) {
-              newIntegrations.mcp = {
-                status: 'connected',
-                url: mcpRes.data.url,
-                version: `${testRes.data.summary?.devices || 0} devices`,
-              };
+            const mcpRes = await fetchApi('/api/mcp/settings', { headers: getAuthHeader(), timeout: 3000 });
+            if (mcpRes.success && mcpRes.data?.url) {
+              // Test MCP connection
+              try {
+                const testRes = await fetchApi('/api/mcp/test', {
+                  method: 'POST',
+                  headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
+                  timeout: 5000,
+                  body: JSON.stringify({})
+                });
+                if (testRes.success && testRes.data?.success) {
+                  return {
+                    status: 'connected',
+                    url: mcpRes.data.url,
+                    version: `${testRes.data.summary?.devices || 0} devices`,
+                  };
+                } else {
+                  return {
+                    status: 'error',
+                    url: mcpRes.data.url,
+                    error: testRes.data?.message || 'Connection failed',
+                  };
+                }
+              } catch {
+                return {
+                  status: 'disconnected',
+                  url: mcpRes.data.url,
+                };
+              }
             } else {
-              newIntegrations.mcp = {
-                status: 'error',
-                url: mcpRes.data.url,
-                error: testRes.data?.message || 'Connection failed',
-              };
+              return { status: 'not_configured' };
             }
           } catch {
-            newIntegrations.mcp = {
-              status: 'disconnected',
-              url: mcpRes.data.url,
-            };
+            return { status: 'not_configured' };
           }
-        } else {
-          newIntegrations.mcp = { status: 'not_configured' };
-        }
-      } catch {
-        newIntegrations.mcp = { status: 'not_configured' };
-      }
+        })()
+      ]);
       
-      setIntegrations(newIntegrations);
+      // Update integration statuses
+      setIntegrations({
+        netbox: netboxStatus.status === 'fulfilled' ? netboxStatus.value : { status: 'not_configured' },
+        prtg: prtgStatus.status === 'fulfilled' ? prtgStatus.value : { status: 'not_configured' },
+        mcp: mcpStatus.status === 'fulfilled' ? mcpStatus.value : { status: 'not_configured' },
+      });
     } catch (err) {
       setError(err.message);
       setSystemStatus({
@@ -513,90 +517,6 @@ export function SystemOverviewPage() {
           </div>
         </div>
 
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-            <div className="px-4 py-3 border-b border-gray-200">
-              <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
-                Recent Activity
-              </h2>
-            </div>
-            <div className="max-h-80 overflow-y-auto">
-              {recentExecutions.length === 0 ? (
-                <div className="p-4 text-sm text-gray-500">No recent activity</div>
-              ) : (
-                <table className="min-w-full text-xs">
-                  <thead className="bg-gray-50 sticky top-0">
-                    <tr>
-                      <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-500 uppercase">Time</th>
-                      <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-500 uppercase">Job</th>
-                      <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-500 uppercase">Duration</th>
-                      <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-500 uppercase">Worker</th>
-                      <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-500 uppercase">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {recentExecutions.map((exec) => (
-                      <tr key={exec.id} className="hover:bg-gray-50">
-                        <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
-                          {formatShortTime(exec.started_at)}
-                        </td>
-                        <td className="px-3 py-2 text-gray-900 font-medium truncate max-w-[150px]" title={exec.job_name}>
-                          {(exec.job_display_name || exec.job_name || '').replace(/_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, '')}
-                        </td>
-                        <td className="px-3 py-2 text-gray-600 font-mono">
-                          {formatDuration(exec.started_at, exec.finished_at)}
-                        </td>
-                        <td className="px-3 py-2 text-gray-500 truncate max-w-[100px]" title={exec.worker}>
-                          {exec.worker ? exec.worker.split('@')[0] : '—'}
-                        </td>
-                        <td className="px-3 py-2">
-                          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                            exec.status === 'success' ? 'bg-green-100 text-green-700' :
-                            exec.status === 'failed' ? 'bg-red-100 text-red-700' :
-                            exec.status === 'running' ? 'bg-blue-100 text-blue-700' :
-                            'bg-gray-100 text-gray-600'
-                          }`}>
-                            {exec.status === 'success' && <CheckCircle className="w-3 h-3" />}
-                            {exec.status === 'failed' && <XCircle className="w-3 h-3" />}
-                            {exec.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-            <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
-                System Alerts
-              </h2>
-              {alerts.length > 0 && (
-                <span className="px-2 py-0.5 text-xs font-medium bg-red-100 text-red-700 rounded-full">
-                  {alerts.length} active
-                </span>
-              )}
-            </div>
-            <div className="max-h-64 overflow-y-auto">
-              {alerts.length === 0 ? (
-                <div className="p-4 text-sm text-gray-500 flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-green-500" />
-                  <span>No active alerts</span>
-                </div>
-              ) : (
-                <div className="divide-y divide-gray-100">
-                  {alerts.map((alert) => (
-                    <AlertItem key={alert.id} alert={alert} onAcknowledge={handleAcknowledgeAlert} />
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
       </div>
     </PageLayout>
   );

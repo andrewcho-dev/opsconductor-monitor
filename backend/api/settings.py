@@ -110,9 +110,9 @@ def test_settings():
     # Test SNMP
     if data.get('snmp_community'):
         try:
-            from pysnmp.hlapi import getCmd, SnmpEngine, CommunityData, UdpTransportTarget, ContextData, ObjectType, ObjectIdentity
+            from pysnmp.hlapi.v3arch.asyncio import get_cmd, SnmpEngine, CommunityData, UdpTransportTarget, ContextData, ObjectType, ObjectIdentity
             
-            iterator = getCmd(
+            iterator = get_cmd(
                 SnmpEngine(),
                 CommunityData(data['snmp_community']),
                 UdpTransportTarget((target, 161), timeout=5, retries=0),

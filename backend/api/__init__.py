@@ -28,6 +28,7 @@ from .metrics import metrics_bp
 from .health import health_bp
 from .polling import polling_bp
 from .mib_mappings import mib_bp
+from .traps import traps_bp
 
 __all__ = [
     'devices_bp',
@@ -106,3 +107,6 @@ def register_blueprints(app):
     
     # MIB OID Mapping system
     app.register_blueprint(mib_bp)
+    
+    # SNMP Trap receiver API
+    app.register_blueprint(traps_bp)

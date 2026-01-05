@@ -10,7 +10,7 @@ import hashlib
 import base64
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, List, Tuple
 from functools import wraps
 
@@ -222,7 +222,7 @@ class AuthService:
                 row = cursor.fetchone()
                 if row and row['password_changed_at']:
                     min_age = timedelta(hours=policy['min_password_age_hours'])
-                    if datetime.utcnow() - row['password_changed_at'].replace(tzinfo=None) < min_age:
+                    if datetime.now(timezone.utc) - row['password_changed_at'].replace(tzinfo=timezone.utc) < min_age:
                         errors.append(f"Password can only be changed once every {policy['min_password_age_hours']} hours")
         
         return len(errors) == 0, errors
@@ -293,7 +293,7 @@ class AuthService:
             if not row['password_changed_at']:
                 return {'expired': True, 'expiring_soon': True, 'days_until_expiry': 0}
             
-            password_age = datetime.utcnow() - row['password_changed_at'].replace(tzinfo=None)
+            password_age = datetime.now(timezone.utc) - row['password_changed_at'].replace(tzinfo=timezone.utc)
             days_until_expiry = policy['expiration_days'] - password_age.days
             
             return {
@@ -384,7 +384,7 @@ class AuthService:
                     username, email, password_hash, first_name, last_name,
                     f"{first_name or ''} {last_name or ''}".strip() or username,
                     auth_method, 'active', created_by,
-                    datetime.utcnow() if password else None
+                    datetime.now(timezone.utc) if password else None
                 ))
                 user = dict(cursor.fetchone())
                 
@@ -598,7 +598,7 @@ class AuthService:
             return False, None, "Invalid username or password"
         
         # Check if account is locked
-        if user['locked_until'] and user['locked_until'] > datetime.utcnow():
+        if user['locked_until'] and user['locked_until'] > datetime.now(timezone.utc):
             return False, None, f"Account locked. Try again later."
         
         # Check account status
@@ -702,7 +702,7 @@ class AuthService:
         session_token = secrets.token_urlsafe(32)
         refresh_token = secrets.token_urlsafe(32)
         
-        expires_at = datetime.utcnow() + self.session_duration
+        expires_at = datetime.now(timezone.utc) + self.session_duration
         
         with self.db.cursor() as cursor:
             cursor.execute("""
@@ -1078,7 +1078,7 @@ class AuthService:
         """Generate and store an email verification code."""
         code = ''.join([str(secrets.randbelow(10)) for _ in range(self.email_code_length)])
         code_hash = self.hash_token(code)
-        expires_at = datetime.utcnow() + self.email_code_expiry
+        expires_at = datetime.now(timezone.utc) + self.email_code_expiry
         
         user = self.get_user(user_id)
         
@@ -1746,7 +1746,7 @@ class AuthService:
         """
         session_token = secrets.token_urlsafe(32)
         refresh_token = secrets.token_urlsafe(32)
-        expires_at = datetime.utcnow() + self.session_duration
+        expires_at = datetime.now(timezone.utc) + self.session_duration
         
         with self.db.cursor() as cursor:
             cursor.execute("""

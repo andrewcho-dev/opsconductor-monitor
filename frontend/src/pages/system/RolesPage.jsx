@@ -76,6 +76,7 @@ const PERMISSION_MODULES = {
 };
 
 export function RolesPage() {
+  console.log('RolesPage component mounting...');
   const { hasPermission, getAuthHeader } = useAuth();
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -88,9 +89,12 @@ export function RolesPage() {
   const loadData = async () => {
     setLoading(true);
     try {
+      console.log('Loading roles...');
       const rolesRes = await fetchApi('/api/auth/roles', { headers: getAuthHeader() });
+      console.log('Roles response:', rolesRes);
       if (rolesRes.success) {
-        setRoles(rolesRes.data.roles || []);
+        console.log('Setting roles:', rolesRes.data);
+        setRoles(rolesRes.data || []);
       }
     } catch (err) {
       console.error('Error loading data:', err);
@@ -106,10 +110,13 @@ export function RolesPage() {
   const canManageRoles = hasPermission('system.roles.manage');
 
   const loadMembers = async (roleId) => {
+    console.log(`Loading members for role ${roleId}...`);
     setLoadingMembers(true);
     try {
       const res = await fetchApi(`/api/auth/roles/${roleId}/members`, { headers: getAuthHeader() });
+      console.log(`Role ${roleId} members response:`, res);
       if (res.success) {
+        console.log(`Setting ${res.data.members?.length || 0} members for role ${roleId}`);
         setMembers(res.data.members || []);
       }
     } catch (err) {

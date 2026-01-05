@@ -1,13 +1,37 @@
-flask==2.3.3
-python-dotenv==1.0.0
+# FastAPI and async
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+pydantic==2.5.3
+pydantic-settings==2.1.0
+
+# Database
 psycopg2-binary==2.9.7
+
+# Environment and config
+python-dotenv==1.0.0
+
+# SSH/Network
 paramiko==3.4.0
 pywinrm==0.4.3
 requests-ntlm==1.2.0
+
+# Notifications
 apprise==1.8.0
+
+# Task queue
 celery==5.3.4
 redis==5.0.1
 croniter==1.4.1
+
+# Auth
 bcrypt==4.1.2
 pyotp==2.9.0
 cryptography==41.0.7
+
+# SNMP (async)
+pysnmp==7.1.16
+
+# HTTP client
+httpx==0.26.0
+requests==2.31.0

@@ -12,7 +12,10 @@ This script:
 
 import requests
 import psycopg2
-from pysnmp.hlapi import *
+from pysnmp.hlapi.v3arch.asyncio import *
+# Aliases for backward compatibility with pysnmp 7.x
+nextCmd = next_cmd
+getCmd = get_cmd
 import sys
 
 def get_netbox_settings():

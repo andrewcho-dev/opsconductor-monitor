@@ -297,8 +297,11 @@ def poll_by_type(
         
         logger.info(f"Polling {len(targets)} devices for '{poll_type_name}'")
         
-        # Create async poller
-        poller = AsyncSNMPPoller(max_concurrent=50, batch_size=25, default_timeout=10)
+        # Create async poller - optimized for 1000+ devices
+        # max_concurrent=200: Allow 200 simultaneous SNMP connections
+        # batch_size=50: Process 50 devices per batch for better throughput
+        # default_timeout=5: Reduce timeout for faster failure detection
+        poller = AsyncSNMPPoller(max_concurrent=200, batch_size=50, default_timeout=5)
         
         # Poll all devices
         results = await poller.walk_devices(targets, oids_to_poll)

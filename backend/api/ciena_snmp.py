@@ -31,7 +31,7 @@ def test_connection():
     community = data.get('community', 'public')
     
     if not host:
-        return error_response('Host is required', code='VALIDATION_ERROR', status=400)
+        return error_response('VALIDATION_ERROR', 'Host is required')
     
     try:
         service = CienaSNMPService(host, community)
@@ -40,13 +40,9 @@ def test_connection():
         if result['success']:
             return success_response(result, message=f"Successfully connected to {host}")
         else:
-            return error_response(
-                f"Failed to connect to {host}: {result.get('error', 'Unknown error')}",
-                code='CONNECTION_ERROR',
-                status=500
-            )
+            return error_response('CONNECTION_ERROR', f"Failed to connect to {host}: {result.get('error', 'Unknown error')}")
     except Exception as e:
-        return error_response(str(e), code='SNMP_ERROR', status=500)
+        return error_response('SNMP_ERROR', str(e))
 
 
 @snmp_bp.route('/poll', methods=['POST'])
@@ -65,15 +61,15 @@ def poll_single():
     community = data.get('community', 'public')
     
     if not host:
-        return error_response('Host is required', code='VALIDATION_ERROR', status=400)
+        return error_response('VALIDATION_ERROR', 'Host is required')
     
     try:
         result = poll_switch(host, community)
         return success_response(result)
     except CienaSNMPError as e:
-        return error_response(str(e), code='SNMP_ERROR', status=500)
+        return error_response('SNMP_ERROR', str(e))
     except Exception as e:
-        return error_response(str(e), code='INTERNAL_ERROR', status=500)
+        return error_response('INTERNAL_ERROR', str(e))
 
 
 @snmp_bp.route('/poll/batch', methods=['POST'])
@@ -92,7 +88,7 @@ def poll_batch():
     community = data.get('community', 'public')
     
     if not hosts:
-        return error_response('Hosts list is required', code='VALIDATION_ERROR', status=400)
+        return error_response('VALIDATION_ERROR', 'Hosts list is required')
     
     try:
         results = poll_multiple_switches(hosts, community)
@@ -101,7 +97,7 @@ def poll_batch():
             'results': results,
         })
     except Exception as e:
-        return error_response(str(e), code='INTERNAL_ERROR', status=500)
+        return error_response('INTERNAL_ERROR', str(e))
 
 
 @snmp_bp.route('/system/<host>', methods=['GET'])
@@ -114,9 +110,9 @@ def get_system_info(host):
         result = service.get_system_info()
         return success_response(result)
     except CienaSNMPError as e:
-        return error_response(str(e), code='SNMP_ERROR', status=500)
+        return error_response('SNMP_ERROR', str(e))
     except Exception as e:
-        return error_response(str(e), code='INTERNAL_ERROR', status=500)
+        return error_response('INTERNAL_ERROR', str(e))
 
 
 @snmp_bp.route('/rings/<host>', methods=['GET'])
@@ -149,9 +145,9 @@ def get_rings(host):
             'count': len(rings),
         })
     except CienaSNMPError as e:
-        return error_response(str(e), code='SNMP_ERROR', status=500)
+        return error_response('SNMP_ERROR', str(e))
     except Exception as e:
-        return error_response(str(e), code='INTERNAL_ERROR', status=500)
+        return error_response('INTERNAL_ERROR', str(e))
 
 
 @snmp_bp.route('/alarms/<host>', methods=['GET'])
@@ -181,9 +177,9 @@ def get_alarms(host):
             'by_severity': by_severity,
         })
     except CienaSNMPError as e:
-        return error_response(str(e), code='SNMP_ERROR', status=500)
+        return error_response('SNMP_ERROR', str(e))
     except Exception as e:
-        return error_response(str(e), code='INTERNAL_ERROR', status=500)
+        return error_response('INTERNAL_ERROR', str(e))
 
 
 @snmp_bp.route('/raps/global/<host>', methods=['GET'])
@@ -196,9 +192,9 @@ def get_raps_global(host):
         result = service.get_raps_global()
         return success_response(result)
     except CienaSNMPError as e:
-        return error_response(str(e), code='SNMP_ERROR', status=500)
+        return error_response('SNMP_ERROR', str(e))
     except Exception as e:
-        return error_response(str(e), code='INTERNAL_ERROR', status=500)
+        return error_response('INTERNAL_ERROR', str(e))
 
 
 @snmp_bp.route('/ports/<host>', methods=['GET'])
@@ -222,9 +218,9 @@ def get_ports(host):
             'down': down_count,
         })
     except CienaSNMPError as e:
-        return error_response(str(e), code='SNMP_ERROR', status=500)
+        return error_response('SNMP_ERROR', str(e))
     except Exception as e:
-        return error_response(str(e), code='INTERNAL_ERROR', status=500)
+        return error_response('INTERNAL_ERROR', str(e))
 
 
 @snmp_bp.route('/transceivers/<host>', methods=['GET'])
@@ -246,9 +242,9 @@ def get_transceivers(host):
             'count': len(xcvrs),
         })
     except CienaSNMPError as e:
-        return error_response(str(e), code='SNMP_ERROR', status=500)
+        return error_response('SNMP_ERROR', str(e))
     except Exception as e:
-        return error_response(str(e), code='INTERNAL_ERROR', status=500)
+        return error_response('INTERNAL_ERROR', str(e))
 
 
 @snmp_bp.route('/port-stats/<host>', methods=['GET'])
@@ -266,9 +262,9 @@ def get_port_stats(host):
             'count': len(stats),
         })
     except CienaSNMPError as e:
-        return error_response(str(e), code='SNMP_ERROR', status=500)
+        return error_response('SNMP_ERROR', str(e))
     except Exception as e:
-        return error_response(str(e), code='INTERNAL_ERROR', status=500)
+        return error_response('INTERNAL_ERROR', str(e))
 
 
 @snmp_bp.route('/chassis/<host>', methods=['GET'])
@@ -282,9 +278,9 @@ def get_chassis_health(host):
         
         return success_response(health)
     except CienaSNMPError as e:
-        return error_response(str(e), code='SNMP_ERROR', status=500)
+        return error_response('SNMP_ERROR', str(e))
     except Exception as e:
-        return error_response(str(e), code='INTERNAL_ERROR', status=500)
+        return error_response('INTERNAL_ERROR', str(e))
 
 
 @snmp_bp.route('/lag/<host>', methods=['GET'])
@@ -302,9 +298,9 @@ def get_lag_status(host):
             'count': len(lags),
         })
     except CienaSNMPError as e:
-        return error_response(str(e), code='SNMP_ERROR', status=500)
+        return error_response('SNMP_ERROR', str(e))
     except Exception as e:
-        return error_response(str(e), code='INTERNAL_ERROR', status=500)
+        return error_response('INTERNAL_ERROR', str(e))
 
 
 @snmp_bp.route('/mstp/<host>', methods=['GET'])
@@ -318,9 +314,9 @@ def get_mstp_status(host):
         
         return success_response(mstp)
     except CienaSNMPError as e:
-        return error_response(str(e), code='SNMP_ERROR', status=500)
+        return error_response('SNMP_ERROR', str(e))
     except Exception as e:
-        return error_response(str(e), code='INTERNAL_ERROR', status=500)
+        return error_response('INTERNAL_ERROR', str(e))
 
 
 @snmp_bp.route('/ntp/<host>', methods=['GET'])
@@ -334,9 +330,9 @@ def get_ntp_status(host):
         
         return success_response(ntp)
     except CienaSNMPError as e:
-        return error_response(str(e), code='SNMP_ERROR', status=500)
+        return error_response('SNMP_ERROR', str(e))
     except Exception as e:
-        return error_response(str(e), code='INTERNAL_ERROR', status=500)
+        return error_response('INTERNAL_ERROR', str(e))
 
 
 @snmp_bp.route('/cfm/<host>', methods=['GET'])
@@ -350,6 +346,6 @@ def get_cfm_status(host):
         
         return success_response(cfm)
     except CienaSNMPError as e:
-        return error_response(str(e), code='SNMP_ERROR', status=500)
+        return error_response('SNMP_ERROR', str(e))
     except Exception as e:
-        return error_response(str(e), code='INTERNAL_ERROR', status=500)
+        return error_response('INTERNAL_ERROR', str(e))

@@ -136,8 +136,8 @@ class AsyncSNMPEngine:
     
     def __init__(
         self,
-        max_concurrent: int = 100,
-        default_timeout: float = 2.0,
+        max_concurrent: int = 200,
+        default_timeout: float = 5.0,
         default_retries: int = 1,
     ):
         self.max_concurrent = max_concurrent
@@ -147,7 +147,8 @@ class AsyncSNMPEngine:
         self._engine = None
         self._stats = PollerStats()
         # Thread pool for concurrent sync SNMP operations
-        # Size matches max_concurrent for optimal parallelism
+        # Size matches max_concurrent for optimal parallelism with 1000+ devices
+        # Each thread handles one SNMP connection, I/O-bound so can exceed CPU count
         from concurrent.futures import ThreadPoolExecutor
         self._executor = ThreadPoolExecutor(
             max_workers=max_concurrent,
@@ -158,10 +159,10 @@ class AsyncSNMPEngine:
         """Get or create SNMP engine (lazy initialization)."""
         if self._engine is None:
             try:
-                from pysnmp.hlapi.asyncio import SnmpEngine
+                from pysnmp.hlapi.v3arch.asyncio import SnmpEngine
                 self._engine = SnmpEngine()
             except ImportError:
-                from pysnmp.hlapi import SnmpEngine
+                from pysnmp.hlapi.v3arch.asyncio import SnmpEngine
                 self._engine = SnmpEngine()
         return self._engine
     
@@ -319,15 +320,15 @@ class AsyncSNMPEngine:
     def _sync_get_pysnmp(self, target: SNMPTarget, oids: List[str]) -> SNMPResult:
         """Fallback: Synchronous SNMP GET using pysnmp."""
         try:
-            from pysnmp.hlapi import (
-                getCmd, SnmpEngine, CommunityData, UdpTransportTarget,
+            from pysnmp.hlapi.v3arch.asyncio import (
+                get_cmd, SnmpEngine, CommunityData, UdpTransportTarget,
                 ContextData, ObjectType, ObjectIdentity
             )
             
             oid_objects = [ObjectType(ObjectIdentity(oid)) for oid in oids]
             mp_model = 0 if target.version == "1" else 1
             
-            iterator = getCmd(
+            iterator = get_cmd(
                 SnmpEngine(),
                 CommunityData(target.community, mpModel=mp_model),
                 UdpTransportTarget(
@@ -511,15 +512,15 @@ class AsyncSNMPEngine:
     ) -> SNMPResult:
         """Fallback: Synchronous SNMP GETBULK using pysnmp."""
         try:
-            from pysnmp.hlapi import (
-                bulkCmd, SnmpEngine, CommunityData, UdpTransportTarget,
+            from pysnmp.hlapi.v3arch.asyncio import (
+                bulk_cmd, SnmpEngine, CommunityData, UdpTransportTarget,
                 ContextData, ObjectType, ObjectIdentity
             )
             
             mp_model = 0 if target.version == "1" else 1
             values = {}
             
-            for (errorIndication, errorStatus, errorIndex, varBinds) in bulkCmd(
+            for (errorIndication, errorStatus, errorIndex, varBinds) in bulk_cmd(
                 SnmpEngine(),
                 CommunityData(target.community, mpModel=mp_model),
                 UdpTransportTarget(
@@ -561,10 +562,10 @@ class AsyncSNMPPoller:
     
     def __init__(
         self,
-        max_concurrent: int = 100,
-        batch_size: int = 50,
-        stagger_delay: float = 0.01,
-        default_timeout: float = 2.0,
+        max_concurrent: int = 200,
+        batch_size: int = 100,
+        stagger_delay: float = 0.005,
+        default_timeout: float = 5.0,
         default_retries: int = 1,
         progress_callback: Optional[Callable[[int, int], None]] = None,
     ):

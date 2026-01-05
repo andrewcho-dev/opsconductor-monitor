@@ -51,8 +51,8 @@ class SNMPExecutor(BaseExecutor):
         oid = command  # The "command" is the OID to query
         
         try:
-            from pysnmp.hlapi import (
-                getCmd, SnmpEngine, CommunityData, UdpTransportTarget,
+            from pysnmp.hlapi.v3arch.asyncio import (
+                get_cmd, SnmpEngine, CommunityData, UdpTransportTarget,
                 ContextData, ObjectType, ObjectIdentity
             )
             
@@ -63,7 +63,7 @@ class SNMPExecutor(BaseExecutor):
                 mp_model = 1  # SNMPv2c
             
             # Execute SNMP GET
-            iterator = getCmd(
+            iterator = get_cmd(
                 SnmpEngine(),
                 CommunityData(community, mpModel=mp_model),
                 UdpTransportTarget((target, port), timeout=timeout, retries=config.get('retries', 1)),
@@ -150,14 +150,14 @@ class SNMPExecutor(BaseExecutor):
         port = config.get('port', 161)
         
         try:
-            from pysnmp.hlapi import (
-                bulkCmd, SnmpEngine, CommunityData, UdpTransportTarget,
+            from pysnmp.hlapi.v3arch.asyncio import (
+                bulk_cmd, SnmpEngine, CommunityData, UdpTransportTarget,
                 ContextData, ObjectType, ObjectIdentity
             )
             
             results = []
             
-            for (errorIndication, errorStatus, errorIndex, varBinds) in bulkCmd(
+            for (errorIndication, errorStatus, errorIndex, varBinds) in bulk_cmd(
                 SnmpEngine(),
                 CommunityData(community, mpModel=1),
                 UdpTransportTarget((target, port), timeout=timeout),

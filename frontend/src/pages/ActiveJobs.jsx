@@ -222,25 +222,27 @@ export function ActiveJobs() {
             </div>
             <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {queueStatus.workers.map((worker) => {
-                const details = queueStatus.worker_details?.[worker] || {};
-                const activeTasks = details.active_tasks || [];
+                // Worker can be an object or a string depending on API version
+                const workerName = typeof worker === 'object' ? worker.name : worker;
+                const workerData = typeof worker === 'object' ? worker : (queueStatus.worker_details?.[worker] || {});
+                const activeTasks = workerData.active_tasks || [];
                 return (
-                  <div key={worker} className="border border-gray-200 rounded-lg p-3">
-                    <div className="font-mono text-sm text-gray-800 truncate mb-2" title={worker}>
-                      {worker}
+                  <div key={workerName} className="border border-gray-200 rounded-lg p-3">
+                    <div className="font-mono text-sm text-gray-800 truncate mb-2" title={workerName}>
+                      {workerName}
                     </div>
                     <div className="grid grid-cols-3 gap-2 text-xs mb-2">
                       <div>
                         <div className="text-gray-500">Concurrency</div>
-                        <div className="font-semibold">{details.concurrency || '—'}</div>
+                        <div className="font-semibold">{workerData.concurrency || '—'}</div>
                       </div>
                       <div>
                         <div className="text-gray-500">Active</div>
-                        <div className="font-semibold">{details.active || 0}</div>
+                        <div className="font-semibold">{workerData.active || 0}</div>
                       </div>
                       <div>
                         <div className="text-gray-500">Reserved</div>
-                        <div className="font-semibold">{details.reserved || 0}</div>
+                        <div className="font-semibold">{workerData.reserved || 0}</div>
                       </div>
                     </div>
                     {/* Active Tasks */}
@@ -265,7 +267,7 @@ export function ActiveJobs() {
                         </div>
                       </div>
                     )}
-                    {details.active > 0 && activeTasks.length === 0 && (
+                    {workerData.active > 0 && activeTasks.length === 0 && (
                       <div className="mt-2 pt-2 border-t border-gray-100">
                         <div className="text-[10px] text-gray-400 italic">Task details loading...</div>
                       </div>

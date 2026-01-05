@@ -27,12 +27,11 @@ export function NetBoxSettings() {
     setLoading(true);
     try {
       const res = await fetchApi('/api/netbox/settings', { headers: getAuthHeader() });
-      if (res.success) {
+      if (res.success && res.data) {
         setSettings(prev => ({
           ...prev,
-          url: res.data.url || '',
-          token: res.data.token || '',
-          verify_ssl: res.data.verify_ssl !== 'false',
+          ...res.data,
+          verify_ssl: res.data.verify_ssl !== 'false' && res.data.verify_ssl !== false,
         }));
       }
     } catch (err) {

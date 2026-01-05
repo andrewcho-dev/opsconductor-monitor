@@ -22,6 +22,7 @@ const ROLE_COLORS = {
 };
 
 export function UsersPage() {
+  console.log('UsersPage component mounting...');
   const { hasPermission, getAuthHeader } = useAuth();
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
@@ -44,6 +45,7 @@ export function UsersPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
+    console.log('UsersPage useEffect triggered, calling loadData...');
     loadData();
   }, [search, statusFilter]);
 
@@ -54,16 +56,22 @@ export function UsersPage() {
       if (search) params.append('search', search);
       if (statusFilter) params.append('status', statusFilter);
 
+      console.log('Loading users and roles...');
       const [usersRes, rolesRes] = await Promise.all([
         fetchApi(`/api/auth/users?${params}`, { headers: getAuthHeader() }),
         fetchApi('/api/auth/roles', { headers: getAuthHeader() })
       ]);
 
+      console.log('Users response:', usersRes);
+      console.log('Roles response:', rolesRes);
+
       if (usersRes.success) {
-        setUsers(usersRes.data.users || []);
+        console.log('Setting users:', usersRes.data);
+        setUsers(usersRes.data || []);
       }
       if (rolesRes.success) {
-        setRoles(rolesRes.data.roles || []);
+        console.log('Setting roles:', rolesRes.data);
+        setRoles(rolesRes.data || []);
       }
     } catch (err) {
       console.error('Error loading data:', err);

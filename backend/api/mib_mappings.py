@@ -505,8 +505,8 @@ def test_poll():
         if not oid and not group_id:
             return error_response("oid or group_id is required", status=400)
         
-        from pysnmp.hlapi import (
-            getCmd, nextCmd, SnmpEngine, CommunityData, 
+        from pysnmp.hlapi.v3arch.asyncio import (
+            get_cmd, next_cmd, SnmpEngine, CommunityData, 
             UdpTransportTarget, ContextData, ObjectType, ObjectIdentity
         )
         
@@ -514,7 +514,7 @@ def test_poll():
         
         if oid:
             # Single OID get
-            iterator = getCmd(
+            iterator = get_cmd(
                 SnmpEngine(),
                 CommunityData(community),
                 UdpTransportTarget((host, 161), timeout=5, retries=1),
@@ -549,7 +549,7 @@ def test_poll():
             
             if group['is_table'] and group['base_oid']:
                 # SNMP walk for tables
-                for errorIndication, errorStatus, errorIndex, varBinds in nextCmd(
+                for errorIndication, errorStatus, errorIndex, varBinds in next_cmd(
                     SnmpEngine(),
                     CommunityData(community),
                     UdpTransportTarget((host, 161), timeout=5, retries=1),
@@ -578,7 +578,7 @@ def test_poll():
             else:
                 # Get individual OIDs
                 for mapping in mappings:
-                    iterator = getCmd(
+                    iterator = get_cmd(
                         SnmpEngine(),
                         CommunityData(community),
                         UdpTransportTarget((host, 161), timeout=5, retries=1),

@@ -61,8 +61,8 @@ class SNMPGetExecutor:
     def _snmp_get_pysnmp(self, target: str, community: str, oids: str, version: str) -> Dict:
         """Use pysnmp library for SNMP GET - parallel OID queries."""
         try:
-            from pysnmp.hlapi import (
-                getCmd, SnmpEngine, CommunityData, UdpTransportTarget,
+            from pysnmp.hlapi.v3arch.asyncio import (
+                get_cmd, SnmpEngine, CommunityData, UdpTransportTarget,
                 ContextData, ObjectType, ObjectIdentity
             )
             from concurrent.futures import ThreadPoolExecutor
@@ -71,7 +71,7 @@ class SNMPGetExecutor:
             
             def query_oid(oid):
                 try:
-                    iterator = getCmd(
+                    iterator = get_cmd(
                         SnmpEngine(),
                         CommunityData(community, mpModel=1 if version == '2c' else 0),
                         UdpTransportTarget((target, 161), timeout=2, retries=1),

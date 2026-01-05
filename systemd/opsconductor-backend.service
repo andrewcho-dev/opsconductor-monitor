@@ -1,25 +1,22 @@
 [Unit]
-Description=OpsConductor Monitor Backend (Gunicorn)
+Description=OpsConductor Monitor Backend (Uvicorn/FastAPI)
 After=network.target postgresql.service redis.service
 Wants=postgresql.service redis.service
 
 [Service]
-Type=notify
+Type=simple
 User=opsconductor
 Group=opsconductor
 WorkingDirectory=/home/opsconductor/opsconductor-monitor/CascadeProjects/windsurf-project
 Environment="PATH=/home/opsconductor/.local/bin:/usr/local/bin:/usr/bin:/bin"
-ExecStart=/home/opsconductor/.local/bin/gunicorn \
-    --bind 0.0.0.0:5000 \
+ExecStart=/home/opsconductor/.local/bin/uvicorn \
+    app:app \
+    --host 0.0.0.0 \
+    --port 5000 \
     --workers 4 \
-    --threads 2 \
-    --timeout 120 \
-    --graceful-timeout 30 \
-    --keep-alive 5 \
-    --access-logfile /tmp/opsconductor_access.log \
-    --error-logfile /tmp/opsconductor_error.log \
-    --capture-output \
-    app:app
+    --timeout-keep-alive 30 \
+    --access-log \
+    --log-level info
 ExecReload=/bin/kill -s HUP $MAINPID
 Restart=always
 RestartSec=5

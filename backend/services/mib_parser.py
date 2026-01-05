@@ -306,15 +306,15 @@ def discover_oids_from_device(host: str, community: str = 'public',
     Returns:
         List of discovered OIDs with their values and types
     """
-    from pysnmp.hlapi import (
-        nextCmd, SnmpEngine, CommunityData,
+    from pysnmp.hlapi.v3arch.asyncio import (
+        next_cmd, SnmpEngine, CommunityData,
         UdpTransportTarget, ContextData, ObjectType, ObjectIdentity
     )
     
     discovered = []
     
     try:
-        for errorIndication, errorStatus, errorIndex, varBinds in nextCmd(
+        for errorIndication, errorStatus, errorIndex, varBinds in next_cmd(
             SnmpEngine(),
             CommunityData(community),
             UdpTransportTarget((host, 161), timeout=5, retries=1),

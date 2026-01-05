@@ -5,8 +5,8 @@ Provides SNMP polling for Eaton UPS devices using the XUPS-MIB (PowerMIB)
 
 import logging
 from typing import Dict, List, Optional, Any
-from pysnmp.hlapi import (
-    getCmd, nextCmd, SnmpEngine, CommunityData, UdpTransportTarget,
+from pysnmp.hlapi.v3arch.asyncio import (
+    get_cmd, next_cmd, walk_cmd, SnmpEngine, CommunityData, UdpTransportTarget,
     ContextData, ObjectType, ObjectIdentity
 )
 

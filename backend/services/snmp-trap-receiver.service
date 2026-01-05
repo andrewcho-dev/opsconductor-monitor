@@ -1,0 +1,32 @@
+[Unit]
+Description=OpsConductor SNMP Trap Receiver
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=opsconductor
+Group=opsconductor
+WorkingDirectory=/home/opsconductor/opsconductor-monitor/CascadeProjects/windsurf-project
+
+# Environment
+EnvironmentFile=/home/opsconductor/opsconductor-monitor/CascadeProjects/windsurf-project/.env
+Environment=PYTHONPATH=/home/opsconductor/opsconductor-monitor/CascadeProjects/windsurf-project
+
+# Allow binding to privileged port 162 without root
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+
+# Run the trap receiver
+ExecStart=/usr/bin/python3 -m backend.services.snmp_trap_receiver
+
+# Restart on failure
+Restart=always
+RestartSec=5
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=snmp-trap-receiver
+
+[Install]
+WantedBy=multi-user.target

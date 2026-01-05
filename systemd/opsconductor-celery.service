@@ -1,0 +1,41 @@
+[Unit]
+Description=OpsConductor Celery Workers (Optimized for 1000+ devices)
+After=network.target postgresql.service redis.service
+Wants=postgresql.service redis.service
+
+[Service]
+User=opsconductor
+Group=opsconductor
+WorkingDirectory=/home/opsconductor/opsconductor-monitor/CascadeProjects/windsurf-project
+Environment="PATH=/home/opsconductor/.local/bin:/usr/bin:/bin"
+Environment="PG_HOST=localhost"
+Environment="PG_PORT=5432"
+Environment="PG_DATABASE=network_scan"
+Environment="PG_USER=postgres"
+Environment="PG_PASSWORD=postgres"
+
+# Optimized for I/O-bound SNMP/SSH/HTTP tasks
+# With 20 CPU cores and 47GB RAM:
+# - 32 worker processes (1.6x CPU cores - optimal for I/O-bound)
+# - Each worker can handle multiple concurrent I/O operations via async
+# - Prefetch multiplier of 4 means each worker grabs 4 tasks at a time
+ExecStart=/home/opsconductor/.local/bin/celery -A celery_app worker \
+    --loglevel=info \
+    --concurrency=32 \
+    --prefetch-multiplier=4 \
+    -Q polling,workflows,analysis,notifications \
+    -n worker@%%h \
+    --max-tasks-per-child=1000 \
+    --without-gossip \
+    --without-mingle
+
+# Process limits
+LimitNOFILE=65536
+LimitNPROC=65536
+
+Restart=always
+RestartSec=5
+TimeoutStopSec=300
+
+[Install]
+WantedBy=multi-user.target

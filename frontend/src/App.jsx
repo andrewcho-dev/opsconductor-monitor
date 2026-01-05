@@ -107,8 +107,8 @@ function App() {
         <Route path="/system/credentials" element={<ProtectedRoute><Navigate to="/credentials" replace /></ProtectedRoute>} />
         <Route path="/system/logs" element={<ProtectedRoute permission="system.audit.view"><LogsPage /></ProtectedRoute>} />
         <Route path="/system/about" element={<ProtectedRoute><AboutPage /></ProtectedRoute>} />
-        <Route path="/system/users" element={<ProtectedRoute permission="system.users.view"><UsersPage /></ProtectedRoute>} />
-        <Route path="/system/roles" element={<ProtectedRoute permission="system.roles.manage"><RolesPage /></ProtectedRoute>} />
+        <Route path="/system/users" element={<ProtectedRoute><UsersPage /></ProtectedRoute>} />
+        <Route path="/system/roles" element={<ProtectedRoute><RolesPage /></ProtectedRoute>} />
 
         {/* LEGACY REDIRECTS */}
         <Route path="/device/:ip" element={<DeviceDetailPage />} />

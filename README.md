@@ -1,6 +1,6 @@
 # OpsConductor Monitor
 
-A comprehensive network operations platform for device discovery, monitoring, workflow automation, and infrastructure management. Built with a Flask backend and React frontend, OpsConductor provides a visual workflow builder for creating complex automation tasks without code.
+A comprehensive network operations platform for device discovery, monitoring, workflow automation, and infrastructure management. Built with a **FastAPI** backend and React frontend, OpsConductor provides a visual workflow builder for creating complex automation tasks without code.
 
 ## Key Features
 
@@ -39,8 +39,8 @@ A comprehensive network operations platform for device discovery, monitoring, wo
 
 ```
 opsconductor/
-├── backend/                    # Flask API Server (Python)
-│   ├── api/                    # REST API Blueprints (18 modules)
+├── backend/                    # FastAPI Server (Python)
+│   ├── api/                    # REST API Routers (30 modules)
 │   ├── services/               # Business Logic Layer
 │   │   ├── workflow_engine.py  # Workflow execution engine
 │   │   ├── auth_service.py     # Authentication & RBAC
@@ -113,9 +113,10 @@ pip install -r requirements.txt
 # Run database migrations
 python3 backend/migrations/migrate.py
 
-# Start the backend server
-python3 app.py
+# Start the backend server (FastAPI with uvicorn)
+uvicorn app:app --host 0.0.0.0 --port 5000 --reload
 # Backend runs on http://localhost:5000
+# API docs available at http://localhost:5000/api/docs
 ```
 
 ### 3. Frontend Setup
@@ -161,10 +162,10 @@ PG_PASSWORD=your_password
 REDIS_HOST=localhost
 REDIS_PORT=6379
 
-# Flask
-FLASK_HOST=0.0.0.0
-FLASK_PORT=5000
-FLASK_DEBUG=true
+# API Server (FastAPI/Uvicorn)
+API_HOST=0.0.0.0
+API_PORT=5000
+API_RELOAD=true
 
 # Security
 SECRET_KEY=your-secret-key

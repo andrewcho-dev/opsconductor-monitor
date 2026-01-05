@@ -191,14 +191,30 @@ export async function fetchApi(endpoint, options = {}) {
   }
   
   // Destructure options to separate headers from other options
-  const { headers: _ignoredHeaders, ...restOptions } = options;
+  const { headers: _ignoredHeaders, timeout = 8000, ...restOptions } = options;
   
-  const response = await fetch(`${API_BASE}${endpoint}`, {
-    ...restOptions,
-    headers,  // Use our merged headers, not options.headers
-  });
-  if (!response.ok) {
-    throw new Error(`API error: ${response.statusText}`);
+  // Create AbortController for timeout
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+  
+  try {
+    const response = await fetch(`${API_BASE}${endpoint}`, {
+      ...restOptions,
+      headers,  // Use our merged headers, not options.headers
+      signal: controller.signal,
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      throw new Error(`API error: ${response.statusText}`);
+    }
+    return response.json();
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error('Request timeout');
+    }
+    throw error;
   }
-  return response.json();
 }

@@ -3,6 +3,7 @@
 
 echo "🛑 Stopping OpsConductor Monitor..."
 
+pkill -9 -f "uvicorn.*app:app" 2>/dev/null || true
 pkill -9 -f "python.*app.py" 2>/dev/null || true
 pkill -9 -f "celery.*worker" 2>/dev/null || true
 pkill -9 -f "celery.*beat" 2>/dev/null || true

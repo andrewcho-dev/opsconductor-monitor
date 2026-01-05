@@ -26,28 +26,46 @@ def _make_celery() -> Celery:
         include=["backend.tasks.job_tasks", "backend.tasks.polling_tasks", "backend.tasks.generic_polling_task"],
     )
 
-    # Basic sensible defaults; we can tune later.
+    # Optimized for high-throughput SNMP/SSH polling of 1000+ devices
     app.conf.update(
         task_serializer="json",
         accept_content=["json"],
         result_serializer="json",
         timezone=os.getenv("CELERY_TIMEZONE", "UTC"),
         enable_utc=True,
-        # Make worker behavior more predictable and resilient.
-        # - worker_prefetch_multiplier=1 prevents a single worker from
-        #   hoarding tasks and starving others.
-        # - task_acks_late=True ensures tasks are only ACKed after the
-        #   work is done so crashes cause re-delivery.
-        # - task_reject_on_worker_lost=True makes sure tasks return to
-        #   the queue if a worker process disappears.
-        worker_prefetch_multiplier=1,
+        
+        # Worker optimization for I/O-bound tasks (SNMP, SSH, HTTP)
+        # - prefetch_multiplier=4 allows workers to grab multiple tasks
+        #   for better throughput with I/O-bound workloads
+        # - task_acks_late=True ensures tasks are only ACKed after completion
+        # - task_reject_on_worker_lost=True returns tasks to queue on crash
+        worker_prefetch_multiplier=int(os.getenv("CELERY_PREFETCH_MULTIPLIER", "4")),
         task_acks_late=True,
         task_reject_on_worker_lost=True,
-        # Visibility timeout should be comfortably larger than any
-        # expected task runtime so Celery can recover tasks from
-        # lost workers instead of dropping them.
+        
+        # Result backend optimization
+        result_expires=3600,  # Results expire after 1 hour
+        result_compression="gzip",  # Compress results to reduce Redis memory
+        
+        # Task routing for different workload types
+        task_routes={
+            'polling.*': {'queue': 'polling'},
+            'workflows.*': {'queue': 'workflows'},
+            'analysis.*': {'queue': 'analysis'},
+            'notifications.*': {'queue': 'notifications'},
+        },
+        
+        # Task time limits to prevent runaway tasks
+        task_soft_time_limit=int(os.getenv("CELERY_TASK_SOFT_LIMIT", "300")),  # 5 min soft limit
+        task_time_limit=int(os.getenv("CELERY_TASK_HARD_LIMIT", "600")),  # 10 min hard limit
+        
+        # Broker connection optimization
+        broker_pool_limit=int(os.getenv("CELERY_BROKER_POOL_LIMIT", "50")),
+        broker_connection_retry_on_startup=True,
         broker_transport_options={
             "visibility_timeout": int(os.getenv("CELERY_VISIBILITY_TIMEOUT", "3600")),
+            "socket_timeout": 30,
+            "socket_connect_timeout": 30,
         },
         # Celery Beat schedule: run the generic scheduler tick task
         # every 30 seconds to dispatch due jobs from scheduler_jobs.

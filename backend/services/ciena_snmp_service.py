@@ -10,13 +10,23 @@ Uses official Ciena MIBs for real-time monitoring of:
 """
 
 import logging
+import asyncio
 from typing import Dict, List, Optional, Any
-from pysnmp.hlapi import (
-    getCmd, nextCmd, bulkCmd,
+from pysnmp.hlapi.v3arch.asyncio import (
+    get_cmd, next_cmd, bulk_cmd, walk_cmd,
     SnmpEngine, CommunityData, UdpTransportTarget,
     ContextData, ObjectType, ObjectIdentity,
     Integer, OctetString
 )
+
+
+def _run_sync(coro):
+    """Run async coroutine synchronously for Flask compatibility."""
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
 
 logger = logging.getLogger(__name__)
 
@@ -377,37 +387,31 @@ class CienaSNMPService:
         self.timeout = timeout
         self.retries = retries
         self._engine = SnmpEngine()
+        self._transport = None
     
-    def _get_transport(self) -> UdpTransportTarget:
-        """Get UDP transport target."""
-        return UdpTransportTarget(
-            (self.host, self.port),
-            timeout=self.timeout,
-            retries=self.retries
-        )
+    async def _get_transport_async(self) -> UdpTransportTarget:
+        """Get UDP transport target (async for pysnmp 7.x)."""
+        if self._transport is None:
+            self._transport = await UdpTransportTarget.create(
+                (self.host, self.port),
+                timeout=self.timeout,
+                retries=self.retries
+            )
+        return self._transport
     
     def _get_community(self) -> CommunityData:
         """Get community data for SNMPv2c."""
         return CommunityData(self.community, mpModel=1)  # mpModel=1 for SNMPv2c
     
-    def _snmp_get(self, oid: str) -> Any:
-        """
-        Perform SNMP GET request.
-        
-        Args:
-            oid: OID to query
-            
-        Returns:
-            Value from SNMP response
-        """
-        error_indication, error_status, error_index, var_binds = next(
-            getCmd(
-                self._engine,
-                self._get_community(),
-                self._get_transport(),
-                ContextData(),
-                ObjectType(ObjectIdentity(oid))
-            )
+    async def _snmp_get_async(self, oid: str) -> Any:
+        """Perform SNMP GET request (async)."""
+        transport = await self._get_transport_async()
+        error_indication, error_status, error_index, var_binds = await get_cmd(
+            self._engine,
+            self._get_community(),
+            transport,
+            ContextData(),
+            ObjectType(ObjectIdentity(oid))
         )
         
         if error_indication:
@@ -420,86 +424,110 @@ class CienaSNMPService:
         
         return None
     
-    def _snmp_walk(self, oid: str) -> List[tuple]:
-        """
-        Perform SNMP WALK (GETNEXT) request.
-        
-        Args:
-            oid: Base OID to walk
-            
-        Returns:
-            List of (oid, value) tuples
-        """
+    def _snmp_get(self, oid: str) -> Any:
+        """Perform SNMP GET request (sync wrapper)."""
+        return _run_sync(self._snmp_get_async(oid))
+    
+    async def _snmp_walk_async(self, oid: str, max_rows: int = 1000) -> List[tuple]:
+        """Perform SNMP WALK request (async) - pysnmp 7.x compatible."""
         results = []
+        transport = await self._get_transport_async()
+        base_oid = oid
+        current_oid = ObjectIdentity(oid)
         
-        for error_indication, error_status, error_index, var_binds in nextCmd(
-            self._engine,
-            self._get_community(),
-            self._get_transport(),
-            ContextData(),
-            ObjectType(ObjectIdentity(oid)),
-            lexicographicMode=False
-        ):
+        for _ in range(max_rows):
+            error_indication, error_status, error_index, var_binds = await next_cmd(
+                self._engine,
+                self._get_community(),
+                transport,
+                ContextData(),
+                ObjectType(current_oid),
+            )
+            
             if error_indication:
                 logger.warning(f"SNMP walk error: {error_indication}")
                 break
-            elif error_status:
+            if error_status:
                 logger.warning(f"SNMP walk error: {error_status.prettyPrint()}")
                 break
-            else:
-                for var_bind in var_binds:
-                    results.append((str(var_bind[0]), var_bind[1]))
+            if not var_binds:
+                break
+            
+            for var_bind in var_binds:
+                oid_str = str(var_bind[0])
+                if not oid_str.startswith(base_oid):
+                    return results
+                results.append((oid_str, var_bind[1]))
+                current_oid = var_bind[0]
+        
+        return results
+    
+    def _snmp_walk(self, oid: str) -> List[tuple]:
+        """Perform SNMP WALK request (sync wrapper)."""
+        return _run_sync(self._snmp_walk_async(oid))
+    
+    async def _snmp_bulk_async(self, oid: str, max_repetitions: int = 25, max_rows: int = 1000) -> List[tuple]:
+        """Perform SNMP BULK request (async) - pysnmp 7.x compatible."""
+        results = []
+        transport = await self._get_transport_async()
+        base_oid = oid
+        current_oid = ObjectIdentity(oid)
+        
+        for _ in range(max_rows // max_repetitions + 1):
+            error_indication, error_status, error_index, var_binds = await bulk_cmd(
+                self._engine,
+                self._get_community(),
+                transport,
+                ContextData(),
+                0, max_repetitions,
+                ObjectType(current_oid),
+            )
+            
+            if error_indication:
+                logger.warning(f"SNMP bulk error: {error_indication}")
+                break
+            if error_status:
+                logger.warning(f"SNMP bulk error: {error_status.prettyPrint()}")
+                break
+            if not var_binds:
+                break
+            
+            done = False
+            for var_bind in var_binds:
+                oid_str = str(var_bind[0])
+                if not oid_str.startswith(base_oid):
+                    done = True
+                    break
+                results.append((oid_str, var_bind[1]))
+                current_oid = var_bind[0]
+            
+            if done:
+                break
         
         return results
     
     def _snmp_bulk(self, oid: str, max_repetitions: int = 25) -> List[tuple]:
-        """
-        Perform SNMP BULK request for efficient table retrieval.
-        
-        Args:
-            oid: Base OID to query
-            max_repetitions: Max rows to retrieve per request
-            
-        Returns:
-            List of (oid, value) tuples
-        """
-        results = []
-        
-        for error_indication, error_status, error_index, var_binds in bulkCmd(
-            self._engine,
-            self._get_community(),
-            self._get_transport(),
-            ContextData(),
-            0, max_repetitions,
-            ObjectType(ObjectIdentity(oid)),
-            lexicographicMode=False
-        ):
-            if error_indication:
-                logger.warning(f"SNMP bulk error: {error_indication}")
-                break
-            elif error_status:
-                logger.warning(f"SNMP bulk error: {error_status.prettyPrint()}")
-                break
-            else:
-                for var_bind in var_binds:
-                    results.append((str(var_bind[0]), var_bind[1]))
-        
-        return results
+        """Perform SNMP BULK request (sync wrapper)."""
+        return _run_sync(self._snmp_bulk_async(oid, max_repetitions))
     
-    def get_system_info(self) -> Dict:
-        """Get basic system information via SNMP."""
+    async def _get_system_info_async(self) -> Dict:
+        """Get basic system information via SNMP (async)."""
         try:
             return {
                 'host': self.host,
-                'name': str(self._snmp_get(CIENA_OIDS['system']['name']) or ''),
-                'description': str(self._snmp_get(CIENA_OIDS['system']['descr']) or ''),
-                'uptime': int(self._snmp_get(CIENA_OIDS['system']['uptime']) or 0),
-                'location': str(self._snmp_get(CIENA_OIDS['system']['location']) or ''),
-                'contact': str(self._snmp_get(CIENA_OIDS['system']['contact']) or ''),
+                'name': str(await self._snmp_get_async(CIENA_OIDS['system']['name']) or ''),
+                'description': str(await self._snmp_get_async(CIENA_OIDS['system']['descr']) or ''),
+                'uptime': int(await self._snmp_get_async(CIENA_OIDS['system']['uptime']) or 0),
+                'location': str(await self._snmp_get_async(CIENA_OIDS['system']['location']) or ''),
+                'contact': str(await self._snmp_get_async(CIENA_OIDS['system']['contact']) or ''),
             }
         except Exception as e:
             logger.error(f"Failed to get system info from {self.host}: {e}")
             raise CienaSNMPError(f"Failed to get system info: {e}")
+    
+    def get_system_info(self) -> Dict:
+        """Get basic system information via SNMP (sync wrapper)."""
+        return _run_sync(self._get_system_info_async())
     
     def get_raps_global(self) -> Dict:
         """Get global RAPS (G.8032) status."""
@@ -572,51 +600,51 @@ class CienaSNMPService:
         
         return rings
     
-    def get_active_alarms(self) -> List[Dict]:
-        """Get active alarms via SNMP using Ciena CES Alarm MIB."""
+    async def _get_active_alarms_async(self) -> List[Dict]:
+        """Get active alarms via SNMP using Ciena CES Alarm MIB (async)."""
         alarms = {}
         
         try:
             # Walk each column and build alarm dict by index
             # Column 1: Severity
-            for oid, val in self._snmp_walk(CES_ALARM_OIDS['active_severity']):
+            for oid, val in await self._snmp_walk_async(CES_ALARM_OIDS['active_severity']):
                 idx = oid.replace(CES_ALARM_OIDS['active_severity'] + '.', '')
                 if idx not in alarms:
                     alarms[idx] = {'index': idx, 'host': self.host}
                 alarms[idx]['severity'] = ALARM_SEVERITY.get(int(val), 'unknown') if val else 'unknown'
             
             # Column 3: Object Class
-            for oid, val in self._snmp_walk(CES_ALARM_OIDS['active_object_class']):
+            for oid, val in await self._snmp_walk_async(CES_ALARM_OIDS['active_object_class']):
                 idx = oid.replace(CES_ALARM_OIDS['active_object_class'] + '.', '')
                 if idx in alarms:
                     alarms[idx]['object_class'] = ALARM_OBJECT_CLASS.get(int(val), 'unknown') if val else 'unknown'
             
             # Column 4: Object Interpret (e.g. "Port ID", "Virt Ring")
-            for oid, val in self._snmp_walk(CES_ALARM_OIDS['active_object_interpret']):
+            for oid, val in await self._snmp_walk_async(CES_ALARM_OIDS['active_object_interpret']):
                 idx = oid.replace(CES_ALARM_OIDS['active_object_interpret'] + '.', '')
                 if idx in alarms:
                     alarms[idx]['object_type'] = str(val).strip() if val else None
             
             # Column 5: Object Instance (e.g. "17", "VR100")
-            for oid, val in self._snmp_walk(CES_ALARM_OIDS['active_object_instance']):
+            for oid, val in await self._snmp_walk_async(CES_ALARM_OIDS['active_object_instance']):
                 idx = oid.replace(CES_ALARM_OIDS['active_object_instance'] + '.', '')
                 if idx in alarms:
                     alarms[idx]['object_instance'] = str(val).strip() if val else None
             
             # Column 6: Acknowledged
-            for oid, val in self._snmp_walk(CES_ALARM_OIDS['active_acknowledged']):
+            for oid, val in await self._snmp_walk_async(CES_ALARM_OIDS['active_acknowledged']):
                 idx = oid.replace(CES_ALARM_OIDS['active_acknowledged'] + '.', '')
                 if idx in alarms:
                     alarms[idx]['acknowledged'] = (int(val) == 1) if val else False
             
             # Column 7: Description
-            for oid, val in self._snmp_walk(CES_ALARM_OIDS['active_description']):
+            for oid, val in await self._snmp_walk_async(CES_ALARM_OIDS['active_description']):
                 idx = oid.replace(CES_ALARM_OIDS['active_description'] + '.', '')
                 if idx in alarms:
                     alarms[idx]['description'] = str(val).strip() if val else 'Unknown'
             
             # Column 8: Timestamp
-            for oid, val in self._snmp_walk(CES_ALARM_OIDS['active_timestamp']):
+            for oid, val in await self._snmp_walk_async(CES_ALARM_OIDS['active_timestamp']):
                 idx = oid.replace(CES_ALARM_OIDS['active_timestamp'] + '.', '')
                 if idx in alarms:
                     alarms[idx]['timestamp'] = str(val).strip() if val else None
@@ -626,6 +654,10 @@ class CienaSNMPService:
             raise CienaSNMPError(f"Failed to get active alarms: {e}")
         
         return list(alarms.values())
+    
+    def get_active_alarms(self) -> List[Dict]:
+        """Get active alarms via SNMP (sync wrapper)."""
+        return _run_sync(self._get_active_alarms_async())
     
     def get_ports(self) -> List[Dict]:
         """Get port status via SNMP."""
@@ -1081,24 +1113,17 @@ def poll_switch(host: str, community: str = 'public') -> Dict:
         community: SNMP community string
         
     Returns:
-        Dict with system info, transceivers, port stats, rings, and alarms
+        Dict with system info, rings, and alarms
     """
-    import time
-    start_time = time.time()
-    
     service = CienaSNMPService(host, community)
     
     result = {
         'host': host,
         'success': False,
         'system': None,
-        'transceivers': [],
-        'port_stats': [],
-        'ports': [],
         'raps_global': None,
         'virtual_rings': [],
         'active_alarms': [],
-        'chassis': None,
         'error': None,
     }
     
@@ -1109,25 +1134,6 @@ def poll_switch(host: str, community: str = 'public') -> Dict:
         result['error'] = f"System info failed: {e}"
         return result
     
-    # Transceivers (optical power) - HIGH PRIORITY
-    try:
-        result['transceivers'] = service.get_transceivers()
-    except Exception as e:
-        logger.warning(f"Transceivers failed for {host}: {e}")
-    
-    # Port statistics (traffic counters)
-    try:
-        result['port_stats'] = service.get_port_stats()
-    except Exception as e:
-        logger.warning(f"Port stats failed for {host}: {e}")
-    
-    # Port status
-    try:
-        result['ports'] = service.get_ports()
-    except Exception as e:
-        logger.warning(f"Ports failed for {host}: {e}")
-    
-    # RAPS/G.8032
     try:
         result['raps_global'] = service.get_raps_global()
     except Exception as e:
@@ -1138,19 +1144,10 @@ def poll_switch(host: str, community: str = 'public') -> Dict:
     except Exception as e:
         logger.warning(f"Virtual rings failed for {host}: {e}")
     
-    # Alarms
     try:
         result['active_alarms'] = service.get_active_alarms()
     except Exception as e:
         logger.warning(f"Active alarms failed for {host}: {e}")
-    
-    # Chassis health
-    try:
-        result['chassis'] = service.get_chassis_health()
-    except Exception as e:
-        logger.warning(f"Chassis health failed for {host}: {e}")
-    
-    result['poll_time_ms'] = int((time.time() - start_time) * 1000)
     
     return result
 

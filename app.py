@@ -1,8 +1,8 @@
 """
 OpsConductor Application - Main Entry Point.
 
-This is the main entry point that uses the new modular backend.
-For backward compatibility, this file delegates to backend.app.
+This is the main entry point that uses the FastAPI backend.
+Run with: uvicorn app:app --host 0.0.0.0 --port 5000 --reload
 """
 
 import os
@@ -24,10 +24,12 @@ from backend.app import create_app, app
 __all__ = ['app', 'create_app']
 
 if __name__ == '__main__':
-    # Get configuration from environment
-    host = os.environ.get('FLASK_HOST', '0.0.0.0')
-    port = int(os.environ.get('FLASK_PORT', 5000))
-    debug = os.environ.get('FLASK_DEBUG', 'true').lower() == 'true'
+    import uvicorn
     
-    print(f"Starting OpsConductor on {host}:{port}")
-    app.run(host=host, port=port, debug=debug)
+    # Get configuration from environment
+    host = os.environ.get('API_HOST', '0.0.0.0')
+    port = int(os.environ.get('API_PORT', 5000))
+    reload = os.environ.get('API_RELOAD', 'true').lower() == 'true'
+    
+    print(f"Starting OpsConductor FastAPI on {host}:{port}")
+    uvicorn.run("app:app", host=host, port=port, reload=reload)

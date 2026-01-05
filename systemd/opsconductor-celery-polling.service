@@ -1,0 +1,40 @@
+[Unit]
+Description=OpsConductor Celery Polling Workers (High-Performance SNMP/SSH)
+After=network.target postgresql.service redis.service
+Wants=postgresql.service redis.service
+
+[Service]
+User=opsconductor
+Group=opsconductor
+WorkingDirectory=/home/opsconductor/opsconductor-monitor/CascadeProjects/windsurf-project
+Environment="PATH=/home/opsconductor/.local/bin:/usr/bin:/bin"
+Environment="PG_HOST=localhost"
+Environment="PG_PORT=5432"
+Environment="PG_DATABASE=network_scan"
+Environment="PG_USER=postgres"
+Environment="PG_PASSWORD=postgres"
+
+# Dedicated polling workers - optimized for SNMP/SSH I/O
+# - 16 worker processes dedicated to polling queue only
+# - Higher prefetch for batch processing
+# - Separate from general workers to prevent polling from blocking other tasks
+ExecStart=/home/opsconductor/.local/bin/celery -A celery_app worker \
+    --loglevel=info \
+    --concurrency=16 \
+    --prefetch-multiplier=8 \
+    -Q polling \
+    -n polling@%%h \
+    --max-tasks-per-child=500 \
+    --without-gossip \
+    --without-mingle
+
+# High file descriptor limit for many concurrent SNMP connections
+LimitNOFILE=65536
+LimitNPROC=65536
+
+Restart=always
+RestartSec=5
+TimeoutStopSec=300
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,25 @@
+[Unit]
+Description=OpsConductor Monitor Backend (FastAPI/Uvicorn)
+After=network.target postgresql.service redis.service
+Wants=postgresql.service redis.service
+
+[Service]
+Type=exec
+User=opsconductor
+Group=opsconductor
+WorkingDirectory=/home/opsconductor/opsconductor-monitor/CascadeProjects/windsurf-project/backend
+Environment="PATH=/home/opsconductor/.local/bin:/usr/local/bin:/usr/bin:/bin"
+EnvironmentFile=/home/opsconductor/opsconductor-monitor/CascadeProjects/windsurf-project/.env
+ExecStart=/home/opsconductor/.local/bin/uvicorn main:app \
+    --host 0.0.0.0 \
+    --port 5000 \
+    --workers 4 \
+    --loop uvloop \
+    --access-log
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=always
+RestartSec=5
+KillMode=mixed
+
+[Install]
+WantedBy=multi-user.target
