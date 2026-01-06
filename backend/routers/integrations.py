@@ -9,9 +9,9 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 import logging
-import requests
 
-from backend.database import get_db
+from backend.utils.db import db_query, db_query_one, get_setting, get_settings_by_prefix, count_rows
+from backend.utils.http import NetBoxClient
 from backend.openapi.integrations_impl import (
     list_integrations_paginated, get_integration_by_id, test_netbox_connection,
     test_prtg_connection, get_mcp_services_status, get_mcp_devices,
@@ -56,10 +56,7 @@ async def get_integration(
 async def netbox_status(credentials: HTTPAuthorizationCredentials = Security(security)):
     """Get NetBox connection status"""
     try:
-        db = get_db()
-        with db.cursor() as cursor:
-            cursor.execute("SELECT key, value FROM system_settings WHERE key LIKE 'netbox_%'")
-            settings = {row['key']: row['value'] for row in cursor.fetchall()}
+        settings = get_settings_by_prefix('netbox_')
         return {
             "connected": bool(settings.get('netbox_url') and settings.get('netbox_token')),
             "url": settings.get('netbox_url', ''),
@@ -90,18 +87,14 @@ async def netbox_devices(
 ):
     """Get devices from NetBox cache"""
     try:
-        db = get_db()
-        with db.cursor() as cursor:
-            cursor.execute("""
-                SELECT netbox_device_id as id, device_name as name, 
-                       device_ip::text as primary_ip4, device_type, 
-                       manufacturer as vendor, site_name as site,
-                       role_name as role, cached_at
-                FROM netbox_device_cache ORDER BY device_name LIMIT %s
-            """, (limit,))
-            devices = [dict(row) for row in cursor.fetchall()]
-            cursor.execute("SELECT COUNT(*) as total FROM netbox_device_cache")
-            total = cursor.fetchone()['total']
+        devices = db_query("""
+            SELECT netbox_device_id as id, device_name as name, 
+                   device_ip::text as primary_ip4, device_type, 
+                   manufacturer as vendor, site_name as site,
+                   role_name as role, cached_at
+            FROM netbox_device_cache ORDER BY device_name LIMIT %s
+        """, (limit,))
+        total = count_rows('netbox_device_cache')
         return {"data": devices, "count": total}
     except Exception as e:
         logger.error(f"Get NetBox devices error: {str(e)}")
@@ -112,26 +105,13 @@ async def netbox_devices(
 async def netbox_prefixes(credentials: HTTPAuthorizationCredentials = Security(security)):
     """Get IP prefixes from NetBox API"""
     try:
-        db = get_db()
-        with db.cursor() as cursor:
-            cursor.execute("SELECT value FROM system_settings WHERE key = 'netbox_url'")
-            row = cursor.fetchone()
-            url = row['value'].rstrip('/') if row else ''
-            cursor.execute("SELECT value FROM system_settings WHERE key = 'netbox_token'")
-            row = cursor.fetchone()
-            token = row['value'] if row else ''
-        
-        if not url or not token:
+        client = NetBoxClient()
+        if not client.is_configured:
             return []
-        
-        headers = {'Authorization': f'Token {token}'}
-        response = requests.get(f"{url}/api/ipam/prefixes/?limit=500", headers=headers, timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            return [{'id': p['id'], 'prefix': p['prefix'], 'description': p.get('description', ''),
-                    'site': p.get('site', {}).get('name') if p.get('site') else None} 
-                   for p in data.get('results', [])]
-        return []
+        prefixes = client.get_prefixes()
+        return [{'id': p['id'], 'prefix': p['prefix'], 'description': p.get('description', ''),
+                'site': p.get('site', {}).get('name') if p.get('site') else None} 
+               for p in prefixes]
     except Exception as e:
         logger.error(f"Get NetBox prefixes error: {str(e)}")
         return []
@@ -141,27 +121,14 @@ async def netbox_prefixes(credentials: HTTPAuthorizationCredentials = Security(s
 async def netbox_ip_ranges(credentials: HTTPAuthorizationCredentials = Security(security)):
     """Get IP ranges from NetBox API"""
     try:
-        db = get_db()
-        with db.cursor() as cursor:
-            cursor.execute("SELECT value FROM system_settings WHERE key = 'netbox_url'")
-            row = cursor.fetchone()
-            url = row['value'].rstrip('/') if row else ''
-            cursor.execute("SELECT value FROM system_settings WHERE key = 'netbox_token'")
-            row = cursor.fetchone()
-            token = row['value'] if row else ''
-        
-        if not url or not token:
+        client = NetBoxClient()
+        if not client.is_configured:
             return []
-        
-        headers = {'Authorization': f'Token {token}'}
-        response = requests.get(f"{url}/api/ipam/ip-ranges/?limit=500", headers=headers, timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            return [{'id': r['id'], 'start_address': r['start_address'].split('/')[0],
-                    'end_address': r['end_address'].split('/')[0], 
-                    'description': r.get('description', ''), 'size': r.get('size', 0)} 
-                   for r in data.get('results', [])]
-        return []
+        ranges = client.get_ip_ranges()
+        return [{'id': r['id'], 'start_address': r['start_address'].split('/')[0],
+                'end_address': r['end_address'].split('/')[0], 
+                'description': r.get('description', ''), 'size': r.get('size', 0)} 
+               for r in ranges]
     except Exception as e:
         logger.error(f"Get NetBox IP ranges error: {str(e)}")
         return []

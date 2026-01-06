@@ -9,7 +9,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional, List, Dict, Any
 import logging
 
-from backend.database import get_db
+from backend.utils.db import db_query, db_query_one
 from backend.openapi.monitoring_impl import (
     list_alerts_paginated, acknowledge_alert, get_device_optical_metrics,
     get_device_interface_metrics, get_device_availability_metrics,
@@ -146,16 +146,13 @@ async def polling_status(credentials: HTTPAuthorizationCredentials = Security(se
 async def get_polling_configs(credentials: HTTPAuthorizationCredentials = Security(security)):
     """Get polling configurations from database"""
     try:
-        db = get_db()
-        with db.cursor() as cursor:
-            cursor.execute("""
-                SELECT id, name, description, poll_type, enabled, interval_seconds,
-                       target_type, target_device_ip, target_site_name, target_role,
-                       target_manufacturer, snmp_community, tags, created_at, updated_at,
-                       last_run_at, last_run_status, last_run_devices_polled
-                FROM polling_configs ORDER BY name
-            """)
-            configs = [dict(row) for row in cursor.fetchall()]
+        configs = db_query("""
+            SELECT id, name, description, poll_type, enabled, interval_seconds,
+                   target_type, target_device_ip, target_site_name, target_role,
+                   target_manufacturer, snmp_community, tags, created_at, updated_at,
+                   last_run_at, last_run_status, last_run_devices_polled
+            FROM polling_configs ORDER BY name
+        """)
         return {"configs": configs, "total": len(configs)}
     except Exception as e:
         logger.error(f"Get polling configs error: {str(e)}")
@@ -169,18 +166,15 @@ async def get_polling_executions(
 ):
     """Get polling executions from database"""
     try:
-        db = get_db()
-        with db.cursor() as cursor:
-            cursor.execute("""
-                SELECT e.id, e.config_id, c.name as config_name, e.started_at, e.completed_at, 
-                       e.status, e.devices_polled, e.devices_success, e.devices_failed, 
-                       e.error_message,
-                       EXTRACT(EPOCH FROM (e.completed_at - e.started_at)) * 1000 as duration_ms
-                FROM polling_executions e
-                LEFT JOIN polling_configs c ON c.id = e.config_id
-                ORDER BY e.started_at DESC LIMIT %s
-            """, (limit,))
-            executions = [dict(row) for row in cursor.fetchall()]
+        executions = db_query("""
+            SELECT e.id, e.config_id, c.name as config_name, e.started_at, e.completed_at, 
+                   e.status, e.devices_polled, e.devices_success, e.devices_failed, 
+                   e.error_message,
+                   EXTRACT(EPOCH FROM (e.completed_at - e.started_at)) * 1000 as duration_ms
+            FROM polling_executions e
+            LEFT JOIN polling_configs c ON c.id = e.config_id
+            ORDER BY e.started_at DESC LIMIT %s
+        """, (limit,))
         return {"executions": executions, "total": len(executions)}
     except Exception as e:
         logger.error(f"Get polling executions error: {str(e)}")
@@ -191,14 +185,12 @@ async def get_polling_executions(
 async def get_poll_types(credentials: HTTPAuthorizationCredentials = Security(security)):
     """Get available poll types from database"""
     try:
-        db = get_db()
-        with db.cursor() as cursor:
-            cursor.execute("""
-                SELECT id, name, display_name, description, enabled
-                FROM snmp_poll_types WHERE enabled = true ORDER BY display_name
-            """)
-            poll_types = [{"id": row['name'], "name": row['display_name'], 
-                          "description": row['description']} for row in cursor.fetchall()]
+        rows = db_query("""
+            SELECT id, name, display_name, description, enabled
+            FROM snmp_poll_types WHERE enabled = true ORDER BY display_name
+        """)
+        poll_types = [{"id": row['name'], "name": row['display_name'], 
+                      "description": row['description']} for row in rows]
         return {"poll_types": poll_types}
     except Exception as e:
         logger.error(f"Get poll types error: {str(e)}")
@@ -220,16 +212,13 @@ async def get_target_types(credentials: HTTPAuthorizationCredentials = Security(
 async def get_mib_profiles(credentials: HTTPAuthorizationCredentials = Security(security)):
     """Get MIB profiles from database"""
     try:
-        db = get_db()
-        with db.cursor() as cursor:
-            cursor.execute("""
-                SELECT p.id, p.name, p.vendor, p.description, p.created_at,
-                       COUNT(g.id) as group_count
-                FROM snmp_profiles p
-                LEFT JOIN snmp_oid_groups g ON g.profile_id = p.id
-                GROUP BY p.id ORDER BY p.vendor, p.name
-            """)
-            profiles = [dict(row) for row in cursor.fetchall()]
+        profiles = db_query("""
+            SELECT p.id, p.name, p.vendor, p.description, p.created_at,
+                   COUNT(g.id) as group_count
+            FROM snmp_profiles p
+            LEFT JOIN snmp_oid_groups g ON g.profile_id = p.id
+            GROUP BY p.id ORDER BY p.vendor, p.name
+        """)
         return {"profiles": profiles, "total": len(profiles)}
     except Exception as e:
         logger.error(f"Get MIB profiles error: {str(e)}")
@@ -243,26 +232,21 @@ async def get_mib_profile(
 ):
     """Get MIB profile with groups and mappings"""
     try:
-        db = get_db()
-        with db.cursor() as cursor:
-            cursor.execute("SELECT * FROM snmp_profiles WHERE id = %s", (profile_id,))
-            profile = cursor.fetchone()
-            if not profile:
-                return {"profile": None}
-            profile = dict(profile)
-            
-            cursor.execute("""
-                SELECT g.id, g.name, g.description, g.is_table,
-                       array_agg(json_build_object(
-                           'id', m.id, 'name', m.name, 'oid', m.oid,
-                           'data_type', m.data_type, 'description', m.description
-                       )) as mappings
-                FROM snmp_oid_groups g
-                LEFT JOIN snmp_oid_mappings m ON m.group_id = g.id
-                WHERE g.profile_id = %s GROUP BY g.id ORDER BY g.name
-            """, (profile_id,))
-            groups = [dict(row) for row in cursor.fetchall()]
-            profile['groups'] = groups
+        profile = db_query_one("SELECT * FROM snmp_profiles WHERE id = %s", (profile_id,))
+        if not profile:
+            return {"profile": None}
+        
+        groups = db_query("""
+            SELECT g.id, g.name, g.description, g.is_table,
+                   array_agg(json_build_object(
+                       'id', m.id, 'name', m.name, 'oid', m.oid,
+                       'data_type', m.data_type, 'description', m.description
+                   )) as mappings
+            FROM snmp_oid_groups g
+            LEFT JOIN snmp_oid_mappings m ON m.group_id = g.id
+            WHERE g.profile_id = %s GROUP BY g.id ORDER BY g.name
+        """, (profile_id,))
+        profile['groups'] = groups
         return {"profile": profile}
     except Exception as e:
         logger.error(f"Get MIB profile error: {str(e)}")

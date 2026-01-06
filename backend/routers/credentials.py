@@ -9,7 +9,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional, List, Dict, Any
 import logging
 
-from backend.database import get_db
+from backend.utils.db import db_query, db_query_one, db_execute
 
 logger = logging.getLogger(__name__)
 security = HTTPBearer()
@@ -25,15 +25,16 @@ async def list_credentials(
 ):
     """List stored credentials"""
     try:
-        db = get_db()
-        with db.cursor() as cursor:
-            query = "SELECT id, name, credential_type, username, created_at FROM credentials"
-            if credential_type:
-                query += " WHERE credential_type = %s"
-                cursor.execute(query + " ORDER BY name LIMIT %s", (credential_type, limit))
-            else:
-                cursor.execute(query + " ORDER BY name LIMIT %s", (limit,))
-            creds = [dict(row) for row in cursor.fetchall()]
+        if credential_type:
+            creds = db_query(
+                "SELECT id, name, credential_type, username, created_at FROM credentials WHERE credential_type = %s ORDER BY name LIMIT %s",
+                (credential_type, limit)
+            )
+        else:
+            creds = db_query(
+                "SELECT id, name, credential_type, username, created_at FROM credentials ORDER BY name LIMIT %s",
+                (limit,)
+            )
         return {"credentials": creds, "total": len(creds)}
     except Exception as e:
         logger.error(f"List credentials error: {str(e)}")
@@ -47,16 +48,12 @@ async def create_credential(
 ):
     """Create a new credential"""
     try:
-        db = get_db()
-        with db.cursor() as cursor:
-            cursor.execute("""
-                INSERT INTO credentials (name, credential_type, username, password, description)
-                VALUES (%s, %s, %s, %s, %s) RETURNING id
-            """, (request['name'], request.get('credential_type', 'ssh'), 
-                  request.get('username'), request.get('password'), request.get('description')))
-            cred_id = cursor.fetchone()['id']
-            db.commit()
-        return {"success": True, "id": cred_id}
+        result = db_execute("""
+            INSERT INTO credentials (name, credential_type, username, password, description)
+            VALUES (%s, %s, %s, %s, %s) RETURNING id
+        """, (request['name'], request.get('credential_type', 'ssh'), 
+              request.get('username'), request.get('password'), request.get('description')), returning=True)
+        return {"success": True, "id": result['id']}
     except Exception as e:
         logger.error(f"Create credential error: {str(e)}")
         raise HTTPException(status_code=500, detail={"code": "CREATE_CREDENTIAL_ERROR", "message": str(e)})
@@ -69,15 +66,12 @@ async def get_credential(
 ):
     """Get credential details (password masked)"""
     try:
-        db = get_db()
-        with db.cursor() as cursor:
-            cursor.execute("""
-                SELECT id, name, credential_type, username, description, created_at
-                FROM credentials WHERE id = %s
-            """, (credential_id,))
-            cred = cursor.fetchone()
-            if not cred:
-                raise HTTPException(status_code=404, detail={"code": "NOT_FOUND", "message": "Credential not found"})
+        cred = db_query_one("""
+            SELECT id, name, credential_type, username, description, created_at
+            FROM credentials WHERE id = %s
+        """, (credential_id,))
+        if not cred:
+            raise HTTPException(status_code=404, detail={"code": "NOT_FOUND", "message": "Credential not found"})
         return dict(cred)
     except HTTPException:
         raise
@@ -94,13 +88,10 @@ async def update_credential(
 ):
     """Update a credential"""
     try:
-        db = get_db()
-        with db.cursor() as cursor:
-            cursor.execute("""
-                UPDATE credentials SET name = %s, username = %s, description = %s
-                WHERE id = %s
-            """, (request.get('name'), request.get('username'), request.get('description'), credential_id))
-            db.commit()
+        db_execute("""
+            UPDATE credentials SET name = %s, username = %s, description = %s
+            WHERE id = %s
+        """, (request.get('name'), request.get('username'), request.get('description'), credential_id))
         return {"success": True}
     except Exception as e:
         logger.error(f"Update credential error: {str(e)}")
@@ -114,10 +105,7 @@ async def delete_credential(
 ):
     """Delete a credential"""
     try:
-        db = get_db()
-        with db.cursor() as cursor:
-            cursor.execute("DELETE FROM credentials WHERE id = %s", (credential_id,))
-            db.commit()
+        db_execute("DELETE FROM credentials WHERE id = %s", (credential_id,))
         return {"success": True}
     except Exception as e:
         logger.error(f"Delete credential error: {str(e)}")

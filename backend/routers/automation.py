@@ -9,7 +9,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional, List, Dict, Any
 import logging
 
-from backend.database import get_db
+from backend.utils.db import db_query
 from backend.openapi.automation_impl import (
     list_workflows_paginated, get_workflow_by_id, list_job_executions_paginated,
     trigger_workflow_execution, get_execution_status, cancel_execution,
@@ -135,10 +135,7 @@ async def get_statistics(credentials: HTTPAuthorizationCredentials = Security(se
 async def list_jobs(credentials: HTTPAuthorizationCredentials = Security(security)):
     """List scheduled jobs"""
     try:
-        db = get_db()
-        with db.cursor() as cursor:
-            cursor.execute("SELECT * FROM scheduled_jobs ORDER BY name")
-            jobs = [dict(row) for row in cursor.fetchall()]
+        jobs = db_query("SELECT * FROM scheduled_jobs ORDER BY name")
         return {"jobs": jobs, "total": len(jobs)}
     except Exception as e:
         logger.error(f"List jobs error: {str(e)}")
@@ -152,13 +149,10 @@ async def recent_executions(
 ):
     """Get recent job executions"""
     try:
-        db = get_db()
-        with db.cursor() as cursor:
-            cursor.execute("""
-                SELECT * FROM job_executions 
-                ORDER BY started_at DESC LIMIT %s
-            """, (limit,))
-            executions = [dict(row) for row in cursor.fetchall()]
+        executions = db_query("""
+            SELECT * FROM job_executions 
+            ORDER BY started_at DESC LIMIT %s
+        """, (limit,))
         return {"executions": executions}
     except Exception as e:
         logger.error(f"Get recent executions error: {str(e)}")

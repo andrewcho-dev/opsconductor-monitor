@@ -9,7 +9,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional, List, Dict, Any
 import logging
 
-from backend.database import get_db
+from backend.utils.db import db_query
 
 logger = logging.getLogger(__name__)
 security = HTTPBearer()
@@ -21,10 +21,7 @@ router = APIRouter(prefix="/notifications/v1", tags=["notifications", "alerts"])
 async def list_channels(credentials: HTTPAuthorizationCredentials = Security(security)):
     """List notification channels (email, slack, webhook, etc.)"""
     try:
-        db = get_db()
-        with db.cursor() as cursor:
-            cursor.execute("SELECT * FROM notification_channels ORDER BY name")
-            channels = [dict(row) for row in cursor.fetchall()]
+        channels = db_query("SELECT * FROM notification_channels ORDER BY name")
         return {"channels": channels, "total": len(channels)}
     except Exception as e:
         logger.error(f"List channels error: {str(e)}")
@@ -44,10 +41,7 @@ async def create_channel(
 async def list_rules(credentials: HTTPAuthorizationCredentials = Security(security)):
     """List notification rules"""
     try:
-        db = get_db()
-        with db.cursor() as cursor:
-            cursor.execute("SELECT * FROM notification_rules ORDER BY name")
-            rules = [dict(row) for row in cursor.fetchall()]
+        rules = db_query("SELECT * FROM notification_rules ORDER BY name")
         return {"rules": rules, "total": len(rules)}
     except Exception as e:
         logger.error(f"List rules error: {str(e)}")
@@ -67,10 +61,7 @@ async def create_rule(
 async def list_templates(credentials: HTTPAuthorizationCredentials = Security(security)):
     """List notification templates"""
     try:
-        db = get_db()
-        with db.cursor() as cursor:
-            cursor.execute("SELECT * FROM notification_templates ORDER BY name")
-            templates = [dict(row) for row in cursor.fetchall()]
+        templates = db_query("SELECT * FROM notification_templates ORDER BY name")
         return {"templates": templates, "total": len(templates)}
     except Exception as e:
         logger.error(f"List templates error: {str(e)}")

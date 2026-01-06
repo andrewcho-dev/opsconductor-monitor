@@ -10,7 +10,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 import logging
 
-from backend.database import get_db
+from backend.utils.db import db_query
 from backend.openapi.identity_impl import (
     authenticate_user, get_current_user_from_token, list_users_paginated,
     list_roles_with_counts, get_role_members, get_password_policy,
@@ -113,17 +113,14 @@ identity_router = APIRouter(prefix="/identity/v1", tags=["identity", "users", "r
 async def get_enterprise_configs():
     """Get available enterprise authentication providers"""
     try:
-        db = get_db()
-        with db.cursor() as cursor:
-            cursor.execute("""
-                SELECT id, name, auth_type, is_default, enabled, priority
-                FROM enterprise_auth_configs WHERE enabled = true
-                ORDER BY priority ASC, name ASC
-            """)
-            configs = [dict(row) for row in cursor.fetchall()]
-            for c in configs:
-                c['id'] = str(c['id'])
-            return {"success": True, "configs": configs, "default_method": "local"}
+        configs = db_query("""
+            SELECT id, name, auth_type, is_default, enabled, priority
+            FROM enterprise_auth_configs WHERE enabled = true
+            ORDER BY priority ASC, name ASC
+        """)
+        for c in configs:
+            c['id'] = str(c['id'])
+        return {"success": True, "configs": configs, "default_method": "local"}
     except Exception as e:
         logger.error(f"Get enterprise configs error: {str(e)}")
         return {"success": False, "error": "Failed to load configurations"}
