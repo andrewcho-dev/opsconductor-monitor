@@ -135,17 +135,50 @@ async def get_statistics(credentials: HTTPAuthorizationCredentials = Security(se
 async def list_queues(credentials: HTTPAuthorizationCredentials = Security(security)):
     """List job queues - returns Celery queue info"""
     try:
-        # Return active/waiting queue info
-        return {
-            "queues": [
-                {"name": "default", "pending": 0, "active": 0},
-                {"name": "polling", "pending": 0, "active": 0}
-            ],
-            "total": 2
-        }
+        # Try to get real Celery worker info
+        try:
+            from backend.celery_app import celery_app
+            inspect = celery_app.control.inspect(timeout=1.0)
+            active = inspect.active() or {}
+            reserved = inspect.reserved() or {}
+            stats = inspect.stats() or {}
+            
+            workers = []
+            active_total = 0
+            reserved_total = 0
+            
+            for worker_name, worker_stats in stats.items():
+                worker_active = active.get(worker_name, [])
+                worker_reserved = reserved.get(worker_name, [])
+                active_total += len(worker_active)
+                reserved_total += len(worker_reserved)
+                
+                workers.append({
+                    "name": worker_name,
+                    "concurrency": worker_stats.get('pool', {}).get('max-concurrency', 1),
+                    "active": len(worker_active),
+                    "reserved": len(worker_reserved),
+                    "active_tasks": [{"name": t.get('name', 'unknown'), "id": t.get('id')} for t in worker_active]
+                })
+            
+            return {
+                "workers": workers,
+                "active_total": active_total,
+                "reserved_total": reserved_total,
+                "queues": [{"name": "default", "pending": 0}, {"name": "polling", "pending": 0}]
+            }
+        except Exception as celery_err:
+            logger.warning(f"Could not get Celery info: {celery_err}")
+            # Return empty but valid structure
+            return {
+                "workers": [],
+                "active_total": 0,
+                "reserved_total": 0,
+                "queues": []
+            }
     except Exception as e:
         logger.error(f"List queues error: {str(e)}")
-        return {"queues": [], "total": 0}
+        return {"workers": [], "active_total": 0, "reserved_total": 0, "queues": []}
 
 
 @router.get("/scheduler/jobs", summary="List scheduled jobs")
