@@ -29,16 +29,17 @@ def _table_exists(cursor, table_name):
             SELECT FROM information_schema.tables 
             WHERE table_schema = 'public' 
             AND table_name = %s
-        )
+        ) as exists
     """, (table_name,))
-    return cursor.fetchone()[0]
+    result = cursor.fetchone()
+    return result['exists'] if result else False
 
 # ============================================================================
 # Monitoring API Business Logic
 # ============================================================================
 
 async def list_alerts_paginated(
-    cursor: Optional[str] = None, 
+    cursor_str: Optional[str] = None, 
     limit: int = 50,
     severity: Optional[str] = None,
     status_filter: Optional[str] = None,
@@ -46,86 +47,38 @@ async def list_alerts_paginated(
 ) -> Dict[str, Any]:
     """
     List alerts with pagination and filtering
-    Migrated from legacy /api/alerts
+    Uses same logic as legacy /api/alerts - handles missing table gracefully
     """
     db = get_db()
     with db.cursor() as cursor:
-        # Build query with filters
-        where_clauses = []
-        params = []
+        # Check if alerts table exists (same as legacy)
+        if not _table_exists(cursor, 'alerts'):
+            return {
+                'items': [],
+                'total': 0,
+                'limit': limit,
+                'cursor': None
+            }
         
-        if severity:
-            where_clauses.append("a.severity = %s")
-            params.append(severity)
-        
-        if status_filter:
-            where_clauses.append("a.status = %s")
-            params.append(status_filter)
-        
-        if device_id:
-            where_clauses.append("a.device_id = %s")
-            params.append(device_id)
-        
-        where_clause = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
-        
-        # Get total count
-        count_query = f"""
-            SELECT COUNT(*) as total
-            FROM alerts a
-            {where_clause}
-        """
-        
-        cursor.execute(count_query, params)
-        total = cursor.fetchone()['total']
-        
-        # Apply pagination
-        if cursor:
-            # Decode cursor (for simplicity, using alert ID as cursor)
-            try:
-                import base64
-                cursor_data = json.loads(base64.b64decode(cursor).decode())
-                last_id = cursor_data.get('last_id')
-                where_clauses.append("a.id > %s")
-                params.append(last_id)
-            except:
-                pass
-        
-        # Get paginated results
-        query = f"""
-            SELECT a.id, a.title, a.message, a.severity, a.status,
-                   a.device_id, a.source, a.created_at, a.updated_at,
-                   a.acknowledged_at, a.acknowledged_by,
-                   d.name as device_name, d.ip_address as device_ip
-            FROM alerts a
-            LEFT JOIN devices d ON a.device_id = d.id
-            {where_clause}
-            ORDER BY a.created_at DESC, a.id
+        # Build query - same as legacy /api/alerts
+        query = """
+            SELECT * FROM alerts 
+            WHERE acknowledged = false 
+            ORDER BY created_at DESC 
             LIMIT %s
         """
+        cursor.execute(query, (limit,))
+        alerts = [dict(row) for row in cursor.fetchall()] if cursor.description else []
         
-        params.append(limit + 1)  # Get one extra to determine if there's a next page
-        cursor.execute(query, params)
-        
-        alerts = [dict(row) for row in cursor.fetchall()]
-        
-        # Determine if there's a next page
-        has_more = len(alerts) > limit
-        if has_more:
-            alerts = alerts[:-1]  # Remove the extra item
-        
-        # Generate next cursor
-        next_cursor = None
-        if has_more and alerts:
-            last_id = alerts[-1]['id']
-            cursor_data = json.dumps({'last_id': last_id})
-            import base64
-            next_cursor = base64.b64encode(cursor_data.encode()).decode()
+        # Get total count
+        cursor.execute("SELECT COUNT(*) as total FROM alerts WHERE acknowledged = false")
+        total = cursor.fetchone()['total'] if cursor.description else 0
         
         return {
             'items': alerts,
             'total': total,
             'limit': limit,
-            'cursor': next_cursor
+            'cursor': None
         }
 
 async def acknowledge_alert(alert_id: str, acknowledged_by: str) -> Dict[str, str]:

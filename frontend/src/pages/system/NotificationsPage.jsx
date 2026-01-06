@@ -35,13 +35,17 @@ export function NotificationsPage() {
   const loadData = async () => {
     try {
       const [channelsRes, rulesRes, templatesRes] = await Promise.all([
-        fetchApi('/api/notifications/channels'),
-        fetchApi('/api/notifications/rules'),
-        fetchApi('/api/notifications/templates')
+        fetchApi('/notifications/v1/channels'),
+        fetchApi('/notifications/v1/rules'),
+        fetchApi('/notifications/v1/templates')
       ]);
-      setChannels(channelsRes.data?.channels || []);
-      setRules(rulesRes.data?.rules || []);
-      setTemplates(templatesRes.data?.templates || []);
+      // Handle both wrapped and direct response formats
+      const channelsData = channelsRes?.data || channelsRes;
+      const rulesData = rulesRes?.data || rulesRes;
+      const templatesData = templatesRes?.data || templatesRes;
+      setChannels(channelsData?.channels || (Array.isArray(channelsData) ? channelsData : []));
+      setRules(rulesData?.rules || (Array.isArray(rulesData) ? rulesData : []));
+      setTemplates(templatesData?.templates || (Array.isArray(templatesData) ? templatesData : []));
     } catch (err) {
       // Error loading data
     } finally {
@@ -52,7 +56,7 @@ export function NotificationsPage() {
   const handleTestChannel = async (channelId) => {
     setTestingChannel(channelId);
     try {
-      const res = await fetchApi(`/api/notifications/channels/${channelId}/test`, { method: 'POST' });
+      const res = await fetchApi(`/notifications/v1/channels/${channelId}/test`, { method: 'POST' });
       if (res.success) {
         alert('Test notification sent successfully!');
       } else {
@@ -69,7 +73,7 @@ export function NotificationsPage() {
   const handleDeleteChannel = async (channelId) => {
     if (!confirm('Delete this notification channel?')) return;
     try {
-      await fetchApi(`/api/notifications/channels/${channelId}`, { method: 'DELETE' });
+      await fetchApi(`/notifications/v1/channels/${channelId}`, { method: 'DELETE' });
       loadData();
     } catch (err) {
       alert('Error deleting channel: ' + err.message);
@@ -78,7 +82,7 @@ export function NotificationsPage() {
 
   const handleToggleChannel = async (channel) => {
     try {
-      await fetchApi(`/api/notifications/channels/${channel.id}`, {
+      await fetchApi(`/notifications/v1/channels/${channel.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled: !channel.enabled })
@@ -92,7 +96,7 @@ export function NotificationsPage() {
   const handleDeleteRule = async (ruleId) => {
     if (!confirm('Delete this notification rule?')) return;
     try {
-      await fetchApi(`/api/notifications/rules/${ruleId}`, { method: 'DELETE' });
+      await fetchApi(`/notifications/v1/rules/${ruleId}`, { method: 'DELETE' });
       loadData();
     } catch (err) {
       alert('Error deleting rule: ' + err.message);
@@ -102,7 +106,7 @@ export function NotificationsPage() {
   const handleDeleteTemplate = async (templateId) => {
     if (!confirm('Delete this template?')) return;
     try {
-      await fetchApi(`/api/notifications/templates/${templateId}`, { method: 'DELETE' });
+      await fetchApi(`/notifications/v1/templates/${templateId}`, { method: 'DELETE' });
       loadData();
     } catch (err) {
       alert('Error deleting template: ' + err.message);

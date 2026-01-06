@@ -36,8 +36,8 @@ export function CredentialsPage() {
     setLoading(true);
     try {
       const [credResponse, groupResponse] = await Promise.all([
-        fetchApi('/api/credentials'),
-        fetchApi('/api/credentials/groups')
+        fetchApi('/credentials/v1/credentials'),
+        fetchApi('/credentials/v1/credentials/groups')
       ]);
       setCredentials(credResponse.data?.credentials || []);
       setGroups(groupResponse.data?.groups || []);
@@ -51,7 +51,7 @@ export function CredentialsPage() {
   const handleDeleteCredential = async (id) => {
     if (!confirm('Are you sure you want to delete this credential?')) return;
     try {
-      await fetchApi(`/api/credentials/${id}`, { method: 'DELETE' });
+      await fetchApi(`/credentials/v1/credentials/${id}`, { method: 'DELETE' });
       loadData();
     } catch (err) {
       alert('Error deleting credential: ' + err.message);
@@ -61,7 +61,7 @@ export function CredentialsPage() {
   const handleDeleteGroup = async (id) => {
     if (!confirm('Are you sure you want to delete this group?')) return;
     try {
-      await fetchApi(`/api/credentials/groups/${id}`, { method: 'DELETE' });
+      await fetchApi(`/credentials/v1/credentials/groups/${id}`, { method: 'DELETE' });
       loadData();
     } catch (err) {
       alert('Error deleting group: ' + err.message);
@@ -310,13 +310,13 @@ function CredentialModal({ credential, onClose, onSave }) {
     setSaving(true);
     try {
       if (credential) {
-        await fetchApi(`/api/credentials/${credential.id}`, {
+        await fetchApi(`/credentials/v1/credentials/${credential.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData)
         });
       } else {
-        await fetchApi('/api/credentials', {
+        await fetchApi('/credentials/v1/credentials', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData)
@@ -682,7 +682,7 @@ function GroupModal({ group, credentials, onClose, onSave }) {
         // Update not implemented yet - just close
         onSave();
       } else {
-        await fetchApi('/api/credentials/groups', {
+        await fetchApi('/credentials/v1/credentials/groups', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData)

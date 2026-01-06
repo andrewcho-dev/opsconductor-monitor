@@ -18,7 +18,7 @@ export function CredentialHistoryModal({ credential, onClose }) {
 
   const loadHistory = async () => {
     try {
-      const res = await fetchApi(`/api/credentials/${credential.id}/history`);
+      const res = await fetchApi(`/credentials/v1/credentials/${credential.id}/history`);
       if (res.success) {
         setHistory(res.data.history);
       }

@@ -23,8 +23,8 @@ export function ProfilePage() {
     setLoading(true);
     try {
       const [profileRes, sessionsRes] = await Promise.all([
-        fetchApi('/api/auth/me', { headers: getAuthHeader() }),
-        fetchApi('/api/auth/sessions', { headers: getAuthHeader() })
+        fetchApi('/identity/v1/auth/me', { headers: getAuthHeader() }),
+        fetchApi('/identity/v1/sessions', { headers: getAuthHeader() })
       ]);
 
       if (profileRes.success) {
@@ -135,7 +135,7 @@ function ProfileTab({ profile, onUpdate, getAuthHeader }) {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await fetchApi('/api/auth/me', {
+      await fetchApi('/identity/v1/auth/me', {
         method: 'PUT',
         headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
@@ -278,7 +278,7 @@ function SecurityTab({ profile, onUpdate, getAuthHeader }) {
 
     setSaving(true);
     try {
-      const res = await fetchApi('/api/auth/me/password', {
+      const res = await fetchApi('/identity/v1/auth/me/password', {
         method: 'PUT',
         headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -464,7 +464,7 @@ function Setup2FA({ onComplete, onCancel, getAuthHeader }) {
     const initSetup = async () => {
       setLoading(true);
       try {
-        const res = await fetchApi('/api/auth/2fa/setup', {
+        const res = await fetchApi('/identity/v1/auth/2fa/setup', {
           method: 'POST',
           headers: getAuthHeader()
         });
@@ -495,7 +495,7 @@ function Setup2FA({ onComplete, onCancel, getAuthHeader }) {
     setLoading(true);
 
     try {
-      const res = await fetchApi('/api/auth/2fa/verify', {
+      const res = await fetchApi('/identity/v1/auth/2fa/verify', {
         method: 'POST',
         headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: verifyCode })
@@ -693,7 +693,7 @@ function Disable2FAButton({ onDisabled, getAuthHeader }) {
     setLoading(true);
 
     try {
-      const res = await fetchApi('/api/auth/2fa/disable', {
+      const res = await fetchApi('/identity/v1/auth/2fa/disable', {
         method: 'POST',
         headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ password })
@@ -767,7 +767,7 @@ function SessionsTab({ sessions, onUpdate, getAuthHeader }) {
     
     setRevoking(true);
     try {
-      await fetchApi('/api/auth/sessions/revoke-all', {
+      await fetchApi('/identity/v1/sessions/revoke-all', {
         method: 'POST',
         headers: getAuthHeader()
       });

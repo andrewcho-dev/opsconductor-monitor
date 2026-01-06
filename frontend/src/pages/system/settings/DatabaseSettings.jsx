@@ -21,7 +21,7 @@ export function DatabaseSettings() {
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const response = await fetchApi('/api/settings/database');
+        const response = await fetchApi('/system/v1/settings/database');
         if (response.data) {
           setSettings(prev => ({ ...prev, ...response.data }));
         }
@@ -36,7 +36,7 @@ export function DatabaseSettings() {
     setTesting(true);
     setMessage(null);
     try {
-      const response = await fetchApi('/api/settings/database/test', { method: 'POST' });
+      const response = await fetchApi('/system/v1/settings/database/test', { method: 'POST' });
       if (response.success) {
         setMessage({ type: 'success', text: 'Database connection successful' });
       } else {

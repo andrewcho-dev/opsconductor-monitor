@@ -212,9 +212,9 @@ export function SystemOverviewPage() {
 
   const handleAcknowledgeAlert = async (alertId) => {
     try {
-      await fetchApi(`/api/alerts/${alertId}/acknowledge`, { method: 'POST', headers: getAuthHeader() });
+      await fetchApi(`/monitoring/v1/alerts/${alertId}/acknowledge`, { method: 'POST', headers: getAuthHeader() });
       // Refresh alerts
-      const alertsResponse = await fetchApi('/api/alerts', { headers: getAuthHeader() });
+      const alertsResponse = await fetchApi('/monitoring/v1/alerts', { headers: getAuthHeader() });
       const alertsData = alertsResponse.data || alertsResponse;
       setAlerts(alertsData.alerts || []);
     } catch (err) {
@@ -242,7 +242,7 @@ export function SystemOverviewPage() {
       
       // Load queue status in parallel with integrations
       const [queuesResponse] = await Promise.allSettled([
-        fetchApi('/api/scheduler/queues', { headers: getAuthHeader(), timeout: 3000 })
+        fetchApi('/automation/v1/scheduler/queues', { headers: getAuthHeader(), timeout: 3000 })
       ]);
       
       // Update queue status if available
@@ -266,11 +266,11 @@ export function SystemOverviewPage() {
       const [netboxStatus, prtgStatus, mcpStatus] = await Promise.allSettled([
         (async () => {
           try {
-            const netboxRes = await fetchApi('/api/netbox/settings', { headers: getAuthHeader(), timeout: 3000 });
+            const netboxRes = await fetchApi('/integrations/v1/netbox/settings', { headers: getAuthHeader(), timeout: 3000 });
             if (netboxRes.success && netboxRes.data?.url) {
               // Test connection
               try {
-                const testRes = await fetchApi('/api/netbox/test', {
+                const testRes = await fetchApi('/integrations/v1/netbox/test', {
                   method: 'POST',
                   headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
                   timeout: 5000,
@@ -308,11 +308,11 @@ export function SystemOverviewPage() {
         })(),
         (async () => {
           try {
-            const prtgRes = await fetchApi('/api/prtg/settings', { headers: getAuthHeader(), timeout: 3000 });
+            const prtgRes = await fetchApi('/integrations/v1/prtg/settings', { headers: getAuthHeader(), timeout: 3000 });
             if (prtgRes.success && prtgRes.data?.url) {
               // Check PRTG status
               try {
-                const statusRes = await fetchApi('/api/prtg/status', { headers: getAuthHeader(), timeout: 5000 });
+                const statusRes = await fetchApi('/integrations/v1/prtg/status', { headers: getAuthHeader(), timeout: 5000 });
                 if (statusRes.success && statusRes.data?.connected) {
                   return {
                     status: 'connected',
@@ -340,11 +340,11 @@ export function SystemOverviewPage() {
         })(),
         (async () => {
           try {
-            const mcpRes = await fetchApi('/api/mcp/settings', { headers: getAuthHeader(), timeout: 3000 });
+            const mcpRes = await fetchApi('/integrations/v1/mcp/settings', { headers: getAuthHeader(), timeout: 3000 });
             if (mcpRes.success && mcpRes.data?.url) {
               // Test MCP connection
               try {
-                const testRes = await fetchApi('/api/mcp/test', {
+                const testRes = await fetchApi('/integrations/v1/mcp/test', {
                   method: 'POST',
                   headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
                   timeout: 5000,

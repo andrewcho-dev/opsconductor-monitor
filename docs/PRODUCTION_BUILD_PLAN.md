@@ -26,7 +26,7 @@ This document provides a **meticulous, step-by-step plan** to transform the curr
 - Redis 6.0.16 (port 6379) - 3.75 MB used
 - Celery Workers (32 workers)
 - Vite Dev Server (port 3000)
-- Flask Backend (port 5000)
+- FastAPI Backend (port 5000)
 
 **Current Database:** 57 tables in `network_scan` database
 

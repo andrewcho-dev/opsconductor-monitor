@@ -184,7 +184,7 @@ export default function UPSMonitorPage() {
     setError(null);
     
     try {
-      const response = await fetchApi(`/api/ups/poll/${upsHost}?community=${community}`);
+      const response = await fetchApi(`/monitoring/v1/ups/poll/${upsHost}?community=${community}`);
       if (response.success) {
         setUpsData(response.data);
         setLastPoll(new Date().toISOString());

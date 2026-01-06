@@ -56,8 +56,9 @@ export function DashboardPage() {
   const loadStats = async () => {
     try {
       setLoading(true);
-      const response = await fetchApi('/api/devices');
-      const deviceList = response.data || response || [];
+      const response = await fetchApi('/inventory/v1/devices');
+      const rawList = response?.data || response;
+      const deviceList = Array.isArray(rawList) ? rawList : [];
       
       const online = deviceList.filter(d => d.ping_status === 'online').length;
       const sshEnabled = deviceList.filter(d => d.ssh_status === 'YES').length;

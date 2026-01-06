@@ -8,7 +8,14 @@ Tracks every action: creation, updates, deletions, access, usage, expiration, ro
 import logging
 from typing import Dict, Any, Optional, List
 from datetime import datetime
-from flask import request, has_request_context
+
+# Try to import Flask for legacy compatibility, but don't require it
+try:
+    from flask import request as flask_request, has_request_context
+except ImportError:
+    flask_request = None
+    def has_request_context():
+        return False
 
 from backend.database import get_db
 from backend.utils.time import now_utc
@@ -54,11 +61,11 @@ class CredentialAuditService:
             'request_id': None,
         }
         
-        if has_request_context():
-            context['performed_by_ip'] = request.remote_addr
-            context['performed_by_user_agent'] = request.headers.get('User-Agent')
-            context['session_id'] = request.headers.get('X-Session-ID')
-            context['request_id'] = request.headers.get('X-Request-ID')
+        if has_request_context() and flask_request:
+            context['performed_by_ip'] = flask_request.remote_addr
+            context['performed_by_user_agent'] = flask_request.headers.get('User-Agent')
+            context['session_id'] = flask_request.headers.get('X-Session-ID')
+            context['request_id'] = flask_request.headers.get('X-Request-ID')
         
         return context
     

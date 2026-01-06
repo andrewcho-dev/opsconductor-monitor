@@ -238,7 +238,7 @@ export default function DeviceImporterPage() {
     setDiscovering(true);
     setError(null);
     try {
-      const response = await fetchApi("/api/import/discover?include_sensors=true");
+      const response = await fetchApi("/integrations/v1/import/discover?include_sensors=true");
       if (response.success) {
         setPrtgDevices(response.devices || []);
         // Auto-select all new devices
@@ -258,7 +258,7 @@ export default function DeviceImporterPage() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetchApi(`/api/import/preview?target=${importTarget}`);
+      const response = await fetchApi(`/integrations/v1/import/preview?target=${importTarget}`);
       if (response.success) {
         setPreview(response);
       } else {
@@ -279,7 +279,7 @@ export default function DeviceImporterPage() {
     try {
       const deviceIds = selectedIds.size > 0 ? Array.from(selectedIds) : null;
 
-      let endpoint = "/api/import/opsconductor";
+      let endpoint = "/integrations/v1/import/opsconductor";
       let body = {
         device_ids: deviceIds,
         update_existing: updateExisting,
@@ -288,7 +288,7 @@ export default function DeviceImporterPage() {
       };
 
       if (importTarget === "netbox") {
-        endpoint = "/api/import/netbox";
+        endpoint = "/integrations/v1/import/netbox";
         body = {
           ...body,
           site_id: netboxSiteId ? parseInt(netboxSiteId) : null,
@@ -296,7 +296,7 @@ export default function DeviceImporterPage() {
           device_type_id: netboxDeviceTypeId ? parseInt(netboxDeviceTypeId) : null,
         };
       } else if (importTarget === "all") {
-        endpoint = "/api/import/all";
+        endpoint = "/integrations/v1/import/all";
         body = {
           device_ids: deviceIds,
           update_existing: updateExisting,

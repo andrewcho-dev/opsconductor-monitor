@@ -32,8 +32,8 @@ export function DeviceAssignmentPanel({ selectedCredential, onUpdate }) {
     setLoading(true);
     try {
       const [assignedRes, devicesRes] = await Promise.all([
-        fetchApi(`/api/credentials/${selectedCredential.id}/devices`),
-        fetchApi('/api/netbox/devices?limit=1000')
+        fetchApi(`/credentials/v1/credentials/${selectedCredential.id}/devices`),
+        fetchApi('/integrations/v1/netbox/devices?limit=1000')
       ]);
       
       const assigned = new Set((assignedRes.data?.devices || []).map(d => d.ip_address));
@@ -86,7 +86,7 @@ export function DeviceAssignmentPanel({ selectedCredential, onUpdate }) {
       
       // Process additions
       for (const ip of toAdd) {
-        await fetchApi(`/api/credentials/devices/${ip}/assign`, {
+        await fetchApi(`/credentials/v1/credentials/devices/${ip}/assign`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ credential_id: selectedCredential.id }),
@@ -95,7 +95,7 @@ export function DeviceAssignmentPanel({ selectedCredential, onUpdate }) {
       
       // Process removals
       for (const ip of toRemove) {
-        await fetchApi(`/api/credentials/devices/${ip}/unassign`, {
+        await fetchApi(`/credentials/v1/credentials/devices/${ip}/unassign`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ credential_id: selectedCredential.id }),

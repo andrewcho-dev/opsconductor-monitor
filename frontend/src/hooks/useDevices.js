@@ -1,8 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { fetchApi } from "../lib/utils";
 
-// Helper to extract data from new API response format
+// Helper to extract data from API response format
 const extractData = (response) => {
+  if (response && response.items !== undefined) {
+    return response.items;
+  }
   if (response && response.data !== undefined) {
     return response.data;
   }
@@ -17,7 +20,7 @@ export function useDevices() {
   const fetchDevices = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetchApi("/api/devices");
+      const response = await fetchApi("/inventory/v1/devices");
       setDevices(extractData(response) || []);
       setError(null);
     } catch (err) {
@@ -43,10 +46,10 @@ export function useGroups() {
     try {
       setLoading(true);
       
-      // Fetch both custom groups and network groups in parallel using new API
+      // Fetch groups using OpenAPI endpoints
       const [customResponse, networkResponse] = await Promise.all([
-        fetchApi("/api/device_groups"),
-        fetchApi("/api/devices/summary/networks")
+        fetchApi("/inventory/v1/groups"),
+        fetchApi("/inventory/v1/groups?type=network")
       ]);
       
       setGroups({
@@ -68,8 +71,8 @@ export function useGroups() {
   }, [fetchGroups]);
 
   const createGroup = async (groupData) => {
-    // Create the group using new API
-    const response = await fetchApi("/api/device_groups", {
+    // Create the group using OpenAPI endpoint
+    const response = await fetchApi("/inventory/v1/groups", {
       method: "POST",
       body: JSON.stringify({
         name: groupData.name,
@@ -83,10 +86,10 @@ export function useGroups() {
     if (groupData.devices && groupData.devices.length > 0) {
       const groupId = group?.id || group?.group_id;
       if (groupId) {
-        await fetchApi(`/api/device_groups/${groupId}/devices`, {
+        await fetchApi(`/inventory/v1/groups/${groupId}/devices`, {
           method: "POST",
           body: JSON.stringify({
-            ip_addresses: groupData.devices,
+            device_ids: groupData.devices,
           }),
         });
       }
@@ -96,7 +99,7 @@ export function useGroups() {
   };
 
   const updateGroup = async (id, groupData) => {
-    await fetchApi(`/api/device_groups/${id}`, {
+    await fetchApi(`/inventory/v1/groups/${id}`, {
       method: "PUT",
       body: JSON.stringify({
         name: groupData.name,
@@ -108,7 +111,7 @@ export function useGroups() {
   };
 
   const deleteGroup = async (id) => {
-    await fetchApi(`/api/device_groups/${id}`, {
+    await fetchApi(`/inventory/v1/groups/${id}`, {
       method: "DELETE",
     });
     await fetchGroups();

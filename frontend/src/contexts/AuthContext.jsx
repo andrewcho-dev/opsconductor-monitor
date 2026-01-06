@@ -59,7 +59,7 @@ export function AuthProvider({ children }) {
     }
 
     try {
-      const res = await fetchApi('/api/auth/refresh', {
+      const res = await fetchApi('/auth/refresh', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refresh_token: refresh })
@@ -86,19 +86,31 @@ export function AuthProvider({ children }) {
     setPermissions([]);
   };
 
-  const login = async (username, password) => {
+  const login = async (username, password, configId = null) => {
     setError(null);
     
     try {
+      const requestBody = { username, password };
+      if (configId) {
+        requestBody.config_id = configId;
+      }
+      
       const res = await fetchApi('/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
+        body: JSON.stringify(requestBody)
       });
 
+      // Check for error response
       if (res.detail) {
-        setError(res.detail.message || 'Login failed');
-        return { success: false, error: res.detail.message };
+        setError(res.detail.message || res.detail || 'Login failed');
+        return { success: false, error: res.detail.message || res.detail };
+      }
+
+      // Check if login was successful
+      if (!res.success && !res.access_token) {
+        setError('Invalid username or password');
+        return { success: false, error: 'Invalid username or password' };
       }
 
       // Check if 2FA is required (not implemented yet)
@@ -129,7 +141,7 @@ export function AuthProvider({ children }) {
     setError(null);
 
     try {
-      const res = await fetchApi('/api/auth/login/2fa', {
+      const res = await fetchApi('/auth/login/2fa', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: userId, code })
@@ -156,7 +168,7 @@ export function AuthProvider({ children }) {
 
   const logout = async () => {
     try {
-      await fetchApi('/api/auth/logout', {
+      await fetchApi('/auth/logout', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem(TOKEN_KEY)}`

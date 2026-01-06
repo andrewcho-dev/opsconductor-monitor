@@ -206,10 +206,17 @@ export async function fetchApi(endpoint, options = {}) {
     
     clearTimeout(timeoutId);
     
+    // Return JSON response even on error status codes so calling code can handle it
+    const data = await response.json().catch(() => ({ detail: response.statusText }));
+    
     if (!response.ok) {
+      // For auth errors, return the data so calling code can handle gracefully
+      if (response.status === 401 || response.status === 403) {
+        return data;
+      }
       throw new Error(`API error: ${response.statusText}`);
     }
-    return response.json();
+    return data;
   } catch (error) {
     clearTimeout(timeoutId);
     if (error.name === 'AbortError') {

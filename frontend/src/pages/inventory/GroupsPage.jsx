@@ -43,7 +43,7 @@ export function GroupsPage() {
 
   const loadGroupDevices = async (groupId) => {
     try {
-      const response = await fetchApi(`/api/device_groups/${groupId}/devices`);
+      const response = await fetchApi(`/inventory/v1/groups/${groupId}/devices`);
       const data = response.data || response || [];
       setGroupDevices(data);
       setSelectedDevicesForGroup(new Set(data.map(d => d.ip_address || d)));
@@ -100,12 +100,12 @@ export function GroupsPage() {
 
       // Remove devices
       for (const ip of toRemove) {
-        await fetchApi(`/api/device_groups/${selectedGroup.id}/devices/${ip}`, { method: 'DELETE' });
+        await fetchApi(`/inventory/v1/groups/${selectedGroup.id}/devices/${ip}`, { method: 'DELETE' });
       }
       
       // Add devices
       if (toAdd.length > 0) {
-        await fetchApi(`/api/device_groups/${selectedGroup.id}/devices`, {
+        await fetchApi(`/inventory/v1/groups/${selectedGroup.id}/devices`, {
           method: 'POST',
           body: JSON.stringify({ ip_addresses: toAdd })
         });

@@ -50,18 +50,25 @@ export default function PollingPage() {
       setError(null);
 
       const [configsRes, statusRes, execRes, typesRes, targetsRes] = await Promise.all([
-        fetchApi('/api/polling/configs'),
-        fetchApi('/api/polling/status'),
-        fetchApi('/api/polling/executions?limit=20'),
-        fetchApi('/api/polling/poll-types'),
-        fetchApi('/api/polling/target-types')
+        fetchApi('/monitoring/v1/polling/configs'),
+        fetchApi('/monitoring/v1/polling/status'),
+        fetchApi('/monitoring/v1/polling/executions?limit=20'),
+        fetchApi('/monitoring/v1/polling/poll-types'),
+        fetchApi('/monitoring/v1/polling/target-types')
       ]);
 
-      setConfigs(configsRes.data?.configs || []);
-      setStatus(statusRes.data || {});
-      setExecutions(execRes.data?.executions || []);
-      setPollTypes(typesRes.data?.poll_types || []);
-      setTargetTypes(targetsRes.data?.target_types || []);
+      // Handle both wrapped and direct response formats
+      const configData = configsRes?.data || configsRes;
+      const statusData = statusRes?.data || statusRes;
+      const execData = execRes?.data || execRes;
+      const typesData = typesRes?.data || typesRes;
+      const targetsData = targetsRes?.data || targetsRes;
+      
+      setConfigs(configData?.configs || (Array.isArray(configData) ? configData : []));
+      setStatus(statusData || {});
+      setExecutions(execData?.executions || (Array.isArray(execData) ? execData : []));
+      setPollTypes(typesData?.poll_types || (Array.isArray(typesData) ? typesData : []));
+      setTargetTypes(targetsData?.target_types || (Array.isArray(targetsData) ? targetsData : []));
     } catch (err) {
       console.error('Failed to load polling data:', err);
       setError(err.message || 'Failed to load polling data');
@@ -100,7 +107,7 @@ export default function PollingPage() {
   const handleToggle = async (config, e) => {
     e?.stopPropagation();
     try {
-      await fetchApi(`/api/polling/configs/${config.id}/toggle`, { method: 'POST' });
+      await fetchApi(`/monitoring/v1/polling/configs/${config.id}/toggle`, { method: 'POST' });
       await loadData();
     } catch (err) {
       console.error('Failed to toggle config:', err);
@@ -112,7 +119,7 @@ export default function PollingPage() {
   const handleRunNow = async (config, e) => {
     e?.stopPropagation();
     try {
-      const result = await fetchApi(`/api/polling/configs/${config.id}/run`, { method: 'POST' });
+      const result = await fetchApi(`/monitoring/v1/polling/configs/${config.id}/run`, { method: 'POST' });
       alert(`Polling triggered: ${result.message || 'Success'}`);
       await loadData();
     } catch (err) {
@@ -126,7 +133,7 @@ export default function PollingPage() {
     e?.stopPropagation();
     if (!window.confirm(`Delete polling config "${config.name}"?`)) return;
     try {
-      await fetchApi(`/api/polling/configs/${config.id}`, { method: 'DELETE' });
+      await fetchApi(`/monitoring/v1/polling/configs/${config.id}`, { method: 'DELETE' });
       if (selectedConfig?.id === config.id) setSelectedConfig(null);
       await loadData();
     } catch (err) {
@@ -437,17 +444,16 @@ export default function PollingPage() {
                   </div>
                 ) : (
                   executions.map((exec) => (
-                    <div key={exec.id} className="px-3 py-1.5 hover:bg-gray-50 flex items-center text-xs font-mono">
-                      <span className="w-4 flex-shrink-0">
-                        {exec.status === 'success' && <CheckCircle className="w-3 h-3 text-green-500" />}
-                        {exec.status === 'failed' && <XCircle className="w-3 h-3 text-red-500" />}
-                        {exec.status === 'running' && <Loader2 className="w-3 h-3 text-blue-500 animate-spin" />}
-                        {exec.status === 'partial' && <AlertCircle className="w-3 h-3 text-yellow-500" />}
+                    <div key={exec.id} className="px-3 py-2 hover:bg-gray-50 grid grid-cols-[16px_1fr_60px_70px] gap-2 items-center text-xs">
+                      <span>
+                        {exec.status === 'success' && <CheckCircle className="w-4 h-4 text-green-500" />}
+                        {exec.status === 'failed' && <XCircle className="w-4 h-4 text-red-500" />}
+                        {exec.status === 'running' && <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />}
+                        {exec.status === 'partial' && <AlertCircle className="w-4 h-4 text-yellow-500" />}
                       </span>
-                      <span className="w-32 font-medium text-gray-900 truncate">{exec.config_name}</span>
-                      <span className="w-16 text-gray-500 text-right">{exec.devices_success}/{exec.devices_polled}</span>
-                      <span className="w-16 text-gray-400 text-right">{exec.duration_ms}ms</span>
-                      <span className="w-16 text-gray-400 text-right">{new Date(exec.started_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</span>
+                      <span className="font-medium text-gray-900 truncate">{exec.config_name || 'Unknown'}</span>
+                      <span className="text-gray-500 text-right tabular-nums">{exec.devices_success}/{exec.devices_polled}</span>
+                      <span className="text-gray-400 text-right tabular-nums">{Math.round(exec.duration_ms || 0)}ms</span>
                     </div>
                   ))
                 )}
@@ -511,7 +517,7 @@ function CreateConfigModal({ pollTypes, targetTypes, onClose, onCreated }) {
     try {
       setSaving(true);
       setError(null);
-      await fetchApi('/api/polling/configs', {
+      await fetchApi('/monitoring/v1/polling/configs', {
         method: 'POST',
         body: JSON.stringify(formData)
       });
@@ -574,18 +580,10 @@ function CreateConfigModal({ pollTypes, targetTypes, onClose, onCreated }) {
                 onChange={(e) => setFormData({ ...formData, poll_type: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <optgroup label="Built-in Poll Types">
-                  {pollTypes.filter(t => t.source === 'builtin').map((t) => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
-                </optgroup>
-                {pollTypes.filter(t => t.source === 'custom').length > 0 && (
-                  <optgroup label="Custom Poll Types (from MIB Mappings)">
-                    {pollTypes.filter(t => t.source === 'custom').map((t) => (
-                      <option key={t.id} value={t.id}>{t.vendor ? `${t.vendor}: ` : ''}{t.name}</option>
-                    ))}
-                  </optgroup>
-                )}
+                <option value="">Select poll type...</option>
+                {pollTypes.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
               </select>
               {formData.poll_type && pollTypes.find(t => t.id === formData.poll_type)?.description && (
                 <p className="mt-1 text-xs text-gray-500">
@@ -743,7 +741,7 @@ function EditConfigModal({ config, pollTypes, targetTypes, onClose, onSaved }) {
     try {
       setSaving(true);
       setError(null);
-      await fetchApi(`/api/polling/configs/${config.id}`, {
+      await fetchApi(`/monitoring/v1/polling/configs/${config.id}`, {
         method: 'PUT',
         body: JSON.stringify(formData)
       });
@@ -808,18 +806,10 @@ function EditConfigModal({ config, pollTypes, targetTypes, onClose, onSaved }) {
                   onChange={(e) => setFormData({ ...formData, poll_type: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <optgroup label="Built-in Poll Types">
-                    {pollTypes.filter(t => t.source === 'builtin').map((t) => (
-                      <option key={t.id} value={t.id}>{t.name}</option>
-                    ))}
-                  </optgroup>
-                  {pollTypes.filter(t => t.source === 'custom').length > 0 && (
-                    <optgroup label="Custom Poll Types (from MIB Mappings)">
-                      {pollTypes.filter(t => t.source === 'custom').map((t) => (
-                        <option key={t.id} value={t.id}>{t.vendor ? `${t.vendor}: ` : ''}{t.name}</option>
-                      ))}
-                    </optgroup>
-                  )}
+                  <option value="">Select poll type...</option>
+                  {pollTypes.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
                 </select>
               </div>
 

@@ -336,7 +336,7 @@ function NetBoxMappingPanel({
     if (!newSiteName.trim()) return;
     setCreating(true);
     try {
-      const res = await fetchApi("/api/import/create-site", {
+      const res = await fetchApi("/integrations/v1/import/create-site", {
         method: "POST",
         body: JSON.stringify({ name: newSiteName.trim() })
       });
@@ -359,7 +359,7 @@ function NetBoxMappingPanel({
     if (!newTypeName.trim()) return;
     setCreating(true);
     try {
-      const res = await fetchApi("/api/import/create-device-type", {
+      const res = await fetchApi("/integrations/v1/import/create-device-type", {
         method: "POST",
         body: JSON.stringify({ model: newTypeName.trim() })
       });
@@ -382,7 +382,7 @@ function NetBoxMappingPanel({
     if (!newRoleName.trim()) return;
     setCreating(true);
     try {
-      const res = await fetchApi("/api/import/create-device-role", {
+      const res = await fetchApi("/integrations/v1/import/create-device-role", {
         method: "POST",
         body: JSON.stringify({ name: newRoleName.trim() })
       });
@@ -819,9 +819,9 @@ export default function PRTGNetBoxImportPage() {
       setLoading(true);
       try {
         const [netboxRes, groupsRes, devicesRes] = await Promise.all([
-          fetchApi("/api/import/netbox-options"),
-          fetchApi("/api/import/prtg-groups"),
-          fetchApi("/api/import/prtg-devices"),
+          fetchApi("/integrations/v1/import/netbox-options"),
+          fetchApi("/integrations/v1/import/prtg-groups"),
+          fetchApi("/integrations/v1/import/prtg-devices"),
         ]);
         
         if (netboxRes.success) {
@@ -848,7 +848,7 @@ export default function PRTGNetBoxImportPage() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetchApi("/api/import/prtg-devices");
+      const response = await fetchApi("/integrations/v1/import/prtg-devices");
       if (response.success) {
         setPrtgDevices(response.devices || []);
       } else {
@@ -863,7 +863,7 @@ export default function PRTGNetBoxImportPage() {
 
   const refreshNetboxOptions = useCallback(async () => {
     try {
-      const response = await fetchApi("/api/import/netbox-options");
+      const response = await fetchApi("/integrations/v1/import/netbox-options");
       if (response.success) {
         setNetboxOptions(response.data || {});
       }
@@ -890,7 +890,7 @@ export default function PRTGNetBoxImportPage() {
     try {
       const selectedDevices = prtgDevices.filter((d) => selectedIds.has(d.ip_address));
 
-      const response = await fetchApi("/api/import/execute", {
+      const response = await fetchApi("/integrations/v1/import/execute", {
         method: "POST",
         body: JSON.stringify({
           devices: selectedDevices,

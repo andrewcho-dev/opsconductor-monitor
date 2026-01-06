@@ -33,13 +33,13 @@ export function RuleModal({ rule, channels, templates, onClose, onSave }) {
       };
       
       if (rule) {
-        await fetchApi(`/api/notifications/rules/${rule.id}`, {
+        await fetchApi(`/notifications/v1/rules/${rule.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
       } else {
-        await fetchApi('/api/notifications/rules', {
+        await fetchApi('/notifications/v1/rules', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)

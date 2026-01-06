@@ -41,7 +41,7 @@ export function EnterpriseAuthConfigsList({ configs, credentials, onRefresh }) {
 
   const loadUsers = async () => {
     try {
-      const res = await fetchApi('/api/credentials/enterprise/users');
+      const res = await fetchApi('/credentials/v1/credentials/enterprise/users');
       if (res.success) {
         setUsers(res.data.users || []);
       }
@@ -53,7 +53,7 @@ export function EnterpriseAuthConfigsList({ configs, credentials, onRefresh }) {
   const handleOpenEditServer = async (config) => {
     setEditingServer(config);
     try {
-      const credRes = await fetchApi(`/api/credentials/${config.credential_id}`);
+      const credRes = await fetchApi(`/credentials/v1/credentials/${config.credential_id}`);
       const cred = credRes.data?.credential || {};
       const secretData = cred.secret_data || {};
       
@@ -127,14 +127,14 @@ export function EnterpriseAuthConfigsList({ configs, credentials, onRefresh }) {
 
       if (editingServer) {
         if (serverForm.secret_key) {
-          await fetchApi(`/api/credentials/${editingServer.credential_id}`, {
+          await fetchApi(`/credentials/v1/credentials/${editingServer.credential_id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(credentialData),
           });
         }
       } else {
-        const credRes = await fetchApi('/api/credentials', {
+        const credRes = await fetchApi('/credentials/v1/credentials', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(credentialData),
@@ -144,7 +144,7 @@ export function EnterpriseAuthConfigsList({ configs, credentials, onRefresh }) {
           throw new Error(credRes.error?.message || 'Failed to create credential');
         }
 
-        await fetchApi('/api/credentials/enterprise/configs', {
+        await fetchApi('/credentials/v1/credentials/enterprise/configs', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -169,7 +169,7 @@ export function EnterpriseAuthConfigsList({ configs, credentials, onRefresh }) {
     e.preventDefault();
     setSaving(true);
     try {
-      await fetchApi('/api/credentials/enterprise/users', {
+      await fetchApi('/credentials/v1/credentials/enterprise/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -190,7 +190,7 @@ export function EnterpriseAuthConfigsList({ configs, credentials, onRefresh }) {
   const handleDeleteServer = async (id) => {
     if (!confirm('Delete this auth server and all associated accounts?')) return;
     try {
-      await fetchApi(`/api/credentials/enterprise/configs/${id}`, { method: 'DELETE' });
+      await fetchApi(`/credentials/v1/credentials/enterprise/configs/${id}`, { method: 'DELETE' });
       onRefresh();
       loadUsers();
     } catch (err) {
@@ -201,7 +201,7 @@ export function EnterpriseAuthConfigsList({ configs, credentials, onRefresh }) {
   const handleDeleteAccount = async (id) => {
     if (!confirm('Delete this service account?')) return;
     try {
-      await fetchApi(`/api/credentials/enterprise/users/${id}`, { method: 'DELETE' });
+      await fetchApi(`/credentials/v1/credentials/enterprise/users/${id}`, { method: 'DELETE' });
       loadUsers();
     } catch (err) {
       alert('Error: ' + err.message);

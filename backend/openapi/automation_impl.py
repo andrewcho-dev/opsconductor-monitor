@@ -29,16 +29,17 @@ def _table_exists(cursor, table_name):
             SELECT FROM information_schema.tables 
             WHERE table_schema = 'public' 
             AND table_name = %s
-        )
+        ) as exists
     """, (table_name,))
-    return cursor.fetchone()[0]
+    result = cursor.fetchone()
+    return result['exists'] if result else False
 
 # ============================================================================
 # Automation API Business Logic
 # ============================================================================
 
 async def list_workflows_paginated(
-    cursor: Optional[str] = None, 
+    cursor_str: Optional[str] = None, 
     limit: int = 50,
     status_filter: Optional[str] = None,
     category: Optional[str] = None,
@@ -46,12 +47,12 @@ async def list_workflows_paginated(
 ) -> Dict[str, Any]:
     """
     List workflows with pagination and filtering
-    Migrated from legacy /api/workflows
+    Uses same schema as legacy /api/workflows
     """
     db = get_db()
     with db.cursor() as cursor:
-        # Build query with filters
-        where_clauses = []
+        # Build query with filters - use actual table columns
+        where_clauses = ["1=1"]
         params = []
         
         if search:
@@ -60,14 +61,12 @@ async def list_workflows_paginated(
             params.extend([search_param, search_param])
         
         if status_filter:
-            where_clauses.append("w.status = %s")
-            params.append(status_filter)
+            where_clauses.append("w.enabled = %s")
+            params.append(status_filter == 'enabled')
         
-        if category:
-            where_clauses.append("w.category = %s")
-            params.append(category)
+        # category filter ignored - column doesn't exist
         
-        where_clause = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
+        where_clause = "WHERE " + " AND ".join(where_clauses)
         
         # Get total count
         count_query = f"""
@@ -79,23 +78,11 @@ async def list_workflows_paginated(
         cursor.execute(count_query, params)
         total = cursor.fetchone()['total']
         
-        # Apply pagination
-        if cursor:
-            # Decode cursor (for simplicity, using workflow ID as cursor)
-            try:
-                import base64
-                cursor_data = json.loads(base64.b64decode(cursor).decode())
-                last_id = cursor_data.get('last_id')
-                where_clauses.append("w.id > %s")
-                params.append(last_id)
-            except:
-                pass
-        
-        # Get paginated results
+        # Get paginated results - use actual columns from workflows table
         query = f"""
-            SELECT w.id, w.name, w.description, w.category, w.status,
-                   w.version, w.created_at, w.updated_at, w.created_by,
-                   w.schedule_enabled, w.last_run_at, w.next_run_at,
+            SELECT w.id::text as id, w.name, w.description, 
+                   w.folder_id::text as folder_id, w.enabled,
+                   w.is_template, w.created_at, w.updated_at, w.last_run_at,
                    (SELECT COUNT(*) FROM workflow_executions e 
                     WHERE e.workflow_id = w.id) as execution_count
             FROM workflows w

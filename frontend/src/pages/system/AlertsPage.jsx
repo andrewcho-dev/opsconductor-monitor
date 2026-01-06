@@ -32,19 +32,19 @@ export function AlertsPage() {
       setError(null);
       
       // Load alerts
-      const alertsResponse = await fetchApi('/api/alerts');
+      const alertsResponse = await fetchApi('/monitoring/v1/alerts');
       setAlerts((alertsResponse.data || alertsResponse).alerts || []);
       
       // Load rules
-      const rulesResponse = await fetchApi('/api/alerts/rules?all=true');
+      const rulesResponse = await fetchApi('/monitoring/v1/alerts/rules?all=true');
       setRules((rulesResponse.data || rulesResponse).rules || []);
       
       // Load stats
-      const statsResponse = await fetchApi('/api/alerts/stats');
+      const statsResponse = await fetchApi('/monitoring/v1/alerts/stats');
       setStats((statsResponse.data || statsResponse));
       
       // Load history
-      const historyResponse = await fetchApi('/api/alerts/history?days=7');
+      const historyResponse = await fetchApi('/monitoring/v1/alerts/history?days=7');
       setHistory((historyResponse.data || historyResponse).history || []);
       
     } catch (err) {
@@ -60,7 +60,7 @@ export function AlertsPage() {
 
   const handleAcknowledge = async (alertId) => {
     try {
-      await fetchApi(`/api/alerts/${alertId}/acknowledge`, { method: 'POST' });
+      await fetchApi(`/monitoring/v1/alerts/${alertId}/acknowledge`, { method: 'POST' });
       loadData();
     } catch (err) {
       console.error('Failed to acknowledge:', err);
@@ -69,7 +69,7 @@ export function AlertsPage() {
 
   const handleResolve = async (alertId) => {
     try {
-      await fetchApi(`/api/alerts/${alertId}/resolve`, { method: 'POST' });
+      await fetchApi(`/monitoring/v1/alerts/${alertId}/resolve`, { method: 'POST' });
       loadData();
     } catch (err) {
       console.error('Failed to resolve:', err);
@@ -78,7 +78,7 @@ export function AlertsPage() {
 
   const handleToggleRule = async (ruleId, currentEnabled) => {
     try {
-      await fetchApi(`/api/alerts/rules/${ruleId}`, {
+      await fetchApi(`/monitoring/v1/alerts/rules/${ruleId}`, {
         method: 'PUT',
         body: JSON.stringify({ enabled: !currentEnabled }),
       });

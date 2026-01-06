@@ -8,7 +8,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 
-const API_BASE = '/api/metrics';
+const API_BASE = '/monitoring/v1/metrics';
 
 /**
  * Fetch optical power metrics for a device/interface

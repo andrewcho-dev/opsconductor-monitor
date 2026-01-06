@@ -696,7 +696,7 @@ export default defineConfig({
 npm run build
 ```
 
-Outputs to `../dist/` for Flask to serve.
+Outputs to `../dist/` for FastAPI to serve.
 
 ### Scripts
 

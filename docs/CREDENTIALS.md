@@ -800,8 +800,8 @@ CREDENTIAL_MASTER_KEY=your-32-char-minimum-key
 # Session encryption key
 ENCRYPTION_KEY=your-fernet-key
 
-# Flask secret key
-SECRET_KEY=your-flask-secret-key
+# FastAPI secret key
+SECRET_KEY=your-fastapi-secret-key
 ```
 
 ### Database Security

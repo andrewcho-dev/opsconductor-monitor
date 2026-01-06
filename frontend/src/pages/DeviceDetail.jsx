@@ -53,7 +53,7 @@ function InterfaceMetricsPanel({ deviceIp, interfaceName, timeRange, isOptical =
         // Load traffic metrics from SNMP polling
         try {
           const trafficRes = await fetchApi(
-            `/api/metrics/interface?device_ip=${encodeURIComponent(deviceIp)}&hours=${timeRange}&limit=500`
+            `/monitoring/v1/metrics/interface?device_ip=${encodeURIComponent(deviceIp)}&hours=${timeRange}&limit=500`
           );
           const trafficData = (trafficRes.metrics || []).filter(m => {
             const mName = m.interface_name || '';
@@ -80,7 +80,7 @@ function InterfaceMetricsPanel({ deviceIp, interfaceName, timeRange, isOptical =
         if (isOptical) {
           try {
             const opticalRes = await fetchApi(
-              `/api/metrics/optical?device_ip=${encodeURIComponent(deviceIp)}&hours=${timeRange}`
+              `/monitoring/v1/metrics/optical?device_ip=${encodeURIComponent(deviceIp)}&hours=${timeRange}`
             );
             const opticalData = (opticalRes.metrics || []).filter(m => {
               const mName = m.interface_name || '';
@@ -95,7 +95,7 @@ function InterfaceMetricsPanel({ deviceIp, interfaceName, timeRange, isOptical =
 
             // Load optical thresholds from SNMP polling data
             const thresholdRes = await fetchApi(
-              `/api/metrics/optical/thresholds?device_ip=${encodeURIComponent(deviceIp)}&interface_index=${portNum}`
+              `/monitoring/v1/metrics/optical/thresholds?device_ip=${encodeURIComponent(deviceIp)}&interface_index=${portNum}`
             );
             if (thresholdRes.thresholds && Object.keys(thresholdRes.thresholds).length > 0) {
               const portThresholds = thresholdRes.thresholds[portNum] || 
@@ -489,7 +489,7 @@ export function DeviceDetail() {
     setError(null);
     
     try {
-      const res = await fetchApi(`/api/netbox/devices/cached?q=${encodeURIComponent(ip)}`);
+      const res = await fetchApi(`/integrations/v1/netbox/devices?q=${encodeURIComponent(ip)}`);
       
       if (res.success && res.data?.length > 0) {
         // Find exact IP match
@@ -529,7 +529,7 @@ export function DeviceDetail() {
     
     setMetricsLoading(true);
     try {
-      const res = await fetchApi(`/api/metrics/optical?device_ip=${encodeURIComponent(ip)}&hours=${timeRange}`);
+      const res = await fetchApi(`/monitoring/v1/metrics/optical?device_ip=${encodeURIComponent(ip)}&hours=${timeRange}`);
       // API returns { metrics: [...], count: N } not { success, data }
       const metrics = res.metrics || res.data || [];
       if (metrics.length > 0) {
@@ -564,7 +564,7 @@ export function DeviceDetail() {
     
     setAlarmsLoading(true);
     try {
-      const res = await fetchApi(`/api/snmp/alarms/${encodeURIComponent(ip)}`);
+      const res = await fetchApi(`/monitoring/v1/snmp/alarms/${encodeURIComponent(ip)}`);
       const alarmsData = res.data?.alarms || res.alarms || [];
       setAlarms(alarmsData);
     } catch (err) {
@@ -580,7 +580,7 @@ export function DeviceDetail() {
     if (!ip) return;
     
     try {
-      const res = await fetchApi(`/api/metrics/availability?device_ip=${encodeURIComponent(ip)}&hours=${timeRange}`);
+      const res = await fetchApi(`/monitoring/v1/metrics/availability?device_ip=${encodeURIComponent(ip)}&hours=${timeRange}`);
       // API returns { metrics: [...], count: N } not { success, data }
       const metrics = res.metrics || res.data || [];
       if (metrics.length > 0) {
@@ -603,7 +603,7 @@ export function DeviceDetail() {
     
     setInterfacesLoading(true);
     try {
-      const res = await fetchApi(`/api/netbox/devices/${device.id}/interfaces`);
+      const res = await fetchApi(`/integrations/v1/netbox/devices/${device.id}/interfaces`);
       if (res.success && res.data) {
         // Sort interfaces by name naturally
         const sorted = res.data.sort((a, b) => {

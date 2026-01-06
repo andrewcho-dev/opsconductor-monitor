@@ -32,7 +32,7 @@ export function LoggingSettings() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const res = await fetchApi('/api/system/logging/settings', { headers: getAuthHeader() }).catch(() => null);
+      const res = await fetchApi('/system/v1/logging/settings', { headers: getAuthHeader() }).catch(() => null);
       if (res?.success) setSettings(prev => ({ ...prev, ...res.data }));
     } catch (err) {
       console.error('Failed to load logging settings:', err);
@@ -51,7 +51,7 @@ export function LoggingSettings() {
     setMessage(null);
     setSaving(true);
     try {
-      const res = await fetchApi('/api/system/logging/settings', {
+      const res = await fetchApi('/system/v1/logging/settings', {
         method: 'PUT',
         headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
         body: JSON.stringify(settings)
@@ -73,7 +73,7 @@ export function LoggingSettings() {
     if (!confirm(`Delete logs older than ${settings.retention_days} days?`)) return;
     setCleaning(true);
     try {
-      const res = await fetchApi('/api/logs/cleanup', {
+      const res = await fetchApi('/system/v1/logs/cleanup', {
         method: 'POST',
         headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ retention_days: settings.retention_days })

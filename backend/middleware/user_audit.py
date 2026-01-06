@@ -10,7 +10,17 @@ import logging
 import re
 from datetime import datetime
 from functools import wraps
-from flask import request, g, has_request_context
+
+# Flask imports for legacy middleware (optional)
+try:
+    from flask import request, g, has_request_context
+    FLASK_AVAILABLE = True
+except ImportError:
+    request = None
+    g = None
+    def has_request_context():
+        return False
+    FLASK_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 

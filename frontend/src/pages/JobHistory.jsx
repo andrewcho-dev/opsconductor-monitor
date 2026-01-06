@@ -35,7 +35,7 @@ export function JobHistory() {
       setError(null);
       
       // Fetch recent executions directly from the API
-      const execResponse = await fetchApi("/api/scheduler/executions/recent?limit=200");
+      const execResponse = await fetchApi("/automation/v1/scheduler/executions/recent?limit=200");
       const execData = execResponse.data || execResponse;
       
       // Handle both array and object responses
@@ -66,7 +66,7 @@ export function JobHistory() {
     
     try {
       setLoadingAudit(true);
-      const data = await fetchApi(`/api/scheduler/executions/${executionId}/audit`);
+      const data = await fetchApi(`/automation/v1/scheduler/executions/${executionId}/audit`);
       setAuditTrail(data.data || []);
     } catch (err) {
       console.error('Failed to load audit trail:', err);

@@ -21,7 +21,7 @@ from pysnmp.hlapi.v3arch.asyncio import (
 
 
 def _run_sync(coro):
-    """Run async coroutine synchronously for Flask compatibility."""
+    """Run async coroutine synchronously for compatibility with sync code."""
     loop = asyncio.new_event_loop()
     try:
         return loop.run_until_complete(coro)

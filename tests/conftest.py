@@ -91,14 +91,13 @@ def mock_db():
 
 @pytest.fixture
 def app():
-    """Create Flask test application."""
-    from backend.app import create_app
-    
-    app = create_app({'TESTING': True})
+    """Create FastAPI test application."""
+    from app import app
     return app
 
 
 @pytest.fixture
 def client(app):
-    """Create Flask test client."""
-    return app.test_client()
+    """Create FastAPI test client."""
+    from fastapi.testclient import TestClient
+    return TestClient(app)

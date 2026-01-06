@@ -83,8 +83,8 @@ export function DeviceSelectionModal({
     setLoading(true);
     try {
       const [devicesRes, tagsRes] = await Promise.all([
-        fetchApi('/api/netbox/devices?limit=1000'),
-        fetchApi('/api/netbox/tags')
+        fetchApi('/integrations/v1/netbox/devices?limit=1000'),
+        fetchApi('/integrations/v1/netbox/tags')
       ]);
       
       const devices = (devicesRes.data || []).map(d => ({

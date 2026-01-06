@@ -173,7 +173,7 @@ export function Scheduler() {
     try {
       setLoading(true);
       setError(null);
-      const data = await fetchApi("/api/scheduler/jobs");
+      const data = await fetchApi("/automation/v1/scheduler/jobs");
       setJobs(data.data || data.jobs || []);
     } catch (err) {
       console.error("Failed to load scheduler jobs", err);
@@ -194,7 +194,7 @@ export function Scheduler() {
       setLoadingExecutions(true);
       setError(null);
       const data = await fetchApi(
-        `/api/scheduler/jobs/${encodeURIComponent(jobName)}/executions?limit=50`
+        `/automation/v1/scheduler/jobs/${encodeURIComponent(jobName)}/executions?limit=50`
       );
       setExecutions(data.data || data.executions || []);
     } catch (err) {
@@ -225,7 +225,7 @@ export function Scheduler() {
     try {
       setError(null);
       await fetchApi(
-        `/api/scheduler/jobs/${encodeURIComponent(selectedJob.name)}/executions/clear`,
+        `/automation/v1/scheduler/jobs/${encodeURIComponent(selectedJob.name)}/executions/clear`,
         { method: "POST", body: JSON.stringify({}) }
       );
       await loadExecutions(selectedJob.name);
@@ -251,7 +251,7 @@ export function Scheduler() {
     }
     try {
       setError(null);
-      await fetchApi(`/api/scheduler/jobs/${encodeURIComponent(name)}`, {
+      await fetchApi(`/automation/v1/scheduler/jobs/${encodeURIComponent(name)}`, {
         method: "DELETE",
       });
       if (selectedJob?.name === name) {
@@ -268,7 +268,7 @@ export function Scheduler() {
     e?.stopPropagation();
     try {
       setError(null);
-      await fetchApi(`/api/scheduler/jobs/${encodeURIComponent(job.name)}/toggle`, {
+      await fetchApi(`/automation/v1/scheduler/jobs/${encodeURIComponent(job.name)}/toggle`, {
         method: "POST",
         body: JSON.stringify({ enabled: !job.enabled }),
       });
@@ -283,7 +283,7 @@ export function Scheduler() {
     try {
       setError(null);
       await fetchApi(
-        `/api/scheduler/jobs/${encodeURIComponent(name)}/run-once`,
+        `/automation/v1/scheduler/jobs/${encodeURIComponent(name)}/run-once`,
         { method: "POST" }
       );
       await loadJobs();

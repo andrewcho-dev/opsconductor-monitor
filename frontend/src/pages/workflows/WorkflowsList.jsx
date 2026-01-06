@@ -65,9 +65,13 @@ const WorkflowsList = () => {
         workflowsApi.getTags(),
       ]);
       
-      setWorkflows(workflowsRes.data || []);
-      setFolders(foldersRes.data || []);
-      setTags(tagsRes.data || []);
+      // Handle both {items: [...]} and direct array formats
+      const wfData = workflowsRes?.items || workflowsRes?.data || (Array.isArray(workflowsRes) ? workflowsRes : []);
+      const folderData = foldersRes?.data || (Array.isArray(foldersRes) ? foldersRes : []);
+      const tagData = tagsRes?.data || (Array.isArray(tagsRes) ? tagsRes : []);
+      setWorkflows(wfData);
+      setFolders(folderData);
+      setTags(tagData);
     } catch (err) {
       console.error('Failed to load data:', err);
       setError(err.message);

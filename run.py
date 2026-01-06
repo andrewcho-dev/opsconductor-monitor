@@ -2,7 +2,8 @@
 """
 OpsConductor Main Entry Point.
 
-This is the new modular entry point that uses the backend package.
+FastAPI application using OpenAPI 3.x specification.
+Use: uvicorn run:app --host 0.0.0.0 --port 5000 --reload
 """
 
 import os
@@ -15,16 +16,16 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from dotenv import load_dotenv
 load_dotenv()
 
-from backend.app import create_app
-
-# Create the application
-app = create_app()
+# Import the FastAPI application from app.py (which imports from backend.main)
+from app import app
 
 if __name__ == '__main__':
+    import uvicorn
+    
     # Get configuration from environment
-    host = os.environ.get('FLASK_HOST', '0.0.0.0')
-    port = int(os.environ.get('FLASK_PORT', 5000))
-    debug = os.environ.get('FLASK_DEBUG', 'true').lower() == 'true'
+    host = os.environ.get('API_HOST', '0.0.0.0')
+    port = int(os.environ.get('API_PORT', 5000))
+    reload = os.environ.get('API_RELOAD', 'true').lower() == 'true'
     
     print(f"Starting OpsConductor on {host}:{port}")
-    app.run(host=host, port=port, debug=debug)
+    uvicorn.run("app:app", host=host, port=port, reload=reload)

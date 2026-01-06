@@ -42,16 +42,15 @@ export function LogsPage() {
       params.append('offset', offset.toString());
       
       const queryString = params.toString();
-      const url = queryString ? `/api/logs?${queryString}` : '/api/logs';
+      const url = queryString ? `/system/v1/logs?${queryString}` : '/system/v1/logs';
       
       const response = await fetchApi(url, { headers: getAuthHeader() });
       
-      if (response.success) {
-        setLogs(response.data.logs || []);
-        setTotal(response.data.total || 0);
-      } else {
-        setError(response.error?.message || 'Failed to fetch logs');
-      }
+      // Handle both wrapped and direct array format
+      const logsData = response?.data || response;
+      const logsList = logsData?.logs || (Array.isArray(logsData) ? logsData : []);
+      setLogs(logsList);
+      setTotal(logsData?.total || logsList.length);
     } catch (err) {
       console.error('Failed to fetch logs:', err);
       setError(err.message || 'Failed to fetch logs');
@@ -64,14 +63,18 @@ export function LogsPage() {
   const fetchMetadata = async () => {
     try {
       const [sourcesRes, levelsRes, statsRes] = await Promise.all([
-        fetchApi('/api/logs/sources', { headers: getAuthHeader() }),
-        fetchApi('/api/logs/levels', { headers: getAuthHeader() }),
-        fetchApi('/api/logs/stats?hours=24', { headers: getAuthHeader() }),
+        fetchApi('/system/v1/logs/sources', { headers: getAuthHeader() }),
+        fetchApi('/system/v1/logs/levels', { headers: getAuthHeader() }),
+        fetchApi('/system/v1/logs/stats?hours=24', { headers: getAuthHeader() }),
       ]);
       
-      if (sourcesRes.success) setSources(sourcesRes.data.sources || []);
-      if (levelsRes.success) setLevels(levelsRes.data.levels || []);
-      if (statsRes.success) setStats(statsRes.data);
+      // Handle both wrapped and direct formats
+      const srcData = sourcesRes?.data || sourcesRes;
+      const lvlData = levelsRes?.data || levelsRes;
+      const statsData = statsRes?.data || statsRes;
+      setSources(srcData?.sources || (Array.isArray(srcData) ? srcData : []));
+      setLevels(lvlData?.levels || (Array.isArray(lvlData) ? lvlData : []));
+      setStats(statsData);
     } catch (err) {
       console.error('Failed to fetch log metadata:', err);
     }
@@ -110,7 +113,7 @@ export function LogsPage() {
       if (filters.search) params.append('search', filters.search);
       
       const queryString = params.toString();
-      const url = queryString ? `/api/logs/export?${queryString}` : '/api/logs/export';
+      const url = queryString ? `/system/v1/logs/export?${queryString}` : '/system/v1/logs/export';
       
       window.open(url, '_blank');
     } catch (err) {

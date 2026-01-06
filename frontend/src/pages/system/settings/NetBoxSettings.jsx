@@ -26,7 +26,7 @@ export function NetBoxSettings() {
   const loadSettings = async () => {
     setLoading(true);
     try {
-      const res = await fetchApi('/api/netbox/settings', { headers: getAuthHeader() });
+      const res = await fetchApi('/integrations/v1/netbox/settings', { headers: getAuthHeader() });
       if (res.success && res.data) {
         setSettings(prev => ({
           ...prev,
@@ -51,7 +51,7 @@ export function NetBoxSettings() {
     setMessage(null);
     setSaving(true);
     try {
-      const res = await fetchApi('/api/netbox/settings', {
+      const res = await fetchApi('/integrations/v1/netbox/settings', {
         method: 'PUT',
         headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
         body: JSON.stringify(settings)
@@ -73,7 +73,7 @@ export function NetBoxSettings() {
     setTesting(true);
     setConnectionStatus(null);
     try {
-      const res = await fetchApi('/api/netbox/test', {
+      const res = await fetchApi('/integrations/v1/netbox/test', {
         method: 'POST',
         headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
         body: JSON.stringify({

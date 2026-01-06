@@ -47,7 +47,7 @@ Fully containerized deployment
 │              │ HTTP API calls       │    │              │                      │
 │              ▼                      │    │              │                      │
 │  ┌───────────────────────────────┐  │    │  ┌───────────────────────────────┐  │
-│  │      FLASK BACKEND            │  │    │  │      POSTGRESQL (NetBox)      │  │
+│  │      FASTAPI BACKEND            │  │    │  │      POSTGRESQL (NetBox)      │  │
 │  │      Port: 5000               │  │    │  │      Port: 5432 (internal)    │  │
 │  │                               │  │    │  │                               │  │
 │  │  Purpose: API & Orchestration │  │    │  │  Purpose: NetBox Data Store   │  │
@@ -117,7 +117,7 @@ Fully containerized deployment
 
 ```
 ┌──────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐
-│ User │───▶│ Frontend │───▶│  Flask   │───▶│  NetBox  │───▶│ NetBox   │
+│ User │───▶│ Frontend │───▶│  FastAPI   │───▶│  NetBox  │───▶│ NetBox   │
 │      │    │ :3000    │    │  :5000   │    │ Service  │    │  :8000   │
 └──────┘    └──────────┘    └──────────┘    └──────────┘    └──────────┘
    ▲                                                              │
@@ -130,7 +130,7 @@ Fully containerized deployment
 
 ```
 ┌──────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐
-│ User │───▶│ Frontend │───▶│  Flask   │───▶│ Metrics  │───▶│PostgreSQL│
+│ User │───▶│ Frontend │───▶│  FastAPI   │───▶│ Metrics  │───▶│PostgreSQL│
 │      │    │ :3000    │    │  :5000   │    │ Service  │    │  :5432   │
 └──────┘    └──────────┘    └──────────┘    └──────────┘    └──────────┘
    ▲                                                              │
@@ -198,7 +198,7 @@ Fully containerized deployment
 │ │  (Nginx)    │ │  │ │   Workers   │ │  │ │  Primary    │ │  │ │   Stack     │ │
 │ └─────────────┘ │  │ │  (4-8)      │ │  │ └─────────────┘ │  │ └─────────────┘ │
 │ ┌─────────────┐ │  │ └─────────────┘ │  │ ┌─────────────┐ │  │                 │
-│ │   Flask     │ │  │ ┌─────────────┐ │  │ │ PostgreSQL  │ │  │  Purpose:       │
+│ │   FastAPI     │ │  │ ┌─────────────┐ │  │ │ PostgreSQL  │ │  │  Purpose:       │
 │ │   API       │ │  │ │   Celery    │ │  │ │  Replica    │ │  │  - Inventory    │
 │ │  (Gunicorn) │ │  │ │   Beat      │ │  │ └─────────────┘ │  │  - IPAM         │
 │ └─────────────┘ │  │ └─────────────┘ │  │ ┌─────────────┐ │  │  - Topology     │
@@ -321,7 +321,7 @@ services:
 | Component | Purpose | Responsibilities | Stateful? | Scalable? |
 |-----------|---------|------------------|-----------|-----------|
 | **Frontend** | User Interface | Dashboard, device views, workflow builder, settings UI | No | Yes (CDN) |
-| **Flask API** | API Gateway | REST endpoints, auth, request routing, NetBox proxy | No | Yes (horizontal) |
+| **FastAPI API** | API Gateway | REST endpoints, auth, request routing, NetBox proxy | No | Yes (horizontal) |
 | **Celery Workers** | Job Execution | Polling, workflows, analysis, notifications | No | Yes (add workers) |
 | **Celery Beat** | Scheduler | Trigger periodic jobs on schedule | Yes (single) | No (single instance) |
 | **PostgreSQL** | Data Store | Metrics, baselines, anomalies, credentials, config | Yes | Yes (replicas) |
@@ -353,7 +353,7 @@ services:
 │  └─ System settings and configuration                           │
 │                                                                  │
 │  COMMUNICATES WITH:                                              │
-│  └─ Flask API (HTTP REST calls)                                 │
+│  └─ FastAPI API (HTTP REST calls)                                 │
 │                                                                  │
 │  DOES NOT:                                                       │
 │  ├─ Access database directly                                    │
@@ -363,11 +363,11 @@ services:
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### 2. FLASK BACKEND (API Server)
+### 2. FASTAPI BACKEND (API Server)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                       FLASK BACKEND                              │
+│                       FASTAPI BACKEND                              │
 │                         Port: 5000                               │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
@@ -551,7 +551,7 @@ services:
 │  └─────────────────────────────────────────────────────────┘    │
 │                                                                  │
 │  ACCESSED BY:                                                    │
-│  ├─ Flask Backend (read/write)                                  │
+│  ├─ FastAPI Backend (read/write)                                  │
 │  └─ Celery Workers (read/write)                                 │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
@@ -597,7 +597,7 @@ services:
 │  └─────────────────────────────────────────────────────────┘    │
 │                                                                  │
 │  ACCESSED BY:                                                    │
-│  ├─ Flask Backend (cache, sessions)                             │
+│  ├─ FastAPI Backend (cache, sessions)                             │
 │  ├─ Celery Workers (task queue)                                 │
 │  └─ Celery Beat (task queue)                                    │
 │                                                                  │
@@ -639,7 +639,7 @@ services:
 │      └─ Circuit tracking                                       │
 │                                                                  │
 │  ACCESSED BY:                                                    │
-│  ├─ OpsConductor Flask (API proxy)                              │
+│  ├─ OpsConductor FastAPI (API proxy)                              │
 │  ├─ OpsConductor Celery (device lookups)                        │
 │  └─ Users directly (NetBox UI)                                  │
 │                                                                  │
@@ -658,7 +658,7 @@ services:
 | Component | Port | Protocol | Direction | Purpose |
 |-----------|------|----------|-----------|---------|
 | Frontend | 3000 | HTTP | Inbound | User access |
-| Flask API | 5000 | HTTP | Inbound | API requests |
+| FastAPI API | 5000 | HTTP | Inbound | API requests |
 | PostgreSQL | 5432 | TCP | Internal | Database |
 | Redis | 6379 | TCP | Internal | Message broker |
 | NetBox | 8000 | HTTP | Internal | Inventory API |
@@ -703,7 +703,7 @@ services:
 │   │                           PRESENTATION LAYER                                 │   │
 │   │                                                                              │   │
 │   │   ┌─────────────┐                        ┌─────────────┐                    │   │
-│   │   │  FRONTEND   │◀──────HTTP API────────▶│   FLASK     │                    │   │
+│   │   │  FRONTEND   │◀──────HTTP API────────▶│   FASTAPI   │                    │   │
 │   │   │  (React)    │                        │   BACKEND   │                    │   │
 │   │   │             │                        │             │                    │   │
 │   │   │  Dashboard  │                        │  REST API   │                    │   │

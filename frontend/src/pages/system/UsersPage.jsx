@@ -58,21 +58,22 @@ export function UsersPage() {
 
       console.log('Loading users and roles...');
       const [usersRes, rolesRes] = await Promise.all([
-        fetchApi(`/api/auth/users?${params}`, { headers: getAuthHeader() }),
-        fetchApi('/api/auth/roles', { headers: getAuthHeader() })
+        fetchApi(`/identity/v1/users?${params}`, { headers: getAuthHeader() }),
+        fetchApi('/identity/v1/roles', { headers: getAuthHeader() })
       ]);
 
       console.log('Users response:', usersRes);
       console.log('Roles response:', rolesRes);
 
-      if (usersRes.success) {
-        console.log('Setting users:', usersRes.data);
-        setUsers(usersRes.data || []);
-      }
-      if (rolesRes.success) {
-        console.log('Setting roles:', rolesRes.data);
-        setRoles(rolesRes.data || []);
-      }
+      // Handle both {items: [...]} format and direct array format
+      const usersList = usersRes?.items || usersRes?.data || (Array.isArray(usersRes) ? usersRes : []);
+      const rolesList = rolesRes?.data || (Array.isArray(rolesRes) ? rolesRes : []);
+      
+      console.log('Setting users:', usersList);
+      console.log('Setting roles:', rolesList);
+      
+      setUsers(usersList);
+      setRoles(rolesList);
     } catch (err) {
       console.error('Error loading data:', err);
     } finally {
@@ -86,7 +87,7 @@ export function UsersPage() {
     setSaving(true);
 
     try {
-      const res = await fetchApi('/api/auth/users', {
+      const res = await fetchApi('/identity/v1/users', {
         method: 'POST',
         headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
@@ -108,7 +109,7 @@ export function UsersPage() {
 
   const handleUpdateRoles = async (userId, roleIds) => {
     try {
-      await fetchApi(`/api/auth/users/${userId}/roles`, {
+      await fetchApi(`/identity/v1/users/${userId}/roles`, {
         method: 'PUT',
         headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ role_ids: roleIds })
@@ -474,7 +475,7 @@ function EditUserModal({ user, roles, onClose, onSave, getAuthHeader }) {
     setSaving(true);
     try {
       // Update roles
-      await fetchApi(`/api/auth/users/${user.id}/roles`, {
+      await fetchApi(`/identity/v1/users/${user.id}/roles`, {
         method: 'PUT',
         headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ role_ids: selectedRoles })
@@ -482,7 +483,7 @@ function EditUserModal({ user, roles, onClose, onSave, getAuthHeader }) {
 
       // Update status if changed
       if (status !== user.status) {
-        await fetchApi(`/api/auth/users/${user.id}`, {
+        await fetchApi(`/identity/v1/users/${user.id}`, {
           method: 'PUT',
           headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
           body: JSON.stringify({ status })

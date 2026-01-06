@@ -7,7 +7,7 @@
 
 import { fetchApi } from '../lib/utils';
 
-const BASE_URL = '/api/workflows';
+const BASE_URL = '/automation/v1/workflows';
 
 /**
  * Get all workflows with optional filters
@@ -179,7 +179,7 @@ export async function updateWorkflowTags(id, tags) {
  * @returns {Promise<Object>} List of folders
  */
 export async function getFolders() {
-  return fetchApi('/api/workflows/folders');
+  return fetchApi('/automation/v1/workflows/folders');
 }
 
 /**
@@ -188,7 +188,7 @@ export async function getFolders() {
  * @returns {Promise<Object>} Created folder
  */
 export async function createFolder(folder) {
-  return fetchApi('/api/workflows/folders', {
+  return fetchApi('/automation/v1/workflows/folders', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(folder),
@@ -202,7 +202,7 @@ export async function createFolder(folder) {
  * @returns {Promise<Object>} Updated folder
  */
 export async function updateFolder(id, folder) {
-  return fetchApi(`/api/workflows/folders/${id}`, {
+  return fetchApi(`/automation/v1/workflows/folders/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(folder),
@@ -215,7 +215,7 @@ export async function updateFolder(id, folder) {
  * @returns {Promise<Object>} Deletion result
  */
 export async function deleteFolder(id) {
-  return fetchApi(`/api/workflows/folders/${id}`, {
+  return fetchApi(`/automation/v1/workflows/folders/${id}`, {
     method: 'DELETE',
   });
 }
@@ -227,7 +227,7 @@ export async function deleteFolder(id) {
  * @returns {Promise<Object>} List of tags
  */
 export async function getTags() {
-  return fetchApi('/api/workflows/tags');
+  return fetchApi('/automation/v1/workflows/tags');
 }
 
 /**
@@ -236,7 +236,7 @@ export async function getTags() {
  * @returns {Promise<Object>} Created tag
  */
 export async function createTag(tag) {
-  return fetchApi('/api/workflows/tags', {
+  return fetchApi('/automation/v1/workflows/tags', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(tag),
@@ -249,7 +249,7 @@ export async function createTag(tag) {
  * @returns {Promise<Object>} Deletion result
  */
 export async function deleteTag(id) {
-  return fetchApi(`/api/workflows/tags/${id}`, {
+  return fetchApi(`/automation/v1/workflows/tags/${id}`, {
     method: 'DELETE',
   });
 }
@@ -261,7 +261,7 @@ export async function deleteTag(id) {
  * @returns {Promise<Object>} List of enabled package IDs
  */
 export async function getEnabledPackages() {
-  return fetchApi('/api/workflows/packages');
+  return fetchApi('/automation/v1/workflows/packages');
 }
 
 /**
@@ -270,7 +270,7 @@ export async function getEnabledPackages() {
  * @returns {Promise<Object>} Result
  */
 export async function enablePackage(packageId) {
-  return fetchApi(`/api/workflows/packages/${packageId}/enable`, {
+  return fetchApi(`/automation/v1/workflows/packages/${packageId}/enable`, {
     method: 'PUT',
   });
 }
@@ -281,7 +281,7 @@ export async function enablePackage(packageId) {
  * @returns {Promise<Object>} Result
  */
 export async function disablePackage(packageId) {
-  return fetchApi(`/api/workflows/packages/${packageId}/disable`, {
+  return fetchApi(`/automation/v1/workflows/packages/${packageId}/disable`, {
     method: 'PUT',
   });
 }

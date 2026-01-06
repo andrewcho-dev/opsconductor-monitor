@@ -1,6 +1,6 @@
 # OpsConductor Backend Documentation
 
-This document provides comprehensive documentation for the OpsConductor backend, a Flask-based API server that handles device management, workflow execution, authentication, and all business logic.
+This document provides comprehensive documentation for the OpsConductor backend, a FastAPI-based API server using OpenAPI 3.x specification that handles device management, workflow execution, authentication, and all business logic.
 
 ## Table of Contents
 
@@ -24,8 +24,8 @@ The backend follows a layered architecture pattern:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                      API Layer (Flask Blueprints)           │
-│   devices, groups, workflows, scheduler, credentials, etc.  │
+│                   API Layer (FastAPI - OpenAPI 3.x)         │
+│   /identity/v1, /inventory/v1, /automation/v1, etc.         │
 ├─────────────────────────────────────────────────────────────┤
 │                      Services Layer                          │
 │   Business logic, validation, orchestration                  │
@@ -51,28 +51,16 @@ The backend follows a layered architecture pattern:
 ```
 backend/
 ├── __init__.py              # Package initialization
-├── app.py                   # Flask application factory
+├── main.py                  # FastAPI application (OpenAPI 3.x - 3500+ lines)
 ├── database.py              # Database connection singleton
 │
-├── api/                     # REST API Blueprints
-│   ├── __init__.py          # Blueprint registration
-│   ├── alerts.py            # Alert management
-│   ├── auth.py              # Authentication & authorization
-│   ├── credentials.py       # Credential vault
-│   ├── devices.py           # Device CRUD
-│   ├── groups.py            # Device groups
-│   ├── jobs.py              # Job definitions
-│   ├── legacy.py            # Legacy endpoint compatibility
-│   ├── logs.py              # System logs
-│   ├── netbox.py            # NetBox integration
-│   ├── notifications.py     # Notification channels & rules
-│   ├── scans.py             # Network scanning
-│   ├── scheduler.py         # Job scheduling
-│   ├── schema.py            # Schema introspection
-│   ├── settings.py          # Application settings
-│   ├── system.py            # System health & info
-│   ├── winrm.py             # Windows Remote Management
-│   └── workflows.py         # Workflow CRUD & execution
+├── openapi/                 # OpenAPI implementation modules
+│   ├── identity_impl.py     # Authentication, users, roles
+│   ├── inventory_impl.py    # Devices, interfaces, topology
+│   ├── monitoring_impl.py   # Metrics, alerts, polling
+│   ├── automation_impl.py   # Workflows, jobs, scheduling
+│   ├── integrations_impl.py # NetBox, PRTG, MCP
+│   └── system_impl.py       # Settings, logs, health
 │
 ├── services/                # Business Logic Layer
 │   ├── __init__.py
@@ -188,8 +176,8 @@ The root `app.py` delegates to the backend application factory:
 from backend.app import create_app, app
 
 if __name__ == '__main__':
-    host = os.environ.get('FLASK_HOST', '0.0.0.0')
-    port = int(os.environ.get('FLASK_PORT', 5000))
+    host = os.environ.get('API_HOST', '0.0.0.0')
+    port = int(os.environ.get('API_PORT', 5000))
     app.run(host=host, port=port, debug=True)
 ```
 
@@ -197,8 +185,8 @@ if __name__ == '__main__':
 
 ```python
 def create_app(config=None):
-    """Create and configure Flask application."""
-    app = Flask(__name__, static_folder='../frontend/dist')
+    """Create and configure FastAPI application."""
+    app = FastAPI(__name__, static_folder='../frontend/dist')
     
     # Enable CORS
     CORS(app)
@@ -595,11 +583,11 @@ celery -A celery_app beat -l info
 | `PG_PASSWORD` | `postgres` | Database password |
 | `REDIS_HOST` | `localhost` | Redis host |
 | `REDIS_PORT` | `6379` | Redis port |
-| `FLASK_HOST` | `0.0.0.0` | Flask bind host |
-| `FLASK_PORT` | `5000` | Flask bind port |
-| `FLASK_DEBUG` | `true` | Debug mode |
+| `API_HOST` | `0.0.0.0` | FastAPI bind host |
+| `API_PORT` | `5000` | FastAPI bind port |
+| `API_DEBUG` | `true` | Debug mode |
 | `LOG_LEVEL` | `INFO` | Logging level |
-| `SECRET_KEY` | - | Flask secret key |
+| `SECRET_KEY` | - | FastAPI secret key |
 | `CREDENTIAL_MASTER_KEY` | - | Credential encryption key |
 | `NETBOX_URL` | - | NetBox base URL |
 | `NETBOX_TOKEN` | - | NetBox API token |

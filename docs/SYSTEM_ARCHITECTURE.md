@@ -46,10 +46,10 @@ This document defines the overall architecture, system boundaries, integration p
 │                                        │ HTTP/REST                                   │
 │                                        ▼                                             │
 │  ┌───────────────────────────────────────────────────────────────────────────────┐  │
-│  │                         BACKEND API (Flask)                                    │  │
+│  │                    BACKEND API (FastAPI - OpenAPI 3.x)                         │  │
 │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │  │
-│  │  │  NetBox API │  │ Metrics API │  │ Workflow API│  │  Auth API   │          │  │
-│  │  │   Proxy     │  │             │  │             │  │             │          │  │
+│  │  │/identity/v1 │  │/inventory/v1│  │/automation/ │  │/monitoring/ │          │  │
+│  │  │   Auth      │  │  Devices    │  │  v1 Jobs    │  │ v1 Metrics  │          │  │
 │  │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘          │  │
 │  └───────────────────────────────────────────────────────────────────────────────┘  │
 │                                        │                                             │
@@ -102,13 +102,13 @@ This document defines the overall architecture, system boundaries, integration p
   - Credentials - Secure credential vault
   - System - Settings, users, logs
 
-#### Backend API (Flask)
-- **Location**: `backend/`, `app.py`
+#### Backend API (FastAPI - OpenAPI 3.x)
+- **Location**: `backend/main.py`, `app.py`
 - **Port**: 5000
 - **Responsibilities**:
-  - REST API endpoints
+  - OpenAPI 3.x REST endpoints
+  - Domain-based routing (/identity/v1, /inventory/v1, etc.)
   - Authentication/Authorization
-  - NetBox API proxy
   - Service orchestration
 
 #### Celery Workers
@@ -180,8 +180,8 @@ This document defines the overall architecture, system boundaries, integration p
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
 │  ┌─────────────────────────────────────────────────────────┐    │
-│  │                    Flask Backend                         │    │
-│  │  - API endpoints                                         │    │
+│  │                   FastAPI Backend                         │    │
+│  │  - OpenAPI 3.x endpoints                                 │    │
 │  │  - Service layer                                         │    │
 │  │  - Database access                                       │    │
 │  └─────────────────────────────────────────────────────────┘    │
@@ -190,7 +190,7 @@ This document defines the overall architecture, system boundaries, integration p
 │                           ▼                                      │
 │  ┌─────────────────────────────────────────────────────────┐    │
 │  │                   Celery Workers                         │    │
-│  │  - Same codebase as Flask                                │    │
+│  │  - Same codebase as FastAPI                                │    │
 │  │  - Shares services, models                               │    │
 │  │  - Must be version-synchronized                          │    │
 │  └─────────────────────────────────────────────────────────┘    │
@@ -199,7 +199,7 @@ This document defines the overall architecture, system boundaries, integration p
 │                           ▼                                      │
 │  ┌─────────────────────────────────────────────────────────┐    │
 │  │                   React Frontend                         │    │
-│  │  - Consumes Flask API                                    │    │
+│  │  - Consumes FastAPI OpenAPI                              │    │
 │  │  - Can be deployed separately (CDN)                      │    │
 │  │  - But version should match API                          │    │
 │  └─────────────────────────────────────────────────────────┘    │
@@ -217,7 +217,7 @@ This document defines the overall architecture, system boundaries, integration p
 User Request: "Show me all devices at site X"
 
 ┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐
-│ Frontend │────▶│  Flask   │────▶│  NetBox  │────▶│  NetBox  │
+│ Frontend │────▶│ FastAPI  │────▶│  NetBox  │────▶│  NetBox  │
 │          │     │   API    │     │  Service │     │   API    │
 └──────────┘     └──────────┘     └──────────┘     └──────────┘
      ▲                                                   │
@@ -232,7 +232,7 @@ User Request: "Show me all devices at site X"
 User Request: "Show optical power for device X"
 
 ┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐
-│ Frontend │────▶│  Flask   │────▶│ Metrics  │────▶│PostgreSQL│
+│ Frontend │────▶│ FastAPI  │────▶│ Metrics  │────▶│PostgreSQL│
 │          │     │   API    │     │ Service  │     │          │
 └──────────┘     └──────────┘     └──────────┘     └──────────┘
      ▲                                                   │
@@ -279,7 +279,7 @@ After Metrics Collection: "Check for anomalies"
 User Trigger: "Run backup workflow for site X"
 
 ┌──────────┐     ┌──────────┐     ┌──────────┐
-│ Frontend │────▶│  Flask   │────▶│  Celery  │
+│ Frontend │────▶│ FastAPI  │────▶│  Celery  │
 │          │     │   API    │     │  Queue   │
 └──────────┘     └──────────┘     └──────────┘
                                        │
@@ -400,7 +400,7 @@ User Trigger: "Run backup workflow for site X"
 │                                                                  │
 │  ┌─────────────────────────────────────────────────────────┐    │
 │  │  OpsConductor Application                                │    │
-│  │  ├─ Flask Backend (port 5000)                           │    │
+│  │  ├─ FastAPI Backend (port 5000)                           │    │
 │  │  ├─ Celery Workers (4 workers)                          │    │
 │  │  ├─ Celery Beat (scheduler)                             │    │
 │  │  └─ React Frontend (port 3000, dev) or Nginx (prod)     │    │
@@ -442,7 +442,7 @@ User Trigger: "Run backup workflow for site X"
             ▼               ▼               ▼
 ┌───────────────┐  ┌───────────────┐  ┌───────────────┐
 │   API Server  │  │   API Server  │  │   API Server  │
-│   (Flask)     │  │   (Flask)     │  │   (Flask)     │
+│   (FastAPI)     │  │   (FastAPI)     │  │   (FastAPI)     │
 │   Stateless   │  │   Stateless   │  │   Stateless   │
 └───────────────┘  └───────────────┘  └───────────────┘
             │               │               │
@@ -552,7 +552,7 @@ User Trigger: "Run backup workflow for site X"
 
 ### 3. API Isolation
 
-**Current**: Single Flask application
+**Current**: Single FastAPI application
 **Recommended**: Consider API gateway for external integrations
 
 ```
@@ -560,14 +560,14 @@ User Trigger: "Run backup workflow for site X"
 │                      API ISOLATION                               │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  Internal API (Flask - port 5000)                               │
+│  Internal API (FastAPI - port 5000)                               │
 │  ├─ /api/auth/*        - Authentication                         │
 │  ├─ /api/devices/*     - Device operations                      │
 │  ├─ /api/metrics/*     - Metrics queries                        │
 │  ├─ /api/workflows/*   - Workflow management                    │
 │  └─ /api/credentials/* - Credential vault                       │
 │                                                                  │
-│  NetBox Proxy (Flask - same port, could separate)               │
+│  NetBox Proxy (FastAPI - same port, could separate)               │
 │  └─ /api/netbox/*      - Proxied to NetBox                      │
 │                                                                  │
 │  Future: External API (separate service)                        │
@@ -679,7 +679,7 @@ User Trigger: "Run backup workflow for site X"
 │                                                                  │
 │  Component          HA Strategy                                  │
 │  ─────────          ───────────                                  │
-│  Flask API          Multiple instances + load balancer          │
+│  FastAPI API          Multiple instances + load balancer          │
 │  Celery Workers     Multiple workers (already supported)        │
 │  PostgreSQL         Primary + streaming replica                 │
 │  Redis              Redis Sentinel or Cluster                   │
@@ -705,9 +705,9 @@ User Trigger: "Run backup workflow for site X"
 | **PostgreSQL** | ✅ Yes | None | Shared service |
 | **Redis** | ✅ Yes | None | Shared service |
 | **Ciena MCP** | ✅ Yes | Vendor managed | External system |
-| **Flask API** | ❌ No | PostgreSQL, Redis, NetBox | Core application |
-| **Celery Workers** | ❌ No | Same as Flask | Shares codebase |
-| **React Frontend** | ⚠️ Partial | Flask API | Can deploy separately |
+| **FastAPI API** | ❌ No | PostgreSQL, Redis, NetBox | Core application |
+| **Celery Workers** | ❌ No | Same as FastAPI | Shares codebase |
+| **React Frontend** | ⚠️ Partial | FastAPI API | Can deploy separately |
 
 ---
 

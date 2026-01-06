@@ -41,7 +41,7 @@ export default function MCPSettings() {
 
   const fetchSettings = async () => {
     try {
-      const data = await fetchApi('/api/mcp/settings', { headers: getAuthHeader() });
+      const data = await fetchApi('/integrations/v1/mcp/settings', { headers: getAuthHeader() });
       if (data.success) {
         setSettings(prev => ({ 
           ...prev, 
@@ -59,7 +59,7 @@ export default function MCPSettings() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const data = await fetchApi('/api/mcp/settings', {
+      const data = await fetchApi('/integrations/v1/mcp/settings', {
         method: 'PUT',
         headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
         body: JSON.stringify(settings)
@@ -81,7 +81,7 @@ export default function MCPSettings() {
     setTesting(true);
     setTestResult(null);
     try {
-      const data = await fetchApi('/api/mcp/test', {
+      const data = await fetchApi('/integrations/v1/mcp/test', {
         method: 'POST',
         headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
         body: JSON.stringify(settings)
@@ -109,7 +109,7 @@ export default function MCPSettings() {
     setSyncing(prev => ({ ...prev, devices: true }));
     setSyncResult(null);
     try {
-      const data = await fetchApi('/api/mcp/sync/netbox', {
+      const data = await fetchApi('/integrations/v1/mcp/sync/netbox', {
         method: 'POST',
         headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ create_missing: false })
@@ -134,7 +134,7 @@ export default function MCPSettings() {
     setSyncing(prev => ({ ...prev, equipment: true }));
     setSyncResult(null);
     try {
-      const data = await fetchApi('/api/mcp/sync/equipment', {
+      const data = await fetchApi('/integrations/v1/mcp/sync/equipment', {
         method: 'POST',
         headers: { ...getAuthHeader(), 'Content-Type': 'application/json' }
       });

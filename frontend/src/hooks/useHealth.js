@@ -7,7 +7,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 
-const API_BASE = '/api/health';
+const API_BASE = '/monitoring/v1/health';
 
 /**
  * Fetch health score for a specific device

@@ -43,7 +43,7 @@ export default function PRTGSettings() {
 
   const fetchSettings = async () => {
     try {
-      const data = await fetchApi('/api/prtg/settings', { headers: getAuthHeader() });
+      const data = await fetchApi('/integrations/v1/prtg/settings', { headers: getAuthHeader() });
       if (data.success) {
         setSettings(prev => ({ ...prev, ...data.data }));
       }
@@ -56,7 +56,7 @@ export default function PRTGSettings() {
 
   const fetchStatus = async () => {
     try {
-      const data = await fetchApi('/api/prtg/status', { headers: getAuthHeader() });
+      const data = await fetchApi('/integrations/v1/prtg/status', { headers: getAuthHeader() });
       setStatus(data.data);
     } catch (error) {
       console.error('Error fetching PRTG status:', error);
@@ -66,7 +66,7 @@ export default function PRTGSettings() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const data = await fetchApi('/api/prtg/settings', {
+      const data = await fetchApi('/integrations/v1/prtg/settings', {
         method: 'PUT',
         headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
         body: JSON.stringify(settings)
@@ -88,7 +88,7 @@ export default function PRTGSettings() {
     setTesting(true);
     setTestResult(null);
     try {
-      const data = await fetchApi('/api/prtg/test-connection', {
+      const data = await fetchApi('/integrations/v1/prtg/test', {
         method: 'POST',
         headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
         body: JSON.stringify(settings)
@@ -116,7 +116,7 @@ export default function PRTGSettings() {
   const handlePreviewSync = async () => {
     setLoadingPreview(true);
     try {
-      const data = await fetchApi('/api/prtg/sync/preview', { headers: getAuthHeader() });
+      const data = await fetchApi('/integrations/v1/prtg/sync/preview', { headers: getAuthHeader() });
       if (data.success) {
         setSyncPreview(data.data);
       }
@@ -350,7 +350,7 @@ export default function PRTGSettings() {
           To receive real-time alerts from PRTG, configure an HTTP notification in PRTG to send alerts to:
         </p>
         <div className="bg-gray-100 rounded-lg p-3 font-mono text-sm break-all">
-          {window.location.origin}/api/prtg/webhook
+          {window.location.origin}/integrations/v1/prtg/webhook
         </div>
         <div className="mt-4 p-4 bg-blue-50 rounded-lg">
           <p className="text-sm font-medium text-blue-800 mb-2">PRTG Setup Instructions:</p>

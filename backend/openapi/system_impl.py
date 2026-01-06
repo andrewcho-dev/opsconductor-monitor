@@ -31,9 +31,10 @@ def _table_exists(cursor, table_name):
             SELECT FROM information_schema.tables 
             WHERE table_schema = 'public' 
             AND table_name = %s
-        )
+        ) as exists
     """, (table_name,))
-    return cursor.fetchone()[0]
+    result = cursor.fetchone()
+    return result['exists'] if result else False
 
 # ============================================================================
 # System API Business Logic
@@ -169,7 +170,7 @@ async def get_system_logs(
         where_clause = "WHERE " + " AND ".join(where_clauses)
         
         cursor.execute(f"""
-            SELECT id, level, message, source, context,
+            SELECT id, level, message, source, details as context,
                    timestamp, created_at
             FROM system_logs 
             {where_clause}

@@ -22,7 +22,7 @@ export function PasswordPolicySettings() {
   const loadPolicy = async () => {
     setLoading(true);
     try {
-      const res = await fetchApi('/api/auth/password-policy', { headers: getAuthHeader() });
+      const res = await fetchApi('/identity/v1/password-policy', { headers: getAuthHeader() });
       if (res.success) {
         setPolicy(res.data.policy);
         setOriginalPolicy(res.data.policy);
@@ -44,7 +44,7 @@ export function PasswordPolicySettings() {
     setMessage(null);
     setSaving(true);
     try {
-      const res = await fetchApi('/api/auth/password-policy', {
+      const res = await fetchApi('/identity/v1/password-policy', {
         method: 'PUT',
         headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
         body: JSON.stringify(policy)

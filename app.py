@@ -1,7 +1,16 @@
 """
 OpsConductor Application - Main Entry Point.
 
-This is the main entry point that uses the FastAPI backend.
+OpenAPI 3.x compliant API with domain-based routing:
+- /identity/v1/* - Authentication, users, roles
+- /inventory/v1/* - Devices, interfaces, topology
+- /monitoring/v1/* - Metrics, alerts, polling
+- /automation/v1/* - Workflows, jobs, scheduling
+- /integrations/v1/* - NetBox, PRTG, MCP
+- /system/v1/* - Settings, logs, health
+- /credentials/v1/* - Credential vault
+- /notifications/v1/* - Notification channels
+
 Run with: uvicorn app:app --host 0.0.0.0 --port 5000 --reload
 """
 
@@ -18,10 +27,11 @@ try:
 except ImportError:
     pass
 
-from backend.app import create_app, app
+# Import the OpenAPI 3.x application from backend.main
+from backend.main import app
 
-# Re-export the app for backward compatibility
-__all__ = ['app', 'create_app']
+# Re-export the app
+__all__ = ['app']
 
 if __name__ == '__main__':
     import uvicorn
@@ -31,5 +41,5 @@ if __name__ == '__main__':
     port = int(os.environ.get('API_PORT', 5000))
     reload = os.environ.get('API_RELOAD', 'true').lower() == 'true'
     
-    print(f"Starting OpsConductor FastAPI on {host}:{port}")
+    print(f"Starting OpsConductor OpenAPI 3.x on {host}:{port}")
     uvicorn.run("app:app", host=host, port=port, reload=reload)

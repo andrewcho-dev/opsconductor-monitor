@@ -29,16 +29,17 @@ def _table_exists(cursor, table_name):
             SELECT FROM information_schema.tables 
             WHERE table_schema = 'public' 
             AND table_name = %s
-        )
+        ) as exists
     """, (table_name,))
-    return cursor.fetchone()[0]
+    result = cursor.fetchone()
+    return result['exists'] if result else False
 
 # ============================================================================
 # Inventory API Business Logic
 # ============================================================================
 
 async def list_devices_paginated(
-    cursor: Optional[str] = None, 
+    cursor_str: Optional[str] = None,
     limit: int = 50,
     site_id: Optional[str] = None,
     device_type: Optional[str] = None,
@@ -46,119 +47,72 @@ async def list_devices_paginated(
     search: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    List devices with pagination and filtering
-    Migrated from legacy /api/devices and /api/inventory/devices
+    List devices with pagination and filtering.
+    Uses EXACT same query as legacy /api/devices endpoint.
     """
     db = get_db()
     with db.cursor() as cursor:
-        # Build query with filters
-        where_clauses = []
+        # Build query with filters - SAME as legacy /api/devices
+        query = """
+            SELECT netbox_device_id::text as id, device_name as name, 
+                   COALESCE(device_ip::text, '') as ip_address,
+                   COALESCE(device_type, '') as device_type, 
+                   COALESCE(manufacturer, '') as vendor, 
+                   COALESCE(site_name, '') as site_name, 
+                   COALESCE(role_name, '') as role,
+                   COALESCE(site_id::text, '') as site_id, 
+                   cached_at as created_at, cached_at as updated_at, cached_at as last_seen
+            FROM netbox_device_cache WHERE 1=1
+        """
         params = []
         
-        if search:
-            where_clauses.append("(d.name ILIKE %s OR d.ip_address ILIKE %s OR d.hostname ILIKE %s)")
-            search_param = f"%{search}%"
-            params.extend([search_param, search_param, search_param])
-        
         if site_id:
-            where_clauses.append("d.site_id = %s")
+            query += " AND site_name = %s"
             params.append(site_id)
         
         if device_type:
-            where_clauses.append("d.device_type = %s")
+            query += " AND device_type = %s"
             params.append(device_type)
         
-        if status_filter:
-            where_clauses.append("d.status = %s")
-            params.append(status_filter)
+        if search:
+            query += " AND (device_name ILIKE %s OR device_ip::text ILIKE %s)"
+            search_param = f"%{search}%"
+            params.extend([search_param, search_param])
         
-        where_clause = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
+        query += " ORDER BY device_name"
         
-        # Get total count
-        count_query = f"""
-            SELECT COUNT(*) as total
-            FROM devices d
-            {where_clause}
-        """
+        if limit:
+            query += f" LIMIT {limit}"
         
-        cursor.execute(count_query, params)
-        total = cursor.fetchone()['total']
-        
-        # Apply pagination
-        if cursor:
-            # Decode cursor (for simplicity, using device ID as cursor)
-            try:
-                import base64
-                cursor_data = json.loads(base64.b64decode(cursor).decode())
-                last_id = cursor_data.get('last_id')
-                where_clauses.append("d.id > %s")
-                params.append(last_id)
-            except:
-                pass
-        
-        # Get paginated results
-        query = f"""
-            SELECT d.id, d.name, d.ip_address, d.hostname, d.device_type,
-                   d.vendor, d.model, d.os_version, d.site_id, d.status,
-                   d.created_at, d.updated_at, d.last_seen,
-                   s.name as site_name
-            FROM devices d
-            LEFT JOIN sites s ON d.site_id = s.id
-            {where_clause}
-            ORDER BY d.id
-            LIMIT %s
-        """
-        
-        params.append(limit + 1)  # Get one extra to determine if there's a next page
         cursor.execute(query, params)
-        
         devices = [dict(row) for row in cursor.fetchall()]
         
-        # Determine if there's a next page
-        has_more = len(devices) > limit
-        if has_more:
-            devices = devices[:-1]  # Remove the extra item
-        
-        # Generate next cursor
-        next_cursor = None
-        if has_more and devices:
-            last_id = devices[-1]['id']
-            cursor_data = json.dumps({'last_id': last_id})
-            import base64
-            next_cursor = base64.b64encode(cursor_data.encode()).decode()
+        # Get total count
+        count_query = "SELECT COUNT(*) as total FROM netbox_device_cache"
+        cursor.execute(count_query)
+        total = cursor.fetchone()['total']
         
         return {
             'items': devices,
             'total': total,
             'limit': limit,
-            'cursor': next_cursor
+            'cursor': None
         }
 
 async def get_device_by_id(device_id: str) -> Dict[str, Any]:
     """
     Get device details by ID
-    Migrated from legacy device endpoints
+    Uses netbox_device_cache table (same as legacy)
     """
     db = get_db()
     with db.cursor() as cursor:
-        if not _table_exists(cursor, 'devices'):
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail={
-                    "code": "DEVICE_NOT_FOUND",
-                    "message": f"Device with ID '{device_id}' not found"
-                }
-            )
-        
         cursor.execute("""
-            SELECT d.id, d.name, d.ip_address, d.hostname, d.device_type,
-                   d.vendor, d.model, d.os_version, d.site_id, d.status,
-                   d.created_at, d.updated_at, d.last_seen,
-                   s.name as site_name, s.description as site_description
-            FROM devices d
-            LEFT JOIN sites s ON d.site_id = s.id
-            WHERE d.id = %s
-        """, (device_id,))
+            SELECT netbox_device_id as id, device_name as name, device_ip::text as ip_address,
+                   device_type, manufacturer as vendor, site_name, role_name as role,
+                   site_id, cached_at as created_at, cached_at as updated_at, cached_at as last_seen
+            FROM netbox_device_cache
+            WHERE netbox_device_id = %s OR device_ip::text = %s
+        """, (device_id, device_id))
         
         device = cursor.fetchone()
         
@@ -176,63 +130,24 @@ async def get_device_by_id(device_id: str) -> Dict[str, Any]:
 async def list_device_interfaces(device_id: str) -> List[Dict[str, Any]]:
     """
     List interfaces for a specific device
-    Migrated from legacy /api/inventory/interfaces
+    Returns empty list - interfaces not stored in current schema
     """
-    db = get_db()
-    with db.cursor() as cursor:
-        # First verify device exists
-        cursor.execute("SELECT id FROM devices WHERE id = %s", (device_id,))
-        if not cursor.fetchone():
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail={
-                    "code": "DEVICE_NOT_FOUND",
-                    "message": f"Device with ID '{device_id}' not found"
-                }
-            )
-        
-        if not _table_exists(cursor, 'interfaces'):
-            return []
-        
-        cursor.execute("""
-            SELECT i.id, i.name, i.description, i.if_index, i.if_type,
-                   i.admin_status, i.oper_status, i.speed, i.mtu,
-                   i.mac_address, i.created_at, i.updated_at
-            FROM interfaces i
-            WHERE i.device_id = %s
-            ORDER BY i.if_index, i.name
-        """, (device_id,))
-        
-        interfaces = [dict(row) for row in cursor.fetchall()] if cursor.description else []
-        
-        return interfaces
+    # Current schema doesn't have interfaces table - return empty
+    return []
 
 async def get_network_topology() -> Dict[str, Any]:
     """
     Get network topology graph
-    Migrated from legacy /api/topology
+    Uses netbox_device_cache table (same as legacy)
     """
     db = get_db()
     with db.cursor() as cursor:
-        if not _table_exists(cursor, 'devices'):
-            return {
-                "nodes": [],
-                "links": [],
-                "metadata": {
-                    "total_devices": 0,
-                    "total_links": 0,
-                    "last_updated": datetime.now().isoformat()
-                }
-            }
-        
-        # Get devices as nodes
+        # Get devices as nodes from netbox_device_cache
         cursor.execute("""
-            SELECT d.id, d.name, d.ip_address, d.device_type, d.vendor,
-                   d.status, d.site_id, s.name as site_name
-            FROM devices d
-            LEFT JOIN sites s ON d.site_id = s.id
-            WHERE d.status = 'active'
-            ORDER BY d.name
+            SELECT netbox_device_id as id, device_name as name, device_ip::text as ip_address,
+                   device_type, manufacturer as vendor, site_name
+            FROM netbox_device_cache
+            ORDER BY device_name
         """)
         
         devices = cursor.fetchall()
@@ -245,7 +160,7 @@ async def get_network_topology() -> Dict[str, Any]:
                 "type": device['device_type'],
                 "vendor": device['vendor'],
                 "site": device['site_name'],
-                "status": device['status']
+                "status": "active"
             })
         
         # Get links (if links table exists)
@@ -291,7 +206,7 @@ async def list_sites() -> List[Dict[str, Any]]:
             SELECT s.id, s.name, s.description, s.address, s.city,
                    s.state, s.country, s.latitude, s.longitude,
                    s.created_at, s.updated_at,
-                   (SELECT COUNT(*) FROM devices d WHERE d.site_id = s.id) as device_count
+                   (SELECT COUNT(*) FROM netbox_device_cache d WHERE d.site_id = s.id) as device_count
             FROM sites s
             ORDER BY s.name
         """)

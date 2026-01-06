@@ -55,7 +55,7 @@ const NodeEditor = ({
   const fetchTables = async () => {
     setLoadingTables(true);
     try {
-      const response = await fetch('/api/schema/tables');
+      const response = await fetch('/system/v1/schema/tables');
       const data = await response.json();
       if (data.success) {
         setTables(data.tables);
@@ -69,7 +69,7 @@ const NodeEditor = ({
   const fetchTableColumns = async (tableName) => {
     setLoadingColumns(true);
     try {
-      const response = await fetch(`/api/schema/tables/${tableName}/columns`);
+      const response = await fetch(`/system/v1/schema/tables/${tableName}/columns`);
       const data = await response.json();
       if (data.success) {
         setTableColumns(prev => ({ ...prev, [tableName]: data.columns }));
@@ -82,7 +82,7 @@ const NodeEditor = ({
 
   const fetchInputFields = async () => {
     try {
-      const response = await fetch('/api/schema/input-fields');
+      const response = await fetch('/system/v1/schema/input-fields');
       const data = await response.json();
       if (data.success) {
         setInputFields(data.node_outputs);

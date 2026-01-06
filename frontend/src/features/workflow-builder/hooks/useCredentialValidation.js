@@ -31,7 +31,7 @@ export function useCredentialValidation() {
   const fetchCredentials = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetchApi('/api/credentials');
+      const response = await fetchApi('/credentials/v1/credentials');
       if (response.success && response.data?.credentials) {
         setCredentials(response.data.credentials);
       }

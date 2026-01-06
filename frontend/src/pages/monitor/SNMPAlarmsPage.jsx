@@ -55,7 +55,7 @@ export function SNMPAlarmsPage() {
 
   const loadDevices = async () => {
     try {
-      const response = await fetchApi('/api/mcp/devices');
+      const response = await fetchApi('/integrations/v1/mcp/devices');
       const deviceList = response.data?.devices || [];
       setDevices(deviceList);
     } catch (err) {
@@ -80,7 +80,7 @@ export function SNMPAlarmsPage() {
       
       const results = await Promise.allSettled(
         batch.map(device => 
-          fetchApi(`/api/snmp/alarms/${device.ip_address}?community=${community}`)
+          fetchApi(`/monitoring/v1/snmp/alarms/${device.ip_address}?community=${community}`)
             .then(res => ({ device, data: res.data }))
         )
       );

@@ -29,9 +29,10 @@ def _table_exists(cursor, table_name):
             SELECT FROM information_schema.tables 
             WHERE table_schema = 'public' 
             AND table_name = %s
-        )
+        ) as exists
     """, (table_name,))
-    return cursor.fetchone()[0]
+    result = cursor.fetchone()
+    return result['exists'] if result else False
 
 # ============================================================================
 # Integrations API Business Logic
@@ -167,6 +168,18 @@ async def test_netbox_connection(netbox_config: Dict[str, Any]) -> Dict[str, Any
         url = netbox_config.get('url', '').rstrip('/')
         token = netbox_config.get('token', '')
         
+        # If no config provided, get from database
+        if not url or not token:
+            db = get_db()
+            with db.cursor() as cursor:
+                cursor.execute("SELECT key, value FROM system_settings WHERE key LIKE 'netbox_%'")
+                for row in cursor.fetchall():
+                    key = row['key'].replace('netbox_', '')
+                    if key == 'url' and not url:
+                        url = row['value'].rstrip('/')
+                    elif key == 'token' and not token:
+                        token = row['value']
+        
         if not url or not token:
             return {
                 "success": False,
@@ -220,25 +233,42 @@ async def test_prtg_connection(prtg_config: Dict[str, Any]) -> Dict[str, Any]:
         url = prtg_config.get('url', '').rstrip('/')
         username = prtg_config.get('username', '')
         passhash = prtg_config.get('passhash', '')
+        api_token = prtg_config.get('api_token', '')
+        verify_ssl = prtg_config.get('verify_ssl', 'true').lower() != 'false'
         
-        if not url or not username or not passhash:
+        # Support both passhash and api_token authentication
+        if not url:
             return {
                 "success": False,
-                "error": "Missing URL, username, or passhash configuration"
+                "error": "Missing URL configuration"
             }
         
-        # Test PRTG API connection
-        params = {
-            'username': username,
-            'passhash': passhash,
-            'id': '0',  # Root object
-            'content': 'status'
-        }
+        if not passhash and not api_token:
+            return {
+                "success": False,
+                "error": "Missing passhash or api_token configuration"
+            }
+        
+        # Test PRTG API connection - prefer api_token over passhash
+        if api_token:
+            params = {
+                'apitoken': api_token,
+                'id': '0',
+                'content': 'status'
+            }
+        else:
+            params = {
+                'username': username,
+                'passhash': passhash,
+                'id': '0',
+                'content': 'status'
+            }
         
         response = requests.get(
             f"{url}/api/status.json",
             params=params,
-            timeout=10
+            timeout=10,
+            verify=verify_ssl
         )
         
         if response.status_code == 200:

@@ -2,12 +2,23 @@
 Permission Enforcement Middleware
 
 Provides decorators and utilities for enforcing RBAC permissions on API endpoints.
+Note: This module uses Flask for legacy compatibility. For FastAPI, use the 
+authentication in backend/main.py instead.
 """
 
 import functools
 import logging
-from flask import request, jsonify, g
 from typing import List, Optional, Union
+
+# Flask imports for legacy middleware (optional)
+try:
+    from flask import request, jsonify, g
+    FLASK_AVAILABLE = True
+except ImportError:
+    request = None
+    jsonify = None
+    g = None
+    FLASK_AVAILABLE = False
 
 from backend.database import get_db
 from backend.services.auth_service import get_auth_service

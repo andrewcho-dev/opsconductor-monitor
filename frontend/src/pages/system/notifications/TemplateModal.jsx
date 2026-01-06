@@ -32,13 +32,13 @@ export function TemplateModal({ template, onClose, onSave }) {
     setSaving(true);
     try {
       if (template) {
-        await fetchApi(`/api/notifications/templates/${template.id}`, {
+        await fetchApi(`/notifications/v1/templates/${template.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData)
         });
       } else {
-        await fetchApi('/api/notifications/templates', {
+        await fetchApi('/notifications/v1/templates', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData)

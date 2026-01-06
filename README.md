@@ -39,8 +39,8 @@ A comprehensive network operations platform for device discovery, monitoring, wo
 
 ```
 opsconductor/
-├── backend/                    # FastAPI Server (Python)
-│   ├── api/                    # REST API Routers (30 modules)
+├── backend/                    # FastAPI Server (Python) - OpenAPI 3.x
+│   ├── main.py                 # OpenAPI 3.x API (single monolithic file)
 │   ├── services/               # Business Logic Layer
 │   │   ├── workflow_engine.py  # Workflow execution engine
 │   │   ├── auth_service.py     # Authentication & RBAC
@@ -66,7 +66,8 @@ opsconductor/
 │   │   │   ├── credentials/    # Credential Vault
 │   │   │   └── system/         # Settings, Users, Logs
 │   │   ├── components/         # Shared UI Components
-│   │   └── api/                # API Client Modules
+│   │   └── api/                # API Client & OpenAPI Services
+│   │       └── services/       # Domain-based API services (identity, inventory, etc.)
 │
 ├── docs/                       # Documentation
 │   ├── BACKEND.md              # Backend architecture & API reference
@@ -116,7 +117,8 @@ python3 backend/migrations/migrate.py
 # Start the backend server (FastAPI with uvicorn)
 uvicorn app:app --host 0.0.0.0 --port 5000 --reload
 # Backend runs on http://localhost:5000
-# API docs available at http://localhost:5000/api/docs
+# API docs available at http://localhost:5000/docs (Swagger UI)
+# ReDoc available at http://localhost:5000/redoc
 ```
 
 ### 3. Frontend Setup
@@ -241,7 +243,8 @@ python3 -m pytest tests/unit/test_workflow_engine.py -v
 ## Technology Stack
 
 ### Backend
-- **Flask 2.3** - Web framework
+- **FastAPI** - Modern async web framework with OpenAPI 3.x
+- **Uvicorn** - ASGI server for FastAPI
 - **PostgreSQL** - Primary database
 - **Celery 5.3** - Background task queue
 - **Redis** - Message broker for Celery

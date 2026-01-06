@@ -90,12 +90,12 @@ export function RolesPage() {
     setLoading(true);
     try {
       console.log('Loading roles...');
-      const rolesRes = await fetchApi('/api/auth/roles', { headers: getAuthHeader() });
+      const rolesRes = await fetchApi('/identity/v1/roles', { headers: getAuthHeader() });
       console.log('Roles response:', rolesRes);
-      if (rolesRes.success) {
-        console.log('Setting roles:', rolesRes.data);
-        setRoles(rolesRes.data || []);
-      }
+      // Handle both wrapped and direct array format
+      const rolesList = rolesRes?.data || (Array.isArray(rolesRes) ? rolesRes : []);
+      console.log('Setting roles:', rolesList);
+      setRoles(rolesList);
     } catch (err) {
       console.error('Error loading data:', err);
     } finally {
@@ -113,12 +113,12 @@ export function RolesPage() {
     console.log(`Loading members for role ${roleId}...`);
     setLoadingMembers(true);
     try {
-      const res = await fetchApi(`/api/auth/roles/${roleId}/members`, { headers: getAuthHeader() });
+      const res = await fetchApi(`/identity/v1/roles/${roleId}/members`, { headers: getAuthHeader() });
       console.log(`Role ${roleId} members response:`, res);
-      if (res.success) {
-        console.log(`Setting ${res.data.members?.length || 0} members for role ${roleId}`);
-        setMembers(res.data.members || []);
-      }
+      // Handle both wrapped and direct array format
+      const membersList = res?.data?.members || res?.members || (Array.isArray(res) ? res : []);
+      console.log(`Setting ${membersList.length} members for role ${roleId}`);
+      setMembers(membersList);
     } catch (err) {
       console.error('Error loading members:', err);
     } finally {
@@ -312,7 +312,7 @@ function RoleMembersPanel({ roleId, members, loading, canManage, getAuthHeader, 
     setMemberError('');
     setAddingMember(true);
     try {
-      const res = await fetchApi(`/api/auth/roles/${roleId}/members`, {
+      const res = await fetchApi(`/identity/v1/roles/${roleId}/members`, {
         method: 'POST',
         headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
         body: JSON.stringify(newMember)
@@ -334,7 +334,7 @@ function RoleMembersPanel({ roleId, members, loading, canManage, getAuthHeader, 
   const handleRemoveMember = async (username, type) => {
     if (!confirm(`Remove ${username}?`)) return;
     try {
-      await fetchApi(`/api/auth/roles/${roleId}/members/${encodeURIComponent(username)}?type=${type}`, {
+      await fetchApi(`/identity/v1/roles/${roleId}/members/${encodeURIComponent(username)}?type=${type}`, {
         method: 'DELETE',
         headers: getAuthHeader()
       });
@@ -520,7 +520,7 @@ function RoleModal({ role, onClose, onSave, getAuthHeader }) {
 
     setSaving(true);
     try {
-      const endpoint = isEdit ? `/api/auth/roles/${role.id}` : '/api/auth/roles';
+      const endpoint = isEdit ? `/identity/v1/roles/${role.id}` : '/identity/v1/roles';
       const method = isEdit ? 'PUT' : 'POST';
       
       const res = await fetchApi(endpoint, {

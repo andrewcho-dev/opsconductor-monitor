@@ -10,7 +10,8 @@ export function LoginPage() {
   const { login, verify2FA, error: authError } = useAuth();
   
   const [step, setStep] = useState('credentials'); // 'credentials' | '2fa'
-  const [authMethod, setAuthMethod] = useState('local'); // 'local' | enterprise config id
+  const [authMethod, setAuthMethod] = useState('local'); // 'local' | 'enterprise'
+  const [selectedConfigId, setSelectedConfigId] = useState(''); // Selected enterprise config ID
   const [enterpriseConfigs, setEnterpriseConfigs] = useState([]);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -30,10 +31,8 @@ export function LoginPage() {
 
   const loadEnterpriseConfigs = async () => {
     try {
-      const res = await fetchApi('/api/auth/enterprise-configs');
-      if (res.success) {
-        setEnterpriseConfigs(res.data.configs || []);
-      }
+      const res = await fetchApi('/identity/v1/enterprise-configs');
+      setEnterpriseConfigs(res.configs || []);
     } catch (err) {
       console.error('Failed to load enterprise configs:', err);
     }
@@ -51,33 +50,8 @@ export function LoginPage() {
         // Local authentication
         result = await login(username, password);
       } else {
-        // Enterprise authentication
-        const res = await fetchApi('/api/auth/login/enterprise', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            username,
-            password,
-            config_id: parseInt(authMethod)
-          })
-        });
-        
-        if (res.success) {
-          if (res.data.requires_2fa) {
-            result = { success: true, requires_2fa: true, user_id: res.data.user_id, two_factor_method: res.data.two_factor_method };
-          } else {
-            // Store tokens and user
-            localStorage.setItem('opsconductor_session_token', res.data.session_token);
-            localStorage.setItem('opsconductor_refresh_token', res.data.refresh_token);
-            localStorage.setItem('opsconductor_user', JSON.stringify(res.data.user));
-            result = { success: true };
-            // Force page reload to pick up new auth state
-            window.location.href = from;
-            return;
-          }
-        } else {
-          result = { success: false, error: res.error?.message || 'Login failed' };
-        }
+        // Enterprise authentication - use standard login endpoint with config_id
+        result = await login(username, password, selectedConfigId);
       }
       
       if (result.success) {
@@ -152,7 +126,10 @@ export function LoginPage() {
                       <div className="grid grid-cols-2 gap-2">
                         <button
                           type="button"
-                          onClick={() => setAuthMethod('local')}
+                          onClick={() => {
+                              setAuthMethod('local');
+                              setSelectedConfigId('');
+                            }}
                           className={cn(
                             "flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-colors",
                             authMethod === 'local'
@@ -167,10 +144,13 @@ export function LoginPage() {
                           <button
                             key={config.id}
                             type="button"
-                            onClick={() => setAuthMethod(String(config.id))}
+                            onClick={() => {
+                              setAuthMethod('enterprise');
+                              setSelectedConfigId(String(config.id));
+                            }}
                             className={cn(
                               "flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-colors",
-                              authMethod === String(config.id)
+                              authMethod === 'enterprise' && selectedConfigId === String(config.id)
                                 ? "border-blue-600 bg-blue-50 text-blue-700"
                                 : "border-gray-300 text-gray-600 hover:bg-gray-50"
                             )}
@@ -183,8 +163,16 @@ export function LoginPage() {
                     ) : (
                       // Dropdown layout for 3+ enterprise configs
                       <select
-                        value={authMethod}
-                        onChange={(e) => setAuthMethod(e.target.value)}
+                        value={authMethod === 'enterprise' ? selectedConfigId : 'local'}
+                        onChange={(e) => {
+                          if (e.target.value === 'local') {
+                            setAuthMethod('local');
+                            setSelectedConfigId('');
+                          } else {
+                            setAuthMethod('enterprise');
+                            setSelectedConfigId(e.target.value);
+                          }
+                        }}
                         className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                       >
                         <option value="local">Local Account</option>
@@ -270,18 +258,7 @@ export function LoginPage() {
             </>
           ) : (
             <>
-              <div className="text-center mb-6">
-                <div className="inline-flex items-center justify-center w-12 h-12 bg-blue-100 rounded-full mb-3">
-                  <Shield className="w-6 h-6 text-blue-600" />
-                </div>
-                <h2 className="text-xl font-semibold text-gray-900">Two-Factor Authentication</h2>
-                <p className="text-gray-500 text-sm mt-1">
-                  {twoFactorMethod === 'totp' 
-                    ? 'Enter the code from your authenticator app'
-                    : 'Enter the verification code'}
-                </p>
-              </div>
-
+              {/* 2FA Form */}
               <form onSubmit={handle2FASubmit} className="space-y-5">
                 {/* 2FA Code */}
                 <div>
@@ -345,7 +322,7 @@ export function LoginPage() {
 
         {/* Footer */}
         <p className="text-center text-slate-500 text-sm mt-6">
-          © {new Date().getFullYear()} OpsConductor. All rights reserved.
+          {new Date().getFullYear()} OpsConductor. All rights reserved.
         </p>
       </div>
     </div>

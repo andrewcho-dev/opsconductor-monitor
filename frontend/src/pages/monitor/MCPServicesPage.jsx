@@ -47,17 +47,20 @@ export function MCPServicesPage() {
     try {
       setError(null);
       const [summaryRes, servicesRes, ringsRes] = await Promise.all([
-        fetchApi('/api/mcp/services/summary', { headers: getAuthHeader() }),
-        fetchApi('/api/mcp/services?limit=500', { headers: getAuthHeader() }),
-        fetchApi('/api/mcp/services/rings', { headers: getAuthHeader() }),
+        fetchApi('/integrations/v1/mcp/services/summary', { headers: getAuthHeader() }),
+        fetchApi('/integrations/v1/mcp/services?limit=500', { headers: getAuthHeader() }),
+        fetchApi('/integrations/v1/mcp/services/rings', { headers: getAuthHeader() }),
       ]);
 
-      if (summaryRes.success) setSummary(summaryRes.data);
-      if (servicesRes.success) {
-        setServices(servicesRes.data.services || []);
-        setServiceFolders(servicesRes.data.service_folders || []);
-      }
-      if (ringsRes.success) setRings(ringsRes.data.rings || []);
+      // Handle both {success, data} and direct response formats
+      const summaryData = summaryRes?.data || summaryRes;
+      const servicesData = servicesRes?.data || servicesRes;
+      const ringsData = ringsRes?.data || ringsRes;
+      
+      setSummary(summaryData);
+      setServices(servicesData?.services || (Array.isArray(servicesData) ? servicesData : []));
+      setServiceFolders(servicesData?.service_folders || []);
+      setRings(ringsData?.rings || (Array.isArray(ringsData) ? ringsData : []));
     } catch (err) {
       setError(err.message);
     } finally {

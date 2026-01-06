@@ -25,10 +25,11 @@ export function useNetBoxStatus() {
       setStatus(prev => ({ ...prev, loading: true }));
       
       // First check if NetBox is configured
-      const settingsRes = await fetchApi("/api/netbox/settings");
+      const settingsRes = await fetchApi("/integrations/v1/netbox/settings");
       const settings = extractData(settingsRes);
       
-      if (!settings?.url || !settings?.token_configured) {
+      // Check for url and either token_configured flag or actual token
+      if (!settings?.url || (!settings?.token_configured && !settings?.token)) {
         setStatus({
           configured: false,
           connected: false,
@@ -39,14 +40,22 @@ export function useNetBoxStatus() {
         return;
       }
       
-      // Test connection
-      const testRes = await fetchApi("/api/netbox/test", { method: "POST" });
+      // Test connection - pass empty config to use DB settings
+      const testRes = await fetchApi("/integrations/v1/netbox/test", { 
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({})
+      });
       
-      if (testRes.success) {
+      // Handle both {success: true} and direct response formats
+      const testData = testRes?.data || testRes;
+      const isConnected = testRes?.success || testData?.success || testData?.connected;
+      
+      if (isConnected) {
         setStatus({
           configured: true,
           connected: true,
-          version: testRes.data?.netbox_version,
+          version: testData?.netbox_version || testData?.version,
           loading: false,
           error: null,
         });
@@ -56,7 +65,7 @@ export function useNetBoxStatus() {
           connected: false,
           version: null,
           loading: false,
-          error: testRes.error?.message || "Connection failed",
+          error: testData?.error?.message || testData?.message || "Connection failed",
         });
       }
     } catch (err) {
@@ -86,32 +95,38 @@ export function useNetBoxDevices(options = {}) {
   const [error, setError] = useState(null);
   const [pagination, setPagination] = useState({ count: 0, next: null, previous: null });
 
-  const transformDevice = (device) => ({
-    id: device.id,
-    ip_address: device.primary_ip4?.address?.split("/")[0] || device.name,
-    ip_with_prefix: device.primary_ip4?.address,
-    hostname: device.name,
-    name: device.name,
-    description: device.description || device.device_type?.display,
-    vendor: device.device_type?.manufacturer?.name,
-    model: device.device_type?.model,
-    serial: device.serial,
-    status: device.status?.value || "active",
-    status_label: device.status?.label || "Active",
-    site: device.site?.name,
-    site_slug: device.site?.slug,
-    role: device.role?.name || device.device_role?.name,
-    role_slug: device.role?.slug || device.device_role?.slug,
-    platform: device.platform?.name,
-    platform_slug: device.platform?.slug,
-    device_type: device._type || "device",
-    _type: device._type || "device",
-    cluster: device.cluster?.name,
-    ping_status: device.status?.value === "active" ? "online" : "unknown",
-    snmp_status: "unknown",
-    network_range: null,
-    _netbox: device,
-  });
+  const transformDevice = (device) => {
+    // Handle both nested NetBox API format and flat cached format
+    const ip = device.primary_ip4?.address?.split("/")[0] || 
+               (typeof device.primary_ip4 === 'string' ? device.primary_ip4.split("/")[0] : null) ||
+               device.ip_address || device.name;
+    return {
+      id: device.id,
+      ip_address: ip,
+      ip_with_prefix: device.primary_ip4?.address || device.primary_ip4,
+      hostname: device.name,
+      name: device.name,
+      description: device.description || device.device_type?.display || device.device_type,
+      vendor: device.device_type?.manufacturer?.name || device.vendor,
+      model: device.device_type?.model || device.model,
+      serial: device.serial,
+      status: device.status?.value || device.status || "active",
+      status_label: device.status?.label || device.status || "Active",
+      site: device.site?.name || device.site,
+      site_slug: device.site?.slug || device.site_slug,
+      role: device.role?.name || device.device_role?.name || device.role,
+      role_slug: device.role?.slug || device.device_role?.slug || device.role_slug,
+      platform: device.platform?.name || device.platform,
+      platform_slug: device.platform?.slug || device.platform_slug,
+      device_type: device.device_type?.display || device.device_type || device._type || "device",
+      _type: device._type || "device",
+      cluster: device.cluster?.name || device.cluster,
+      ping_status: (device.status?.value || device.status) === "active" ? "online" : "unknown",
+      snmp_status: "unknown",
+      network_range: null,
+      _netbox: device,
+    };
+  };
 
   const fetchDevices = useCallback(async (params = {}) => {
     try {
@@ -123,7 +138,7 @@ export function useNetBoxDevices(options = {}) {
       if (params.role) queryParams.set("role", params.role);
       if (params.search) queryParams.set("q", params.search);
       
-      const url = `/api/netbox/devices/cached${queryParams.toString() ? `?${queryParams}` : ""}`;
+      const url = `/integrations/v1/netbox/devices${queryParams.toString() ? `?${queryParams}` : ""}`;
       const response = await fetchApi(url);
       
       const allDevices = (response.data || []).map(transformDevice);
@@ -173,7 +188,7 @@ export function useNetBoxDevice(deviceId) {
     
     try {
       setLoading(true);
-      const response = await fetchApi(`/api/netbox/devices/${deviceId}`);
+      const response = await fetchApi(`/integrations/v1/netbox/devices/${deviceId}`);
       const data = extractData(response);
       
       // Transform to match UI expectations
@@ -230,10 +245,10 @@ export function useNetBoxLookups() {
       setLoading(true);
       
       const [sitesRes, rolesRes, typesRes, mfrsRes] = await Promise.all([
-        fetchApi("/api/netbox/sites").catch(() => ({ data: [] })),
-        fetchApi("/api/netbox/device-roles").catch(() => ({ data: [] })),
-        fetchApi("/api/netbox/device-types").catch(() => ({ data: [] })),
-        fetchApi("/api/netbox/manufacturers").catch(() => ({ data: [] })),
+        fetchApi("/integrations/v1/netbox/sites").catch(() => ({ data: [] })),
+        fetchApi("/integrations/v1/netbox/device-roles").catch(() => ({ data: [] })),
+        fetchApi("/integrations/v1/netbox/device-types").catch(() => ({ data: [] })),
+        fetchApi("/integrations/v1/netbox/manufacturers").catch(() => ({ data: [] })),
       ]);
       
       setLookups({
@@ -267,7 +282,7 @@ export function useNetBoxTags() {
   const fetchTags = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetchApi("/api/netbox/tags");
+      const response = await fetchApi("/integrations/v1/netbox/tags");
       
       const transformedTags = (extractData(response) || []).map(tag => ({
         id: tag.id,
@@ -306,20 +321,26 @@ export function useNetBoxIPRanges() {
   const fetchRanges = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetchApi("/api/netbox/ip-ranges");
+      const response = await fetchApi("/integrations/v1/netbox/ip-ranges");
       
-      const transformedRanges = (response.data || []).map(range => ({
-        id: range.id,
-        start_address: range.start_address?.split("/")[0],
-        end_address: range.end_address?.split("/")[0],
-        display: range.display,
-        description: range.description,
-        status: range.status?.value,
-        role: range.role?.name,
-        vrf: range.vrf?.name,
-        tenant: range.tenant?.name,
-        _netbox: range,
-      }));
+      // Handle both {data: [...]} and direct array formats
+      const rangeData = response?.data || (Array.isArray(response) ? response : []);
+      const transformedRanges = rangeData.map(range => {
+        const startAddr = range.start_address?.includes('/') ? range.start_address.split("/")[0] : range.start_address;
+        const endAddr = range.end_address?.includes('/') ? range.end_address.split("/")[0] : range.end_address;
+        return {
+          id: range.id,
+          start_address: startAddr,
+          end_address: endAddr,
+          display: range.display || `${startAddr} - ${endAddr}`,
+          description: range.description,
+          status: range.status?.value,
+          role: range.role?.name,
+          vrf: range.vrf?.name,
+          tenant: range.tenant?.name,
+          _netbox: range,
+        };
+      });
       
       setRanges(transformedRanges);
       setError(null);
@@ -349,9 +370,11 @@ export function useNetBoxPrefixes() {
   const fetchPrefixes = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetchApi("/api/netbox/prefixes");
+      const response = await fetchApi("/integrations/v1/netbox/prefixes");
       
-      const transformedPrefixes = (response.data || []).map(prefix => ({
+      // Handle both {data: [...]} and direct array formats
+      const prefixData = response?.data || (Array.isArray(response) ? response : []);
+      const transformedPrefixes = prefixData.map(prefix => ({
         id: prefix.id,
         prefix: prefix.prefix,
         display: prefix.display,

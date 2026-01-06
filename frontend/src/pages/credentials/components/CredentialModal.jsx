@@ -22,10 +22,10 @@ function DeviceAssignmentSection({ credentialId }) {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const assignedRes = await fetchApi(`/api/credentials/${credentialId}/devices`);
+        const assignedRes = await fetchApi(`/credentials/v1/credentials/${credentialId}/devices`);
         setAssignedDevices(assignedRes.data?.devices || []);
 
-        const devicesRes = await fetchApi('/api/netbox/devices?limit=1000');
+        const devicesRes = await fetchApi('/integrations/v1/netbox/devices?limit=1000');
         const devices = (devicesRes.data || []).map(d => ({
           ip_address: d.primary_ip4?.address?.split('/')[0] || '',
           hostname: d.name,
@@ -48,7 +48,7 @@ function DeviceAssignmentSection({ credentialId }) {
     try {
       const devicesToAdd = availableDevices.filter(d => selectedToAdd.has(d.ip_address));
       for (const device of devicesToAdd) {
-        await fetchApi(`/api/credentials/devices/${device.ip_address}/assign`, {
+        await fetchApi(`/credentials/v1/credentials/devices/${device.ip_address}/assign`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ credential_id: credentialId }),
@@ -75,7 +75,7 @@ function DeviceAssignmentSection({ credentialId }) {
     setProcessing(true);
     try {
       for (const ip of selectedToRemove) {
-        await fetchApi(`/api/credentials/devices/${ip}/unassign`, {
+        await fetchApi(`/credentials/v1/credentials/devices/${ip}/unassign`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ credential_id: credentialId }),
@@ -328,13 +328,13 @@ export function CredentialModal({ credential, onClose, onSave }) {
       }
       
       if (credential) {
-        await fetchApi(`/api/credentials/${credential.id}`, {
+        await fetchApi(`/credentials/v1/credentials/${credential.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
       } else {
-        await fetchApi('/api/credentials', {
+        await fetchApi('/credentials/v1/credentials', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)

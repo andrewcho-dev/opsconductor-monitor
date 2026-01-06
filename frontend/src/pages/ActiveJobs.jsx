@@ -38,12 +38,12 @@ export function ActiveJobs() {
       setError(null);
       
       // Fetch queue status which includes active/reserved/scheduled counts and worker details
-      const status = await fetchApi("/api/scheduler/queues", { headers: getAuthHeader() });
+      const status = await fetchApi("/automation/v1/scheduler/queues", { headers: getAuthHeader() });
       const statusData = status.data || status;
       setQueueStatus(statusData);
       
       // Fetch scheduled jobs for upcoming list
-      const scheduledJobs = await fetchApi("/api/scheduler/jobs?enabled=true&limit=50", { headers: getAuthHeader() });
+      const scheduledJobs = await fetchApi("/automation/v1/scheduler/jobs?enabled=true&limit=50", { headers: getAuthHeader() });
       const now = new Date();
       const upcoming = (scheduledJobs.data || scheduledJobs.jobs || [])
         .filter(j => j.next_run_at && new Date(j.next_run_at) > now)
@@ -53,7 +53,7 @@ export function ActiveJobs() {
       
       // Fetch running executions from recent executions endpoint
       try {
-        const execResponse = await fetchApi("/api/scheduler/executions/recent?limit=50&status=running", { headers: getAuthHeader() });
+        const execResponse = await fetchApi("/automation/v1/scheduler/executions/recent?limit=50&status=running", { headers: getAuthHeader() });
         const execData = execResponse.data || execResponse;
         const jobs = Array.isArray(execData) ? execData : [];
         setActiveJobs(jobs);
@@ -61,7 +61,7 @@ export function ActiveJobs() {
         // Fetch progress for each running job
         const progressPromises = jobs.map(async (job) => {
           try {
-            const progressRes = await fetchApi(`/api/scheduler/executions/${job.id}/progress`, { headers: getAuthHeader() });
+            const progressRes = await fetchApi(`/automation/v1/scheduler/executions/${job.id}/progress`, { headers: getAuthHeader() });
             return { id: job.id, progress: progressRes.data?.progress || progressRes.progress };
           } catch {
             return { id: job.id, progress: null };
@@ -95,7 +95,7 @@ export function ActiveJobs() {
   const handleCancelJob = async (executionId) => {
     if (!window.confirm("Cancel this running job?")) return;
     try {
-      await fetchApi(`/api/scheduler/executions/${executionId}/cancel`, { method: "POST" });
+      await fetchApi(`/automation/v1/scheduler/executions/${executionId}/cancel`, { method: "POST" });
       loadData();
     } catch (err) {
       alert(`Failed to cancel job: ${err.message}`);
@@ -105,7 +105,7 @@ export function ActiveJobs() {
   const handlePauseQueued = async (jobName) => {
     if (!window.confirm("Pause this scheduled job?")) return;
     try {
-      await fetchApi(`/api/scheduler/jobs/${jobName}/toggle`, {
+      await fetchApi(`/automation/v1/scheduler/jobs/${jobName}/toggle`, {
         method: "POST",
         body: JSON.stringify({ enabled: false })
       });

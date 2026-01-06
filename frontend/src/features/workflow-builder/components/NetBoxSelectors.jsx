@@ -33,7 +33,7 @@ const NetBoxSelector = ({
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/api/netbox/${endpoint}`);
+      const response = await fetch(`/integrations/v1/netbox/${endpoint}`);
       const data = await response.json();
       
       // Handle various response formats from NetBox API
@@ -147,7 +147,7 @@ export const NetBoxDeviceTypeSelector = ({ value, onChange, disabled, required, 
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/netbox/device-types');
+      const response = await fetch('/integrations/v1/netbox/device-types');
       const data = await response.json();
       
       // Handle various response formats from NetBox API
@@ -268,7 +268,7 @@ export const NetBoxTagsSelector = ({ value, onChange, disabled, className }) => 
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/netbox/tags');
+      const response = await fetch('/integrations/v1/netbox/tags');
       const data = await response.json();
       
       // Handle various response formats from NetBox API

@@ -16,7 +16,7 @@ function DeviceAssociations({ credentialId, onClick }) {
   useEffect(() => {
     const fetchDevices = async () => {
       try {
-        const response = await fetchApi(`/api/credentials/${credentialId}/devices`);
+        const response = await fetchApi(`/credentials/v1/credentials/${credentialId}/devices`);
         setDevices(response.data?.devices || []);
       } catch (err) {
         console.error('Error fetching device associations:', err);

@@ -22,13 +22,13 @@ export function ChannelModal({ channel, onClose, onSave }) {
     setSaving(true);
     try {
       if (channel) {
-        await fetchApi(`/api/notifications/channels/${channel.id}`, {
+        await fetchApi(`/notifications/v1/channels/${channel.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData)
         });
       } else {
-        await fetchApi('/api/notifications/channels', {
+        await fetchApi('/notifications/v1/channels', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData)

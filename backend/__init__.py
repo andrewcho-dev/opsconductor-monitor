@@ -1,8 +1,11 @@
 """
 OpsConductor Backend Package
 
-This package contains the refactored backend with:
-- api/: Flask Blueprints (routes only)
+FastAPI application using OpenAPI 3.x specification.
+
+This package contains:
+- main.py: FastAPI application with OpenAPI 3.x endpoints
+- openapi/: Domain implementation modules (identity, inventory, monitoring, etc.)
 - services/: Business logic layer
 - repositories/: Data access layer
 - models/: Data models/schemas

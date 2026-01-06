@@ -132,8 +132,10 @@ export function SNMPLivePage() {
 
   const loadDevices = async () => {
     try {
-      const response = await fetchApi('/api/mcp/devices');
-      const deviceList = response.data?.devices || [];
+      const response = await fetchApi('/integrations/v1/mcp/devices');
+      // Handle both wrapped and direct response formats
+      const devData = response?.data || response;
+      const deviceList = devData?.devices || (Array.isArray(devData) ? devData : []);
       setDevices(deviceList);
     } catch (err) {
       console.error('Failed to load devices:', err);
@@ -149,17 +151,17 @@ export function SNMPLivePage() {
     try {
       // Poll all data in parallel
       const [pollRes, portsRes, xcvrRes, statsRes, chassisRes, lagRes, mstpRes, ntpRes] = await Promise.all([
-        fetchApi('/api/snmp/poll', {
+        fetchApi('/monitoring/v1/snmp/poll', {
           method: 'POST',
           body: JSON.stringify({ host: device.ip_address, community }),
         }),
-        fetchApi(`/api/snmp/ports/${device.ip_address}?community=${community}`),
-        fetchApi(`/api/snmp/transceivers/${device.ip_address}?community=${community}`),
-        fetchApi(`/api/snmp/port-stats/${device.ip_address}?community=${community}`).catch(() => ({ data: { port_stats: [] } })),
-        fetchApi(`/api/snmp/chassis/${device.ip_address}?community=${community}`).catch(() => ({ data: {} })),
-        fetchApi(`/api/snmp/lag/${device.ip_address}?community=${community}`).catch(() => ({ data: { lags: [] } })),
-        fetchApi(`/api/snmp/mstp/${device.ip_address}?community=${community}`).catch(() => ({ data: {} })),
-        fetchApi(`/api/snmp/ntp/${device.ip_address}?community=${community}`).catch(() => ({ data: {} })),
+        fetchApi(`/monitoring/v1/snmp/ports/${device.ip_address}?community=${community}`),
+        fetchApi(`/monitoring/v1/snmp/transceivers/${device.ip_address}?community=${community}`),
+        fetchApi(`/monitoring/v1/snmp/port-stats/${device.ip_address}?community=${community}`).catch(() => ({ data: { port_stats: [] } })),
+        fetchApi(`/monitoring/v1/snmp/chassis/${device.ip_address}?community=${community}`).catch(() => ({ data: {} })),
+        fetchApi(`/monitoring/v1/snmp/lag/${device.ip_address}?community=${community}`).catch(() => ({ data: { lags: [] } })),
+        fetchApi(`/monitoring/v1/snmp/mstp/${device.ip_address}?community=${community}`).catch(() => ({ data: {} })),
+        fetchApi(`/monitoring/v1/snmp/ntp/${device.ip_address}?community=${community}`).catch(() => ({ data: {} })),
       ]);
       
       setSnmpData({

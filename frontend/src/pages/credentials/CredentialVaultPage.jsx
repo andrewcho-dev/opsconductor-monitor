@@ -74,58 +74,54 @@ export function CredentialVaultPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const statsRes = await fetchApi('/api/credentials/statistics');
-      if (statsRes.success) {
-        setStatistics(statsRes.data.statistics);
+      const statsRes = await fetchApi('/credentials/v1/credentials/statistics');
+      // Handle both {success, data} and direct response formats
+      const statsData = statsRes?.data || statsRes;
+      if (statsData?.statistics) {
+        setStatistics(statsData.statistics);
       }
 
       if (activeView === 'credentials' || activeView === 'expiring') {
-        let url = '/api/credentials';
+        let url = '/credentials/v1/credentials';
         const params = new URLSearchParams();
         if (typeFilter) params.append('type', typeFilter);
         if (statusFilter) params.append('status', statusFilter);
         if (activeView === 'expiring') {
-          url = '/api/credentials/expiring?days=30';
+          url = '/credentials/v1/credentials/expiring?days=30';
         } else if (params.toString()) {
           url += '?' + params.toString();
         }
         
         const res = await fetchApi(url);
-        if (res.success) {
-          setCredentials(activeView === 'expiring' ? res.data.expiring : res.data.credentials);
-        }
+        const resData = res?.data || res;
+        const credList = activeView === 'expiring' ? (resData?.expiring || resData?.items || []) : (resData?.credentials || resData?.items || []);
+        setCredentials(credList);
       } else if (activeView === 'groups') {
-        const res = await fetchApi('/api/credentials/groups');
-        if (res.success) {
-          setGroups(res.data.groups);
-        }
+        const res = await fetchApi('/credentials/v1/credentials/groups');
+        const resData = res?.data || res;
+        setGroups(resData?.groups || resData || []);
       } else if (activeView === 'audit') {
-        const res = await fetchApi('/api/credentials/audit?limit=100');
-        if (res.success) {
-          setAuditLog(res.data.entries);
-        }
+        const res = await fetchApi('/credentials/v1/credentials/audit?limit=100');
+        const resData = res?.data || res;
+        setAuditLog(resData?.entries || resData || []);
       } else if (activeView === 'enterprise') {
         const [configsRes, credsRes] = await Promise.all([
-          fetchApi('/api/credentials/enterprise/configs'),
-          fetchApi('/api/credentials')
+          fetchApi('/credentials/v1/credentials/enterprise/configs'),
+          fetchApi('/credentials/v1/credentials')
         ]);
-        if (configsRes.success) {
-          setEnterpriseConfigs(configsRes.data.configs || []);
-        }
-        if (credsRes.success) {
-          setCredentials(credsRes.data.credentials || []);
-        }
+        const configsData = configsRes?.data || configsRes;
+        setEnterpriseConfigs(configsData?.configs || []);
+        const credsData = credsRes?.data || credsRes;
+        setCredentials(credsData?.credentials || credsData?.items || []);
       } else if (activeView === 'enterprise-users') {
         const [usersRes, configsRes] = await Promise.all([
-          fetchApi('/api/credentials/enterprise/users'),
-          fetchApi('/api/credentials/enterprise/configs')
+          fetchApi('/credentials/v1/credentials/enterprise/users'),
+          fetchApi('/credentials/v1/credentials/enterprise/configs')
         ]);
-        if (usersRes.success) {
-          setEnterpriseUsers(usersRes.data.users || []);
-        }
-        if (configsRes.success) {
-          setEnterpriseConfigs(configsRes.data.configs || []);
-        }
+        const usersData = usersRes?.data || usersRes;
+        setEnterpriseUsers(usersData?.users || []);
+        const configsData = configsRes?.data || configsRes;
+        setEnterpriseConfigs(configsData?.configs || []);
       }
     } catch (err) {
       // Error loading data
@@ -137,7 +133,7 @@ export function CredentialVaultPage() {
   const handleDelete = async (id) => {
     if (!confirm('Are you sure you want to delete this credential?')) return;
     try {
-      await fetchApi(`/api/credentials/${id}`, { method: 'DELETE' });
+      await fetchApi(`/credentials/v1/credentials/${id}`, { method: 'DELETE' });
       loadData();
     } catch (err) {
       alert('Error deleting credential: ' + err.message);
@@ -147,7 +143,7 @@ export function CredentialVaultPage() {
   const openDeviceModal = async (credential) => {
     setDeviceModalCredential(credential);
     try {
-      const res = await fetchApi(`/api/credentials/${credential.id}/devices`);
+      const res = await fetchApi(`/credentials/v1/credentials/${credential.id}/devices`);
       const ips = (res.data?.devices || []).map(d => d.ip_address);
       setAssignedDeviceIps(ips);
     } catch (err) {
@@ -168,7 +164,7 @@ export function CredentialVaultPage() {
     
     // Process additions
     for (const ip of toAdd) {
-      await fetchApi(`/api/credentials/devices/${ip}/assign`, {
+      await fetchApi(`/credentials/v1/credentials/devices/${ip}/assign`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ credential_id: deviceModalCredential.id }),
@@ -177,7 +173,7 @@ export function CredentialVaultPage() {
     
     // Process removals
     for (const ip of toRemove) {
-      await fetchApi(`/api/credentials/devices/${ip}/unassign`, {
+      await fetchApi(`/credentials/v1/credentials/devices/${ip}/unassign`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ credential_id: deviceModalCredential.id }),

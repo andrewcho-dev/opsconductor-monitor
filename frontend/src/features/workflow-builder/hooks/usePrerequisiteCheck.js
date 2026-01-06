@@ -15,7 +15,7 @@ export function usePrerequisiteCheck() {
   // Check if a tool is available on the server
   const checkTool = useCallback(async (toolName) => {
     try {
-      const response = await fetchApi(`/api/system/check-tool?tool=${encodeURIComponent(toolName)}`);
+      const response = await fetchApi(`/system/v1/check-tool?tool=${encodeURIComponent(toolName)}`);
       return {
         tool: toolName,
         available: response.data?.available ?? false,
@@ -34,7 +34,7 @@ export function usePrerequisiteCheck() {
   // Check network connectivity
   const checkNetwork = useCallback(async () => {
     try {
-      const response = await fetchApi('/api/system/check-network');
+      const response = await fetchApi('/system/v1/check-network');
       return {
         available: response.data?.available ?? true,
         internet: response.data?.internet ?? true,
@@ -48,7 +48,7 @@ export function usePrerequisiteCheck() {
   // Check database connectivity
   const checkDatabase = useCallback(async () => {
     try {
-      const response = await fetchApi('/api/system/check-database');
+      const response = await fetchApi('/system/v1/check-database');
       return {
         available: response.data?.available ?? false,
         type: response.data?.type,

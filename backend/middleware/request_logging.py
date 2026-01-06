@@ -7,8 +7,16 @@ status codes, and request context.
 
 import time
 import uuid
-from flask import request, g
 from functools import wraps
+
+# Flask imports for legacy middleware (optional)
+try:
+    from flask import request, g
+    FLASK_AVAILABLE = True
+except ImportError:
+    request = None
+    g = None
+    FLASK_AVAILABLE = False
 
 from ..services.logging_service import logging_service, get_logger, LogSource
 

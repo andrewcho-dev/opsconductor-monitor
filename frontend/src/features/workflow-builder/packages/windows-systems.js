@@ -114,7 +114,7 @@ export default {
         },
       ],
       advanced: advancedTimeout,
-      execution: { ...baseExecution, type: 'action', executor: 'winrm', api_endpoint: '/api/winrm/execute/powershell' },
+      execution: { ...baseExecution, type: 'action', executor: 'winrm', api_endpoint: '/automation/v1/winrm/execute/powershell' },
     },
 
     'windows:cmd': {
@@ -138,7 +138,7 @@ export default {
         },
       ],
       advanced: advancedTimeout,
-      execution: { ...baseExecution, type: 'action', executor: 'winrm', api_endpoint: '/api/winrm/execute/cmd' },
+      execution: { ...baseExecution, type: 'action', executor: 'winrm', api_endpoint: '/automation/v1/winrm/execute/cmd' },
     },
 
     // =========================================================================
@@ -157,7 +157,7 @@ export default {
       outputs: [...standardOutputs, { id: 'system_info', type: 'object[]', label: 'System Info' }],
       parameters: targetParams,
       advanced: advancedTimeout,
-      execution: { ...baseExecution, type: 'query', executor: 'winrm', api_endpoint: '/api/winrm/system-info' },
+      execution: { ...baseExecution, type: 'query', executor: 'winrm', api_endpoint: '/automation/v1/winrm/system-info' },
     },
 
     'windows:disk-space': {
@@ -172,7 +172,7 @@ export default {
       outputs: [...standardOutputs, { id: 'disks', type: 'object[]', label: 'Disk Info' }],
       parameters: targetParams,
       advanced: advancedTimeout,
-      execution: { ...baseExecution, type: 'query', executor: 'winrm', api_endpoint: '/api/winrm/disk-space' },
+      execution: { ...baseExecution, type: 'query', executor: 'winrm', api_endpoint: '/automation/v1/winrm/disk-space' },
     },
 
     'windows:network-config': {
@@ -187,7 +187,7 @@ export default {
       outputs: [...standardOutputs, { id: 'network_config', type: 'object[]', label: 'Network Config' }],
       parameters: targetParams,
       advanced: advancedTimeout,
-      execution: { ...baseExecution, type: 'query', executor: 'winrm', api_endpoint: '/api/winrm/network-config' },
+      execution: { ...baseExecution, type: 'query', executor: 'winrm', api_endpoint: '/automation/v1/winrm/network-config' },
     },
 
     // =========================================================================
@@ -226,7 +226,7 @@ export default {
         },
       ],
       advanced: advancedTimeout,
-      execution: { ...baseExecution, type: 'query', executor: 'winrm', api_endpoint: '/api/winrm/services' },
+      execution: { ...baseExecution, type: 'query', executor: 'winrm', api_endpoint: '/automation/v1/winrm/services' },
     },
 
     'windows:start-service': {
@@ -250,7 +250,7 @@ export default {
         },
       ],
       advanced: advancedTimeout,
-      execution: { ...baseExecution, type: 'action', executor: 'winrm', api_endpoint: '/api/winrm/services/manage', api_params: { action: 'start' } },
+      execution: { ...baseExecution, type: 'action', executor: 'winrm', api_endpoint: '/automation/v1/winrm/services/manage', api_params: { action: 'start' } },
     },
 
     'windows:stop-service': {
@@ -274,7 +274,7 @@ export default {
         },
       ],
       advanced: advancedTimeout,
-      execution: { ...baseExecution, type: 'action', executor: 'winrm', api_endpoint: '/api/winrm/services/manage', api_params: { action: 'stop' } },
+      execution: { ...baseExecution, type: 'action', executor: 'winrm', api_endpoint: '/automation/v1/winrm/services/manage', api_params: { action: 'stop' } },
     },
 
     'windows:restart-service': {
@@ -298,7 +298,7 @@ export default {
         },
       ],
       advanced: advancedTimeout,
-      execution: { ...baseExecution, type: 'action', executor: 'winrm', api_endpoint: '/api/winrm/services/manage', api_params: { action: 'restart' } },
+      execution: { ...baseExecution, type: 'action', executor: 'winrm', api_endpoint: '/automation/v1/winrm/services/manage', api_params: { action: 'restart' } },
     },
 
     // =========================================================================
@@ -326,7 +326,7 @@ export default {
         },
       ],
       advanced: advancedTimeout,
-      execution: { ...baseExecution, type: 'query', executor: 'winrm', api_endpoint: '/api/winrm/processes' },
+      execution: { ...baseExecution, type: 'query', executor: 'winrm', api_endpoint: '/automation/v1/winrm/processes' },
     },
 
     'windows:stop-process': {
@@ -410,7 +410,7 @@ export default {
         },
       ],
       advanced: advancedTimeout,
-      execution: { ...baseExecution, type: 'query', executor: 'winrm', api_endpoint: '/api/winrm/event-log' },
+      execution: { ...baseExecution, type: 'query', executor: 'winrm', api_endpoint: '/automation/v1/winrm/event-log' },
     },
 
     // =========================================================================
@@ -661,7 +661,7 @@ export default {
       advanced: [
         { id: 'timeout', type: 'number', label: 'Timeout (seconds)', default: 300, min: 60, max: 1800 },
       ],
-      execution: { ...baseExecution, type: 'action', executor: 'winrm', api_endpoint: '/api/winrm/reboot' },
+      execution: { ...baseExecution, type: 'action', executor: 'winrm', api_endpoint: '/automation/v1/winrm/reboot' },
     },
 
     'windows:shutdown': {
@@ -699,7 +699,7 @@ export default {
         },
       ],
       advanced: advancedTimeout,
-      execution: { ...baseExecution, type: 'action', executor: 'winrm', api_endpoint: '/api/winrm/shutdown' },
+      execution: { ...baseExecution, type: 'action', executor: 'winrm', api_endpoint: '/automation/v1/winrm/shutdown' },
     },
 
     // =========================================================================
@@ -718,7 +718,7 @@ export default {
       outputs: [...standardOutputs, { id: 'hostname', type: 'string', label: 'Hostname' }],
       parameters: targetParams,
       advanced: advancedTimeout,
-      execution: { ...baseExecution, type: 'query', executor: 'winrm', api_endpoint: '/api/winrm/test' },
+      execution: { ...baseExecution, type: 'query', executor: 'winrm', api_endpoint: '/automation/v1/winrm/test' },
     },
   },
 };

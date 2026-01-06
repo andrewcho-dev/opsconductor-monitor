@@ -184,19 +184,47 @@ async def get_current_user_from_token(token: str) -> Dict[str, Any]:
     # Fetch user from database
     db = get_db()
     with db.cursor() as cursor:
-        cursor.execute("""
-            SELECT id, username, email, created_at, last_login_at,
-                   username as display_name,
-                   '' as first_name,
-                   '' as last_name,
-                   'active' as status,
-                   false as two_factor_enabled
-            FROM users WHERE id = %s AND username = %s
-        """, (user_id, username))
+        # Check if user_id is an integer or enterprise ID
+        if user_id.startswith('enterprise_'):
+            # Enterprise user - look up by username only
+            cursor.execute("""
+                SELECT id, username, email, created_at, last_login_at,
+                       COALESCE(display_name, username) as display_name,
+                       COALESCE(first_name, '') as first_name,
+                       COALESCE(last_name, '') as last_name,
+                       COALESCE(status, 'active') as status,
+                       COALESCE(two_factor_enabled, false) as two_factor_enabled
+                FROM users WHERE username = %s
+            """, (username,))
+        else:
+            # Regular user - look up by ID
+            cursor.execute("""
+                SELECT id, username, email, created_at, last_login_at,
+                       COALESCE(display_name, username) as display_name,
+                       COALESCE(first_name, '') as first_name,
+                       COALESCE(last_name, '') as last_name,
+                       COALESCE(status, 'active') as status,
+                       COALESCE(two_factor_enabled, false) as two_factor_enabled
+                FROM users WHERE id = %s AND username = %s
+            """, (user_id, username))
         
         user = cursor.fetchone()
         
         if not user:
+            # For enterprise users, return synthetic user data from token
+            if user_id.startswith('enterprise_'):
+                return {
+                    "id": user_id,
+                    "username": username,
+                    "email": f"{username}@enterprise.local",
+                    "display_name": username,
+                    "first_name": "",
+                    "last_name": "",
+                    "status": "active",
+                    "two_factor_enabled": False,
+                    "created_at": datetime.now(),
+                    "roles": []
+                }
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail={
@@ -222,7 +250,7 @@ async def get_current_user_from_token(token: str) -> Dict[str, Any]:
         return user_data
 
 async def list_users_paginated(
-    cursor: Optional[str] = None, 
+    page_cursor: Optional[str] = None, 
     limit: int = 50,
     search: Optional[str] = None,
     status_filter: Optional[str] = None
@@ -232,7 +260,7 @@ async def list_users_paginated(
     Migrated from legacy /api/users
     """
     db = get_db()
-    with db.cursor() as cursor:
+    with db.cursor() as db_cursor:
         # Build query
         where_clauses = []
         params = []
@@ -267,15 +295,15 @@ async def list_users_paginated(
             ) as filtered_users
         """
         
-        cursor.execute(count_query, params)
-        total = cursor.fetchone()['total']
+        db_cursor.execute(count_query, params)
+        total = db_cursor.fetchone()['total']
         
         # Apply pagination
-        if cursor:
+        if page_cursor:
             # Decode cursor (for simplicity, using user ID as cursor)
             try:
                 import base64
-                cursor_data = json.loads(base64.b64decode(cursor).decode())
+                cursor_data = json.loads(base64.b64decode(page_cursor).decode())
                 last_id = cursor_data.get('last_id')
                 where_clauses.append("u.id > %s")
                 params.append(last_id)
@@ -301,10 +329,10 @@ async def list_users_paginated(
         """
         
         params.append(limit + 1)  # Get one extra to determine if there's a next page
-        cursor.execute(query, params)
+        db_cursor.execute(query, params)
         
         users = []
-        for row in cursor.fetchall():
+        for row in db_cursor.fetchall():
             user_dict = dict(row)
             user_dict['id'] = str(user_dict['id'])  # Convert id to string
             users.append(user_dict)

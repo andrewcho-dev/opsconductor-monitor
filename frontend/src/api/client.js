@@ -1,12 +1,33 @@
 /**
  * Base API client for OpsConductor.
  * 
- * Provides centralized API communication with:
- * - Standardized error handling
- * - Response parsing
- * - Request/response interceptors
+ * OpenAPI 3.x compliant with domain-based routing:
+ * - /identity/v1/* - Authentication, users, roles
+ * - /inventory/v1/* - Devices, interfaces, topology
+ * - /monitoring/v1/* - Metrics, alerts, polling
+ * - /automation/v1/* - Workflows, jobs, scheduling
+ * - /integrations/v1/* - NetBox, PRTG, MCP
+ * - /system/v1/* - Settings, logs, health
+ * - /credentials/v1/* - Credential vault
+ * - /notifications/v1/* - Notification channels
+ * - /admin/v1/* - Administrative operations
  */
 
+// API Domain endpoints (OpenAPI 3.x)
+export const API_DOMAINS = {
+  IDENTITY: '/identity/v1',
+  INVENTORY: '/inventory/v1',
+  MONITORING: '/monitoring/v1',
+  AUTOMATION: '/automation/v1',
+  INTEGRATIONS: '/integrations/v1',
+  SYSTEM: '/system/v1',
+  CREDENTIALS: '/credentials/v1',
+  NOTIFICATIONS: '/notifications/v1',
+  ADMIN: '/admin/v1',
+  AUTH: '/auth',  // Auth endpoints at root level
+};
+
+// Legacy API base (deprecated - for backward compatibility during migration)
 const API_BASE_URL = '/api';
 
 /**
@@ -58,9 +79,29 @@ async function parseResponse(response) {
 
 /**
  * Make an API request
+ * Supports both domain-based (OpenAPI 3.x) and legacy endpoints
  */
 async function request(endpoint, options = {}) {
-  const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
+  // Determine URL based on endpoint format
+  let url;
+  if (endpoint.startsWith('http')) {
+    url = endpoint;
+  } else if (endpoint.startsWith('/identity/') || 
+             endpoint.startsWith('/inventory/') ||
+             endpoint.startsWith('/monitoring/') ||
+             endpoint.startsWith('/automation/') ||
+             endpoint.startsWith('/integrations/') ||
+             endpoint.startsWith('/system/') ||
+             endpoint.startsWith('/credentials/') ||
+             endpoint.startsWith('/notifications/') ||
+             endpoint.startsWith('/admin/') ||
+             endpoint.startsWith('/auth/')) {
+    // OpenAPI 3.x domain-based endpoint - use as-is
+    url = endpoint;
+  } else {
+    // Legacy endpoint - prefix with /api
+    url = `${API_BASE_URL}${endpoint}`;
+  }
   
   const config = {
     headers: {

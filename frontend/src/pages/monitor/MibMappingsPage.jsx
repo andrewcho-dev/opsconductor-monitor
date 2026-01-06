@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
-const API_BASE = '/api/mib';
+const API_BASE = '/monitoring/v1/mib';
 
 // Import MIB Modal - for uploading and parsing MIB files
 function ImportMibModal({ profiles, onClose, onImported }) {
@@ -551,11 +551,11 @@ export default function MibMappingsPage() {
       setLoading(true);
       const res = await fetch(`${API_BASE}/profiles`);
       const data = await res.json();
-      if (data.success) {
-        setProfiles(data.data.profiles);
-        if (data.data.profiles.length > 0) {
-          loadProfile(data.data.profiles[0].id);
-        }
+      // Handle both {success, data} and direct response formats
+      const profileList = data?.data?.profiles || data?.profiles || (Array.isArray(data) ? data : []);
+      setProfiles(profileList);
+      if (profileList.length > 0) {
+        loadProfile(profileList[0].id);
       }
     } catch (e) {
       setError(e.message);
@@ -570,13 +570,13 @@ export default function MibMappingsPage() {
       setSelectedOids([]);
       const res = await fetch(`${API_BASE}/profiles/${profileId}`);
       const data = await res.json();
-      if (data.success) {
-        setSelectedProfile(data.data.profile);
-        // Expand all groups by default
-        const expanded = {};
-        data.data.profile.groups?.forEach(g => { expanded[g.id] = true; });
-        setExpandedGroups(expanded);
-      }
+      // Handle both {success, data} and direct response formats
+      const profile = data?.data?.profile || data?.profile || data;
+      setSelectedProfile(profile);
+      // Expand all groups by default
+      const expanded = {};
+      profile?.groups?.forEach(g => { expanded[g.id] = true; });
+      setExpandedGroups(expanded);
     } catch (e) {
       setError(e.message);
     } finally {

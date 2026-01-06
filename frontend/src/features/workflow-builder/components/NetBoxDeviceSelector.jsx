@@ -34,8 +34,8 @@ const NetBoxDeviceSelector = ({ value, onChange }) => {
   const loadLookups = async () => {
     try {
       const [sitesRes, rolesRes] = await Promise.all([
-        fetchApi('/api/netbox/sites').catch(() => ({ data: [] })),
-        fetchApi('/api/netbox/device-roles').catch(() => ({ data: [] })),
+        fetchApi('/integrations/v1/netbox/sites').catch(() => ({ data: [] })),
+        fetchApi('/integrations/v1/netbox/device-roles').catch(() => ({ data: [] })),
       ]);
 
       setLookups({
@@ -62,7 +62,7 @@ const NetBoxDeviceSelector = ({ value, onChange }) => {
       if (value.status) params.set('status', value.status);
       params.set('limit', '1'); // Just need count, not all devices
 
-      const res = await fetchApi(`/api/netbox/devices?${params}`);
+      const res = await fetchApi(`/integrations/v1/netbox/devices?${params}`);
       setDeviceCount(res.count ?? res.data?.length ?? 0);
     } catch (err) {
       setDeviceCount(null);
