@@ -195,14 +195,23 @@ async def list_jobs(credentials: HTTPAuthorizationCredentials = Security(securit
 @router.get("/scheduler/executions/recent", summary="Get recent executions")
 async def recent_executions(
     limit: int = Query(200, ge=1, le=1000),
+    status: Optional[str] = Query(None),
     credentials: HTTPAuthorizationCredentials = Security(security)
 ):
-    """Get recent job executions"""
+    """Get recent job executions from workflow_executions table"""
     try:
-        executions = db_query("""
-            SELECT * FROM job_executions 
-            ORDER BY started_at DESC LIMIT %s
-        """, (limit,))
+        base_query = """
+            SELECT e.id, e.workflow_id, e.workflow_name as job_name, e.workflow_name,
+                   e.status, e.started_at, e.finished_at as completed_at,
+                   e.duration_ms / 1000.0 as duration_seconds,
+                   e.trigger_type, e.triggered_by, e.error_message,
+                   e.nodes_total, e.nodes_completed, e.nodes_failed
+            FROM workflow_executions e
+        """
+        if status:
+            executions = db_query(base_query + " WHERE e.status = %s ORDER BY e.started_at DESC LIMIT %s", (status, limit))
+        else:
+            executions = db_query(base_query + " ORDER BY e.started_at DESC LIMIT %s", (limit,))
         return {"executions": executions}
     except Exception as e:
         logger.error(f"Get recent executions error: {str(e)}")
