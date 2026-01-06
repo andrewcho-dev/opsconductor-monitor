@@ -105,11 +105,19 @@ async def netbox_settings(credentials: HTTPAuthorizationCredentials = Security(s
     """Get NetBox integration settings"""
     try:
         url = get_setting('netbox_url') or ''
-        enabled = bool(url)
-        return {"url": url, "enabled": enabled, "api_token_set": bool(get_setting('netbox_api_token'))}
+        token = get_setting('netbox_api_token') or ''
+        return {
+            "success": True,
+            "data": {
+                "url": url,
+                "token": token,
+                "verify_ssl": True,
+                "enabled": bool(url)
+            }
+        }
     except Exception as e:
         logger.error(f"Get NetBox settings error: {str(e)}")
-        return {"url": "", "enabled": False, "api_token_set": False}
+        return {"success": False, "error": str(e)}
 
 
 @router.get("/netbox/prefixes", summary="Get NetBox prefixes")
@@ -157,11 +165,18 @@ async def prtg_settings(credentials: HTTPAuthorizationCredentials = Security(sec
     """Get PRTG integration settings"""
     try:
         url = get_setting('prtg_url') or ''
-        enabled = bool(url)
-        return {"url": url, "enabled": enabled, "api_token_set": bool(get_setting('prtg_api_token'))}
+        token = get_setting('prtg_api_token') or ''
+        return {
+            "success": True,
+            "data": {
+                "url": url,
+                "token": token,
+                "enabled": bool(url)
+            }
+        }
     except Exception as e:
         logger.error(f"Get PRTG settings error: {str(e)}")
-        return {"url": "", "enabled": False, "api_token_set": False}
+        return {"success": False, "error": str(e)}
 
 
 @router.get("/prtg/status", summary="Get PRTG status")
@@ -185,7 +200,7 @@ async def test_prtg(
 @router.get("/mcp/settings", summary="Get MCP settings")
 async def mcp_settings(credentials: HTTPAuthorizationCredentials = Security(security)):
     """Get MCP settings - returns disabled since feature was removed"""
-    return {"url": "", "enabled": False}
+    return {"success": True, "data": {"url": "", "enabled": False}}
 
 
 @router.get("/test", include_in_schema=False)
