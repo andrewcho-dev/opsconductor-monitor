@@ -197,6 +197,29 @@ async def test_prtg(
         return {"success": False, "error": str(e)}
 
 # MCP integration
+@router.post("/mcp/test", summary="Test MCP connection")
+async def test_mcp(
+    config: Dict[str, Any] = Body(...),
+    credentials: HTTPAuthorizationCredentials = Security(security)
+):
+    """Test MCP connection"""
+    try:
+        url = config.get('url', '')
+        if not url:
+            return {"success": False, "error": "MCP URL is required"}
+        
+        # Try to connect to MCP endpoint
+        import httpx
+        async with httpx.AsyncClient(timeout=10.0, verify=False) as client:
+            response = await client.get(f"{url.rstrip('/')}/api/health")
+            if response.status_code == 200:
+                return {"success": True, "message": "Connected successfully"}
+            else:
+                return {"success": False, "error": f"MCP returned status {response.status_code}"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 @router.get("/mcp/settings", summary="Get MCP settings")
 async def mcp_settings(credentials: HTTPAuthorizationCredentials = Security(security)):
     """Get MCP integration settings"""
