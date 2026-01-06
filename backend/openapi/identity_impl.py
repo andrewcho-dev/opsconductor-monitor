@@ -160,72 +160,42 @@ async def get_current_user_from_token(token: str) -> Dict[str, Any]:
         )
     
     # Fetch user from database
-    db = get_db()
-    with db.cursor() as cursor:
-        # Check if user_id is an integer or enterprise ID
+    user_query = """
+        SELECT id, username, email, created_at, last_login_at,
+               COALESCE(display_name, username) as display_name,
+               COALESCE(first_name, '') as first_name,
+               COALESCE(last_name, '') as last_name,
+               COALESCE(status, 'active') as status,
+               COALESCE(two_factor_enabled, false) as two_factor_enabled
+        FROM users WHERE """
+    
+    if user_id.startswith('enterprise_'):
+        user = db_query_one(user_query + "username = %s", (username,))
+    else:
+        user = db_query_one(user_query + "id = %s AND username = %s", (user_id, username))
+    
+    if not user:
         if user_id.startswith('enterprise_'):
-            # Enterprise user - look up by username only
-            cursor.execute("""
-                SELECT id, username, email, created_at, last_login_at,
-                       COALESCE(display_name, username) as display_name,
-                       COALESCE(first_name, '') as first_name,
-                       COALESCE(last_name, '') as last_name,
-                       COALESCE(status, 'active') as status,
-                       COALESCE(two_factor_enabled, false) as two_factor_enabled
-                FROM users WHERE username = %s
-            """, (username,))
-        else:
-            # Regular user - look up by ID
-            cursor.execute("""
-                SELECT id, username, email, created_at, last_login_at,
-                       COALESCE(display_name, username) as display_name,
-                       COALESCE(first_name, '') as first_name,
-                       COALESCE(last_name, '') as last_name,
-                       COALESCE(status, 'active') as status,
-                       COALESCE(two_factor_enabled, false) as two_factor_enabled
-                FROM users WHERE id = %s AND username = %s
-            """, (user_id, username))
-        
-        user = cursor.fetchone()
-        
-        if not user:
-            # For enterprise users, return synthetic user data from token
-            if user_id.startswith('enterprise_'):
-                return {
-                    "id": user_id,
-                    "username": username,
-                    "email": f"{username}@enterprise.local",
-                    "display_name": username,
-                    "first_name": "",
-                    "last_name": "",
-                    "status": "active",
-                    "two_factor_enabled": False,
-                    "created_at": datetime.now(),
-                    "roles": []
-                }
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail={
-                    "code": "USER_NOT_FOUND",
-                    "message": "User not found"
-                }
-            )
-        
-        # Get user roles
-        cursor.execute("""
-            SELECT r.name
-            FROM roles r
-            JOIN user_roles ur ON r.id = ur.role_id
-            WHERE ur.user_id = %s
-        """, (user['id'],))
-        
-        roles = [row['name'] for row in cursor.fetchall()]
-        
-        user_data = dict(user)
-        user_data['id'] = str(user['id'])  # Convert id to string
-        user_data['roles'] = roles
-        
-        return user_data
+            return {
+                "id": user_id, "username": username, "email": f"{username}@enterprise.local",
+                "display_name": username, "first_name": "", "last_name": "",
+                "status": "active", "two_factor_enabled": False,
+                "created_at": datetime.now(), "roles": []
+            }
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                          detail={"code": "USER_NOT_FOUND", "message": "User not found"})
+    
+    # Get user roles
+    roles_data = db_query("""
+        SELECT r.name FROM roles r
+        JOIN user_roles ur ON r.id = ur.role_id WHERE ur.user_id = %s
+    """, (user['id'],))
+    roles = [row['name'] for row in roles_data]
+    
+    user_data = dict(user)
+    user_data['id'] = str(user['id'])
+    user_data['roles'] = roles
+    return user_data
 
 async def list_users_paginated(
     page_cursor: Optional[str] = None, 
@@ -340,100 +310,62 @@ async def list_roles_with_counts() -> List[Dict[str, Any]]:
     List roles with user and permission counts
     Migrated from legacy /api/roles
     """
-    db = get_db()
-    with db.cursor() as cursor:
-        if _table_exists(cursor, 'roles'):
-            cursor.execute("""
-                SELECT r.*, 
-                       (SELECT COUNT(*) FROM user_roles ur WHERE ur.role_id = r.id) as user_count,
-                       0 as permission_count
-                FROM roles r
-                ORDER BY r.name
-            """)
-            roles = [dict(row) for row in cursor.fetchall()] if cursor.description else []
-        else:
-            roles = []
-    
-    return roles
+    if not table_exists('roles'):
+        return []
+    return db_query("""
+        SELECT r.*, 
+               (SELECT COUNT(*) FROM user_roles ur WHERE ur.role_id = r.id) as user_count,
+               0 as permission_count
+        FROM roles r ORDER BY r.name
+    """)
 
 async def get_role_members(role_id: int) -> List[Dict[str, Any]]:
     """
     Get users in a specific role
     Migrated from legacy /api/auth/roles/{id}/members
     """
-    db = get_db()
-    with db.cursor() as cursor:
-        cursor.execute("""
-            SELECT u.id, u.username, u.email, u.created_at,
-                   u.username as display_name,
-                   '' as first_name,
-                   '' as last_name,
-                   'active' as status,
-                   false as two_factor_enabled
-            FROM users u
-            JOIN user_roles ur ON u.id = ur.user_id
-            WHERE ur.role_id = %s
-            ORDER BY u.username
-        """, (role_id,))
-        
-        members = [dict(row) for row in cursor.fetchall()] if cursor.description else []
-    
-    return members
+    return db_query("""
+        SELECT u.id, u.username, u.email, u.created_at,
+               u.username as display_name, '' as first_name, '' as last_name,
+               'active' as status, false as two_factor_enabled
+        FROM users u
+        JOIN user_roles ur ON u.id = ur.user_id
+        WHERE ur.role_id = %s ORDER BY u.username
+    """, (role_id,))
 
 async def get_password_policy() -> Dict[str, Any]:
     """
     Get password policy settings
     Migrated from legacy /api/auth/password-policy
     """
-    db = get_db()
-    with db.cursor() as cursor:
-        # Default policy if not in database
-        default_policy = {
-            "min_length": 8,
-            "require_uppercase": True,
-            "require_lowercase": True,
-            "require_numbers": True,
-            "require_special": True,
-            "max_age_days": 90,
-            "prevent_reuse": 5,
-            "lockout_attempts": 5,
-            "lockout_duration_minutes": 30
-        }
-        
-        if _table_exists(cursor, 'settings'):
-            cursor.execute("SELECT value FROM settings WHERE key = 'password_policy'")
-            result = cursor.fetchone()
-            if result and result['value']:
-                try:
-                    stored_policy = json.loads(result['value'])
-                    # Merge with defaults
-                    policy = {**default_policy, **stored_policy}
-                except:
-                    policy = default_policy
-            else:
-                policy = default_policy
-        else:
-            policy = default_policy
+    default_policy = {
+        "min_length": 8, "require_uppercase": True, "require_lowercase": True,
+        "require_numbers": True, "require_special": True, "max_age_days": 90,
+        "prevent_reuse": 5, "lockout_attempts": 5, "lockout_duration_minutes": 30
+    }
     
-    return policy
+    if not table_exists('settings'):
+        return default_policy
+    
+    result = db_query_one("SELECT value FROM settings WHERE key = 'password_policy'")
+    if result and result.get('value'):
+        try:
+            return {**default_policy, **json.loads(result['value'])}
+        except:
+            pass
+    return default_policy
 
 async def update_password_policy(policy_data: Dict[str, Any]) -> Dict[str, str]:
     """
     Update password policy settings
     Migrated from legacy /api/auth/password-policy PUT
     """
-    db = get_db()
-    with db.cursor() as cursor:
-        if _table_exists(cursor, 'settings'):
-            cursor.execute("""
-                INSERT INTO settings (key, value, updated_at)
-                VALUES ('password_policy', %s, NOW())
-                ON CONFLICT (key) DO UPDATE SET
-                value = EXCLUDED.value,
-                updated_at = NOW()
-            """, (json.dumps(policy_data),))
-            db.commit()
-    
+    if table_exists('settings'):
+        db_execute("""
+            INSERT INTO settings (key, value, updated_at)
+            VALUES ('password_policy', %s, NOW())
+            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+        """, (json.dumps(policy_data),))
     return {"success": True, "message": "Password policy updated successfully"}
 
 # ============================================================================
