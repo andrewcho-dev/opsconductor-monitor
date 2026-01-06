@@ -138,7 +138,7 @@ async def list_queues(credentials: HTTPAuthorizationCredentials = Security(secur
         # Try to get real Celery worker info
         try:
             from backend.celery_app import celery_app
-            inspect = celery_app.control.inspect(timeout=1.0)
+            inspect = celery_app.control.inspect(timeout=3.0)
             active = inspect.active() or {}
             reserved = inspect.reserved() or {}
             stats = inspect.stats() or {}
