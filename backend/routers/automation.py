@@ -185,7 +185,7 @@ async def list_queues(credentials: HTTPAuthorizationCredentials = Security(secur
 async def list_jobs(credentials: HTTPAuthorizationCredentials = Security(security)):
     """List scheduled jobs"""
     try:
-        jobs = db_query("SELECT * FROM scheduled_jobs ORDER BY name")
+        jobs = db_query("SELECT * FROM scheduler_jobs ORDER BY name")
         return {"jobs": jobs, "total": len(jobs)}
     except Exception as e:
         logger.error(f"List jobs error: {str(e)}")

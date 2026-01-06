@@ -32,7 +32,7 @@ async def list_alerts(
 ):
     """List alerts with filtering"""
     try:
-        return await list_alerts_paginated(limit, cursor, severity, status)
+        return await list_alerts_paginated(cursor_str=cursor, limit=limit, severity=severity, status_filter=status)
     except Exception as e:
         logger.error(f"List alerts error: {str(e)}")
         raise HTTPException(status_code=500, detail={"code": "LIST_ALERTS_ERROR", "message": str(e)})

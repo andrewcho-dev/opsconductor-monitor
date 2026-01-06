@@ -47,15 +47,31 @@ async def list_alerts_paginated(
 ) -> Dict[str, Any]:
     """
     List alerts with pagination and filtering
-    Uses same logic as legacy /api/alerts - handles missing table gracefully
+    Uses alert_history table which has the actual alert data
     """
-    if not table_exists('alerts'):
+    if not table_exists('alert_history'):
         return {'items': [], 'total': 0, 'limit': limit, 'cursor': None}
     
+    where_clauses = ["1=1"]
+    params = []
+    
+    if severity:
+        where_clauses.append("severity = %s")
+        params.append(severity)
+    
+    if status_filter and status_filter != 'all':
+        where_clauses.append("status = %s")
+        params.append(status_filter)
+    
+    where_clause = " AND ".join(where_clauses)
+    
     return db_paginate(
-        "SELECT * FROM alerts WHERE acknowledged = false ORDER BY created_at DESC",
-        "SELECT COUNT(*) as total FROM alerts WHERE acknowledged = false",
-        [], limit
+        f"""SELECT id, original_alert_id, rule_id, alert_key, severity, category,
+               title, message, details, status, triggered_at, 
+               acknowledged_at, acknowledged_by, resolved_at, archived_at
+            FROM alert_history WHERE {where_clause} ORDER BY triggered_at DESC""",
+        f"SELECT COUNT(*) as total FROM alert_history WHERE {where_clause}",
+        params, limit
     )
 
 async def acknowledge_alert(alert_id: str, acknowledged_by: str) -> Dict[str, str]:
