@@ -132,10 +132,10 @@ export function SNMPLivePage() {
 
   const loadDevices = async () => {
     try {
-      const response = await fetchApi('/integrations/v1/mcp/devices');
+      const response = await fetchApi('/inventory/v1/devices?limit=100');
       // Handle both wrapped and direct response formats
       const devData = response?.data || response;
-      const deviceList = devData?.devices || (Array.isArray(devData) ? devData : []);
+      const deviceList = devData?.items || (Array.isArray(devData) ? devData : []);
       setDevices(deviceList);
     } catch (err) {
       console.error('Failed to load devices:', err);
