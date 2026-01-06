@@ -196,11 +196,24 @@ async def test_prtg(
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-# MCP settings stub (feature removed but endpoint needed for frontend compatibility)
+# MCP integration
 @router.get("/mcp/settings", summary="Get MCP settings")
 async def mcp_settings(credentials: HTTPAuthorizationCredentials = Security(security)):
-    """Get MCP settings - returns disabled since feature was removed"""
-    return {"success": True, "data": {"url": "", "enabled": False}}
+    """Get MCP integration settings"""
+    try:
+        url = get_setting('mcp_url') or ''
+        token = get_setting('mcp_api_token') or ''
+        return {
+            "success": True,
+            "data": {
+                "url": url,
+                "token": token,
+                "enabled": bool(url)
+            }
+        }
+    except Exception as e:
+        logger.error(f"Get MCP settings error: {str(e)}")
+        return {"success": False, "error": str(e)}
 
 
 @router.get("/test", include_in_schema=False)
