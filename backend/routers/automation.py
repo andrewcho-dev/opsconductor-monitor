@@ -137,8 +137,9 @@ async def list_queues(credentials: HTTPAuthorizationCredentials = Security(secur
     try:
         from celery_app import celery_app
         
-        # Use Celery's control inspect with a reasonable timeout
-        inspect = celery_app.control.inspect(timeout=2.0)
+        # Use Celery's control inspect with a shorter timeout
+        # Each inspect call (stats, active, reserved) uses this timeout
+        inspect = celery_app.control.inspect(timeout=0.5)
         
         # Get worker stats - this is a synchronous blocking call
         stats = inspect.stats()
