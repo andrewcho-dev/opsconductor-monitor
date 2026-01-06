@@ -134,29 +134,21 @@ async def get_statistics(credentials: HTTPAuthorizationCredentials = Security(se
 @router.get("/scheduler/queues", summary="List job queues")
 async def list_queues(credentials: HTTPAuthorizationCredentials = Security(security)):
     """List job queues - returns Celery worker info"""
-    import asyncio
-    import concurrent.futures
-    
-    def get_celery_info():
-        try:
-            from celery_app import celery_app
-            inspect = celery_app.control.inspect(timeout=1.0)
-            stats = inspect.stats() or {}
-            active = inspect.active() or {}
-            reserved = inspect.reserved() or {}
-            return stats, active, reserved
-        except Exception as e:
-            logger.warning(f"Celery inspect error: {e}")
-            return {}, {}, {}
-    
     try:
-        # Run Celery inspect in thread pool to avoid blocking
-        loop = asyncio.get_event_loop()
-        with concurrent.futures.ThreadPoolExecutor() as pool:
-            stats, active, reserved = await asyncio.wait_for(
-                loop.run_in_executor(pool, get_celery_info),
-                timeout=2.0
-            )
+        from celery_app import celery_app
+        
+        # Use Celery's control inspect with a reasonable timeout
+        inspect = celery_app.control.inspect(timeout=2.0)
+        
+        # Get worker stats - this is a synchronous blocking call
+        stats = inspect.stats()
+        if not stats:
+            logger.warning("No Celery workers responded to inspect.stats()")
+            return {"workers": [], "active_total": 0, "reserved_total": 0, "queues": []}
+        
+        # Get active and reserved tasks
+        active = inspect.active() or {}
+        reserved = inspect.reserved() or {}
         
         workers = []
         active_total = 0
@@ -168,19 +160,21 @@ async def list_queues(credentials: HTTPAuthorizationCredentials = Security(secur
             active_total += len(worker_active)
             reserved_total += len(worker_reserved)
             
+            pool_info = worker_stats.get('pool', {})
             workers.append({
                 "name": worker_name,
-                "concurrency": worker_stats.get('pool', {}).get('max-concurrency', 1),
+                "concurrency": pool_info.get('max-concurrency', 1),
                 "active": len(worker_active),
                 "reserved": len(worker_reserved),
                 "active_tasks": [{"name": t.get('name', 'unknown'), "id": t.get('id')} for t in worker_active]
             })
         
-        return {"workers": workers, "active_total": active_total, "reserved_total": reserved_total,
-                "queues": [{"name": "default", "pending": 0}, {"name": "polling", "pending": 0}]}
-    except asyncio.TimeoutError:
-        logger.warning("Celery inspect timed out")
-        return {"workers": [], "active_total": 0, "reserved_total": 0, "queues": []}
+        return {
+            "workers": workers, 
+            "active_total": active_total, 
+            "reserved_total": reserved_total,
+            "queues": [{"name": "default", "pending": 0}, {"name": "polling", "pending": 0}]
+        }
     except Exception as e:
         logger.error(f"List queues error: {e}")
         return {"workers": [], "active_total": 0, "reserved_total": 0, "queues": []}
