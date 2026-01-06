@@ -122,38 +122,23 @@ async def get_workflow_by_id(workflow_id: str) -> Dict[str, Any]:
     Get workflow details by ID
     Migrated from legacy /api/workflows/{id}
     """
-    db = get_db()
-    with db.cursor() as cursor:
-        if not _table_exists(cursor, 'workflows'):
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail={
-                    "code": "WORKFLOW_NOT_FOUND",
-                    "message": f"Workflow with ID '{workflow_id}' not found"
-                }
-            )
-        
-        cursor.execute("""
-            SELECT w.id, w.name, w.description, w.category, w.status,
-                   w.version, w.definition, w.parameters, w.created_at,
-                   w.updated_at, w.created_by, w.schedule_enabled,
-                   w.schedule_cron, w.last_run_at, w.next_run_at
-            FROM workflows w
-            WHERE w.id = %s
-        """, (workflow_id,))
-        
-        workflow = cursor.fetchone()
-        
-        if not workflow:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail={
-                    "code": "WORKFLOW_NOT_FOUND",
-                    "message": f"Workflow with ID '{workflow_id}' not found"
-                }
-            )
-        
-        return dict(workflow)
+    if not table_exists('workflows'):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "WORKFLOW_NOT_FOUND", "message": f"Workflow with ID '{workflow_id}' not found"})
+    
+    workflow = db_query_one("""
+        SELECT w.id, w.name, w.description, w.category, w.status,
+               w.version, w.definition, w.parameters, w.created_at,
+               w.updated_at, w.created_by, w.schedule_enabled,
+               w.schedule_cron, w.last_run_at, w.next_run_at
+        FROM workflows w WHERE w.id = %s
+    """, (workflow_id,))
+    
+    if not workflow:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "WORKFLOW_NOT_FOUND", "message": f"Workflow with ID '{workflow_id}' not found"})
+    
+    return workflow
 
 async def list_job_executions_paginated(
     cursor: Optional[str] = None, 
@@ -312,39 +297,24 @@ async def get_execution_status(execution_id: str) -> Dict[str, Any]:
     Get execution status and progress
     Migrated from legacy /api/scheduler/executions/{id}/progress
     """
-    db = get_db()
-    with db.cursor() as cursor:
-        if not _table_exists(cursor, 'workflow_executions'):
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail={
-                    "code": "EXECUTION_NOT_FOUND",
-                    "message": f"Execution with ID '{execution_id}' not found"
-                }
-            )
-        
-        cursor.execute("""
-            SELECT e.id, e.workflow_id, e.status, e.started_at, e.completed_at,
-                   e.duration_seconds, e.trigger_type, e.triggered_by,
-                   e.result, e.error_message, e.progress, e.log_output,
-                   w.name as workflow_name
-            FROM workflow_executions e
-            LEFT JOIN workflows w ON e.workflow_id = w.id
-            WHERE e.id = %s
-        """, (execution_id,))
-        
-        execution = cursor.fetchone()
-        
-        if not execution:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail={
-                    "code": "EXECUTION_NOT_FOUND",
-                    "message": f"Execution with ID '{execution_id}' not found"
-                }
-            )
-        
-        return dict(execution)
+    if not table_exists('workflow_executions'):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "EXECUTION_NOT_FOUND", "message": f"Execution with ID '{execution_id}' not found"})
+    
+    execution = db_query_one("""
+        SELECT e.id, e.workflow_id, e.status, e.started_at, e.completed_at,
+               e.duration_seconds, e.trigger_type, e.triggered_by,
+               e.result, e.error_message, e.progress, e.log_output,
+               w.name as workflow_name
+        FROM workflow_executions e
+        LEFT JOIN workflows w ON e.workflow_id = w.id WHERE e.id = %s
+    """, (execution_id,))
+    
+    if not execution:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "EXECUTION_NOT_FOUND", "message": f"Execution with ID '{execution_id}' not found"})
+    
+    return execution
 
 async def cancel_execution(execution_id: str, cancelled_by: str) -> Dict[str, str]:
     """
@@ -401,91 +371,44 @@ async def list_schedules() -> List[Dict[str, Any]]:
     List workflow schedules
     Migrated from legacy /api/scheduler/schedules
     """
-    db = get_db()
-    with db.cursor() as cursor:
-        if not _table_exists(cursor, 'workflows'):
-            return []
-        
-        cursor.execute("""
-            SELECT w.id, w.name, w.schedule_cron, w.schedule_enabled,
-                   w.last_run_at, w.next_run_at, w.created_at,
-                   (SELECT COUNT(*) FROM workflow_executions e 
-                    WHERE e.workflow_id = w.id 
-                    AND e.trigger_type = 'scheduled') as scheduled_runs
-            FROM workflows w
-            WHERE w.schedule_enabled = true
-            ORDER BY w.name
-        """)
-        
-        schedules = [dict(row) for row in cursor.fetchall()] if cursor.description else []
-        
-        return schedules
+    if not table_exists('workflows'):
+        return []
+    return db_query("""
+        SELECT w.id, w.name, w.schedule_cron, w.schedule_enabled,
+               w.last_run_at, w.next_run_at, w.created_at,
+               (SELECT COUNT(*) FROM workflow_executions e 
+                WHERE e.workflow_id = w.id AND e.trigger_type = 'scheduled') as scheduled_runs
+        FROM workflows w WHERE w.schedule_enabled = true ORDER BY w.name
+    """)
 
 async def get_job_statistics() -> Dict[str, Any]:
     """
     Get job execution statistics
     """
-    db = get_db()
-    with db.cursor() as cursor:
-        if not _table_exists(cursor, 'workflow_executions'):
-            return {
-                "total_executions": 0,
-                "by_status": {},
-                "by_trigger_type": {},
-                "recent_24h": 0,
-                "recent_7d": 0,
-                "average_duration": 0
-            }
-        
-        # Overall stats
-        cursor.execute("SELECT COUNT(*) as total FROM workflow_executions")
-        total = cursor.fetchone()['total']
-        
-        # By status
-        cursor.execute("""
-            SELECT status, COUNT(*) as count 
-            FROM workflow_executions 
-            GROUP BY status
-        """)
-        by_status = {row['status']: row['count'] for row in cursor.fetchall()}
-        
-        # By trigger type
-        cursor.execute("""
-            SELECT trigger_type, COUNT(*) as count 
-            FROM workflow_executions 
-            GROUP BY trigger_type
-        """)
-        by_trigger_type = {row['trigger_type']: row['count'] for row in cursor.fetchall()}
-        
-        # Recent activity
-        cursor.execute("""
-            SELECT COUNT(*) as count FROM workflow_executions 
-            WHERE started_at >= NOW() - INTERVAL '24 hours'
-        """)
-        recent_24h = cursor.fetchone()['count']
-        
-        cursor.execute("""
-            SELECT COUNT(*) as count FROM workflow_executions 
-            WHERE started_at >= NOW() - INTERVAL '7 days'
-        """)
-        recent_7d = cursor.fetchone()['count']
-        
-        # Average duration
-        cursor.execute("""
-            SELECT AVG(duration_seconds) as avg_duration 
-            FROM workflow_executions 
-            WHERE status = 'completed' AND duration_seconds IS NOT NULL
-        """)
-        avg_duration = cursor.fetchone()['avg_duration'] or 0
-        
-        return {
-            "total_executions": total,
-            "by_status": by_status,
-            "by_trigger_type": by_trigger_type,
-            "recent_24h": recent_24h,
-            "recent_7d": recent_7d,
-            "average_duration": round(avg_duration, 2)
-        }
+    if not table_exists('workflow_executions'):
+        return {"total_executions": 0, "by_status": {}, "by_trigger_type": {},
+                "recent_24h": 0, "recent_7d": 0, "average_duration": 0}
+    
+    total_row = db_query_one("SELECT COUNT(*) as total FROM workflow_executions")
+    total = total_row['total'] if total_row else 0
+    
+    status_rows = db_query("SELECT status, COUNT(*) as count FROM workflow_executions GROUP BY status")
+    by_status = {row['status']: row['count'] for row in status_rows}
+    
+    trigger_rows = db_query("SELECT trigger_type, COUNT(*) as count FROM workflow_executions GROUP BY trigger_type")
+    by_trigger_type = {row['trigger_type']: row['count'] for row in trigger_rows}
+    
+    recent_24h_row = db_query_one("SELECT COUNT(*) as count FROM workflow_executions WHERE started_at >= NOW() - INTERVAL '24 hours'")
+    recent_24h = recent_24h_row['count'] if recent_24h_row else 0
+    
+    recent_7d_row = db_query_one("SELECT COUNT(*) as count FROM workflow_executions WHERE started_at >= NOW() - INTERVAL '7 days'")
+    recent_7d = recent_7d_row['count'] if recent_7d_row else 0
+    
+    avg_row = db_query_one("SELECT AVG(duration_seconds) as avg_duration FROM workflow_executions WHERE status = 'completed' AND duration_seconds IS NOT NULL")
+    avg_duration = avg_row['avg_duration'] or 0 if avg_row else 0
+    
+    return {"total_executions": total, "by_status": by_status, "by_trigger_type": by_trigger_type,
+            "recent_24h": recent_24h, "recent_7d": recent_7d, "average_duration": round(avg_duration, 2)}
 
 # ============================================================================
 # Testing Functions
