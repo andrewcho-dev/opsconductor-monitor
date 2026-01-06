@@ -13,8 +13,7 @@ from fastapi import HTTPException, status
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from backend.utils.db import db_query, db_query_one, db_execute, table_exists
-from backend.database import get_db  # TODO: refactor remaining usages
+from backend.utils.db import db_query, db_query_one, db_execute, table_exists, db_paginate, db_transaction
 from backend.services.logging_service import get_logger, LogSource
 
 logger = get_logger(__name__, LogSource.SYSTEM)
@@ -50,217 +49,103 @@ async def list_alerts_paginated(
     List alerts with pagination and filtering
     Uses same logic as legacy /api/alerts - handles missing table gracefully
     """
-    db = get_db()
-    with db.cursor() as cursor:
-        # Check if alerts table exists (same as legacy)
-        if not _table_exists(cursor, 'alerts'):
-            return {
-                'items': [],
-                'total': 0,
-                'limit': limit,
-                'cursor': None
-            }
-        
-        # Build query - same as legacy /api/alerts
-        query = """
-            SELECT * FROM alerts 
-            WHERE acknowledged = false 
-            ORDER BY created_at DESC 
-            LIMIT %s
-        """
-        cursor.execute(query, (limit,))
-        alerts = [dict(row) for row in cursor.fetchall()] if cursor.description else []
-        
-        # Get total count
-        cursor.execute("SELECT COUNT(*) as total FROM alerts WHERE acknowledged = false")
-        total = cursor.fetchone()['total'] if cursor.description else 0
-        
-        return {
-            'items': alerts,
-            'total': total,
-            'limit': limit,
-            'cursor': None
-        }
+    if not table_exists('alerts'):
+        return {'items': [], 'total': 0, 'limit': limit, 'cursor': None}
+    
+    return db_paginate(
+        "SELECT * FROM alerts WHERE acknowledged = false ORDER BY created_at DESC",
+        "SELECT COUNT(*) as total FROM alerts WHERE acknowledged = false",
+        [], limit
+    )
 
 async def acknowledge_alert(alert_id: str, acknowledged_by: str) -> Dict[str, str]:
     """
     Acknowledge an alert
     Migrated from legacy /api/alerts/{id}/acknowledge
     """
-    db = get_db()
-    with db.cursor() as cursor:
-        if not _table_exists(cursor, 'alerts'):
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail={
-                    "code": "ALERT_NOT_FOUND",
-                    "message": f"Alert with ID '{alert_id}' not found"
-                }
-            )
-        
-        # Check if alert exists and is not already acknowledged
-        cursor.execute("""
-            SELECT id, status, acknowledged_at FROM alerts 
-            WHERE id = %s
-        """, (alert_id,))
-        
-        alert = cursor.fetchone()
+    if not table_exists('alerts'):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "ALERT_NOT_FOUND", "message": f"Alert with ID '{alert_id}' not found"})
+    
+    with db_transaction() as tx:
+        alert = tx.query_one("SELECT id, status, acknowledged_at FROM alerts WHERE id = %s", (alert_id,))
         if not alert:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail={
-                    "code": "ALERT_NOT_FOUND",
-                    "message": f"Alert with ID '{alert_id}' not found"
-                }
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                detail={"code": "ALERT_NOT_FOUND", "message": f"Alert with ID '{alert_id}' not found"})
         
         if alert['acknowledged_at']:
-            return {
-                "success": True,
-                "message": "Alert already acknowledged",
-                "acknowledged_at": alert['acknowledged_at'].isoformat()
-            }
+            return {"success": True, "message": "Alert already acknowledged", "acknowledged_at": alert['acknowledged_at'].isoformat()}
         
-        # Acknowledge the alert
-        cursor.execute("""
-            UPDATE alerts 
-            SET status = 'acknowledged', 
-                acknowledged_at = NOW(),
-                acknowledged_by = %s,
-                updated_at = NOW()
-            WHERE id = %s
+        tx.execute("""
+            UPDATE alerts SET status = 'acknowledged', acknowledged_at = NOW(),
+                acknowledged_by = %s, updated_at = NOW() WHERE id = %s
         """, (acknowledged_by, alert_id))
         
-        db.commit()
-        
         logger.info(f"Alert {alert_id} acknowledged by {acknowledged_by}")
-        
-        return {
-            "success": True,
-            "message": "Alert acknowledged successfully",
-            "acknowledged_at": datetime.now().isoformat()
-        }
+        return {"success": True, "message": "Alert acknowledged successfully", "acknowledged_at": datetime.now().isoformat()}
 
 async def get_device_optical_metrics(device_id: str, hours: int = 24) -> List[Dict[str, Any]]:
     """
     Get optical power metrics for a device
     Migrated from legacy /api/metrics/optical/{ip}
     """
-    db = get_db()
-    with db.cursor() as cursor:
-        # Verify device exists
-        cursor.execute("SELECT id, ip_address FROM devices WHERE id = %s", (device_id,))
-        device = cursor.fetchone()
-        if not device:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail={
-                    "code": "DEVICE_NOT_FOUND",
-                    "message": f"Device with ID '{device_id}' not found"
-                }
-            )
-        
-        # Get optical metrics from the last N hours
-        if not _table_exists(cursor, 'optical_metrics'):
-            return []
-        
-        cursor.execute("""
-            SELECT interface_name, rx_power, tx_power,
-                   rx_power_low_alarm, rx_power_high_alarm,
-                   tx_power_low_alarm, tx_power_high_alarm,
-                   timestamp, unit
-            FROM optical_metrics 
-            WHERE device_id = %s 
-            AND timestamp >= NOW() - INTERVAL '%s hours'
-            ORDER BY timestamp DESC, interface_name
-            LIMIT 1000
-        """, (device_id, hours))
-        
-        metrics = [dict(row) for row in cursor.fetchall()] if cursor.description else []
-        
-        return metrics
+    device = db_query_one("SELECT id, ip_address FROM devices WHERE id = %s", (device_id,))
+    if not device:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "DEVICE_NOT_FOUND", "message": f"Device with ID '{device_id}' not found"})
+    
+    if not table_exists('optical_metrics'):
+        return []
+    
+    return db_query(f"""
+        SELECT interface_name, rx_power, tx_power, rx_power_low_alarm, rx_power_high_alarm,
+               tx_power_low_alarm, tx_power_high_alarm, timestamp, unit
+        FROM optical_metrics WHERE device_id = %s AND timestamp >= NOW() - INTERVAL '{hours} hours'
+        ORDER BY timestamp DESC, interface_name LIMIT 1000
+    """, (device_id,))
 
 async def get_device_interface_metrics(device_id: str, hours: int = 24) -> List[Dict[str, Any]]:
     """
     Get interface utilization metrics for a device
     Migrated from legacy /api/metrics/interfaces/{ip}
     """
-    db = get_db()
-    with db.cursor() as cursor:
-        # Verify device exists
-        cursor.execute("SELECT id, ip_address FROM devices WHERE id = %s", (device_id,))
-        device = cursor.fetchone()
-        if not device:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail={
-                    "code": "DEVICE_NOT_FOUND",
-                    "message": f"Device with ID '{device_id}' not found"
-                }
-            )
-        
-        # Get interface metrics from the last N hours
-        if not _table_exists(cursor, 'interface_metrics'):
-            return []
-        
-        cursor.execute("""
-            SELECT interface_name, interface_index, admin_status, oper_status,
-                   speed, mtu, rx_bytes, tx_bytes, rx_packets, tx_packets,
-                   rx_errors, tx_errors, rx_drops, tx_drops,
-                   timestamp, utilization_in, utilization_out
-            FROM interface_metrics 
-            WHERE device_id = %s 
-            AND timestamp >= NOW() - INTERVAL '%s hours'
-            ORDER BY timestamp DESC, interface_index
-            LIMIT 1000
-        """, (device_id, hours))
-        
-        metrics = [dict(row) for row in cursor.fetchall()] if cursor.description else []
-        
-        return metrics
+    device = db_query_one("SELECT id, ip_address FROM devices WHERE id = %s", (device_id,))
+    if not device:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "DEVICE_NOT_FOUND", "message": f"Device with ID '{device_id}' not found"})
+    
+    if not table_exists('interface_metrics'):
+        return []
+    
+    return db_query(f"""
+        SELECT interface_name, interface_index, admin_status, oper_status,
+               speed, mtu, rx_bytes, tx_bytes, rx_packets, tx_packets,
+               rx_errors, tx_errors, rx_drops, tx_drops, timestamp, utilization_in, utilization_out
+        FROM interface_metrics WHERE device_id = %s AND timestamp >= NOW() - INTERVAL '{hours} hours'
+        ORDER BY timestamp DESC, interface_index LIMIT 1000
+    """, (device_id,))
 
 async def get_device_availability_metrics(device_id: str, days: int = 30) -> List[Dict[str, Any]]:
     """
     Get availability metrics for a device
     Migrated from legacy /api/metrics/availability/{ip}
     """
-    db = get_db()
-    with db.cursor() as cursor:
-        # Verify device exists
-        cursor.execute("SELECT id, ip_address FROM devices WHERE id = %s", (device_id,))
-        device = cursor.fetchone()
-        if not device:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail={
-                    "code": "DEVICE_NOT_FOUND",
-                    "message": f"Device with ID '{device_id}' not found"
-                }
-            )
-        
-        # Get availability metrics from the last N days
-        if not _table_exists(cursor, 'availability_metrics'):
-            return []
-        
-        cursor.execute("""
-            SELECT DATE(timestamp) as date,
-                   COUNT(*) as total_checks,
-                   COUNT(*) FILTER (WHERE is_up = true) as up_checks,
-                   ROUND(
-                       (COUNT(*) FILTER (WHERE is_up = true) * 100.0 / COUNT(*), 2
-                   ) as availability_percentage,
-                   MIN(timestamp) as first_check,
-                   MAX(timestamp) as last_check
-            FROM availability_metrics 
-            WHERE device_id = %s 
-            AND timestamp >= NOW() - INTERVAL '%s days'
-            GROUP BY DATE(timestamp)
-            ORDER BY date DESC
-        """, (device_id, days))
-        
-        metrics = [dict(row) for row in cursor.fetchall()] if cursor.description else []
-        
-        return metrics
+    device = db_query_one("SELECT id, ip_address FROM devices WHERE id = %s", (device_id,))
+    if not device:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "DEVICE_NOT_FOUND", "message": f"Device with ID '{device_id}' not found"})
+    
+    if not table_exists('availability_metrics'):
+        return []
+    
+    return db_query(f"""
+        SELECT DATE(timestamp) as date, COUNT(*) as total_checks,
+               COUNT(*) FILTER (WHERE is_up = true) as up_checks,
+               ROUND((COUNT(*) FILTER (WHERE is_up = true) * 100.0 / COUNT(*)), 2) as availability_percentage,
+               MIN(timestamp) as first_check, MAX(timestamp) as last_check
+        FROM availability_metrics WHERE device_id = %s AND timestamp >= NOW() - INTERVAL '{days} days'
+        GROUP BY DATE(timestamp) ORDER BY date DESC
+    """, (device_id,))
 
 async def get_telemetry_status() -> Dict[str, Any]:
     """

@@ -13,8 +13,7 @@ from fastapi import HTTPException, status
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from backend.utils.db import db_query, db_query_one, db_execute, table_exists
-from backend.database import get_db  # TODO: refactor remaining usages
+from backend.utils.db import db_query, db_query_one, db_execute, table_exists, get_settings_by_prefix, db_paginate, db_transaction
 from backend.services.logging_service import get_logger, LogSource
 
 logger = get_logger(__name__, LogSource.SYSTEM)
@@ -40,7 +39,7 @@ def _table_exists(cursor, table_name):
 # ============================================================================
 
 async def list_integrations_paginated(
-    cursor: Optional[str] = None, 
+    cursor_str: Optional[str] = None, 
     limit: int = 50,
     integration_type: Optional[str] = None,
     status_filter: Optional[str] = None
@@ -48,79 +47,27 @@ async def list_integrations_paginated(
     """
     List external integrations with pagination and filtering
     """
-    db = get_db()
-    with db.cursor() as cursor:
-        # Build query with filters
-        where_clauses = []
-        params = []
-        
-        if integration_type:
-            where_clauses.append("i.integration_type = %s")
-            params.append(integration_type)
-        
-        if status_filter:
-            where_clauses.append("i.status = %s")
-            params.append(status_filter)
-        
-        where_clause = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
-        
-        # Get total count
-        count_query = f"""
-            SELECT COUNT(*) as total
-            FROM integrations i
-            {where_clause}
-        """
-        
-        cursor.execute(count_query, params)
-        total = cursor.fetchone()['total']
-        
-        # Apply pagination
-        if cursor:
-            # Decode cursor (for simplicity, using integration ID as cursor)
-            try:
-                import base64
-                cursor_data = json.loads(base64.b64decode(cursor).decode())
-                last_id = cursor_data.get('last_id')
-                where_clauses.append("i.id > %s")
-                params.append(last_id)
-            except:
-                pass
-        
-        # Get paginated results
-        query = f"""
-            SELECT i.id, i.name, i.integration_type, i.status, i.description,
-                   i.config, i.created_at, i.updated_at, i.last_sync_at,
-                   i.sync_enabled, i.error_message
-            FROM integrations i
-            {where_clause}
-            ORDER BY i.id
-            LIMIT %s
-        """
-        
-        params.append(limit + 1)  # Get one extra to determine if there's a next page
-        cursor.execute(query, params)
-        
-        integrations = [dict(row) for row in cursor.fetchall()]
-        
-        # Determine if there's a next page
-        has_more = len(integrations) > limit
-        if has_more:
-            integrations = integrations[:-1]  # Remove the extra item
-        
-        # Generate next cursor
-        next_cursor = None
-        if has_more and integrations:
-            last_id = integrations[-1]['id']
-            cursor_data = json.dumps({'last_id': last_id})
-            import base64
-            next_cursor = base64.b64encode(cursor_data.encode()).decode()
-        
-        return {
-            'items': integrations,
-            'total': total,
-            'limit': limit,
-            'cursor': next_cursor
-        }
+    where_clauses = []
+    params = []
+    
+    if integration_type:
+        where_clauses.append("i.integration_type = %s")
+        params.append(integration_type)
+    
+    if status_filter:
+        where_clauses.append("i.status = %s")
+        params.append(status_filter)
+    
+    where_clause = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
+    
+    return db_paginate(
+        f"""SELECT i.id, i.name, i.integration_type, i.status, i.description,
+               i.config, i.created_at, i.updated_at, i.last_sync_at,
+               i.sync_enabled, i.error_message
+            FROM integrations i {where_clause} ORDER BY i.id""",
+        f"SELECT COUNT(*) as total FROM integrations i {where_clause}",
+        params, limit
+    )
 
 async def get_integration_by_id(integration_id: str) -> Dict[str, Any]:
     """
@@ -333,54 +280,21 @@ async def sync_integration(integration_id: str, triggered_by: str) -> Dict[str, 
     """
     Trigger manual sync for an integration
     """
-    db = get_db()
-    with db.cursor() as cursor:
-        # Check if integration exists and is active
-        cursor.execute("""
-            SELECT id, name, integration_type, status FROM integrations 
-            WHERE id = %s
-        """, (integration_id,))
-        
-        integration = cursor.fetchone()
+    with db_transaction() as tx:
+        integration = tx.query_one("SELECT id, name, integration_type, status FROM integrations WHERE id = %s", (integration_id,))
         if not integration:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail={
-                    "code": "INTEGRATION_NOT_FOUND",
-                    "message": f"Integration with ID '{integration_id}' not found"
-                }
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                detail={"code": "INTEGRATION_NOT_FOUND", "message": f"Integration with ID '{integration_id}' not found"})
         
         if integration['status'] != 'active':
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail={
-                    "code": "INTEGRATION_INACTIVE",
-                    "message": f"Integration '{integration['name']}' is not active"
-                }
-            )
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"code": "INTEGRATION_INACTIVE", "message": f"Integration '{integration['name']}' is not active"})
         
-        # Update last sync time
-        cursor.execute("""
-            UPDATE integrations 
-            SET last_sync_at = NOW(),
-                error_message = NULL
-            WHERE id = %s
-        """, (integration_id,))
-        
-        db.commit()
-        
+        tx.execute("UPDATE integrations SET last_sync_at = NOW(), error_message = NULL WHERE id = %s", (integration_id,))
         logger.info(f"Integration {integration_id} ({integration['name']}) synced by {triggered_by}")
         
-        # In a real implementation, you would trigger the actual sync process here
-        
-        return {
-            "success": True,
-            "message": "Integration sync triggered successfully",
-            "integration_id": integration_id,
-            "integration_name": integration['name'],
-            "sync_time": datetime.now().isoformat()
-        }
+        return {"success": True, "message": "Integration sync triggered successfully",
+                "integration_id": integration_id, "integration_name": integration['name'], "sync_time": datetime.now().isoformat()}
 
 # ============================================================================
 # Testing Functions

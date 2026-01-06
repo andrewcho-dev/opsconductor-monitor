@@ -15,8 +15,7 @@ from typing import Optional, List, Dict, Any
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from backend.utils.db import db_query, db_query_one, db_execute, table_exists
-from backend.database import get_db  # TODO: refactor remaining usages
+from backend.utils.db import db_query, db_query_one, db_execute, table_exists, db_paginate
 from backend.services.logging_service import get_logger, LogSource
 
 # Configuration
@@ -207,103 +206,25 @@ async def list_users_paginated(
     List users with pagination and filtering
     Migrated from legacy /api/users
     """
-    db = get_db()
-    with db.cursor() as db_cursor:
-        # Build query
-        where_clauses = []
-        params = []
-        
-        if search:
-            where_clauses.append("(username ILIKE %s OR email ILIKE %s OR display_name ILIKE %s)")
-            search_param = f"%{search}%"
-            params.extend([search_param, search_param, search_param])
-        
-        if status_filter:
-            where_clauses.append("status = %s")
-            params.append(status_filter)
-        
-        where_clause = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
-        
-        # Get total count
-        count_query = f"""
-            SELECT COUNT(*) as total
-            FROM (
-                SELECT u.id, u.username, u.email, u.created_at,
-                       u.username as display_name,
-                       '' as first_name,
-                       '' as last_name,
-                       'active' as status,
-                       false as two_factor_enabled,
-                       array_agg(r.name) as roles
-                FROM users u
-                LEFT JOIN user_roles ur ON u.id = ur.user_id
-                LEFT JOIN roles r ON ur.role_id = r.id
-                {where_clause}
-                GROUP BY u.id
-            ) as filtered_users
-        """
-        
-        db_cursor.execute(count_query, params)
-        total = db_cursor.fetchone()['total']
-        
-        # Apply pagination
-        if page_cursor:
-            # Decode cursor (for simplicity, using user ID as cursor)
-            try:
-                import base64
-                cursor_data = json.loads(base64.b64decode(page_cursor).decode())
-                last_id = cursor_data.get('last_id')
-                where_clauses.append("u.id > %s")
-                params.append(last_id)
-            except:
-                pass
-        
-        # Get paginated results
-        query = f"""
-            SELECT u.id, u.username, u.email, u.created_at,
-                   u.username as display_name,
-                   '' as first_name,
-                   '' as last_name,
-                   'active' as status,
-                   false as two_factor_enabled,
-                   COALESCE(array_agg(r.name), ARRAY[]::text[]) as roles
-            FROM users u
-            LEFT JOIN user_roles ur ON u.id = ur.user_id
-            LEFT JOIN roles r ON ur.role_id = r.id
-            {where_clause}
-            GROUP BY u.id
-            ORDER BY u.id
-            LIMIT %s
-        """
-        
-        params.append(limit + 1)  # Get one extra to determine if there's a next page
-        db_cursor.execute(query, params)
-        
-        users = []
-        for row in db_cursor.fetchall():
-            user_dict = dict(row)
-            user_dict['id'] = str(user_dict['id'])  # Convert id to string
-            users.append(user_dict)
-        
-        # Determine if there's a next page
-        has_more = len(users) > limit
-        if has_more:
-            users = users[:-1]  # Remove the extra item
-        
-        # Generate next cursor
-        next_cursor = None
-        if has_more and users:
-            last_id = users[-1]['id']
-            cursor_data = json.dumps({'last_id': last_id})
-            import base64
-            next_cursor = base64.b64encode(cursor_data.encode()).decode()
-        
-        return {
-            'items': users,
-            'total': total,
-            'limit': limit,
-            'cursor': next_cursor
-        }
+    where_clauses = []
+    params = []
+    
+    if search:
+        where_clauses.append("(u.username ILIKE %s OR u.email ILIKE %s)")
+        search_param = f"%{search}%"
+        params.extend([search_param, search_param])
+    
+    where_clause = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
+    
+    return db_paginate(
+        f"""SELECT u.id, u.username, u.email, u.created_at, u.username as display_name,
+               '' as first_name, '' as last_name, 'active' as status, false as two_factor_enabled,
+               COALESCE(array_agg(r.name), ARRAY[]::text[]) as roles
+            FROM users u LEFT JOIN user_roles ur ON u.id = ur.user_id
+            LEFT JOIN roles r ON ur.role_id = r.id {where_clause} GROUP BY u.id ORDER BY u.id""",
+        f"SELECT COUNT(*) as total FROM users u {where_clause}",
+        params, limit
+    )
 
 async def list_roles_with_counts() -> List[Dict[str, Any]]:
     """

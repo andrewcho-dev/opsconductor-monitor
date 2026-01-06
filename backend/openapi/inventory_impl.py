@@ -13,8 +13,7 @@ from fastapi import HTTPException, status
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from backend.utils.db import db_query, db_query_one, db_execute, table_exists
-from backend.database import get_db  # TODO: refactor remaining usages
+from backend.utils.db import db_query, db_query_one, db_execute, table_exists, db_paginate
 from backend.services.logging_service import get_logger, LogSource
 
 logger = get_logger(__name__, LogSource.SYSTEM)
@@ -51,54 +50,34 @@ async def list_devices_paginated(
     List devices with pagination and filtering.
     Uses EXACT same query as legacy /api/devices endpoint.
     """
-    db = get_db()
-    with db.cursor() as cursor:
-        # Build query with filters - SAME as legacy /api/devices
-        query = """
-            SELECT netbox_device_id::text as id, device_name as name, 
-                   COALESCE(device_ip::text, '') as ip_address,
-                   COALESCE(device_type, '') as device_type, 
-                   COALESCE(manufacturer, '') as vendor, 
-                   COALESCE(site_name, '') as site_name, 
-                   COALESCE(role_name, '') as role,
-                   COALESCE(site_id::text, '') as site_id, 
-                   cached_at as created_at, cached_at as updated_at, cached_at as last_seen
-            FROM netbox_device_cache WHERE 1=1
-        """
-        params = []
-        
-        if site_id:
-            query += " AND site_name = %s"
-            params.append(site_id)
-        
-        if device_type:
-            query += " AND device_type = %s"
-            params.append(device_type)
-        
-        if search:
-            query += " AND (device_name ILIKE %s OR device_ip::text ILIKE %s)"
-            search_param = f"%{search}%"
-            params.extend([search_param, search_param])
-        
-        query += " ORDER BY device_name"
-        
-        if limit:
-            query += f" LIMIT {limit}"
-        
-        cursor.execute(query, params)
-        devices = [dict(row) for row in cursor.fetchall()]
-        
-        # Get total count
-        count_query = "SELECT COUNT(*) as total FROM netbox_device_cache"
-        cursor.execute(count_query)
-        total = cursor.fetchone()['total']
-        
-        return {
-            'items': devices,
-            'total': total,
-            'limit': limit,
-            'cursor': None
-        }
+    where_clauses = ["1=1"]
+    params = []
+    
+    if site_id:
+        where_clauses.append("site_name = %s")
+        params.append(site_id)
+    
+    if device_type:
+        where_clauses.append("device_type = %s")
+        params.append(device_type)
+    
+    if search:
+        where_clauses.append("(device_name ILIKE %s OR device_ip::text ILIKE %s)")
+        search_param = f"%{search}%"
+        params.extend([search_param, search_param])
+    
+    where_clause = "WHERE " + " AND ".join(where_clauses)
+    
+    return db_paginate(
+        f"""SELECT netbox_device_id::text as id, device_name as name, 
+               COALESCE(device_ip::text, '') as ip_address, COALESCE(device_type, '') as device_type, 
+               COALESCE(manufacturer, '') as vendor, COALESCE(site_name, '') as site_name, 
+               COALESCE(role_name, '') as role, COALESCE(site_id::text, '') as site_id, 
+               cached_at as created_at, cached_at as updated_at, cached_at as last_seen
+            FROM netbox_device_cache {where_clause} ORDER BY device_name""",
+        f"SELECT COUNT(*) as total FROM netbox_device_cache {where_clause}",
+        params, limit
+    )
 
 async def get_device_by_id(device_id: str) -> Dict[str, Any]:
     """
@@ -131,57 +110,23 @@ async def get_network_topology() -> Dict[str, Any]:
     Get network topology graph
     Uses netbox_device_cache table (same as legacy)
     """
-    db = get_db()
-    with db.cursor() as cursor:
-        # Get devices as nodes from netbox_device_cache
-        cursor.execute("""
-            SELECT netbox_device_id as id, device_name as name, device_ip::text as ip_address,
-                   device_type, manufacturer as vendor, site_name
-            FROM netbox_device_cache
-            ORDER BY device_name
-        """)
-        
-        devices = cursor.fetchall()
-        nodes = []
-        for device in devices:
-            nodes.append({
-                "id": str(device['id']),
-                "name": device['name'],
-                "ip": device['ip_address'],
-                "type": device['device_type'],
-                "vendor": device['vendor'],
-                "site": device['site_name'],
-                "status": "active"
-            })
-        
-        # Get links (if links table exists)
-        links = []
-        if _table_exists(cursor, 'links'):
-            cursor.execute("""
-                SELECT l.source_device_id, l.target_device_id, l.link_type,
-                       l.bandwidth, l.status
-                FROM links l
-                WHERE l.status = 'active'
-            """)
-            
-            for link in cursor.fetchall():
-                links.append({
-                    "source": str(link['source_device_id']),
-                    "target": str(link['target_device_id']),
-                    "type": link['link_type'],
-                    "bandwidth": link['bandwidth'],
-                    "status": link['status']
-                })
-        
-        return {
-            "nodes": nodes,
-            "links": links,
-            "metadata": {
-                "total_devices": len(nodes),
-                "total_links": len(links),
-                "last_updated": datetime.now().isoformat()
-            }
-        }
+    devices = db_query("""
+        SELECT netbox_device_id as id, device_name as name, device_ip::text as ip_address,
+               device_type, manufacturer as vendor, site_name
+        FROM netbox_device_cache ORDER BY device_name
+    """)
+    
+    nodes = [{"id": str(d['id']), "name": d['name'], "ip": d['ip_address'],
+              "type": d['device_type'], "vendor": d['vendor'], "site": d['site_name'], "status": "active"}
+             for d in devices]
+    
+    links = []
+    if table_exists('links'):
+        link_rows = db_query("SELECT source_device_id, target_device_id, link_type, bandwidth, status FROM links WHERE status = 'active'")
+        links = [{"source": str(l['source_device_id']), "target": str(l['target_device_id']),
+                  "type": l['link_type'], "bandwidth": l['bandwidth'], "status": l['status']} for l in link_rows]
+    
+    return {"nodes": nodes, "links": links, "metadata": {"total_devices": len(nodes), "total_links": len(links), "last_updated": datetime.now().isoformat()}}
 
 async def list_sites() -> List[Dict[str, Any]]:
     """

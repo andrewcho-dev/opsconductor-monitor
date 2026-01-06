@@ -247,3 +247,115 @@ def count_rows(table_name: str, where: str = None, params: Tuple = None) -> int:
     
     row = db_query_one(sql, params)
     return row['count'] if row else 0
+
+
+def db_paginate(
+    select_sql: str,
+    count_sql: str,
+    params: List = None,
+    limit: int = 50
+) -> Dict[str, Any]:
+    """
+    Execute a paginated query with count and cursor support.
+    
+    Args:
+        select_sql: SELECT query (should include ORDER BY, LIMIT will be added)
+        count_sql: COUNT query for total
+        params: Parameters list (will be modified to add limit)
+        limit: Number of items per page
+        
+    Returns:
+        Dict with 'items', 'total', 'limit', 'cursor'
+        
+    Example:
+        result = db_paginate(
+            "SELECT * FROM users WHERE status = %s ORDER BY id",
+            "SELECT COUNT(*) as total FROM users WHERE status = %s",
+            ['active'],
+            limit=50
+        )
+    """
+    import base64
+    import json
+    
+    params = list(params) if params else []
+    
+    # Get total count
+    total_row = db_query_one(count_sql, tuple(params) if params else None)
+    total = total_row['total'] if total_row else 0
+    
+    # Add limit + 1 to check for more pages
+    select_params = params + [limit + 1]
+    items = db_query(select_sql + " LIMIT %s", tuple(select_params))
+    
+    # Determine if there's a next page
+    has_more = len(items) > limit
+    if has_more:
+        items = items[:-1]
+    
+    # Generate cursor
+    next_cursor = None
+    if has_more and items:
+        last_id = items[-1].get('id')
+        if last_id:
+            cursor_data = json.dumps({'last_id': str(last_id)})
+            next_cursor = base64.b64encode(cursor_data.encode()).decode()
+    
+    return {
+        'items': items,
+        'total': total,
+        'limit': limit,
+        'cursor': next_cursor
+    }
+
+
+class db_transaction:
+    """
+    Context manager for database transactions with multiple operations.
+    
+    Usage:
+        with db_transaction() as tx:
+            row = tx.query_one("SELECT * FROM users WHERE id = %s", (user_id,))
+            if row:
+                tx.execute("UPDATE users SET status = %s WHERE id = %s", ('active', user_id))
+                tx.execute("INSERT INTO logs (msg) VALUES (%s)", ('User activated',))
+            # Automatically commits on exit, rolls back on exception
+    """
+    
+    def __init__(self):
+        self.db = None
+        self.cursor = None
+    
+    def __enter__(self):
+        self.db = get_db()
+        self.cursor = self.db.cursor()
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is None:
+            self.db.commit()
+        else:
+            self.db.rollback()
+        self.cursor.close()
+        return False
+    
+    def query(self, sql: str, params: Tuple = None) -> List[Dict[str, Any]]:
+        """Execute SELECT and return all rows."""
+        self.cursor.execute(sql, params)
+        if self.cursor.description:
+            return [dict(row) for row in self.cursor.fetchall()]
+        return []
+    
+    def query_one(self, sql: str, params: Tuple = None) -> Optional[Dict[str, Any]]:
+        """Execute SELECT and return single row."""
+        self.cursor.execute(sql, params)
+        row = self.cursor.fetchone()
+        return dict(row) if row else None
+    
+    def execute(self, sql: str, params: Tuple = None) -> Union[int, Dict[str, Any]]:
+        """Execute INSERT/UPDATE/DELETE, returns row if RETURNING clause used."""
+        self.cursor.execute(sql, params)
+        if self.cursor.description:
+            row = self.cursor.fetchone()
+            return dict(row) if row else None
+        return self.cursor.rowcount
