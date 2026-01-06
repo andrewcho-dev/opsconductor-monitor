@@ -126,37 +126,22 @@ async def get_integration_by_id(integration_id: str) -> Dict[str, Any]:
     """
     Get integration details by ID
     """
-    db = get_db()
-    with db.cursor() as cursor:
-        if not _table_exists(cursor, 'integrations'):
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail={
-                    "code": "INTEGRATION_NOT_FOUND",
-                    "message": f"Integration with ID '{integration_id}' not found"
-                }
-            )
-        
-        cursor.execute("""
-            SELECT i.id, i.name, i.integration_type, i.status, i.description,
-                   i.config, i.created_at, i.updated_at, i.last_sync_at,
-                   i.sync_enabled, i.error_message
-            FROM integrations i
-            WHERE i.id = %s
-        """, (integration_id,))
-        
-        integration = cursor.fetchone()
-        
-        if not integration:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail={
-                    "code": "INTEGRATION_NOT_FOUND",
-                    "message": f"Integration with ID '{integration_id}' not found"
-                }
-            )
-        
-        return dict(integration)
+    if not table_exists('integrations'):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "INTEGRATION_NOT_FOUND", "message": f"Integration with ID '{integration_id}' not found"})
+    
+    integration = db_query_one("""
+        SELECT i.id, i.name, i.integration_type, i.status, i.description,
+               i.config, i.created_at, i.updated_at, i.last_sync_at,
+               i.sync_enabled, i.error_message
+        FROM integrations i WHERE i.id = %s
+    """, (integration_id,))
+    
+    if not integration:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "INTEGRATION_NOT_FOUND", "message": f"Integration with ID '{integration_id}' not found"})
+    
+    return integration
 
 async def test_netbox_connection(netbox_config: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -171,15 +156,12 @@ async def test_netbox_connection(netbox_config: Dict[str, Any]) -> Dict[str, Any
         
         # If no config provided, get from database
         if not url or not token:
-            db = get_db()
-            with db.cursor() as cursor:
-                cursor.execute("SELECT key, value FROM system_settings WHERE key LIKE 'netbox_%'")
-                for row in cursor.fetchall():
-                    key = row['key'].replace('netbox_', '')
-                    if key == 'url' and not url:
-                        url = row['value'].rstrip('/')
-                    elif key == 'token' and not token:
-                        token = row['value']
+            from backend.utils.db import get_settings_by_prefix
+            settings = get_settings_by_prefix('netbox_')
+            if not url:
+                url = settings.get('netbox_url', '').rstrip('/')
+            if not token:
+                token = settings.get('netbox_token', '')
         
         if not url or not token:
             return {
@@ -301,95 +283,51 @@ async def get_mcp_services_status() -> Dict[str, Any]:
     Get MCP (Model Context Protocol) services status
     Migrated from legacy /api/mcp/services
     """
-    db = get_db()
-    with db.cursor() as cursor:
-        if not _table_exists(cursor, 'mcp_services'):
-            return {
-                "services": [],
-                "total_count": 0,
-                "active_count": 0,
-                "last_updated": datetime.now().isoformat()
-            }
-        
-        cursor.execute("""
-            SELECT id, name, service_type, status, endpoint, config,
-                   created_at, updated_at, last_check_at
-            FROM mcp_services
-            ORDER BY name
-        """)
-        
-        services = [dict(row) for row in cursor.fetchall()] if cursor.description else []
-        
-        # Count active services
-        active_count = len([s for s in services if s['status'] == 'active'])
-        
-        return {
-            "services": services,
-            "total_count": len(services),
-            "active_count": active_count,
-            "last_updated": datetime.now().isoformat()
-        }
+    if not table_exists('mcp_services'):
+        return {"services": [], "total_count": 0, "active_count": 0, "last_updated": datetime.now().isoformat()}
+    
+    services = db_query("""
+        SELECT id, name, service_type, status, endpoint, config,
+               created_at, updated_at, last_check_at
+        FROM mcp_services ORDER BY name
+    """)
+    active_count = len([s for s in services if s.get('status') == 'active'])
+    return {"services": services, "total_count": len(services), "active_count": active_count, "last_updated": datetime.now().isoformat()}
 
 async def get_mcp_devices() -> List[Dict[str, Any]]:
     """
     Get MCP devices
     Migrated from legacy /api/mcp/devices
     """
-    db = get_db()
-    with db.cursor() as cursor:
-        if not _table_exists(cursor, 'mcp_devices'):
-            return []
-        
-        cursor.execute("""
-            SELECT id, name, device_type, status, endpoint, config,
-                   created_at, updated_at, last_seen_at
-            FROM mcp_devices
-            ORDER BY name
-        """)
-        
-        devices = [dict(row) for row in cursor.fetchall()] if cursor.description else []
-        
-        return devices
+    if not table_exists('mcp_devices'):
+        return []
+    return db_query("""
+        SELECT id, name, device_type, status, endpoint, config,
+               created_at, updated_at, last_seen_at
+        FROM mcp_devices ORDER BY name
+    """)
 
 async def get_integration_status(integration_type: str) -> Dict[str, Any]:
     """
     Get status for a specific integration type
     """
-    db = get_db()
-    with db.cursor() as cursor:
-        if not _table_exists(cursor, 'integrations'):
-            return {
-                "integration_type": integration_type,
-                "status": "unavailable",
-                "message": "Integrations table not found"
-            }
-        
-        cursor.execute("""
-            SELECT COUNT(*) as total,
-                   COUNT(*) FILTER (WHERE status = 'active') as active,
-                   COUNT(*) FILTER (WHERE sync_enabled = true) as sync_enabled,
-                   MAX(last_sync_at) as last_sync
-            FROM integrations 
-            WHERE integration_type = %s
-        """, (integration_type,))
-        
-        stats = cursor.fetchone()
-        
-        if not stats or stats['total'] == 0:
-            return {
-                "integration_type": integration_type,
-                "status": "not_configured",
-                "message": f"No {integration_type} integrations configured"
-            }
-        
-        return {
-            "integration_type": integration_type,
-            "status": "configured",
-            "total_integrations": stats['total'],
-            "active_integrations": stats['active'],
-            "sync_enabled": stats['sync_enabled'],
-            "last_sync": stats['last_sync'].isoformat() if stats['last_sync'] else None
-        }
+    if not table_exists('integrations'):
+        return {"integration_type": integration_type, "status": "unavailable", "message": "Integrations table not found"}
+    
+    stats = db_query_one("""
+        SELECT COUNT(*) as total,
+               COUNT(*) FILTER (WHERE status = 'active') as active,
+               COUNT(*) FILTER (WHERE sync_enabled = true) as sync_enabled,
+               MAX(last_sync_at) as last_sync
+        FROM integrations WHERE integration_type = %s
+    """, (integration_type,))
+    
+    if not stats or stats['total'] == 0:
+        return {"integration_type": integration_type, "status": "not_configured", "message": f"No {integration_type} integrations configured"}
+    
+    return {"integration_type": integration_type, "status": "configured",
+            "total_integrations": stats['total'], "active_integrations": stats['active'],
+            "sync_enabled": stats['sync_enabled'], "last_sync": stats['last_sync'].isoformat() if stats['last_sync'] else None}
 
 async def sync_integration(integration_id: str, triggered_by: str) -> Dict[str, str]:
     """
