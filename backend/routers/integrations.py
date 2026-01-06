@@ -1,7 +1,7 @@
 """
 Integrations API Router (/integrations/v1)
 
-Handles NetBox, PRTG, MCP, and other external system integrations.
+Handles NetBox, PRTG, and other external system integrations.
 """
 
 from fastapi import APIRouter, Query, Path, Body, Security, HTTPException
@@ -14,14 +14,13 @@ from backend.utils.db import db_query, db_query_one, get_setting, get_settings_b
 from backend.utils.http import NetBoxClient
 from backend.openapi.integrations_impl import (
     list_integrations_paginated, get_integration_by_id, test_netbox_connection,
-    test_prtg_connection, get_mcp_services_status, get_mcp_devices,
-    get_integration_status, sync_integration, test_integrations_endpoints
+    test_prtg_connection, get_integration_status, sync_integration, test_integrations_endpoints
 )
 
 logger = logging.getLogger(__name__)
 security = HTTPBearer()
 
-router = APIRouter(prefix="/integrations/v1", tags=["integrations", "netbox", "prtg", "mcp"])
+router = APIRouter(prefix="/integrations/v1", tags=["integrations", "netbox", "prtg"])
 
 
 @router.get("/", summary="List integrations")
@@ -157,64 +156,6 @@ async def test_prtg(
         return await test_prtg_connection(config)
     except Exception as e:
         return {"success": False, "error": str(e)}
-
-
-# MCP integration
-@router.get("/mcp/settings", summary="Get MCP settings")
-async def mcp_settings(credentials: HTTPAuthorizationCredentials = Security(security)):
-    """Get MCP settings"""
-    return {"url": "", "enabled": False}
-
-
-@router.post("/mcp/test", summary="Test MCP connection")
-async def test_mcp(
-    config: Dict[str, Any] = Body(...),
-    credentials: HTTPAuthorizationCredentials = Security(security)
-):
-    """Test MCP connection"""
-    return {"success": False, "error": "Not configured"}
-
-
-@router.get("/mcp/services", summary="Get MCP services")
-async def mcp_services(credentials: HTTPAuthorizationCredentials = Security(security)):
-    """Get MCP services"""
-    try:
-        data = await get_mcp_services_status()
-        return data
-    except Exception as e:
-        logger.error(f"Get MCP services error: {str(e)}")
-        return {"services": [], "total_count": 0, "active_count": 0}
-
-
-@router.get("/mcp/services/summary", summary="Get MCP services summary")
-async def mcp_summary(credentials: HTTPAuthorizationCredentials = Security(security)):
-    """Get MCP services summary"""
-    try:
-        data = await get_mcp_services_status()
-        return {
-            "total_services": data.get('total_count', 0),
-            "active_services": data.get('active_count', 0),
-            "last_updated": data.get('last_updated', datetime.now().isoformat())
-        }
-    except Exception as e:
-        return {"total_services": 0, "active_services": 0}
-
-
-@router.get("/mcp/services/rings", summary="Get MCP rings")
-async def mcp_rings(credentials: HTTPAuthorizationCredentials = Security(security)):
-    """Get MCP service rings"""
-    return {"rings": []}
-
-
-@router.get("/mcp/devices", summary="Get MCP devices")
-async def mcp_devices(credentials: HTTPAuthorizationCredentials = Security(security)):
-    """Get MCP devices"""
-    try:
-        return await get_mcp_devices()
-    except Exception as e:
-        logger.error(f"Get MCP devices error: {str(e)}")
-        return []
-
 
 @router.get("/test", include_in_schema=False)
 async def test_api():

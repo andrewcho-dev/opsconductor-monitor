@@ -11,7 +11,7 @@ import { DevicesPage, DeviceDetailPage, GroupsPage, DeviceImporterPage, PRTGNetB
 import { WorkflowsListPage, WorkflowBuilderPage } from "./pages/workflows";
 
 // Monitor Module
-import { DashboardPage, TopologyPage, PowerTrendsPage, AlertsPage, ActiveJobsPage, JobHistoryPage, MCPServicesPage, SNMPLivePage, SNMPAlarmsPage, UPSMonitorPage } from "./pages/monitor";
+import { DashboardPage, TopologyPage, PowerTrendsPage, AlertsPage, ActiveJobsPage, JobHistoryPage, SNMPLivePage, SNMPAlarmsPage, UPSMonitorPage } from "./pages/monitor";
 import PollingPage from "./pages/monitor/PollingPage";
 import MibMappingsPage from "./pages/monitor/MibMappingsPage";
 
@@ -37,7 +37,6 @@ import {
   NetBoxSettings,
   BackupSettings,
   PRTGSettings,
-  MCPSettings
 } from "./pages/system/settings";
 
 function App() {
@@ -73,7 +72,6 @@ function App() {
         <Route path="/monitor/alerts" element={<ProtectedRoute><AlertsPage /></ProtectedRoute>} />
         <Route path="/monitor/active-jobs" element={<ProtectedRoute permission="jobs.job.view"><ActiveJobsPage /></ProtectedRoute>} />
         <Route path="/monitor/job-history" element={<ProtectedRoute permission="jobs.job.view"><JobHistoryPage /></ProtectedRoute>} />
-        <Route path="/monitor/mcp-services" element={<ProtectedRoute><MCPServicesPage /></ProtectedRoute>} />
         <Route path="/monitor/snmp-live" element={<ProtectedRoute><SNMPLivePage /></ProtectedRoute>} />
         <Route path="/monitor/snmp-alarms" element={<ProtectedRoute><SNMPAlarmsPage /></ProtectedRoute>} />
         <Route path="/monitor/ups" element={<ProtectedRoute><UPSMonitorPage /></ProtectedRoute>} />
@@ -100,7 +98,6 @@ function App() {
           <Route path="logging" element={<LoggingSettings />} />
           <Route path="netbox" element={<NetBoxSettings />} />
           <Route path="prtg" element={<PRTGSettings />} />
-          <Route path="mcp" element={<MCPSettings />} />
           <Route path="backup" element={<BackupSettings />} />
         </Route>
         <Route path="/system/notifications" element={<ProtectedRoute permission="system.settings.view"><NotificationsPage /></ProtectedRoute>} />
