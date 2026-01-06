@@ -32,7 +32,7 @@ async def list_devices(
 ):
     """List network devices with filtering and pagination"""
     try:
-        return await list_devices_paginated(limit, cursor, site, role, status)
+        return await list_devices_paginated(cursor_str=cursor, limit=limit, site_id=site, device_type=role, status_filter=status)
     except Exception as e:
         logger.error(f"List devices error: {str(e)}")
         raise HTTPException(status_code=500, detail={"code": "LIST_DEVICES_ERROR", "message": str(e)})
