@@ -266,97 +266,54 @@ async def get_telemetry_status() -> Dict[str, Any]:
     """
     Get telemetry and monitoring service status
     """
-    db = get_db()
-    with db.cursor() as cursor:
-        status = {
-            "database": "connected",
-            "polling": "active",
-            "metrics_collection": "active",
-            "alerting": "active",
-            "last_update": datetime.now().isoformat(),
-            "services": {}
-        }
-        
-        # Check if monitoring tables exist
-        monitoring_tables = ['alerts', 'optical_metrics', 'interface_metrics', 'availability_metrics']
-        for table in monitoring_tables:
-            status["services"][table] = {
-                "status": "available" if _table_exists(cursor, table) else "unavailable",
-                "table_exists": _table_exists(cursor, table)
-            }
-        
-        # Get recent activity counts
-        if _table_exists(cursor, 'alerts'):
-            cursor.execute("SELECT COUNT(*) as count FROM alerts WHERE created_at >= NOW() - INTERVAL '1 hour'")
-            status["services"]["alerts"]["last_hour_count"] = cursor.fetchone()['count']
-        
-        if _table_exists(cursor, 'optical_metrics'):
-            cursor.execute("SELECT COUNT(*) as count FROM optical_metrics WHERE timestamp >= NOW() - INTERVAL '1 hour'")
-            status["services"]["optical_metrics"]["last_hour_count"] = cursor.fetchone()['count']
-        
-        return status
+    result = {
+        "database": "connected", "polling": "active", "metrics_collection": "active",
+        "alerting": "active", "last_update": datetime.now().isoformat(), "services": {}
+    }
+    
+    # Check if monitoring tables exist
+    for tbl in ['alerts', 'optical_metrics', 'interface_metrics', 'availability_metrics']:
+        exists = table_exists(tbl)
+        result["services"][tbl] = {"status": "available" if exists else "unavailable", "table_exists": exists}
+    
+    # Get recent activity counts
+    if table_exists('alerts'):
+        row = db_query_one("SELECT COUNT(*) as count FROM alerts WHERE created_at >= NOW() - INTERVAL '1 hour'")
+        result["services"]["alerts"]["last_hour_count"] = row['count'] if row else 0
+    
+    if table_exists('optical_metrics'):
+        row = db_query_one("SELECT COUNT(*) as count FROM optical_metrics WHERE timestamp >= NOW() - INTERVAL '1 hour'")
+        result["services"]["optical_metrics"]["last_hour_count"] = row['count'] if row else 0
+    
+    return result
 
 async def get_alert_stats() -> Dict[str, Any]:
     """
     Get alert statistics
     Migrated from legacy /api/alerts/stats
     """
-    db = get_db()
-    with db.cursor() as cursor:
-        if not _table_exists(cursor, 'alerts'):
-            return {
-                "total": 0,
-                "by_severity": {},
-                "by_status": {},
-                "recent_24h": 0,
-                "acknowledged": 0,
-                "unacknowledged": 0
-            }
-        
-        # Overall stats
-        cursor.execute("SELECT COUNT(*) as total FROM alerts")
-        total = cursor.fetchone()['total']
-        
-        # By severity
-        cursor.execute("""
-            SELECT severity, COUNT(*) as count 
-            FROM alerts 
-            GROUP BY severity
-        """)
-        by_severity = {row['severity']: row['count'] for row in cursor.fetchall()}
-        
-        # By status
-        cursor.execute("""
-            SELECT status, COUNT(*) as count 
-            FROM alerts 
-            GROUP BY status
-        """)
-        by_status = {row['status']: row['count'] for row in cursor.fetchall()}
-        
-        # Recent activity
-        cursor.execute("""
-            SELECT COUNT(*) as count FROM alerts 
-            WHERE created_at >= NOW() - INTERVAL '24 hours'
-        """)
-        recent_24h = cursor.fetchone()['count']
-        
-        # Acknowledged vs unacknowledged
-        cursor.execute("""
-            SELECT 
-                COUNT(*) FILTER (WHERE acknowledged_at IS NOT NULL) as acknowledged,
-                COUNT(*) FILTER (WHERE acknowledged_at IS NULL) as unacknowledged
-            FROM alerts
-        """)
-        ack_stats = cursor.fetchone()
-        
-        return {
-            "total": total,
-            "by_severity": by_severity,
-            "by_status": by_status,
-            "recent_24h": recent_24h,
-            "acknowledged": ack_stats['acknowledged'],
-            "unacknowledged": ack_stats['unacknowledged']
-        }
+    if not table_exists('alerts'):
+        return {"total": 0, "by_severity": {}, "by_status": {}, "recent_24h": 0, "acknowledged": 0, "unacknowledged": 0}
+    
+    total_row = db_query_one("SELECT COUNT(*) as total FROM alerts")
+    total = total_row['total'] if total_row else 0
+    
+    severity_rows = db_query("SELECT severity, COUNT(*) as count FROM alerts GROUP BY severity")
+    by_severity = {row['severity']: row['count'] for row in severity_rows}
+    
+    status_rows = db_query("SELECT status, COUNT(*) as count FROM alerts GROUP BY status")
+    by_status = {row['status']: row['count'] for row in status_rows}
+    
+    recent_row = db_query_one("SELECT COUNT(*) as count FROM alerts WHERE created_at >= NOW() - INTERVAL '24 hours'")
+    recent_24h = recent_row['count'] if recent_row else 0
+    
+    ack_row = db_query_one("""
+        SELECT COUNT(*) FILTER (WHERE acknowledged_at IS NOT NULL) as acknowledged,
+               COUNT(*) FILTER (WHERE acknowledged_at IS NULL) as unacknowledged FROM alerts
+    """)
+    
+    return {"total": total, "by_severity": by_severity, "by_status": by_status, "recent_24h": recent_24h,
+            "acknowledged": ack_row['acknowledged'] if ack_row else 0, "unacknowledged": ack_row['unacknowledged'] if ack_row else 0}
 
 # ============================================================================
 # Testing Functions
