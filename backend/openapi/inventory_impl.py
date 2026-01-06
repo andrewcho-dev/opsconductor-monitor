@@ -105,28 +105,18 @@ async def get_device_by_id(device_id: str) -> Dict[str, Any]:
     Get device details by ID
     Uses netbox_device_cache table (same as legacy)
     """
-    db = get_db()
-    with db.cursor() as cursor:
-        cursor.execute("""
-            SELECT netbox_device_id as id, device_name as name, device_ip::text as ip_address,
-                   device_type, manufacturer as vendor, site_name, role_name as role,
-                   site_id, cached_at as created_at, cached_at as updated_at, cached_at as last_seen
-            FROM netbox_device_cache
-            WHERE netbox_device_id = %s OR device_ip::text = %s
-        """, (device_id, device_id))
-        
-        device = cursor.fetchone()
-        
-        if not device:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail={
-                    "code": "DEVICE_NOT_FOUND",
-                    "message": f"Device with ID '{device_id}' not found"
-                }
-            )
-        
-        return dict(device)
+    device = db_query_one("""
+        SELECT netbox_device_id as id, device_name as name, device_ip::text as ip_address,
+               device_type, manufacturer as vendor, site_name, role_name as role,
+               site_id, cached_at as created_at, cached_at as updated_at, cached_at as last_seen
+        FROM netbox_device_cache WHERE netbox_device_id = %s OR device_ip::text = %s
+    """, (device_id, device_id))
+    
+    if not device:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "DEVICE_NOT_FOUND", "message": f"Device with ID '{device_id}' not found"})
+    
+    return device
 
 async def list_device_interfaces(device_id: str) -> List[Dict[str, Any]]:
     """
@@ -198,86 +188,59 @@ async def list_sites() -> List[Dict[str, Any]]:
     List all sites
     Migrated from legacy /api/inventory/sites
     """
-    db = get_db()
-    with db.cursor() as cursor:
-        if not _table_exists(cursor, 'sites'):
-            return []
-        
-        cursor.execute("""
-            SELECT s.id, s.name, s.description, s.address, s.city,
-                   s.state, s.country, s.latitude, s.longitude,
-                   s.created_at, s.updated_at,
-                   (SELECT COUNT(*) FROM netbox_device_cache d WHERE d.site_id = s.id) as device_count
-            FROM sites s
-            ORDER BY s.name
-        """)
-        
-        sites = [dict(row) for row in cursor.fetchall()] if cursor.description else []
-        
-        return sites
+    if not table_exists('sites'):
+        return []
+    return db_query("""
+        SELECT s.id, s.name, s.description, s.address, s.city,
+               s.state, s.country, s.latitude, s.longitude,
+               s.created_at, s.updated_at,
+               (SELECT COUNT(*) FROM netbox_device_cache d WHERE d.site_id = s.id) as device_count
+        FROM sites s ORDER BY s.name
+    """)
 
 async def list_modules(device_id: Optional[str] = None) -> List[Dict[str, Any]]:
     """
     List device modules
     Migrated from legacy /api/inventory/modules
     """
-    db = get_db()
-    with db.cursor() as cursor:
-        if not _table_exists(cursor, 'modules'):
-            return []
-        
-        where_clause = ""
-        params = []
-        
-        if device_id:
-            where_clause = "WHERE m.device_id = %s"
-            params.append(device_id)
-        
-        cursor.execute(f"""
+    if not table_exists('modules'):
+        return []
+    
+    if device_id:
+        return db_query("""
             SELECT m.id, m.device_id, m.name, m.description, m.type,
-                   m.part_number, m.serial_number, m.status,
-                   m.created_at, m.updated_at,
+                   m.part_number, m.serial_number, m.status, m.created_at, m.updated_at,
                    d.name as device_name
-            FROM modules m
-            LEFT JOIN devices d ON m.device_id = d.id
-            {where_clause}
-            ORDER BY m.device_id, m.name
-        """, params)
-        
-        modules = [dict(row) for row in cursor.fetchall()] if cursor.description else []
-        
-        return modules
+            FROM modules m LEFT JOIN devices d ON m.device_id = d.id
+            WHERE m.device_id = %s ORDER BY m.device_id, m.name
+        """, (device_id,))
+    return db_query("""
+        SELECT m.id, m.device_id, m.name, m.description, m.type,
+               m.part_number, m.serial_number, m.status, m.created_at, m.updated_at,
+               d.name as device_name
+        FROM modules m LEFT JOIN devices d ON m.device_id = d.id ORDER BY m.device_id, m.name
+    """)
 
 async def list_racks(site_id: Optional[str] = None) -> List[Dict[str, Any]]:
     """
     List racks
     Migrated from legacy /api/inventory/racks
     """
-    db = get_db()
-    with db.cursor() as cursor:
-        if not _table_exists(cursor, 'racks'):
-            return []
-        
-        where_clause = ""
-        params = []
-        
-        if site_id:
-            where_clause = "WHERE r.site_id = %s"
-            params.append(site_id)
-        
-        cursor.execute(f"""
+    if not table_exists('racks'):
+        return []
+    
+    if site_id:
+        return db_query("""
             SELECT r.id, r.site_id, r.name, r.description, r.height,
-                   r.position, r.status, r.created_at, r.updated_at,
-                   s.name as site_name
-            FROM racks r
-            LEFT JOIN sites s ON r.site_id = s.id
-            {where_clause}
-            ORDER BY r.site_id, r.name
-        """, params)
-        
-        racks = [dict(row) for row in cursor.fetchall()] if cursor.description else []
-        
-        return racks
+                   r.position, r.status, r.created_at, r.updated_at, s.name as site_name
+            FROM racks r LEFT JOIN sites s ON r.site_id = s.id
+            WHERE r.site_id = %s ORDER BY r.site_id, r.name
+        """, (site_id,))
+    return db_query("""
+        SELECT r.id, r.site_id, r.name, r.description, r.height,
+               r.position, r.status, r.created_at, r.updated_at, s.name as site_name
+        FROM racks r LEFT JOIN sites s ON r.site_id = s.id ORDER BY r.site_id, r.name
+    """)
 
 # ============================================================================
 # Testing Functions
