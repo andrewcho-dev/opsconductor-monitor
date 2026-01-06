@@ -31,7 +31,7 @@ async def list_workflows(
 ):
     """List automation workflows"""
     try:
-        return await list_workflows_paginated(limit, cursor, folder_id)
+        return await list_workflows_paginated(cursor_str=cursor, limit=limit)
     except Exception as e:
         logger.error(f"List workflows error: {str(e)}")
         raise HTTPException(status_code=500, detail={"code": "LIST_WORKFLOWS_ERROR", "message": str(e)})
@@ -63,7 +63,7 @@ async def execute_workflow(
 ):
     """Trigger workflow execution"""
     try:
-        return await trigger_workflow_execution(workflow_id, request.get('parameters', {}))
+        return await trigger_workflow_execution(str(workflow_id), "api_user", request.get('parameters', {}))
     except Exception as e:
         logger.error(f"Execute workflow error: {str(e)}")
         raise HTTPException(status_code=500, detail={"code": "EXECUTE_ERROR", "message": str(e)})
@@ -78,7 +78,7 @@ async def list_executions(
 ):
     """List job executions"""
     try:
-        return await list_job_executions_paginated(limit, cursor, status)
+        return await list_job_executions_paginated(cursor_str=cursor, limit=limit, status_filter=status)
     except Exception as e:
         logger.error(f"List executions error: {str(e)}")
         raise HTTPException(status_code=500, detail={"code": "LIST_EXECUTIONS_ERROR", "message": str(e)})
@@ -104,7 +104,7 @@ async def cancel_exec(
 ):
     """Cancel a running execution"""
     try:
-        return await cancel_execution(execution_id)
+        return await cancel_execution(execution_id, "api_user")
     except Exception as e:
         logger.error(f"Cancel execution error: {str(e)}")
         raise HTTPException(status_code=500, detail={"code": "CANCEL_ERROR", "message": str(e)})
