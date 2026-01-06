@@ -100,6 +100,18 @@ async def netbox_devices(
         return {"data": [], "count": 0}
 
 
+@router.get("/netbox/settings", summary="Get NetBox settings")
+async def netbox_settings(credentials: HTTPAuthorizationCredentials = Security(security)):
+    """Get NetBox integration settings"""
+    try:
+        url = get_setting('netbox_url') or ''
+        enabled = bool(url)
+        return {"url": url, "enabled": enabled, "api_token_set": bool(get_setting('netbox_api_token'))}
+    except Exception as e:
+        logger.error(f"Get NetBox settings error: {str(e)}")
+        return {"url": "", "enabled": False, "api_token_set": False}
+
+
 @router.get("/netbox/prefixes", summary="Get NetBox prefixes")
 async def netbox_prefixes(credentials: HTTPAuthorizationCredentials = Security(security)):
     """Get IP prefixes from NetBox API"""
@@ -140,6 +152,18 @@ async def netbox_tags(credentials: HTTPAuthorizationCredentials = Security(secur
 
 
 # PRTG integration
+@router.get("/prtg/settings", summary="Get PRTG settings")
+async def prtg_settings(credentials: HTTPAuthorizationCredentials = Security(security)):
+    """Get PRTG integration settings"""
+    try:
+        url = get_setting('prtg_url') or ''
+        enabled = bool(url)
+        return {"url": url, "enabled": enabled, "api_token_set": bool(get_setting('prtg_api_token'))}
+    except Exception as e:
+        logger.error(f"Get PRTG settings error: {str(e)}")
+        return {"url": "", "enabled": False, "api_token_set": False}
+
+
 @router.get("/prtg/status", summary="Get PRTG status")
 async def prtg_status(credentials: HTTPAuthorizationCredentials = Security(security)):
     """Get PRTG connection status"""
@@ -156,6 +180,13 @@ async def test_prtg(
         return await test_prtg_connection(config)
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+# MCP settings stub (feature removed but endpoint needed for frontend compatibility)
+@router.get("/mcp/settings", summary="Get MCP settings")
+async def mcp_settings(credentials: HTTPAuthorizationCredentials = Security(security)):
+    """Get MCP settings - returns disabled since feature was removed"""
+    return {"url": "", "enabled": False}
+
 
 @router.get("/test", include_in_schema=False)
 async def test_api():
