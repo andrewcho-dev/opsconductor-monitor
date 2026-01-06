@@ -7,7 +7,7 @@ import {
   Loader2, Copy, TestTube, Save, Zap, CheckSquare, Square,
   Upload, FileText, Download
 } from 'lucide-react';
-import { cn } from '../../lib/utils';
+import { cn, fetchApi } from '../../lib/utils';
 
 const API_BASE = '/monitoring/v1/mib';
 
@@ -42,11 +42,11 @@ function ImportMibModal({ profiles, onClose, onImported }) {
       const formData = new FormData();
       formData.append('file', file);
       
-      const res = await fetch(`${API_BASE}/parse-mib`, {
+      const data = await fetchApi(`${API_BASE}/parse-mib`, {
         method: 'POST',
-        body: formData
+        body: formData,
+        rawBody: true
       });
-      const data = await res.json();
       
       if (data.success) {
         setParsedMib(data.data);
@@ -81,9 +81,8 @@ function ImportMibModal({ profiles, onClose, onImported }) {
       setLoading(true);
       setError(null);
       
-      const res = await fetch(`${API_BASE}/import-mib`, {
+      const data = await fetchApi(`${API_BASE}/import-mib`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           profile_id: profileId || null,
           profile_name: newProfileName,
@@ -93,7 +92,6 @@ function ImportMibModal({ profiles, onClose, onImported }) {
           groups: groupsToImport
         })
       });
-      const data = await res.json();
       
       if (data.success) {
         onImported(data.data);
@@ -327,9 +325,8 @@ function CreatePollTypeModal({ profile, selectedOids, onClose, onCreated }) {
     }
     try {
       setSaving(true);
-      const res = await fetch(`${API_BASE}/profiles/${profile.id}/poll-types`, {
+      const data = await fetchApi(`${API_BASE}/profiles/${profile.id}/poll-types`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name,
           display_name: displayName,
@@ -339,7 +336,6 @@ function CreatePollTypeModal({ profile, selectedOids, onClose, onCreated }) {
           enabled: true
         })
       });
-      const data = await res.json();
       if (data.success) {
         onCreated(data.data.poll_type);
       } else {
@@ -446,12 +442,10 @@ function TestPollModal({ oid, onClose }) {
     try {
       setLoading(true);
       setResult(null);
-      const res = await fetch(`${API_BASE}/test-poll`, {
+      const data = await fetchApi(`${API_BASE}/test-poll`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ host, community, oid: oid.oid })
       });
-      const data = await res.json();
       setResult(data);
     } catch (e) {
       setResult({ success: false, message: e.message });
@@ -549,8 +543,7 @@ export default function MibMappingsPage() {
   const loadProfiles = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_BASE}/profiles`);
-      const data = await res.json();
+      const data = await fetchApi(`${API_BASE}/profiles`);
       // Handle both {success, data} and direct response formats
       const profileList = data?.data?.profiles || data?.profiles || (Array.isArray(data) ? data : []);
       setProfiles(profileList);
@@ -568,8 +561,7 @@ export default function MibMappingsPage() {
     try {
       setLoading(true);
       setSelectedOids([]);
-      const res = await fetch(`${API_BASE}/profiles/${profileId}`);
-      const data = await res.json();
+      const data = await fetchApi(`${API_BASE}/profiles/${profileId}`);
       // Handle both {success, data} and direct response formats
       const profile = data?.data?.profile || data?.profile || data;
       setSelectedProfile(profile);
