@@ -13,7 +13,8 @@ from fastapi import HTTPException, status
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from backend.database import get_db
+from backend.utils.db import db_query, db_query_one, db_execute, table_exists
+from backend.database import get_db  # TODO: refactor remaining usages
 from backend.services.logging_service import get_logger, LogSource
 
 logger = get_logger(__name__, LogSource.SYSTEM)
