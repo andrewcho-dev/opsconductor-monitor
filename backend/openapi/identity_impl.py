@@ -77,67 +77,44 @@ async def authenticate_user(username: str, password: str) -> Dict[str, Any]:
     """
     try:
         logger.info(f"Attempting authentication for user: {username}")
-        db = get_db()
-        with db.cursor() as cursor:
-            if not _table_exists(cursor, 'users'):
-                logger.error("Users table does not exist")
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail={
-                        "code": "USERS_TABLE_MISSING",
-                        "message": "User database not initialized"
-                    }
-                )
-            
-            # Query user
-            cursor.execute("""
-                SELECT id, username, email, password_hash, created_at,
-                       username as display_name,
-                       '' as first_name,
-                       '' as last_name,
-                       'active' as status,
-                       false as two_factor_enabled
-                FROM users 
-                WHERE username = %s OR email = %s
-            """, (username, username))
-            
-            user = cursor.fetchone()
-            
-            if not user:
-                logger.warning(f"Login attempt for non-existent user: {username}")
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail={
-                        "code": "INVALID_CREDENTIALS",
-                        "message": "Invalid username or password"
-                    }
-                )
-            
-            # Verify password
-            if not verify_password(password, user['password_hash']):
-                logger.warning(f"Invalid password for user: {username}")
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail={
-                        "code": "INVALID_CREDENTIALS", 
-                        "message": "Invalid username or password"
-                    }
-                )
-            
-            logger.info(f"User authenticated successfully: {username}")
-            
-            # Return user data
-            return {
-                "id": str(user['id']),
-                "username": user['username'],
-                "email": user['email'],
-                "display_name": user['display_name'],
-                "first_name": user['first_name'],
-                "last_name": user['last_name'],
-                "status": user['status'],
-                "two_factor_enabled": user['two_factor_enabled'],
-                "created_at": user['created_at']
-            }
+        if not table_exists('users'):
+            logger.error("Users table does not exist")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={"code": "USERS_TABLE_MISSING", "message": "User database not initialized"}
+            )
+        
+        # Query user
+        user = db_query_one("""
+            SELECT id, username, email, password_hash, created_at,
+                   username as display_name, '' as first_name, '' as last_name,
+                   'active' as status, false as two_factor_enabled
+            FROM users WHERE username = %s OR email = %s
+        """, (username, username))
+        
+        if not user:
+            logger.warning(f"Login attempt for non-existent user: {username}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={"code": "INVALID_CREDENTIALS", "message": "Invalid username or password"}
+            )
+        
+        # Verify password
+        if not verify_password(password, user['password_hash']):
+            logger.warning(f"Invalid password for user: {username}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={"code": "INVALID_CREDENTIALS", "message": "Invalid username or password"}
+            )
+        
+        logger.info(f"User authenticated successfully: {username}")
+        
+        return {
+            "id": str(user['id']), "username": user['username'], "email": user['email'],
+            "display_name": user['display_name'], "first_name": user['first_name'],
+            "last_name": user['last_name'], "status": user['status'],
+            "two_factor_enabled": user['two_factor_enabled'], "created_at": user['created_at']
+        }
             
     except HTTPException:
         raise
