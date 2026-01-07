@@ -164,7 +164,8 @@ async def test_prtg_connection(prtg_config: Dict[str, Any]) -> Dict[str, Any]:
         username = prtg_config.get('username', '')
         passhash = prtg_config.get('passhash', '')
         api_token = prtg_config.get('api_token', '')
-        verify_ssl = prtg_config.get('verify_ssl', 'true').lower() != 'false'
+        verify_ssl_val = prtg_config.get('verify_ssl', True)
+        verify_ssl = verify_ssl_val if isinstance(verify_ssl_val, bool) else str(verify_ssl_val).lower() != 'false'
         
         # Support both passhash and api_token authentication
         if not url:

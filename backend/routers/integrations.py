@@ -191,7 +191,8 @@ async def prtg_status(credentials: HTTPAuthorizationCredentials = Security(secur
         result = await test_prtg_connection({
             'url': url,
             'username': get_setting('prtg_username'),
-            'passhash': get_setting('prtg_passhash') or get_setting('prtg_api_token'),
+            'passhash': get_setting('prtg_passhash'),
+            'api_token': get_setting('prtg_api_token'),
             'verify_ssl': False
         })
         
