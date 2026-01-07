@@ -204,27 +204,44 @@ async def list_users_paginated(
 ) -> Dict[str, Any]:
     """
     List users with pagination and filtering
-    Migrated from legacy /api/users
+    Includes both local users and enterprise (AD/LDAP) users
     """
-    where_clauses = []
-    params = []
-    
-    if search:
-        where_clauses.append("(u.username ILIKE %s OR u.email ILIKE %s)")
-        search_param = f"%{search}%"
-        params.extend([search_param, search_param])
-    
-    where_clause = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
-    
-    return db_paginate(
-        f"""SELECT u.id, u.username, u.email, u.created_at, u.username as display_name,
+    # Get local users
+    local_users = db_query("""
+        SELECT u.id, u.username, u.email, u.created_at, u.username as display_name,
                '' as first_name, '' as last_name, 'active' as status, false as two_factor_enabled,
-               COALESCE(array_agg(r.name), ARRAY[]::text[]) as roles
-            FROM users u LEFT JOIN user_roles ur ON u.id = ur.user_id
-            LEFT JOIN roles r ON ur.role_id = r.id {where_clause} GROUP BY u.id ORDER BY u.id""",
-        f"SELECT COUNT(*) as total FROM users u {where_clause}",
-        params, limit
-    )
+               'local' as auth_type,
+               COALESCE(array_agg(r.name) FILTER (WHERE r.name IS NOT NULL), ARRAY[]::text[]) as roles
+        FROM users u 
+        LEFT JOIN user_roles ur ON u.id = ur.user_id
+        LEFT JOIN roles r ON ur.role_id = r.id 
+        GROUP BY u.id ORDER BY u.id
+    """)
+    
+    # Get enterprise users (AD/LDAP) from enterprise_user_roles
+    enterprise_users = []
+    if table_exists('enterprise_user_roles'):
+        enterprise_users = db_query("""
+            SELECT eur.id + 10000 as id, eur.username, 
+                   CASE WHEN eur.email = '[]' THEN '' ELSE eur.email END as email,
+                   eur.assigned_at as created_at, 
+                   COALESCE(eur.display_name, eur.username) as display_name,
+                   '' as first_name, '' as last_name, 'active' as status, false as two_factor_enabled,
+                   'enterprise' as auth_type,
+                   ARRAY[r.name] as roles
+            FROM enterprise_user_roles eur
+            LEFT JOIN roles r ON eur.role_id = r.id
+            ORDER BY eur.username
+        """)
+    
+    # Combine and return
+    all_users = local_users + enterprise_users
+    return {
+        'items': all_users[:limit],
+        'total': len(all_users),
+        'limit': limit,
+        'cursor': None
+    }
 
 async def list_roles_with_counts() -> List[Dict[str, Any]]:
     """
