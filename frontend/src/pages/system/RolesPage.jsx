@@ -430,10 +430,10 @@ function RoleMembersPanel({ roleId, members, loading, canManage, getAuthHeader, 
           {!showAddMember ? (
             <button
               onClick={() => setShowAddMember(true)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-blue-50 text-blue-600 rounded hover:bg-blue-100"
+              className="p-1.5 bg-blue-600 text-white rounded hover:bg-blue-700"
+              title="Add Member"
             >
-              <UserPlus className="w-3.5 h-3.5" />
-              Add Member
+              <Plus className="w-4 h-4" />
             </button>
           ) : (
             <div className="p-2.5 bg-gray-50 rounded-lg space-y-2">
