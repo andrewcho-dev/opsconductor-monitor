@@ -340,12 +340,10 @@ export function DevicesPage() {
 
   const handleRefresh = () => {
     refetchDevices();
-    refetchPrefixes();
-    refetchRanges();
     refetchTags();
   };
 
-  const loading = devicesLoading || prefixesLoading || rangesLoading || tagsLoading;
+  const loading = devicesLoading || tagsLoading;
 
   // Device type icon
   const DeviceTypeIcon = ({ type }) => {
