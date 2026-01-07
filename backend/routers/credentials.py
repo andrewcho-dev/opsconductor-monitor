@@ -98,6 +98,21 @@ async def create_credential(
         raise HTTPException(status_code=500, detail={"code": "CREATE_CREDENTIAL_ERROR", "message": str(e)})
 
 
+@router.get("/credentials/groups", summary="Get credential groups")
+async def get_credential_groups(
+    credentials: HTTPAuthorizationCredentials = Security(security)
+):
+    """Get credential groups"""
+    try:
+        groups = db_query("SELECT id, name, description, created_at FROM credential_groups ORDER BY name")
+        return {"groups": groups, "total": len(groups)}
+    except Exception as e:
+        if 'does not exist' in str(e):
+            return {"groups": [], "total": 0}
+        logger.error(f"Get credential groups error: {str(e)}")
+        return {"groups": [], "total": 0}
+
+
 @router.get("/credentials/{credential_id}/devices", summary="Get credential device associations")
 async def get_credential_devices(
     credential_id: int = Path(...),
