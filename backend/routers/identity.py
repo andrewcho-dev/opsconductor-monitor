@@ -143,7 +143,7 @@ async def list_users(
 ):
     """List users with pagination"""
     try:
-        return await list_users_paginated(limit, cursor)
+        return await list_users_paginated(page_cursor=cursor, limit=limit)
     except Exception as e:
         logger.error(f"List users error: {str(e)}")
         raise HTTPException(status_code=500, detail={"code": "LIST_USERS_ERROR", "message": str(e)})
