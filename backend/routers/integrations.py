@@ -105,12 +105,12 @@ async def netbox_settings(credentials: HTTPAuthorizationCredentials = Security(s
     """Get NetBox integration settings"""
     try:
         url = get_setting('netbox_url') or ''
-        token = get_setting('netbox_api_token') or ''
+        token = get_setting('netbox_token') or get_setting('netbox_api_token') or ''
         return {
             "success": True,
             "data": {
                 "url": url,
-                "token": token,
+                "token_configured": bool(token),
                 "verify_ssl": True,
                 "enabled": bool(url)
             }
