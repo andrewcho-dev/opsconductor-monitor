@@ -68,38 +68,20 @@ export function DevicesPage() {
     status: '',
   });
 
-  // Assign devices to IP prefixes and ranges
+  // Process devices with network info derived from IP
   const devicesWithRanges = useMemo(() => {
     return devices.map(device => {
       const ip = device.ip_address;
-      
-      // Find matching prefix (most specific match - longest prefix)
-      const matchingPrefixes = ipPrefixes.filter(prefix => 
-        isIpInPrefix(ip, prefix.prefix)
-      );
-      // Sort by prefix length descending to get most specific match
-      matchingPrefixes.sort((a, b) => {
-        const aLen = parseInt(a.prefix.split('/')[1] || 0);
-        const bLen = parseInt(b.prefix.split('/')[1] || 0);
-        return bLen - aLen;
-      });
-      const matchingPrefix = matchingPrefixes[0];
-      
-      // Find matching range
-      const matchingRange = ipRanges.find(range => 
-        isIpInRange(ip, range.start_address, range.end_address)
-      );
+      // Derive network from IP (first 3 octets)
+      const networkPrefix = ip ? ip.split('.').slice(0, 3).join('.') + '.0/24' : null;
       
       return {
         ...device,
-        network_prefix: matchingPrefix?.prefix || null,
-        network_prefix_id: matchingPrefix?.id || null,
-        network_prefix_display: matchingPrefix?.display || "Unassigned",
-        network_range: matchingRange?.display || "Unassigned",
-        network_range_id: matchingRange?.id || null,
+        network_prefix: networkPrefix,
+        network_prefix_display: networkPrefix || "Unknown",
       };
     });
-  }, [devices, ipPrefixes, ipRanges]);
+  }, [devices]);
 
   // Get unique values for filter dropdowns
   const filterOptions = useMemo(() => {
@@ -123,27 +105,18 @@ export function DevicesPage() {
     };
   }, [devicesWithRanges]);
 
-  // Filter devices by search, selected prefix, selected range, and filters
+  // Filter devices by search, selected group, and filters
   const filteredDevices = useMemo(() => {
     let filtered = devicesWithRanges;
     
-    // Filter by selected prefix
-    if (selectedPrefix !== null) {
-      if (selectedPrefix === 'unassigned') {
-        filtered = filtered.filter(d => d.network_prefix_id === null);
-      } else {
-        const prefixId = typeof selectedPrefix === 'string' ? parseInt(selectedPrefix) : selectedPrefix;
-        filtered = filtered.filter(d => d.network_prefix_id === prefixId);
-      }
-    }
-    
-    // Filter by selected range
-    if (selectedRange !== null) {
-      if (selectedRange === 'unassigned') {
-        filtered = filtered.filter(d => d.network_range_id === null);
-      } else {
-        const rangeId = typeof selectedRange === 'string' ? parseInt(selectedRange) : selectedRange;
-        filtered = filtered.filter(d => d.network_range_id === rangeId);
+    // Filter by selected group (network, site, or type)
+    if (selectedGroup) {
+      if (viewMode === 'network') {
+        filtered = filtered.filter(d => d.network_prefix === selectedGroup);
+      } else if (viewMode === 'site') {
+        filtered = filtered.filter(d => d.site === selectedGroup);
+      } else if (viewMode === 'type') {
+        filtered = filtered.filter(d => d.device_type === selectedGroup);
       }
     }
     
@@ -190,7 +163,7 @@ export function DevicesPage() {
     }
     
     return filtered;
-  }, [devicesWithRanges, selectedPrefix, selectedRange, selectedTags, tagLogic, search, filters]);
+  }, [devicesWithRanges, selectedGroup, viewMode, selectedTags, tagLogic, search, filters]);
   
   // Sort devices within groups
   const sortDevices = (deviceList) => {
@@ -295,45 +268,47 @@ export function DevicesPage() {
     );
   };
 
-  // Group devices by IP range for hierarchical display
-  const groupedByRange = useMemo(() => {
+  // Group devices by selected view mode
+  const groupedDevices = useMemo(() => {
     const groups = {};
     
-    // Initialize groups from IP ranges
-    ipRanges.forEach(range => {
-      groups[range.id] = {
-        id: range.id,
-        display: range.display,
-        description: range.description,
-        devices: [],
-      };
-    });
-    
-    // Add "Unassigned" group
-    groups['unassigned'] = {
-      id: 'unassigned',
-      display: 'Unassigned',
-      description: 'Devices not in any defined IP range',
-      devices: [],
-    };
-    
-    // Assign devices to groups
     filteredDevices.forEach(device => {
-      const rangeId = device.network_range_id || 'unassigned';
-      if (groups[rangeId]) {
-        groups[rangeId].devices.push(device);
+      let groupKey;
+      let groupDisplay;
+      
+      if (viewMode === 'network') {
+        groupKey = device.network_prefix || 'unknown';
+        groupDisplay = device.network_prefix || 'Unknown Network';
+      } else if (viewMode === 'site') {
+        groupKey = device.site || 'unknown';
+        groupDisplay = device.site || 'No Site';
+      } else if (viewMode === 'type') {
+        groupKey = device.device_type || 'unknown';
+        groupDisplay = device.device_type || 'Unknown Type';
+      } else {
+        // For 'all' view, just use one group
+        groupKey = 'all';
+        groupDisplay = 'All Devices';
       }
+      
+      if (!groups[groupKey]) {
+        groups[groupKey] = {
+          id: groupKey,
+          display: groupDisplay,
+          devices: [],
+        };
+      }
+      groups[groupKey].devices.push(device);
     });
     
-    // Convert to array and filter out empty groups
-    return Object.values(groups).filter(g => g.devices.length > 0);
-  }, [filteredDevices, ipRanges]);
+    return Object.values(groups).sort((a, b) => a.display.localeCompare(b.display));
+  }, [filteredDevices, viewMode]);
 
-  const toggleRange = (rangeId) => {
-    setExpandedRanges(prev => {
+  const toggleGroup = (groupId) => {
+    setExpandedGroups(prev => {
       const next = new Set(prev);
-      if (next.has(rangeId)) next.delete(rangeId);
-      else next.add(rangeId);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
       return next;
     });
   };
@@ -394,129 +369,53 @@ export function DevicesPage() {
     );
   };
 
-  // Count devices per prefix for sidebar
-  const prefixDeviceCounts = useMemo(() => {
+  // Count devices per group for sidebar display
+  const groupCounts = useMemo(() => {
     const counts = {};
     devicesWithRanges.forEach(d => {
-      const prefixId = d.network_prefix_id || 'unassigned';
-      counts[prefixId] = (counts[prefixId] || 0) + 1;
+      let key;
+      if (viewMode === 'network') key = d.network_prefix || 'unknown';
+      else if (viewMode === 'site') key = d.site || 'unknown';
+      else if (viewMode === 'type') key = d.device_type || 'unknown';
+      else key = 'all';
+      counts[key] = (counts[key] || 0) + 1;
     });
     return counts;
-  }, [devicesWithRanges]);
+  }, [devicesWithRanges, viewMode]);
 
-  // Count devices per range for sidebar
-  const rangeDeviceCounts = useMemo(() => {
-    const counts = {};
-    devicesWithRanges.forEach(d => {
-      const rangeId = d.network_range_id || 'unassigned';
-      counts[rangeId] = (counts[rangeId] || 0) + 1;
-    });
-    return counts;
-  }, [devicesWithRanges]);
-
-  // Sidebar content for IP prefixes, ranges, and tags
+  // Sidebar content - simplified with groups based on view mode
   const sidebarContent = (
     <>
-      {/* IP Prefixes */}
-      <div className="mb-4">
-        <div className="px-4 py-1">
-          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-            IP Prefixes
-          </span>
+      {/* Group list based on view mode */}
+      {viewMode !== 'all' && (
+        <div className="mb-4">
+          <div className="px-4 py-1">
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+              {viewMode === 'network' ? 'Networks' : viewMode === 'site' ? 'Sites' : 'Device Types'}
+            </span>
+          </div>
+          <div className="mt-1 space-y-0.5 max-h-64 overflow-y-auto">
+            {Object.entries(groupCounts).sort((a, b) => a[0].localeCompare(b[0])).map(([groupKey, count]) => (
+              <button
+                key={groupKey}
+                onClick={() => setSelectedGroup(selectedGroup === groupKey ? null : groupKey)}
+                className={cn(
+                  "w-full flex items-center gap-3 px-4 py-2 text-sm transition-colors",
+                  selectedGroup === groupKey
+                    ? "bg-blue-50 text-blue-700 border-r-2 border-blue-600 font-medium"
+                    : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                )}
+              >
+                {viewMode === 'network' ? <Network className="w-4 h-4" /> : 
+                 viewMode === 'site' ? <Database className="w-4 h-4" /> : 
+                 <Server className="w-4 h-4" />}
+                <span className="truncate text-xs">{groupKey === 'unknown' ? 'Unknown' : groupKey}</span>
+                <span className="ml-auto text-xs text-gray-400">{count}</span>
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="mt-1 space-y-0.5 max-h-64 overflow-y-auto">
-          {ipPrefixes.map(prefix => (
-            <button
-              key={prefix.id}
-              onClick={() => {
-                setSelectedPrefix(selectedPrefix === prefix.id ? null : prefix.id);
-                setSelectedRange(null); // Clear range filter when selecting prefix
-              }}
-              className={cn(
-                "w-full flex items-center gap-3 px-4 py-2 text-sm transition-colors",
-                selectedPrefix === prefix.id
-                  ? "bg-blue-50 text-blue-700 border-r-2 border-blue-600 font-medium"
-                  : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
-              )}
-            >
-              {selectedPrefix === prefix.id ? (
-                <Network className="w-4 h-4" />
-              ) : (
-                <Network className="w-4 h-4 text-gray-400" />
-              )}
-              <span className="truncate font-mono text-xs">{prefix.prefix}</span>
-              <span className="ml-auto text-xs text-gray-400">{prefixDeviceCounts[prefix.id] || 0}</span>
-            </button>
-          ))}
-          {prefixDeviceCounts['unassigned'] > 0 && (
-            <button
-              onClick={() => {
-                setSelectedPrefix(selectedPrefix === 'unassigned' ? null : 'unassigned');
-                setSelectedRange(null);
-              }}
-              className={cn(
-                "w-full flex items-center gap-3 px-4 py-2 text-sm transition-colors",
-                selectedPrefix === 'unassigned'
-                  ? "bg-blue-50 text-blue-700 border-r-2 border-blue-600 font-medium"
-                  : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
-              )}
-            >
-              <Network className="w-4 h-4 text-gray-400" />
-              <span className="truncate">No Prefix</span>
-              <span className="ml-auto text-xs text-gray-400">{prefixDeviceCounts['unassigned']}</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* IP Ranges */}
-      <div className="mb-4">
-        <div className="px-4 py-1">
-          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-            IP Ranges
-          </span>
-        </div>
-        <div className="mt-1 space-y-0.5">
-          {ipRanges.map(range => (
-            <button
-              key={range.id}
-              onClick={() => {
-                setSelectedRange(selectedRange === range.id ? null : range.id);
-                setSelectedPrefix(null); // Clear prefix filter when selecting range
-              }}
-              className={cn(
-                "w-full flex items-center gap-3 px-4 py-2 text-sm transition-colors",
-                selectedRange === range.id
-                  ? "bg-blue-50 text-blue-700 border-r-2 border-blue-600 font-medium"
-                  : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
-              )}
-            >
-              {selectedRange === range.id ? (
-                <FolderOpen className="w-4 h-4" />
-              ) : (
-                <FolderClosed className="w-4 h-4" />
-              )}
-              <span className="truncate font-mono text-xs">{range.display}</span>
-              <span className="ml-auto text-xs text-gray-400">{rangeDeviceCounts[range.id] || 0}</span>
-            </button>
-          ))}
-          {rangeDeviceCounts['unassigned'] > 0 && (
-            <button
-              onClick={() => setSelectedRange(selectedRange === 'unassigned' ? null : 'unassigned')}
-              className={cn(
-                "w-full flex items-center gap-3 px-4 py-2 text-sm transition-colors",
-                selectedRange === 'unassigned'
-                  ? "bg-blue-50 text-blue-700 border-r-2 border-blue-600 font-medium"
-                  : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
-              )}
-            >
-              <FolderClosed className="w-4 h-4 text-gray-400" />
-              <span className="truncate">Unassigned</span>
-              <span className="ml-auto text-xs text-gray-400">{rangeDeviceCounts['unassigned']}</span>
-            </button>
-          )}
-        </div>
-      </div>
+      )}
 
       {/* Tags */}
       {netboxTags.length > 0 && (
@@ -617,18 +516,13 @@ export function DevicesPage() {
               </div>
               
               {/* Active filters indicator */}
-              {(selectedPrefix || selectedRange || selectedTags.length > 0 || filters.role || filters.platform || filters.site || filters.status) && (
+              {(selectedGroup || selectedTags.length > 0 || filters.role || filters.platform || filters.site || filters.status) && (
                 <>
                   <div className="h-5 w-px bg-gray-300" />
                   <div className="flex items-center gap-2 flex-wrap">
-                    {selectedPrefix && (
+                    {selectedGroup && (
                       <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
-                        Prefix: {selectedPrefix === 'unassigned' ? 'No Prefix' : ipPrefixes.find(p => p.id === parseInt(selectedPrefix))?.prefix || selectedPrefix}
-                      </span>
-                    )}
-                    {selectedRange && (
-                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
-                        Range: {selectedRange === 'unassigned' ? 'Unassigned' : ipRanges.find(r => r.id === parseInt(selectedRange))?.display || selectedRange}
+                        {viewMode === 'network' ? 'Network' : viewMode === 'site' ? 'Site' : 'Type'}: {selectedGroup}
                       </span>
                     )}
                     {selectedTags.length > 0 && (
@@ -658,8 +552,7 @@ export function DevicesPage() {
                     )}
                     <button
                       onClick={() => {
-                        setSelectedPrefix(null);
-                        setSelectedRange(null);
+                        setSelectedGroup(null);
                         setSelectedTags([]);
                         setFilters({ role: '', platform: '', site: '', status: '' });
                       }}
