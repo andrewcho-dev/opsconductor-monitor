@@ -37,25 +37,44 @@ async def get_credential_statistics(
         return {"total": 0, "by_type": {}, "expiring_soon": 0, "expired": 0}
 
 
+async def _list_credentials_impl(limit: int = 50, credential_type: Optional[str] = None):
+    """Internal implementation for listing credentials"""
+    if credential_type:
+        creds = db_query(
+            "SELECT id, name, credential_type, username, created_at FROM credentials WHERE credential_type = %s ORDER BY name LIMIT %s",
+            (credential_type, limit)
+        )
+    else:
+        creds = db_query(
+            "SELECT id, name, credential_type, username, created_at FROM credentials ORDER BY name LIMIT %s",
+            (limit,)
+        )
+    return {"credentials": creds, "total": len(creds)}
+
+
 @router.get("/", summary="List credentials")
-async def list_credentials(
+async def list_credentials_root(
     limit: int = Query(50, ge=1, le=100),
     credential_type: Optional[str] = Query(None),
     credentials: HTTPAuthorizationCredentials = Security(security)
 ):
     """List stored credentials"""
     try:
-        if credential_type:
-            creds = db_query(
-                "SELECT id, name, credential_type, username, created_at FROM credentials WHERE credential_type = %s ORDER BY name LIMIT %s",
-                (credential_type, limit)
-            )
-        else:
-            creds = db_query(
-                "SELECT id, name, credential_type, username, created_at FROM credentials ORDER BY name LIMIT %s",
-                (limit,)
-            )
-        return {"credentials": creds, "total": len(creds)}
+        return await _list_credentials_impl(limit, credential_type)
+    except Exception as e:
+        logger.error(f"List credentials error: {str(e)}")
+        raise HTTPException(status_code=500, detail={"code": "LIST_CREDENTIALS_ERROR", "message": str(e)})
+
+
+@router.get("/credentials", summary="List credentials (alt path)")
+async def list_credentials(
+    limit: int = Query(50, ge=1, le=100),
+    credential_type: Optional[str] = Query(None),
+    credentials: HTTPAuthorizationCredentials = Security(security)
+):
+    """List stored credentials - alternative path"""
+    try:
+        return await _list_credentials_impl(limit, credential_type)
     except Exception as e:
         logger.error(f"List credentials error: {str(e)}")
         raise HTTPException(status_code=500, detail={"code": "LIST_CREDENTIALS_ERROR", "message": str(e)})
