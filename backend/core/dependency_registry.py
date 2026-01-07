@@ -148,9 +148,8 @@ class DependencyRegistry:
             List of dependencies (devices this one depends on)
         """
         rows = db_query("""
-            SELECT d.*, dev.name as depends_on_name
+            SELECT d.*, NULL as depends_on_name
             FROM dependencies d
-            LEFT JOIN devices dev ON dev.ip_address = d.depends_on_ip
             WHERE d.device_ip = %s
         """, (device_ip,))
         
@@ -167,9 +166,8 @@ class DependencyRegistry:
             List of dependencies (devices depending on this one)
         """
         rows = db_query("""
-            SELECT d.*, dev.name as device_name
+            SELECT d.*, NULL as device_name
             FROM dependencies d
-            LEFT JOIN devices dev ON dev.ip_address = d.device_ip
             WHERE d.depends_on_ip = %s
         """, (device_ip,))
         
@@ -275,11 +273,9 @@ class DependencyRegistry:
         
         rows = db_query(f"""
             SELECT d.*,
-                   dev1.name as device_name,
-                   dev2.name as depends_on_name
+                   NULL as device_name,
+                   NULL as depends_on_name
             FROM dependencies d
-            LEFT JOIN devices dev1 ON dev1.ip_address = d.device_ip
-            LEFT JOIN devices dev2 ON dev2.ip_address = d.depends_on_ip
             WHERE {where_clause}
             ORDER BY d.created_at DESC
             LIMIT %s OFFSET %s
