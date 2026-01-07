@@ -17,6 +17,27 @@ import { useAuth } from '../../contexts/AuthContext';
 
 const modules = [
   { 
+    id: 'alerts', 
+    label: 'Alerts', 
+    icon: Bell, 
+    path: '/alerts',
+    description: 'Alert Dashboard'
+  },
+  { 
+    id: 'connectors', 
+    label: 'Connectors', 
+    icon: Activity, 
+    path: '/connectors',
+    description: 'Alert Sources'
+  },
+  { 
+    id: 'dependencies', 
+    label: 'Dependencies', 
+    icon: GitBranch, 
+    path: '/dependencies',
+    description: 'Device Relationships'
+  },
+  { 
     id: 'inventory', 
     label: 'Inventory', 
     icon: Server, 
@@ -24,32 +45,11 @@ const modules = [
     description: 'Devices & Groups'
   },
   { 
-    id: 'workflows', 
-    label: 'Workflows', 
-    icon: GitBranch, 
-    path: '/workflows',
-    description: 'Visual Automation Builder'
-  },
-  { 
-    id: 'credentials', 
-    label: 'Credentials', 
-    icon: KeyRound, 
-    path: '/credentials',
-    description: 'Credential Vault'
-  },
-  { 
-    id: 'monitor', 
-    label: 'Monitor', 
-    icon: Activity, 
-    path: '/monitor',
-    description: 'Dashboards & Alerts'
-  },
-  { 
     id: 'system', 
     label: 'System', 
     icon: Settings, 
     path: '/system',
-    description: 'Settings & Infrastructure'
+    description: 'Settings'
   },
 ];
 

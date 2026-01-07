@@ -55,8 +55,8 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
           
-          {/* Root redirect to dashboard */}
-          <Route path="/" element={<ProtectedRoute><Navigate to="/monitor/dashboard" replace /></ProtectedRoute>} />
+          {/* Root redirect to alerts dashboard (MVP) */}
+          <Route path="/" element={<ProtectedRoute><Navigate to="/alerts" replace /></ProtectedRoute>} />
 
         {/* INVENTORY MODULE */}
         <Route path="/inventory" element={<ProtectedRoute><Navigate to="/inventory/devices" replace /></ProtectedRoute>} />

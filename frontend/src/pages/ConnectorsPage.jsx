@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useConnectors, useConnectorActions } from '../hooks/useConnectors';
 import { CONNECTOR_TYPES } from '../lib/constants';
+import { PageLayout } from '../components/layout/PageLayout';
 
 function ConnectorCard({ connector, onTest, onToggle, onConfigure, testing }) {
   const typeInfo = CONNECTOR_TYPES.find(t => t.type === connector.type) || {};
@@ -248,8 +249,8 @@ export function ConnectorsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <PageLayout module="connectors">
+      <div className="p-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -331,7 +332,7 @@ export function ConnectorsPage() {
           />
         )}
       </div>
-    </div>
+    </PageLayout>
   );
 }
 

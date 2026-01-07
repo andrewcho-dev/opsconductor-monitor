@@ -41,6 +41,47 @@ import { cn } from '../../lib/utils';
 
 // Define sidebar navigation for each module
 const moduleNavigation = {
+  alerts: {
+    title: 'Alert Center',
+    sections: [
+      {
+        title: 'Monitoring',
+        items: [
+          { id: 'dashboard', label: 'Alert Dashboard', icon: LayoutDashboard, path: '/alerts' },
+        ]
+      },
+      {
+        title: 'Filter By Status',
+        items: [
+          { id: 'active', label: 'Active Alerts', icon: AlertTriangle, path: '/alerts?status=active' },
+          { id: 'acknowledged', label: 'Acknowledged', icon: Circle, path: '/alerts?status=acknowledged' },
+          { id: 'resolved', label: 'Resolved', icon: ShieldCheck, path: '/alerts?status=resolved' },
+        ]
+      }
+    ]
+  },
+  connectors: {
+    title: 'Connectors',
+    sections: [
+      {
+        title: 'Management',
+        items: [
+          { id: 'all-connectors', label: 'All Connectors', icon: Radio, path: '/connectors' },
+        ]
+      }
+    ]
+  },
+  dependencies: {
+    title: 'Dependencies',
+    sections: [
+      {
+        title: 'Management',
+        items: [
+          { id: 'all-deps', label: 'All Dependencies', icon: Network, path: '/dependencies' },
+        ]
+      }
+    ]
+  },
   inventory: {
     title: 'Inventory',
     sections: [
@@ -49,76 +90,6 @@ const moduleNavigation = {
         items: [
           { id: 'devices', label: 'All Devices', icon: Server, path: '/inventory/devices' },
         ]
-      },
-      {
-        title: 'Filter By',
-        items: [
-          { id: 'by-network', label: 'By Network', icon: Network, path: '/inventory/devices?view=network' },
-          { id: 'by-site', label: 'By Site', icon: Database, path: '/inventory/devices?view=site' },
-          { id: 'by-type', label: 'By Device Type', icon: Server, path: '/inventory/devices?view=type' },
-        ]
-      }
-    ]
-  },
-  workflows: {
-    title: 'Workflows',
-    sections: [
-      {
-        title: 'Visual Builder',
-        items: [
-          { id: 'all-workflows', label: 'All Workflows', icon: FileText, path: '/workflows' },
-          { id: 'new-workflow', label: 'New Workflow', icon: Plus, path: '/workflows/new' },
-        ]
-      },
-      {
-        title: 'Organization',
-        items: [
-          { id: 'folders', label: 'Folders', icon: FolderOpen, path: '/workflows?view=folders' },
-        ]
-      }
-    ]
-  },
-  monitor: {
-    title: 'Monitor',
-    sections: [
-      {
-        title: 'Visualization',
-        items: [
-          { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/monitor/dashboard' },
-        ]
-      },
-      {
-        title: 'Jobs',
-        items: [
-          { id: 'active-jobs', label: 'Active Jobs', icon: Activity, path: '/monitor/active-jobs' },
-          { id: 'job-history', label: 'Job History', icon: CalendarClock, path: '/monitor/job-history' },
-        ]
-      },
-      {
-        title: 'Alerts',
-        items: [
-          { id: 'alerts', label: 'Alert History', icon: Bell, path: '/monitor/alerts' },
-        ]
-      },
-      {
-        title: 'SNMP Live',
-        items: [
-          { id: 'snmp-live', label: 'Device Monitor', icon: Activity, path: '/monitor/snmp-live' },
-          { id: 'snmp-alarms', label: 'Active Alarms', icon: AlertTriangle, path: '/monitor/snmp-alarms' },
-        ]
-      },
-      {
-        title: 'Power',
-        items: [
-          { id: 'ups', label: 'UPS Monitor', icon: Battery, path: '/monitor/ups' },
-        ]
-      },
-      {
-        title: 'Polling',
-        items: [
-          { id: 'polling', label: 'Polling Management', icon: Radio, path: '/monitor/polling' },
-          { id: 'mib-mappings', label: 'MIB Mappings', icon: Database, path: '/monitor/mib-mappings' },
-        ]
       }
     ]
   },
@@ -126,24 +97,9 @@ const moduleNavigation = {
     title: 'System',
     sections: [
       {
-        title: 'Infrastructure',
-        items: [
-          { id: 'overview', label: 'System Overview', icon: Activity, path: '/system/overview' },
-          { id: 'alerts', label: 'Alerts', icon: Bell, path: '/system/alerts' },
-        ]
-      },
-      {
         title: 'Configuration',
         items: [
           { id: 'settings', label: 'Settings', icon: Settings, path: '/system/settings' },
-          { id: 'notifications', label: 'Notifications', icon: Bell, path: '/system/notifications' },
-        ]
-      },
-      {
-        title: 'Access Control',
-        items: [
-          { id: 'users', label: 'Users', icon: Users, path: '/system/users' },
-          { id: 'roles', label: 'Roles & Permissions', icon: Shield, path: '/system/roles' },
         ]
       },
       {
@@ -151,31 +107,6 @@ const moduleNavigation = {
         items: [
           { id: 'logs', label: 'System Logs', icon: ScrollText, path: '/system/logs' },
           { id: 'about', label: 'About', icon: Info, path: '/system/about' },
-        ]
-      }
-    ]
-  },
-  credentials: {
-    title: 'Credential Vault',
-    sections: [
-      {
-        title: 'Management',
-        items: [
-          { id: 'all', label: 'All Credentials', icon: KeyRound, path: '/credentials' },
-          { id: 'groups', label: 'Credential Groups', icon: FolderOpen, path: '/credentials/groups' },
-        ]
-      },
-      {
-        title: 'Enterprise Auth',
-        items: [
-          { id: 'enterprise-auth', label: 'Auth Servers', icon: Server, path: '/credentials/enterprise' },
-        ]
-      },
-      {
-        title: 'Monitoring',
-        items: [
-          { id: 'expiring', label: 'Expiring Soon', icon: AlertTriangle, path: '/credentials/expiring' },
-          { id: 'audit', label: 'Audit Log', icon: History, path: '/credentials/audit' },
         ]
       }
     ]

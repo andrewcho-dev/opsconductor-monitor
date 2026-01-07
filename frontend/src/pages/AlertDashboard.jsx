@@ -8,6 +8,7 @@ import { useState, useCallback } from 'react';
 import { RefreshCw, Check, CheckCheck } from 'lucide-react';
 import { useAlerts, useAlertActions } from '../hooks/useAlerts';
 import { AlertStats, AlertFilters, AlertTable } from '../components/alerts';
+import { PageLayout } from '../components/layout/PageLayout';
 
 export function AlertDashboard() {
   const {
@@ -67,8 +68,8 @@ export function AlertDashboard() {
   }, [selectedIds, bulkResolve, refresh]);
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <PageLayout module="alerts">
+      <div className="p-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -151,7 +152,7 @@ export function AlertDashboard() {
           onSelectChange={setSelectedIds}
         />
       </div>
-    </div>
+    </PageLayout>
   );
 }
 

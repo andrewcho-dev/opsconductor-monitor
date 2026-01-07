@@ -10,6 +10,7 @@ import {
   ArrowRight, Search, X
 } from 'lucide-react';
 import { useDependencies, useDependencyActions } from '../hooks/useDependencies';
+import { PageLayout } from '../components/layout/PageLayout';
 
 const DEPENDENCY_TYPES = [
   { value: 'network', label: 'Network', icon: Network, description: 'Network path dependency' },
@@ -248,8 +249,8 @@ export function DependenciesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <PageLayout module="dependencies">
+      <div className="p-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -398,7 +399,7 @@ export function DependenciesPage() {
           />
         )}
       </div>
-    </div>
+    </PageLayout>
   );
 }
 
