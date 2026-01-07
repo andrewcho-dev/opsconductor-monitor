@@ -16,6 +16,7 @@ from backend.openapi.system_impl import (
     test_system_endpoints
 )
 from backend.openapi.identity_impl import get_current_user_from_token
+from backend.utils.db import db_query, db_query_one
 
 logger = logging.getLogger(__name__)
 security = HTTPBearer()
@@ -75,7 +76,7 @@ async def update_settings(
 @router.get("/logs", summary="Get system logs")
 async def get_logs(
     level: Optional[str] = Query(None),
-    limit: int = Query(100, ge=1, le=1000),
+    limit: int = Query(500, ge=1, le=5000),
     hours: int = Query(24, ge=1, le=168),
     credentials: HTTPAuthorizationCredentials = Security(security)
 ):
@@ -93,7 +94,34 @@ async def get_log_stats(
     credentials: HTTPAuthorizationCredentials = Security(security)
 ):
     """Get log statistics"""
-    return {"total": 0, "by_level": {}, "by_source": {}, "hours": hours}
+    try:
+        # Get total count
+        total_result = db_query_one(f"""
+            SELECT COUNT(*) as total FROM system_logs 
+            WHERE timestamp >= NOW() - INTERVAL '{hours} hours'
+        """)
+        total = total_result['total'] if total_result else 0
+        
+        # Get counts by level
+        level_results = db_query(f"""
+            SELECT level, COUNT(*) as count FROM system_logs 
+            WHERE timestamp >= NOW() - INTERVAL '{hours} hours'
+            GROUP BY level
+        """)
+        by_level = {r['level']: r['count'] for r in level_results}
+        
+        # Get counts by source
+        source_results = db_query(f"""
+            SELECT COALESCE(source, 'unknown') as source, COUNT(*) as count FROM system_logs 
+            WHERE timestamp >= NOW() - INTERVAL '{hours} hours'
+            GROUP BY source
+        """)
+        by_source = {r['source']: r['count'] for r in source_results}
+        
+        return {"total": total, "by_level": by_level, "by_source": by_source, "hours": hours}
+    except Exception as e:
+        logger.error(f"Get log stats error: {str(e)}")
+        return {"total": 0, "by_level": {}, "by_source": {}, "hours": hours}
 
 
 @router.get("/logs/sources", summary="Get log sources")
