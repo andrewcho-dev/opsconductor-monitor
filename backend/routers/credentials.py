@@ -98,6 +98,43 @@ async def create_credential(
         raise HTTPException(status_code=500, detail={"code": "CREATE_CREDENTIAL_ERROR", "message": str(e)})
 
 
+@router.get("/credentials/enterprise/configs", summary="Get enterprise auth configs")
+async def get_enterprise_configs(
+    credentials: HTTPAuthorizationCredentials = Security(security)
+):
+    """Get enterprise authentication configurations (AD/LDAP)"""
+    try:
+        configs = db_query("""
+            SELECT id, name, credential_type, description, created_at 
+            FROM credentials 
+            WHERE credential_type IN ('active_directory', 'ldap', 'radius')
+            ORDER BY name
+        """)
+        return {"configs": configs, "total": len(configs)}
+    except Exception as e:
+        logger.error(f"Get enterprise configs error: {str(e)}")
+        return {"configs": [], "total": 0}
+
+
+@router.get("/credentials/enterprise/users", summary="Get enterprise users")
+async def get_enterprise_users(
+    credentials: HTTPAuthorizationCredentials = Security(security)
+):
+    """Get enterprise users from AD/LDAP"""
+    try:
+        users = db_query("""
+            SELECT id, username, display_name, email, role_id, assigned_at
+            FROM enterprise_user_roles
+            ORDER BY username
+        """)
+        return {"users": users, "total": len(users)}
+    except Exception as e:
+        if 'does not exist' in str(e):
+            return {"users": [], "total": 0}
+        logger.error(f"Get enterprise users error: {str(e)}")
+        return {"users": [], "total": 0}
+
+
 @router.get("/credentials/groups", summary="Get credential groups")
 async def get_credential_groups(
     credentials: HTTPAuthorizationCredentials = Security(security)
