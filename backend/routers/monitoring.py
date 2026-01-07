@@ -253,6 +253,111 @@ async def get_mib_profile(
         return {"profile": None}
 
 
+@router.get("/metrics/optical", summary="Get optical metrics by IP")
+async def get_optical_by_ip(
+    device_ip: str = Query(...),
+    hours: int = Query(24, ge=1, le=168),
+    credentials: HTTPAuthorizationCredentials = Security(security)
+):
+    """Get optical power metrics for a device by IP address"""
+    try:
+        metrics = db_query("""
+            SELECT device_ip, interface_name, tx_power, rx_power, 
+                   tx_high_alarm, tx_low_alarm, rx_high_alarm, rx_low_alarm,
+                   recorded_at
+            FROM snmp_optical_metrics 
+            WHERE device_ip = %s AND recorded_at > NOW() - INTERVAL '%s hours'
+            ORDER BY recorded_at DESC
+        """, (device_ip, hours))
+        return {"metrics": metrics, "count": len(metrics)}
+    except Exception as e:
+        logger.error(f"Get optical metrics error: {str(e)}")
+        return {"metrics": [], "count": 0}
+
+
+@router.get("/metrics/availability", summary="Get availability metrics by IP")
+async def get_availability_by_ip(
+    device_ip: str = Query(...),
+    hours: int = Query(24, ge=1, le=168),
+    credentials: HTTPAuthorizationCredentials = Security(security)
+):
+    """Get availability metrics for a device by IP address"""
+    try:
+        metrics = db_query("""
+            SELECT device_ip, is_reachable, response_time_ms, packet_loss_pct, recorded_at
+            FROM device_availability 
+            WHERE device_ip = %s AND recorded_at > NOW() - INTERVAL '%s hours'
+            ORDER BY recorded_at DESC
+        """, (device_ip, hours))
+        return {"metrics": metrics, "count": len(metrics)}
+    except Exception as e:
+        logger.error(f"Get availability metrics error: {str(e)}")
+        return {"metrics": [], "count": 0}
+
+
+@router.get("/metrics/interface", summary="Get interface metrics by IP")
+async def get_interface_by_ip(
+    device_ip: str = Query(...),
+    hours: int = Query(24, ge=1, le=168),
+    limit: int = Query(100, ge=1, le=1000),
+    credentials: HTTPAuthorizationCredentials = Security(security)
+):
+    """Get interface traffic metrics for a device by IP address"""
+    try:
+        metrics = db_query("""
+            SELECT device_ip, interface_name, rx_bytes, tx_bytes, rx_bps, tx_bps,
+                   rx_errors, tx_errors, recorded_at
+            FROM snmp_interface_metrics 
+            WHERE device_ip = %s AND recorded_at > NOW() - INTERVAL '%s hours'
+            ORDER BY recorded_at DESC LIMIT %s
+        """, (device_ip, hours, limit))
+        return {"metrics": metrics, "count": len(metrics)}
+    except Exception as e:
+        logger.error(f"Get interface metrics error: {str(e)}")
+        return {"metrics": [], "count": 0}
+
+
+@router.get("/metrics/optical/thresholds", summary="Get optical thresholds")
+async def get_optical_thresholds(
+    device_ip: str = Query(...),
+    interface_index: str = Query(None),
+    credentials: HTTPAuthorizationCredentials = Security(security)
+):
+    """Get optical power thresholds for a device"""
+    try:
+        if interface_index:
+            row = db_query_one("""
+                SELECT tx_high_alarm, tx_low_alarm, rx_high_alarm, rx_low_alarm
+                FROM snmp_optical_metrics 
+                WHERE device_ip = %s AND interface_name LIKE %s
+                ORDER BY recorded_at DESC LIMIT 1
+            """, (device_ip, f"%{interface_index}"))
+            return {"thresholds": row or {}}
+        return {"thresholds": {}}
+    except Exception as e:
+        logger.error(f"Get optical thresholds error: {str(e)}")
+        return {"thresholds": {}}
+
+
+@router.get("/snmp/alarms/{device_ip}", summary="Get SNMP alarms for device")
+async def get_snmp_alarms(
+    device_ip: str = Path(...),
+    credentials: HTTPAuthorizationCredentials = Security(security)
+):
+    """Get SNMP alarms for a device"""
+    try:
+        alarms = db_query("""
+            SELECT id, device_ip, alarm_type, severity, message, first_seen, last_seen, cleared_at
+            FROM snmp_alarms 
+            WHERE device_ip = %s AND cleared_at IS NULL
+            ORDER BY severity, last_seen DESC
+        """, (device_ip,))
+        return {"alarms": alarms, "count": len(alarms)}
+    except Exception as e:
+        logger.error(f"Get SNMP alarms error: {str(e)}")
+        return {"alarms": [], "count": 0}
+
+
 @router.get("/test", include_in_schema=False)
 async def test_api():
     """Test Monitoring API"""

@@ -100,6 +100,29 @@ async def netbox_devices(
         return {"data": [], "count": 0}
 
 
+@router.get("/netbox/devices/{device_id}/interfaces", summary="Get device interfaces")
+async def netbox_device_interfaces(
+    device_id: int = Path(...),
+    credentials: HTTPAuthorizationCredentials = Security(security)
+):
+    """Get interfaces for a NetBox device"""
+    try:
+        # Try to get interfaces from cache or return empty list
+        interfaces = db_query("""
+            SELECT interface_name as name, interface_type as type, enabled, 
+                   mac_address, mtu, description
+            FROM netbox_interface_cache 
+            WHERE device_id = %s ORDER BY interface_name
+        """, (device_id,))
+        if interfaces:
+            return {"interfaces": interfaces, "count": len(interfaces)}
+        # Return empty list if no cached interfaces
+        return {"interfaces": [], "count": 0}
+    except Exception as e:
+        logger.error(f"Get device interfaces error: {str(e)}")
+        return {"interfaces": [], "count": 0}
+
+
 @router.get("/netbox/settings", summary="Get NetBox settings")
 async def netbox_settings(credentials: HTTPAuthorizationCredentials = Security(security)):
     """Get NetBox integration settings"""
