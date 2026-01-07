@@ -98,6 +98,30 @@ async def create_credential(
         raise HTTPException(status_code=500, detail={"code": "CREATE_CREDENTIAL_ERROR", "message": str(e)})
 
 
+@router.get("/credentials/{credential_id}/devices", summary="Get credential device associations")
+async def get_credential_devices(
+    credential_id: int = Path(...),
+    credentials: HTTPAuthorizationCredentials = Security(security)
+):
+    """Get devices associated with a credential"""
+    try:
+        # Check if credential_device_associations table exists
+        devices = db_query("""
+            SELECT d.id, d.name, d.ip_address, d.device_type
+            FROM devices d
+            JOIN credential_device_associations cda ON d.id = cda.device_id
+            WHERE cda.credential_id = %s
+            ORDER BY d.name
+        """, (credential_id,))
+        return {"devices": devices, "total": len(devices)}
+    except Exception as e:
+        # If table doesn't exist, return empty list
+        if 'does not exist' in str(e):
+            return {"devices": [], "total": 0}
+        logger.error(f"Get credential devices error: {str(e)}")
+        return {"devices": [], "total": 0}
+
+
 @router.get("/{credential_id}", summary="Get credential")
 async def get_credential(
     credential_id: int = Path(...),
