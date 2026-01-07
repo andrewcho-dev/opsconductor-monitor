@@ -489,24 +489,34 @@ export function DeviceDetail() {
     setError(null);
     
     try {
-      const res = await fetchApi(`/integrations/v1/netbox/devices?q=${encodeURIComponent(ip)}`);
+      const res = await fetchApi(`/integrations/v1/netbox/devices`);
+      const devices = res.data || [];
       
-      if (res.success && res.data?.length > 0) {
-        // Find exact IP match
-        const found = res.data.find(d => {
-          const deviceIp = d.primary_ip4?.address?.split('/')[0];
+      if (devices.length > 0) {
+        // Find exact IP match - handle both flat (cache) and nested (API) formats
+        const found = devices.find(d => {
+          // Flat format from cache: primary_ip4 is string like "10.1.1.1"
+          // Nested format from API: primary_ip4.address is string like "10.1.1.1/24"
+          const deviceIp = typeof d.primary_ip4 === 'string' 
+            ? d.primary_ip4.split('/')[0]
+            : d.primary_ip4?.address?.split('/')[0];
           return deviceIp === ip;
         });
         
         if (found) {
+          // Handle both flat and nested data formats
+          const deviceIp = typeof found.primary_ip4 === 'string'
+            ? found.primary_ip4.split('/')[0]
+            : found.primary_ip4?.address?.split('/')[0];
+          
           setDevice({
             id: found.id,
             name: found.name,
-            ip: found.primary_ip4?.address?.split('/')[0],
-            site: found.site?.name,
-            role: found.role?.name,
-            deviceType: found.device_type?.model,
-            manufacturer: found.device_type?.manufacturer?.name,
+            ip: deviceIp,
+            site: typeof found.site === 'string' ? found.site : found.site?.name,
+            role: typeof found.role === 'string' ? found.role : found.role?.name,
+            deviceType: found.device_type?.model || found.device_type,
+            manufacturer: found.device_type?.manufacturer?.name || found.vendor,
             status: found.status?.value || 'active',
             statusLabel: found.status?.label || 'Active',
           });
