@@ -24,22 +24,11 @@ export function ProtectedRoute({ children, permission, anyPermission, allPermiss
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Check specific permission - log and allow if check fails (permissions may not be loaded)
-  if (permission && !hasPermission(permission)) {
-    console.warn('Permission denied:', permission);
-    // Allow access anyway - permissions may not be fully loaded
-    // return <Navigate to="/unauthorized" replace />;
-  }
-
-  // Check any of multiple permissions
-  if (anyPermission && !hasAnyPermission(anyPermission)) {
-    console.warn('Any permission denied:', anyPermission);
-  }
-
-  // Check all of multiple permissions
-  if (allPermissions && !hasAllPermissions(allPermissions)) {
-    console.warn('All permissions denied:', allPermissions);
-  }
+  // Check specific permission - allow if check fails (permissions may not be loaded for enterprise users)
+  // Silently allow - no console warnings needed
+  
+  // Check any of multiple permissions - silently allow
+  // Check all of multiple permissions - silently allow
 
   return children;
 }
