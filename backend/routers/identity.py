@@ -158,6 +158,142 @@ async def list_roles(credentials: HTTPAuthorizationCredentials = Security(securi
         raise HTTPException(status_code=500, detail={"code": "LIST_ROLES_ERROR", "message": str(e)})
 
 
+@identity_router.post("/roles", summary="Create role")
+async def create_role(
+    request: Dict[str, Any] = Body(...),
+    credentials: HTTPAuthorizationCredentials = Security(security)
+):
+    """Create a new role"""
+    try:
+        name = request.get('name', '').strip().lower().replace(' ', '_')
+        display_name = request.get('display_name', '').strip()
+        description = request.get('description', '').strip()
+        permissions = request.get('permissions', [])
+        
+        if not name or not display_name:
+            raise HTTPException(status_code=400, detail={"code": "INVALID_REQUEST", "message": "name and display_name are required"})
+        
+        # Check if role name already exists
+        existing = db_query_one("SELECT id FROM roles WHERE name = %s", (name,))
+        if existing:
+            raise HTTPException(status_code=400, detail={"code": "ROLE_EXISTS", "message": f"Role '{name}' already exists"})
+        
+        # Create role
+        result = db_execute("""
+            INSERT INTO roles (name, display_name, description, role_type, priority, created_at, updated_at)
+            VALUES (%s, %s, %s, 'custom', 100, NOW(), NOW())
+            RETURNING id
+        """, (name, display_name, description), returning=True)
+        
+        role_id = result['id']
+        
+        # Add permissions
+        if permissions:
+            for perm_code in permissions:
+                perm = db_query_one("SELECT id FROM permissions WHERE code = %s", (perm_code,))
+                if perm:
+                    db_execute("INSERT INTO role_permissions (role_id, permission_id, created_at) VALUES (%s, %s, NOW())", 
+                              (role_id, perm['id']))
+        
+        return {"success": True, "id": role_id, "message": f"Role '{display_name}' created"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Create role error: {str(e)}")
+        raise HTTPException(status_code=500, detail={"code": "CREATE_ROLE_ERROR", "message": str(e)})
+
+
+@identity_router.put("/roles/{role_id}", summary="Update role")
+async def update_role(
+    role_id: int,
+    request: Dict[str, Any] = Body(...),
+    credentials: HTTPAuthorizationCredentials = Security(security)
+):
+    """Update an existing role"""
+    try:
+        # Check role exists
+        role = db_query_one("SELECT * FROM roles WHERE id = %s", (role_id,))
+        if not role:
+            raise HTTPException(status_code=404, detail={"code": "ROLE_NOT_FOUND", "message": "Role not found"})
+        
+        # Don't allow editing system roles' core properties
+        if role['role_type'] == 'system':
+            # Only allow updating permissions for system roles
+            permissions = request.get('permissions')
+            if permissions is not None:
+                # Clear existing permissions
+                db_execute("DELETE FROM role_permissions WHERE role_id = %s", (role_id,))
+                # Add new permissions
+                for perm_code in permissions:
+                    perm = db_query_one("SELECT id FROM permissions WHERE code = %s", (perm_code,))
+                    if perm:
+                        db_execute("INSERT INTO role_permissions (role_id, permission_id, created_at) VALUES (%s, %s, NOW())", 
+                                  (role_id, perm['id']))
+            return {"success": True, "message": "System role permissions updated"}
+        
+        # Update custom role
+        display_name = request.get('display_name', role['display_name'])
+        description = request.get('description', role['description'])
+        permissions = request.get('permissions')
+        
+        db_execute("""
+            UPDATE roles SET display_name = %s, description = %s, updated_at = NOW()
+            WHERE id = %s
+        """, (display_name, description, role_id))
+        
+        # Update permissions if provided
+        if permissions is not None:
+            db_execute("DELETE FROM role_permissions WHERE role_id = %s", (role_id,))
+            for perm_code in permissions:
+                perm = db_query_one("SELECT id FROM permissions WHERE code = %s", (perm_code,))
+                if perm:
+                    db_execute("INSERT INTO role_permissions (role_id, permission_id, created_at) VALUES (%s, %s, NOW())", 
+                              (role_id, perm['id']))
+        
+        return {"success": True, "message": f"Role '{display_name}' updated"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Update role error: {str(e)}")
+        raise HTTPException(status_code=500, detail={"code": "UPDATE_ROLE_ERROR", "message": str(e)})
+
+
+@identity_router.delete("/roles/{role_id}", summary="Delete role")
+async def delete_role(
+    role_id: int,
+    credentials: HTTPAuthorizationCredentials = Security(security)
+):
+    """Delete a role (custom roles only)"""
+    try:
+        role = db_query_one("SELECT * FROM roles WHERE id = %s", (role_id,))
+        if not role:
+            raise HTTPException(status_code=404, detail={"code": "ROLE_NOT_FOUND", "message": "Role not found"})
+        
+        if role['role_type'] == 'system':
+            raise HTTPException(status_code=400, detail={"code": "CANNOT_DELETE_SYSTEM", "message": "Cannot delete system roles"})
+        
+        # Check if role has users
+        user_count = db_query_one("""
+            SELECT (SELECT COUNT(*) FROM user_roles WHERE role_id = %s) + 
+                   (SELECT COUNT(*) FROM enterprise_user_roles WHERE role_id = %s) as total
+        """, (role_id, role_id))
+        
+        if user_count and user_count['total'] > 0:
+            raise HTTPException(status_code=400, detail={"code": "ROLE_HAS_USERS", "message": f"Cannot delete role with {user_count['total']} assigned users"})
+        
+        # Delete role permissions first
+        db_execute("DELETE FROM role_permissions WHERE role_id = %s", (role_id,))
+        # Delete role
+        db_execute("DELETE FROM roles WHERE id = %s", (role_id,))
+        
+        return {"success": True, "message": f"Role '{role['display_name']}' deleted"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Delete role error: {str(e)}")
+        raise HTTPException(status_code=500, detail={"code": "DELETE_ROLE_ERROR", "message": str(e)})
+
+
 @identity_router.get("/roles/{role_id}/members", summary="Get role members")
 async def get_members(role_id: int, credentials: HTTPAuthorizationCredentials = Security(security)):
     """Get all users in a role (local and enterprise)"""
