@@ -81,7 +81,7 @@ async def test_netbox(
 
 @router.get("/netbox/devices", summary="Get NetBox devices")
 async def netbox_devices(
-    limit: int = Query(1000, ge=1, le=10000),
+    limit: int = Query(10000, ge=1, le=100000),
     credentials: HTTPAuthorizationCredentials = Security(security)
 ):
     """Get devices from NetBox cache"""

@@ -33,7 +33,7 @@ export function DeviceAssignmentPanel({ selectedCredential, onUpdate }) {
     try {
       const [assignedRes, devicesRes] = await Promise.all([
         fetchApi(`/credentials/v1/credentials/${selectedCredential.id}/devices`),
-        fetchApi('/integrations/v1/netbox/devices?limit=1000')
+        fetchApi('/integrations/v1/netbox/devices?limit=10000')
       ]);
       
       const assigned = new Set((assignedRes.data?.devices || []).map(d => d.ip_address));

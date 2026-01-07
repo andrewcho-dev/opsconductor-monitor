@@ -25,7 +25,7 @@ function DeviceAssignmentSection({ credentialId }) {
         const assignedRes = await fetchApi(`/credentials/v1/credentials/${credentialId}/devices`);
         setAssignedDevices(assignedRes.data?.devices || []);
 
-        const devicesRes = await fetchApi('/integrations/v1/netbox/devices?limit=1000');
+        const devicesRes = await fetchApi('/integrations/v1/netbox/devices?limit=10000');
         const devices = (devicesRes.data || []).map(d => ({
           ip_address: d.primary_ip4?.address?.split('/')[0] || '',
           hostname: d.name,
