@@ -241,7 +241,14 @@ async def test_mcp(
                 try:
                     response = await client.get(f"{url.rstrip('/')}{endpoint}")
                     if response.status_code in [200, 301, 302]:
-                        return {"success": True, "data": {"success": True, "message": "Connected successfully"}}
+                        # Count Ciena devices from inventory
+                        device_count = 0
+                        try:
+                            result = db_query_one("SELECT COUNT(*) as cnt FROM netbox_device_cache WHERE manufacturer ILIKE '%ciena%'")
+                            device_count = result['cnt'] if result else 0
+                        except:
+                            pass
+                        return {"success": True, "data": {"success": True, "message": "Connected successfully", "summary": {"devices": device_count}}}
                 except:
                     continue
             return {"success": True, "data": {"success": False, "message": "No health endpoint responded"}}
