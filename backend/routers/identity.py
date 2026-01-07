@@ -13,8 +13,8 @@ import logging
 from backend.utils.db import db_query, db_query_one, db_execute, table_exists
 from backend.openapi.identity_impl import (
     authenticate_user, get_current_user_from_token, list_users_paginated,
-    list_roles_with_counts, get_role_members, get_password_policy,
-    update_password_policy, test_identity_endpoints,
+    list_roles_with_counts, get_role_members, get_role_permissions, get_all_permissions,
+    get_password_policy, update_password_policy, test_identity_endpoints,
     create_access_token, JWT_SECRET_KEY, JWT_ALGORITHM
 )
 
@@ -160,12 +160,101 @@ async def list_roles(credentials: HTTPAuthorizationCredentials = Security(securi
 
 @identity_router.get("/roles/{role_id}/members", summary="Get role members")
 async def get_members(role_id: int, credentials: HTTPAuthorizationCredentials = Security(security)):
-    """Get users in a role"""
+    """Get all users in a role (local and enterprise)"""
     try:
         return await get_role_members(role_id)
     except Exception as e:
         logger.error(f"Get role members error: {str(e)}")
         raise HTTPException(status_code=500, detail={"code": "ROLE_MEMBERS_ERROR", "message": str(e)})
+
+
+@identity_router.get("/roles/{role_id}/permissions", summary="Get role permissions")
+async def get_permissions(role_id: int, credentials: HTTPAuthorizationCredentials = Security(security)):
+    """Get all permissions assigned to a role"""
+    try:
+        return await get_role_permissions(role_id)
+    except Exception as e:
+        logger.error(f"Get role permissions error: {str(e)}")
+        raise HTTPException(status_code=500, detail={"code": "ROLE_PERMISSIONS_ERROR", "message": str(e)})
+
+
+@identity_router.get("/permissions", summary="Get all permissions")
+async def list_permissions(credentials: HTTPAuthorizationCredentials = Security(security)):
+    """Get all available permissions"""
+    try:
+        return await get_all_permissions()
+    except Exception as e:
+        logger.error(f"List permissions error: {str(e)}")
+        raise HTTPException(status_code=500, detail={"code": "LIST_PERMISSIONS_ERROR", "message": str(e)})
+
+
+@identity_router.post("/roles/{role_id}/members", summary="Add user to role")
+async def add_role_member(
+    role_id: int,
+    request: Dict[str, Any] = Body(...),
+    credentials: HTTPAuthorizationCredentials = Security(security)
+):
+    """Add a local or enterprise user to a role"""
+    try:
+        username = request.get('username')
+        auth_type = request.get('auth_type', 'enterprise')  # Default to enterprise
+        display_name = request.get('display_name', '')
+        email = request.get('email', '')
+        
+        if not username:
+            raise HTTPException(status_code=400, detail={"code": "INVALID_REQUEST", "message": "username is required"})
+        
+        if auth_type == 'local':
+            # Find local user and add to role
+            user = db_query_one("SELECT id FROM users WHERE username = %s", (username,))
+            if not user:
+                raise HTTPException(status_code=404, detail={"code": "USER_NOT_FOUND", "message": f"Local user {username} not found"})
+            
+            # Check if already assigned
+            existing = db_query_one("SELECT id FROM user_roles WHERE user_id = %s AND role_id = %s", (user['id'], role_id))
+            if existing:
+                return {"success": True, "message": "User already assigned to role"}
+            
+            db_execute("INSERT INTO user_roles (user_id, role_id) VALUES (%s, %s)", (user['id'], role_id))
+        else:
+            # Enterprise user - add/update enterprise_user_roles
+            existing = db_query_one("SELECT id FROM enterprise_user_roles WHERE username = %s", (username,))
+            if existing:
+                db_execute("UPDATE enterprise_user_roles SET role_id = %s, assigned_at = NOW() WHERE username = %s", (role_id, username))
+            else:
+                db_execute("""
+                    INSERT INTO enterprise_user_roles (username, role_id, display_name, email, assigned_by, assigned_at)
+                    VALUES (%s, %s, %s, %s, 1, NOW())
+                """, (username, role_id, display_name or username, email))
+        
+        return {"success": True, "message": f"Added {username} to role"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Add role member error: {str(e)}")
+        raise HTTPException(status_code=500, detail={"code": "ADD_MEMBER_ERROR", "message": str(e)})
+
+
+@identity_router.delete("/roles/{role_id}/members/{username}", summary="Remove user from role")
+async def remove_role_member(
+    role_id: int,
+    username: str,
+    auth_type: str = Query("enterprise"),
+    credentials: HTTPAuthorizationCredentials = Security(security)
+):
+    """Remove a user from a role"""
+    try:
+        if auth_type == 'local':
+            user = db_query_one("SELECT id FROM users WHERE username = %s", (username,))
+            if user:
+                db_execute("DELETE FROM user_roles WHERE user_id = %s AND role_id = %s", (user['id'], role_id))
+        else:
+            db_execute("DELETE FROM enterprise_user_roles WHERE username = %s AND role_id = %s", (username, role_id))
+        
+        return {"success": True, "message": f"Removed {username} from role"}
+    except Exception as e:
+        logger.error(f"Remove role member error: {str(e)}")
+        raise HTTPException(status_code=500, detail={"code": "REMOVE_MEMBER_ERROR", "message": str(e)})
 
 
 # ============================================================================

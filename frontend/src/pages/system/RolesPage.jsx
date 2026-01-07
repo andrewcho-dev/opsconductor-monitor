@@ -85,6 +85,8 @@ export function RolesPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [members, setMembers] = useState([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
+  const [permissions, setPermissions] = useState([]);
+  const [loadingPermissions, setLoadingPermissions] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
@@ -110,25 +112,39 @@ export function RolesPage() {
   const canManageRoles = hasPermission('system.roles.manage');
 
   const loadMembers = async (roleId) => {
-    console.log(`Loading members for role ${roleId}...`);
     setLoadingMembers(true);
     try {
       const res = await fetchApi(`/identity/v1/roles/${roleId}/members`, { headers: getAuthHeader() });
-      console.log(`Role ${roleId} members response:`, res);
-      // Handle both wrapped and direct array format
-      const membersList = res?.data?.members || res?.members || (Array.isArray(res) ? res : []);
-      console.log(`Setting ${membersList.length} members for role ${roleId}`);
-      setMembers(membersList);
+      // New API returns { local_users: [], enterprise_users: [], total: n }
+      const localUsers = (res?.local_users || []).map(u => ({ ...u, type: 'local' }));
+      const enterpriseUsers = (res?.enterprise_users || []).map(u => ({ ...u, type: 'enterprise' }));
+      setMembers([...localUsers, ...enterpriseUsers]);
     } catch (err) {
       console.error('Error loading members:', err);
+      setMembers([]);
     } finally {
       setLoadingMembers(false);
+    }
+  };
+
+  const loadPermissions = async (roleId) => {
+    setLoadingPermissions(true);
+    try {
+      const res = await fetchApi(`/identity/v1/roles/${roleId}/permissions`, { headers: getAuthHeader() });
+      // API returns array of permission objects
+      setPermissions(Array.isArray(res) ? res : []);
+    } catch (err) {
+      console.error('Error loading permissions:', err);
+      setPermissions([]);
+    } finally {
+      setLoadingPermissions(false);
     }
   };
 
   const handleSelectRole = (role) => {
     setSelectedRole(role);
     loadMembers(role.id);
+    loadPermissions(role.id);
   };
 
   // Auto-select first role on load
@@ -242,22 +258,44 @@ export function RolesPage() {
                   {/* Permissions Column */}
                   <div className="w-1/2 flex flex-col">
                     <div className="px-4 py-2 border-b bg-gray-50">
-                      <span className="text-sm font-medium text-gray-700">Permissions ({selectedRole.permission_count || 0})</span>
+                      <span className="text-sm font-medium text-gray-700">Permissions ({permissions.length})</span>
                     </div>
                     <div className="flex-1 overflow-y-auto p-3">
-                      {selectedRole.permissions && selectedRole.permissions.length > 0 ? (
-                        <div className="flex flex-wrap gap-1.5">
-                          {selectedRole.permissions.map((perm, idx) => (
-                            <span
-                              key={idx}
-                              className="px-2 py-1 text-xs bg-gray-100 rounded text-gray-600"
-                            >
-                              {perm}
-                            </span>
+                      {loadingPermissions ? (
+                        <div className="flex items-center justify-center py-8">
+                          <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+                        </div>
+                      ) : permissions.length > 0 ? (
+                        <div className="space-y-3">
+                          {/* Group permissions by module */}
+                          {Object.entries(
+                            permissions.reduce((acc, p) => {
+                              const mod = p.module || 'other';
+                              if (!acc[mod]) acc[mod] = [];
+                              acc[mod].push(p);
+                              return acc;
+                            }, {})
+                          ).map(([module, perms]) => (
+                            <div key={module}>
+                              <div className="text-xs font-semibold text-gray-500 uppercase mb-1">
+                                {module}
+                              </div>
+                              <div className="flex flex-wrap gap-1">
+                                {perms.map((perm) => (
+                                  <span
+                                    key={perm.id}
+                                    className="px-2 py-0.5 text-xs bg-gray-100 rounded text-gray-700"
+                                    title={perm.description}
+                                  >
+                                    {perm.display_name || perm.code}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
                           ))}
                         </div>
                       ) : (
-                        <p className="text-sm text-gray-400 text-center py-4">No permissions</p>
+                        <p className="text-sm text-gray-400 text-center py-4">No permissions assigned</p>
                       )}
                     </div>
                   </div>
@@ -315,7 +353,11 @@ function RoleMembersPanel({ roleId, members, loading, canManage, getAuthHeader, 
       const res = await fetchApi(`/identity/v1/roles/${roleId}/members`, {
         method: 'POST',
         headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
-        body: JSON.stringify(newMember)
+        body: JSON.stringify({
+          username: newMember.username,
+          auth_type: newMember.type,
+          display_name: newMember.display_name || newMember.username
+        })
       });
       if (res.success) {
         setNewMember({ username: '', type: 'enterprise', display_name: '' });
@@ -334,7 +376,7 @@ function RoleMembersPanel({ roleId, members, loading, canManage, getAuthHeader, 
   const handleRemoveMember = async (username, type) => {
     if (!confirm(`Remove ${username}?`)) return;
     try {
-      await fetchApi(`/identity/v1/roles/${roleId}/members/${encodeURIComponent(username)}?type=${type}`, {
+      await fetchApi(`/identity/v1/roles/${roleId}/members/${encodeURIComponent(username)}?auth_type=${type}`, {
         method: 'DELETE',
         headers: getAuthHeader()
       });

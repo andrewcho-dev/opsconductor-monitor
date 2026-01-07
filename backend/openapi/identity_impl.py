@@ -203,10 +203,10 @@ async def list_users_paginated(
     status_filter: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    List users with pagination and filtering
-    Includes both local users and enterprise (AD/LDAP) users
+    List LOCAL users only with pagination and filtering.
+    Enterprise users are managed via Roles page, not Users page.
     """
-    # Get local users
+    # Get local users only
     local_users = db_query("""
         SELECT u.id, u.username, u.email, u.created_at, u.username as display_name,
                '' as first_name, '' as last_name, 'active' as status, false as two_factor_enabled,
@@ -218,27 +218,9 @@ async def list_users_paginated(
         GROUP BY u.id ORDER BY u.id
     """)
     
-    # Get enterprise users (AD/LDAP) from enterprise_user_roles
-    enterprise_users = []
-    if table_exists('enterprise_user_roles'):
-        enterprise_users = db_query("""
-            SELECT eur.id + 10000 as id, eur.username, 
-                   CASE WHEN eur.email = '[]' THEN '' ELSE eur.email END as email,
-                   eur.assigned_at as created_at, 
-                   COALESCE(eur.display_name, eur.username) as display_name,
-                   '' as first_name, '' as last_name, 'active' as status, false as two_factor_enabled,
-                   'enterprise' as auth_type,
-                   ARRAY[r.name] as roles
-            FROM enterprise_user_roles eur
-            LEFT JOIN roles r ON eur.role_id = r.id
-            ORDER BY eur.username
-        """)
-    
-    # Combine and return
-    all_users = local_users + enterprise_users
     return {
-        'items': all_users[:limit],
-        'total': len(all_users),
+        'items': local_users[:limit],
+        'total': len(local_users),
         'limit': limit,
         'cursor': None
     }
@@ -258,19 +240,53 @@ async def list_roles_with_counts() -> List[Dict[str, Any]]:
         FROM roles r ORDER BY r.name
     """)
 
-async def get_role_members(role_id: int) -> List[Dict[str, Any]]:
+async def get_role_members(role_id: int) -> Dict[str, Any]:
     """
-    Get users in a specific role
-    Migrated from legacy /api/auth/roles/{id}/members
+    Get all users in a specific role - both local and enterprise users
     """
-    return db_query("""
+    # Get local users
+    local_users = db_query("""
         SELECT u.id, u.username, u.email, u.created_at,
-               u.username as display_name, '' as first_name, '' as last_name,
-               'active' as status, false as two_factor_enabled
+               u.username as display_name, 'local' as auth_type
         FROM users u
         JOIN user_roles ur ON u.id = ur.user_id
         WHERE ur.role_id = %s ORDER BY u.username
     """, (role_id,))
+    
+    # Get enterprise users
+    enterprise_users = db_query("""
+        SELECT eur.id, eur.username, eur.email, eur.assigned_at as created_at,
+               eur.display_name, 'enterprise' as auth_type
+        FROM enterprise_user_roles eur
+        WHERE eur.role_id = %s ORDER BY eur.username
+    """, (role_id,))
+    
+    return {
+        "local_users": local_users,
+        "enterprise_users": enterprise_users,
+        "total": len(local_users) + len(enterprise_users)
+    }
+
+
+async def get_role_permissions(role_id: int) -> List[Dict[str, Any]]:
+    """Get all permissions assigned to a role"""
+    return db_query("""
+        SELECT p.id, p.code, p.module, p.resource, p.action, 
+               p.display_name, p.description
+        FROM permissions p
+        JOIN role_permissions rp ON p.id = rp.permission_id
+        WHERE rp.role_id = %s
+        ORDER BY p.module, p.resource, p.action
+    """, (role_id,))
+
+
+async def get_all_permissions() -> List[Dict[str, Any]]:
+    """Get all available permissions grouped by module"""
+    return db_query("""
+        SELECT id, code, module, resource, action, display_name, description
+        FROM permissions
+        ORDER BY module, resource, action
+    """)
 
 async def get_password_policy() -> Dict[str, Any]:
     """
