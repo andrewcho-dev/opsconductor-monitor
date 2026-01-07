@@ -105,22 +105,35 @@ async def netbox_device_interfaces(
     device_id: int = Path(...),
     credentials: HTTPAuthorizationCredentials = Security(security)
 ):
-    """Get interfaces for a NetBox device"""
+    """Get interfaces for a NetBox device from NetBox API"""
     try:
-        # Try to get interfaces from cache or return empty list
-        interfaces = db_query("""
-            SELECT interface_name as name, interface_type as type, enabled, 
-                   mac_address, mtu, description
-            FROM netbox_interface_cache 
-            WHERE device_id = %s ORDER BY interface_name
-        """, (device_id,))
-        if interfaces:
-            return {"interfaces": interfaces, "count": len(interfaces)}
-        # Return empty list if no cached interfaces
-        return {"interfaces": [], "count": 0}
+        from backend.utils.http import NetBoxClient
+        client = NetBoxClient()
+        
+        if not client.is_configured:
+            return {"success": False, "data": [], "error": "NetBox not configured"}
+        
+        # Fetch interfaces from NetBox API
+        response = client.get(f'/api/dcim/interfaces/', params={'device_id': device_id, 'limit': 500})
+        interfaces = response.get('results', [])
+        
+        # Transform to simpler format
+        data = [{
+            'id': iface.get('id'),
+            'name': iface.get('name'),
+            'type': iface.get('type', {}).get('value') if isinstance(iface.get('type'), dict) else iface.get('type'),
+            'enabled': iface.get('enabled', True),
+            'mac_address': iface.get('mac_address'),
+            'mtu': iface.get('mtu'),
+            'description': iface.get('description', ''),
+            'speed': iface.get('speed'),
+            'mode': iface.get('mode', {}).get('value') if isinstance(iface.get('mode'), dict) else None,
+        } for iface in interfaces]
+        
+        return {"success": True, "data": data, "count": len(data)}
     except Exception as e:
         logger.error(f"Get device interfaces error: {str(e)}")
-        return {"interfaces": [], "count": 0}
+        return {"success": False, "data": [], "error": str(e)}
 
 
 @router.get("/netbox/settings", summary="Get NetBox settings")
