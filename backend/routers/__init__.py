@@ -13,6 +13,9 @@ from .automation import router as automation_router
 from .integrations import router as integrations_router
 from .credentials import router as credentials_router
 from .notifications import router as notifications_router
+from .alerts import router as alerts_router
+from .dependencies import router as dependencies_router
+from .connectors import router as connectors_router
 
 __all__ = [
     'system_router',
@@ -24,4 +27,7 @@ __all__ = [
     'integrations_router',
     'credentials_router',
     'notifications_router',
+    'alerts_router',
+    'dependencies_router',
+    'connectors_router',
 ]

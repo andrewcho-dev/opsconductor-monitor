@@ -79,6 +79,9 @@ from backend.routers import (
     integrations_router,
     credentials_router,
     notifications_router,
+    alerts_router,
+    dependencies_router,
+    connectors_router,
 )
 
 # Include all routers
@@ -91,6 +94,11 @@ app.include_router(automation_router)
 app.include_router(integrations_router)
 app.include_router(credentials_router)
 app.include_router(notifications_router)
+
+# MVP Alert Aggregation routers
+app.include_router(alerts_router, prefix="/api/v1/alerts", tags=["alerts"])
+app.include_router(dependencies_router, prefix="/api/v1/dependencies", tags=["dependencies"])
+app.include_router(connectors_router, prefix="/api/v1/connectors", tags=["connectors"])
 
 
 # Root endpoint
