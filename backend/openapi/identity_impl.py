@@ -246,14 +246,15 @@ async def list_users_paginated(
 async def list_roles_with_counts() -> List[Dict[str, Any]]:
     """
     List roles with user and permission counts
-    Migrated from legacy /api/roles
+    Includes both local users and enterprise users in user_count
     """
     if not table_exists('roles'):
         return []
     return db_query("""
         SELECT r.*, 
-               (SELECT COUNT(*) FROM user_roles ur WHERE ur.role_id = r.id) as user_count,
-               0 as permission_count
+               (SELECT COUNT(*) FROM user_roles ur WHERE ur.role_id = r.id) + 
+               (SELECT COUNT(*) FROM enterprise_user_roles eur WHERE eur.role_id = r.id) as user_count,
+               (SELECT COUNT(*) FROM role_permissions rp WHERE rp.role_id = r.id) as permission_count
         FROM roles r ORDER BY r.name
     """)
 
