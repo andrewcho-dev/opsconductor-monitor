@@ -17,6 +17,26 @@ security = HTTPBearer()
 router = APIRouter(prefix="/credentials/v1", tags=["credentials", "vault", "secrets"])
 
 
+@router.get("/credentials/statistics", summary="Get credential statistics")
+async def get_credential_statistics(
+    credentials: HTTPAuthorizationCredentials = Security(security)
+):
+    """Get credential vault statistics"""
+    try:
+        total = db_query_one("SELECT COUNT(*) as count FROM credentials")
+        by_type = db_query("SELECT credential_type, COUNT(*) as count FROM credentials GROUP BY credential_type")
+        
+        return {
+            "total": total['count'] if total else 0,
+            "by_type": {r['credential_type']: r['count'] for r in by_type} if by_type else {},
+            "expiring_soon": 0,
+            "expired": 0
+        }
+    except Exception as e:
+        logger.error(f"Get credential statistics error: {str(e)}")
+        return {"total": 0, "by_type": {}, "expiring_soon": 0, "expired": 0}
+
+
 @router.get("/", summary="List credentials")
 async def list_credentials(
     limit: int = Query(50, ge=1, le=100),
