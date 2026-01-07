@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { PageLayout, PageHeader } from "../../components/layout";
-import { useNetBoxDevices, useNetBoxStatus, useNetBoxIPRanges, useNetBoxTags, useNetBoxPrefixes } from "../../hooks/useNetBox";
+import { useNetBoxDevices, useNetBoxStatus, useNetBoxTags } from "../../hooks/useNetBox";
 import { fetchApi } from "../../lib/utils";
 import { 
   Server, RefreshCw, Database, ExternalLink, ChevronDown, ChevronRight,
@@ -39,24 +39,23 @@ function isIpInPrefix(ip, prefix) {
 
 export function DevicesPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const viewMode = searchParams.get('view') || 'all'; // 'all', 'network', 'site', 'type'
   
   // Check NetBox status
   const netboxStatus = useNetBoxStatus();
   
-  // NetBox devices, IP ranges, prefixes, and tags
+  // NetBox devices and tags
   const { devices, loading: devicesLoading, refetch: refetchDevices } = useNetBoxDevices();
-  const { prefixes: ipPrefixes, loading: prefixesLoading, refetch: refetchPrefixes } = useNetBoxPrefixes();
-  const { ranges: ipRanges, loading: rangesLoading, refetch: refetchRanges } = useNetBoxIPRanges();
   const { tags: netboxTags, loading: tagsLoading, refetch: refetchTags } = useNetBoxTags();
   
   // UI state
   const [search, setSearch] = useState("");
-  const [selectedPrefix, setSelectedPrefix] = useState(null); // null = all prefixes
-  const [selectedRange, setSelectedRange] = useState(null); // null = all ranges
   const [selectedTags, setSelectedTags] = useState([]); // array for multi-select
   const [tagLogic, setTagLogic] = useState('OR'); // 'OR' or 'AND'
-  const [expandedRanges, setExpandedRanges] = useState(new Set());
   const [selectedDevices, setSelectedDevices] = useState(new Set());
+  const [expandedGroups, setExpandedGroups] = useState(new Set());
+  const [selectedGroup, setSelectedGroup] = useState(null); // for filtering by group
   
   // Sorting state
   const [sortConfig, setSortConfig] = useState({ key: 'ip_address', direction: 'asc' });
@@ -68,13 +67,6 @@ export function DevicesPage() {
     site: '',
     status: '',
   });
-
-  // Auto-expand all ranges on load
-  useEffect(() => {
-    if (ipRanges.length > 0 && expandedRanges.size === 0) {
-      setExpandedRanges(new Set(ipRanges.map(r => r.id)));
-    }
-  }, [ipRanges]);
 
   // Assign devices to IP prefixes and ranges
   const devicesWithRanges = useMemo(() => {

@@ -45,9 +45,17 @@ const moduleNavigation = {
     title: 'Inventory',
     sections: [
       {
-        title: 'Devices',
+        title: 'Browse',
         items: [
           { id: 'devices', label: 'All Devices', icon: Server, path: '/inventory/devices' },
+        ]
+      },
+      {
+        title: 'Filter By',
+        items: [
+          { id: 'by-network', label: 'By Network', icon: Network, path: '/inventory/devices?view=network' },
+          { id: 'by-site', label: 'By Site', icon: Database, path: '/inventory/devices?view=site' },
+          { id: 'by-type', label: 'By Device Type', icon: Server, path: '/inventory/devices?view=type' },
         ]
       }
     ]
