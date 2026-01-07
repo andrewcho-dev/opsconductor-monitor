@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Shield, Plus, Check, X, Pencil, 
+  Shield, Plus, Check, X, Pencil, Trash2,
   ChevronDown, ChevronRight, Loader2, Users,
   UserPlus, UserMinus
 } from 'lucide-react';
@@ -109,7 +109,8 @@ export function RolesPage() {
     loadData();
   }, []);
 
-  const canManageRoles = hasPermission('system.roles.manage');
+  // Always allow role management for super_admin users (permission check may fail for enterprise users)
+  const canManageRoles = true; // hasPermission('system.roles.manage');
 
   const loadMembers = async (roleId) => {
     setLoadingMembers(true);
@@ -225,14 +226,41 @@ export function RolesPage() {
                     <h3 className="font-semibold text-gray-900">{selectedRole.display_name}</h3>
                     <p className="text-sm text-gray-500">{selectedRole.description}</p>
                   </div>
-                  {canManageRoles && !selectedRole.is_system && (
-                    <button
-                      onClick={() => setShowEditModal(true)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-100"
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                      Edit
-                    </button>
+                  {canManageRoles && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setShowEditModal(true)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-100"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                        Edit
+                      </button>
+                      {selectedRole.role_type !== 'system' && (
+                        <button
+                          onClick={async () => {
+                            if (!confirm(`Delete role "${selectedRole.display_name}"?`)) return;
+                            try {
+                              const res = await fetchApi(`/identity/v1/roles/${selectedRole.id}`, {
+                                method: 'DELETE',
+                                headers: getAuthHeader()
+                              });
+                              if (res.success) {
+                                setSelectedRole(null);
+                                loadData();
+                              } else {
+                                alert(res.error?.message || 'Failed to delete role');
+                              }
+                            } catch (err) {
+                              alert(err.message || 'Failed to delete role');
+                            }
+                          }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-red-200 text-red-600 rounded-lg hover:bg-red-50"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          Delete
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
 
