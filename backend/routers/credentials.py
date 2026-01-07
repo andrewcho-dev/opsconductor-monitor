@@ -121,17 +121,18 @@ async def get_credential_audit(
     try:
         # Check if credential_audit table exists
         audit = db_query("""
-            SELECT id, credential_id, action, user_id, timestamp, details
+            SELECT id, credential_id, action, user_id, timestamp as performed_at, details,
+                   true as success
             FROM credential_audit
             ORDER BY timestamp DESC
             LIMIT %s
         """, (limit,))
-        return {"audit": audit, "total": len(audit)}
+        return {"entries": audit, "total": len(audit)}
     except Exception as e:
         if 'does not exist' in str(e):
-            return {"audit": [], "total": 0}
+            return {"entries": [], "total": 0}
         logger.error(f"Get credential audit error: {str(e)}")
-        return {"audit": [], "total": 0}
+        return {"entries": [], "total": 0}
 
 
 @router.get("/credentials/enterprise/configs", summary="Get enterprise auth configs")
