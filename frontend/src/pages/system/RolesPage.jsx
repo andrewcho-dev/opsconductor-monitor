@@ -83,6 +83,7 @@ export function RolesPage() {
   const [selectedRole, setSelectedRole] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [members, setMembers] = useState([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [permissions, setPermissions] = useState([]);
@@ -268,8 +269,17 @@ export function RolesPage() {
                 <div className="flex-1 overflow-hidden flex">
                   {/* Members Column */}
                   <div className="w-1/2 border-r flex flex-col">
-                    <div className="px-4 py-2 border-b bg-gray-50">
+                    <div className="px-4 py-2 border-b bg-gray-50 flex items-center justify-between">
                       <span className="text-sm font-medium text-gray-700">Members ({members.length})</span>
+                      {canManageRoles && (
+                        <button
+                          onClick={() => setShowAddMemberModal(true)}
+                          className="p-1.5 bg-blue-600 text-white rounded hover:bg-blue-700"
+                          title="Add Member"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                     <div className="flex-1 overflow-y-auto p-3">
                       <RoleMembersPanel
@@ -359,48 +369,114 @@ export function RolesPage() {
           getAuthHeader={getAuthHeader}
         />
       )}
+
+      {/* Add Member Modal */}
+      {showAddMemberModal && selectedRole && (
+        <AddMemberModal
+          roleId={selectedRole.id}
+          roleName={selectedRole.display_name}
+          onClose={() => setShowAddMemberModal(false)}
+          onSave={() => { setShowAddMemberModal(false); loadMembers(selectedRole.id); loadData(); }}
+          getAuthHeader={getAuthHeader}
+        />
+      )}
     </PageLayout>
   );
 }
 
-// Compact members panel component
-function RoleMembersPanel({ roleId, members, loading, canManage, getAuthHeader, onRefresh }) {
-  const [showAddMember, setShowAddMember] = useState(false);
-  const [newMember, setNewMember] = useState({ username: '', type: 'enterprise', display_name: '' });
-  const [addingMember, setAddingMember] = useState(false);
-  const [memberError, setMemberError] = useState('');
+// Add Member Modal
+function AddMemberModal({ roleId, roleName, onClose, onSave, getAuthHeader }) {
+  const [username, setUsername] = useState('');
+  const [authType, setAuthType] = useState('enterprise');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleAddMember = async () => {
-    if (!newMember.username.trim()) {
-      setMemberError('Username required');
+  const handleSave = async () => {
+    if (!username.trim()) {
+      setError('Username is required');
       return;
     }
-    setMemberError('');
-    setAddingMember(true);
+    setError('');
+    setSaving(true);
     try {
       const res = await fetchApi(`/identity/v1/roles/${roleId}/members`, {
         method: 'POST',
         headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          username: newMember.username,
-          auth_type: newMember.type,
-          display_name: newMember.display_name || newMember.username
+          username: username.trim(),
+          auth_type: authType,
+          display_name: username.trim()
         })
       });
       if (res.success) {
-        setNewMember({ username: '', type: 'enterprise', display_name: '' });
-        setShowAddMember(false);
-        onRefresh();
+        onSave();
       } else {
-        setMemberError(res.error?.message || 'Failed');
+        setError(res.error?.message || 'Failed to add member');
       }
     } catch (err) {
-      setMemberError(err.message || 'Failed');
+      setError(err.message || 'Failed to add member');
     } finally {
-      setAddingMember(false);
+      setSaving(false);
     }
   };
 
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4">
+        <div className="flex items-center justify-between px-6 py-4 border-b">
+          <h2 className="text-lg font-semibold">Add Member to {roleName}</h2>
+          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Enter username"
+              className="w-full px-3 py-2 border rounded-lg"
+              autoFocus
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">User Type</label>
+            <select
+              value={authType}
+              onChange={(e) => setAuthType(e.target.value)}
+              className="w-full px-3 py-2 border rounded-lg"
+            >
+              <option value="enterprise">Enterprise (AD/LDAP)</option>
+              <option value="local">Local User</option>
+            </select>
+          </div>
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-600">{error}</p>
+            </div>
+          )}
+          <div className="flex justify-end gap-3 pt-4 border-t">
+            <button onClick={onClose} className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg">
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {saving ? 'Adding...' : 'Add Member'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Members list panel (display only, no add form)
+function RoleMembersPanel({ roleId, members, loading, canManage, getAuthHeader, onRefresh }) {
   const handleRemoveMember = async (username, type) => {
     if (!confirm(`Remove ${username}?`)) return;
     try {
@@ -424,57 +500,6 @@ function RoleMembersPanel({ roleId, members, loading, canManage, getAuthHeader, 
 
   return (
     <div className="space-y-2">
-      {/* Add Member */}
-      {canManage && (
-        <div className="mb-3">
-          {!showAddMember ? (
-            <button
-              onClick={() => setShowAddMember(true)}
-              className="p-1.5 bg-blue-600 text-white rounded hover:bg-blue-700"
-              title="Add Member"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-          ) : (
-            <div className="p-2.5 bg-gray-50 rounded-lg space-y-2">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={newMember.username}
-                  onChange={(e) => setNewMember(prev => ({ ...prev, username: e.target.value }))}
-                  placeholder="Username"
-                  className="flex-1 px-2 py-1.5 text-xs border rounded"
-                />
-                <select
-                  value={newMember.type}
-                  onChange={(e) => setNewMember(prev => ({ ...prev, type: e.target.value }))}
-                  className="px-2 py-1.5 text-xs border rounded"
-                >
-                  <option value="enterprise">AD</option>
-                  <option value="local">Local</option>
-                </select>
-              </div>
-              {memberError && <p className="text-xs text-red-600">{memberError}</p>}
-              <div className="flex gap-1.5">
-                <button
-                  onClick={handleAddMember}
-                  disabled={addingMember}
-                  className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {addingMember ? '...' : 'Add'}
-                </button>
-                <button
-                  onClick={() => { setShowAddMember(false); setMemberError(''); }}
-                  className="px-2 py-1 text-xs text-gray-600 hover:bg-gray-200 rounded"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Members List */}
       {members.length === 0 ? (
         <div className="text-center py-4 text-gray-400 text-sm">
