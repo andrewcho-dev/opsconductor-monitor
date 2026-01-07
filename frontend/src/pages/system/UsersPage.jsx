@@ -254,11 +254,23 @@ export function UsersPage() {
                   <tr key={user.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-medium">
+                        <div className={cn(
+                          "w-9 h-9 rounded-full flex items-center justify-center text-white font-medium",
+                          user.auth_type === 'enterprise' 
+                            ? "bg-gradient-to-br from-indigo-500 to-purple-600" 
+                            : "bg-gradient-to-br from-blue-500 to-purple-600"
+                        )}>
                           {(user.display_name || user.username || '?')[0].toUpperCase()}
                         </div>
                         <div>
-                          <p className="font-medium text-gray-900">{user.display_name || user.username}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-gray-900">{user.display_name || user.username}</p>
+                            {user.auth_type === 'enterprise' && (
+                              <span className="px-1.5 py-0.5 text-[10px] bg-indigo-100 text-indigo-700 rounded">
+                                AD
+                              </span>
+                            )}
+                          </div>
                           <p className="text-sm text-gray-500">@{user.username}</p>
                         </div>
                       </div>
@@ -465,34 +477,65 @@ export function UsersPage() {
 }
 
 function EditUserModal({ user, roles, onClose, onSave, getAuthHeader }) {
+  const isEnterprise = user.auth_type === 'enterprise';
+  
+  // For enterprise users, find the role by name; for local users, use the role mapping
+  const initialRoleId = isEnterprise 
+    ? roles.find(r => (user.roles || []).includes(r.name))?.id || null
+    : null;
   const [selectedRoles, setSelectedRoles] = useState(
-    roles.filter(r => (user.roles || []).includes(r.display_name)).map(r => r.id)
+    isEnterprise 
+      ? (initialRoleId ? [initialRoleId] : [])
+      : roles.filter(r => (user.roles || []).includes(r.name) || (user.roles || []).includes(r.display_name)).map(r => r.id)
   );
   const [status, setStatus] = useState(user.status);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSave = async () => {
     setSaving(true);
+    setError('');
     try {
-      // Update roles
-      await fetchApi(`/identity/v1/users/${user.id}/roles`, {
-        method: 'PUT',
-        headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role_ids: selectedRoles })
-      });
-
-      // Update status if changed
-      if (status !== user.status) {
-        await fetchApi(`/identity/v1/users/${user.id}`, {
+      if (isEnterprise) {
+        // Enterprise users - use the enterprise-users/assign-role endpoint
+        const roleId = selectedRoles[0]; // Enterprise users get one role
+        if (!roleId) {
+          setError('Please select a role');
+          setSaving(false);
+          return;
+        }
+        await fetchApi('/identity/v1/enterprise-users/assign-role', {
+          method: 'POST',
+          headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            username: user.username, 
+            role_id: roleId,
+            display_name: user.display_name,
+            email: user.email
+          })
+        });
+      } else {
+        // Local users - use the standard endpoint
+        await fetchApi(`/identity/v1/users/${user.id}/roles`, {
           method: 'PUT',
           headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status })
+          body: JSON.stringify({ role_ids: selectedRoles })
         });
+
+        // Update status if changed
+        if (status !== user.status) {
+          await fetchApi(`/identity/v1/users/${user.id}`, {
+            method: 'PUT',
+            headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status })
+          });
+        }
       }
 
       onSave();
     } catch (err) {
       console.error('Error updating user:', err);
+      setError(err.message || 'Failed to update user');
     } finally {
       setSaving(false);
     }
@@ -502,47 +545,79 @@ function EditUserModal({ user, roles, onClose, onSave, getAuthHeader }) {
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4">
         <div className="flex items-center justify-between px-6 py-4 border-b">
-          <h2 className="text-lg font-semibold">Edit User: {user.username}</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold">Edit User: {user.username}</h2>
+            {isEnterprise && (
+              <span className="px-2 py-0.5 text-xs bg-indigo-100 text-indigo-700 rounded-full">
+                Enterprise
+              </span>
+            )}
+          </div>
           <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded">
             <X className="w-5 h-5" />
           </button>
         </div>
         <div className="p-6 space-y-4">
+          {isEnterprise && (
+            <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+              <p className="text-sm text-indigo-700">
+                This is an enterprise (AD/LDAP) user. You can only change their role assignment.
+              </p>
+            </div>
+          )}
+          
+          {!isEnterprise && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg"
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="locked">Locked</option>
+              </select>
+            </div>
+          )}
+          
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg"
-            >
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="locked">Locked</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Roles</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              {isEnterprise ? 'Assigned Role' : 'Roles'}
+            </label>
             <div className="space-y-2">
               {roles.map((role) => (
                 <label key={role.id} className="flex items-center gap-2">
                   <input
-                    type="checkbox"
+                    type={isEnterprise ? "radio" : "checkbox"}
+                    name="enterpriseRole"
                     checked={selectedRoles.includes(role.id)}
                     onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedRoles(prev => [...prev, role.id]);
+                      if (isEnterprise) {
+                        // Enterprise users get single role selection
+                        setSelectedRoles([role.id]);
                       } else {
-                        setSelectedRoles(prev => prev.filter(id => id !== role.id));
+                        if (e.target.checked) {
+                          setSelectedRoles(prev => [...prev, role.id]);
+                        } else {
+                          setSelectedRoles(prev => prev.filter(id => id !== role.id));
+                        }
                       }
                     }}
                     className="rounded"
                   />
-                  <span className="text-sm">{role.display_name}</span>
+                  <span className="text-sm font-medium">{role.display_name}</span>
                   <span className="text-xs text-gray-500">- {role.description}</span>
                 </label>
               ))}
             </div>
           </div>
+
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-600">{error}</p>
+            </div>
+          )}
 
           <div className="flex justify-end gap-3 pt-4 border-t">
             <button
