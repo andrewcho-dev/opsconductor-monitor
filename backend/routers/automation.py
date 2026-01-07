@@ -37,6 +37,36 @@ async def list_workflows(
         raise HTTPException(status_code=500, detail={"code": "LIST_WORKFLOWS_ERROR", "message": str(e)})
 
 
+@router.get("/workflows/folders", summary="Get workflow folders")
+async def get_workflow_folders(
+    credentials: HTTPAuthorizationCredentials = Security(security)
+):
+    """Get workflow folders"""
+    try:
+        folders = db_query("SELECT id, name, description, created_at FROM workflow_folders ORDER BY name")
+        return {"folders": folders, "total": len(folders)}
+    except Exception as e:
+        if 'does not exist' in str(e):
+            return {"folders": [], "total": 0}
+        logger.error(f"Get workflow folders error: {str(e)}")
+        return {"folders": [], "total": 0}
+
+
+@router.get("/workflows/tags", summary="Get workflow tags")
+async def get_workflow_tags(
+    credentials: HTTPAuthorizationCredentials = Security(security)
+):
+    """Get workflow tags"""
+    try:
+        tags = db_query("SELECT DISTINCT tag FROM workflow_tags ORDER BY tag")
+        return {"tags": [t['tag'] for t in tags] if tags else [], "total": len(tags) if tags else 0}
+    except Exception as e:
+        if 'does not exist' in str(e):
+            return {"tags": [], "total": 0}
+        logger.error(f"Get workflow tags error: {str(e)}")
+        return {"tags": [], "total": 0}
+
+
 @router.get("/workflows/{workflow_id}", summary="Get workflow")
 async def get_workflow(
     workflow_id: int = Path(...),
