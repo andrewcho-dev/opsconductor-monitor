@@ -15,6 +15,10 @@ import { DashboardPage, TopologyPage, PowerTrendsPage, AlertsPage, ActiveJobsPag
 import PollingPage from "./pages/monitor/PollingPage";
 import MibMappingsPage from "./pages/monitor/MibMappingsPage";
 
+// Alert Aggregation Module (MVP)
+import { AlertDashboard } from "./pages/AlertDashboard";
+import { AlertDetailPage } from "./pages/AlertDetailPage";
+
 // System Module
 import { 
   SystemOverviewPage, 
@@ -78,6 +82,10 @@ function App() {
         <Route path="/monitor/ups" element={<ProtectedRoute><UPSMonitorPage /></ProtectedRoute>} />
         <Route path="/monitor/polling" element={<ProtectedRoute><PollingPage /></ProtectedRoute>} />
         <Route path="/monitor/mib-mappings" element={<ProtectedRoute><MibMappingsPage /></ProtectedRoute>} />
+
+        {/* ALERT AGGREGATION MODULE (MVP) */}
+        <Route path="/alerts" element={<ProtectedRoute><AlertDashboard /></ProtectedRoute>} />
+        <Route path="/alerts/:alertId" element={<ProtectedRoute><AlertDetailPage /></ProtectedRoute>} />
 
         {/* CREDENTIALS MODULE */}
         <Route path="/credentials" element={<ProtectedRoute permission="credentials.credential.view"><CredentialVaultPage /></ProtectedRoute>} />
