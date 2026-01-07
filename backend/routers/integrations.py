@@ -182,7 +182,31 @@ async def prtg_settings(credentials: HTTPAuthorizationCredentials = Security(sec
 @router.get("/prtg/status", summary="Get PRTG status")
 async def prtg_status(credentials: HTTPAuthorizationCredentials = Security(security)):
     """Get PRTG connection status"""
-    return {"connected": False}
+    try:
+        url = get_setting('prtg_url')
+        if not url:
+            return {"success": True, "data": {"connected": False}}
+        
+        # Try to test PRTG connection
+        result = await test_prtg_connection({
+            'url': url,
+            'username': get_setting('prtg_username'),
+            'passhash': get_setting('prtg_passhash') or get_setting('prtg_api_token'),
+            'verify_ssl': False
+        })
+        
+        return {
+            "success": True,
+            "data": {
+                "connected": result.get('success', False),
+                "version": result.get('prtg_version'),
+                "sensors": result.get('sensors_count'),
+                "devices": result.get('devices_count')
+            }
+        }
+    except Exception as e:
+        logger.error(f"PRTG status error: {str(e)}")
+        return {"success": True, "data": {"connected": False, "error": str(e)}}
 
 
 @router.post("/prtg/test", summary="Test PRTG connection")
@@ -204,20 +228,25 @@ async def test_mcp(
 ):
     """Test MCP connection"""
     try:
-        url = config.get('url', '')
+        # Use provided URL or fall back to settings
+        url = config.get('url') or get_setting('mcp_url') or ''
         if not url:
-            return {"success": False, "error": "MCP URL is required"}
+            return {"success": True, "data": {"success": False, "message": "MCP URL not configured"}}
         
         # Try to connect to MCP endpoint
         import httpx
         async with httpx.AsyncClient(timeout=10.0, verify=False) as client:
-            response = await client.get(f"{url.rstrip('/')}/api/health")
-            if response.status_code == 200:
-                return {"success": True, "message": "Connected successfully"}
-            else:
-                return {"success": False, "error": f"MCP returned status {response.status_code}"}
+            # Try common health check endpoints
+            for endpoint in ['/api/health', '/health', '/api/v1/health', '/']:
+                try:
+                    response = await client.get(f"{url.rstrip('/')}{endpoint}")
+                    if response.status_code == 200:
+                        return {"success": True, "data": {"success": True, "message": "Connected successfully"}}
+                except:
+                    continue
+            return {"success": True, "data": {"success": False, "message": "No health endpoint responded"}}
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        return {"success": True, "data": {"success": False, "message": str(e)}}
 
 
 @router.get("/mcp/settings", summary="Get MCP settings")
