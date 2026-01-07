@@ -108,7 +108,7 @@ def db_execute(sql: str, params: Tuple = None, returning: bool = False) -> Union
     db = get_db()
     with db.cursor() as cursor:
         cursor.execute(sql, params)
-        db.commit()
+        # Note: autocommit is enabled on the connection, no explicit commit needed
         
         if returning and cursor.description:
             row = cursor.fetchone()

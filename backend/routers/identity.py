@@ -10,7 +10,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 import logging
 
-from backend.utils.db import db_query
+from backend.utils.db import db_query, db_query_one, db_execute, table_exists
 from backend.openapi.identity_impl import (
     authenticate_user, get_current_user_from_token, list_users_paginated,
     list_roles_with_counts, get_role_members, get_password_policy,
@@ -23,7 +23,6 @@ security = HTTPBearer()
 ACCESS_TOKEN_EXPIRE_MINUTES = 1440
 
 router = APIRouter(tags=["identity", "auth", "users", "roles"])
-
 
 # Auth routes (no prefix - /auth/*)
 auth_router = APIRouter(tags=["auth"])
@@ -167,6 +166,98 @@ async def get_members(role_id: int, credentials: HTTPAuthorizationCredentials = 
     except Exception as e:
         logger.error(f"Get role members error: {str(e)}")
         raise HTTPException(status_code=500, detail={"code": "ROLE_MEMBERS_ERROR", "message": str(e)})
+
+
+# ============================================================================
+# Enterprise User Role Assignment
+# ============================================================================
+
+@identity_router.post("/enterprise-users/assign-role", summary="Assign role to enterprise user")
+async def assign_enterprise_role_v2(
+    request: Dict[str, Any] = Body(...),
+    credentials: HTTPAuthorizationCredentials = Security(security)
+):
+    """
+    Assign a role to an enterprise (AD/LDAP) user.
+    Creates the mapping if it doesn't exist, updates if it does.
+    Request body: { username: string, role_id: int, display_name?: string, email?: string }
+    """
+    try:
+        username = request.get('username')
+        role_id = request.get('role_id')
+        display_name = request.get('display_name', '')
+        email = request.get('email', '')
+        
+        if not username or not role_id:
+            raise HTTPException(status_code=400, detail={"code": "INVALID_REQUEST", "message": "username and role_id are required"})
+        
+        # Check if role exists
+        role = db_query_one("SELECT id, name FROM roles WHERE id = %s", (role_id,))
+        if not role:
+            raise HTTPException(status_code=404, detail={"code": "ROLE_NOT_FOUND", "message": f"Role {role_id} not found"})
+        
+        # Check if user already has a role assignment
+        existing = db_query_one("SELECT id FROM enterprise_user_roles WHERE username = %s", (username,))
+        
+        if existing:
+            # Update existing assignment
+            db_execute("""
+                UPDATE enterprise_user_roles 
+                SET role_id = %s, display_name = %s, email = %s, assigned_at = NOW()
+                WHERE username = %s
+            """, (role_id, display_name or f"Enterprise - {username}", email, username))
+            return {"success": True, "message": f"Updated role for {username} to {role['name']}", "action": "updated"}
+        else:
+            # Create new assignment
+            db_execute("""
+                INSERT INTO enterprise_user_roles (username, role_id, display_name, email, assigned_by, assigned_at)
+                VALUES (%s, %s, %s, %s, 1, NOW())
+            """, (username, role_id, display_name or f"Enterprise - {username}", email))
+            return {"success": True, "message": f"Assigned {username} to role {role['name']}", "action": "created"}
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Assign enterprise role error: {str(e)}")
+        raise HTTPException(status_code=500, detail={"code": "ASSIGN_ROLE_ERROR", "message": str(e)})
+
+
+@identity_router.delete("/enterprise-users/{username}/role", summary="Remove enterprise user role")
+async def remove_enterprise_role_v2(
+    username: str,
+    credentials: HTTPAuthorizationCredentials = Security(security)
+):
+    """Remove role assignment from an enterprise user"""
+    try:
+        existing = db_query_one("SELECT id FROM enterprise_user_roles WHERE username = %s", (username,))
+        if not existing:
+            raise HTTPException(status_code=404, detail={"code": "NOT_FOUND", "message": f"No role assignment found for {username}"})
+        
+        db_execute("DELETE FROM enterprise_user_roles WHERE username = %s", (username,))
+        return {"success": True, "message": f"Removed role assignment for {username}"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Remove enterprise role error: {str(e)}")
+        raise HTTPException(status_code=500, detail={"code": "REMOVE_ROLE_ERROR", "message": str(e)})
+
+
+@identity_router.get("/enterprise-users", summary="List enterprise user role assignments")
+async def list_enterprise_users_v2(credentials: HTTPAuthorizationCredentials = Security(security)):
+    """List all enterprise users with their role assignments"""
+    try:
+        users = db_query("""
+            SELECT eur.id, eur.username, eur.display_name, eur.email, 
+                   eur.role_id, r.name as role_name, eur.assigned_at, eur.assigned_by
+            FROM enterprise_user_roles eur
+            LEFT JOIN roles r ON eur.role_id = r.id
+            ORDER BY eur.username
+        """)
+        return {"items": users, "total": len(users)}
+    except Exception as e:
+        logger.error(f"List enterprise users error: {str(e)}")
+        raise HTTPException(status_code=500, detail={"code": "LIST_ERROR", "message": str(e)})
 
 
 @identity_router.get("/sessions", summary="List sessions")
