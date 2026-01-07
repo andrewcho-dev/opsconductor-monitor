@@ -250,6 +250,25 @@ async def update_credential(
         raise HTTPException(status_code=500, detail={"code": "UPDATE_CREDENTIAL_ERROR", "message": str(e)})
 
 
+async def _delete_credential_impl(credential_id: int):
+    """Internal implementation for deleting a credential"""
+    db_execute("DELETE FROM credentials WHERE id = %s", (credential_id,))
+    return {"success": True}
+
+
+@router.delete("/credentials/{credential_id}", summary="Delete credential (alt path)")
+async def delete_credential_alt(
+    credential_id: int = Path(...),
+    credentials: HTTPAuthorizationCredentials = Security(security)
+):
+    """Delete a credential - alternative path"""
+    try:
+        return await _delete_credential_impl(credential_id)
+    except Exception as e:
+        logger.error(f"Delete credential error: {str(e)}")
+        raise HTTPException(status_code=500, detail={"code": "DELETE_CREDENTIAL_ERROR", "message": str(e)})
+
+
 @router.delete("/{credential_id}", summary="Delete credential")
 async def delete_credential(
     credential_id: int = Path(...),
@@ -257,8 +276,7 @@ async def delete_credential(
 ):
     """Delete a credential"""
     try:
-        db_execute("DELETE FROM credentials WHERE id = %s", (credential_id,))
-        return {"success": True}
+        return await _delete_credential_impl(credential_id)
     except Exception as e:
         logger.error(f"Delete credential error: {str(e)}")
         raise HTTPException(status_code=500, detail={"code": "DELETE_CREDENTIAL_ERROR", "message": str(e)})
