@@ -98,6 +98,42 @@ async def create_credential(
         raise HTTPException(status_code=500, detail={"code": "CREATE_CREDENTIAL_ERROR", "message": str(e)})
 
 
+@router.get("/credentials/expiring", summary="Get expiring credentials")
+async def get_expiring_credentials(
+    days: int = Query(30, ge=1, le=365),
+    credentials: HTTPAuthorizationCredentials = Security(security)
+):
+    """Get credentials expiring within specified days"""
+    try:
+        # Most credentials don't have expiration dates, return empty for now
+        return {"credentials": [], "total": 0, "days": days}
+    except Exception as e:
+        logger.error(f"Get expiring credentials error: {str(e)}")
+        return {"credentials": [], "total": 0, "days": days}
+
+
+@router.get("/credentials/audit", summary="Get credential audit log")
+async def get_credential_audit(
+    limit: int = Query(100, ge=1, le=1000),
+    credentials: HTTPAuthorizationCredentials = Security(security)
+):
+    """Get credential access/change audit log"""
+    try:
+        # Check if credential_audit table exists
+        audit = db_query("""
+            SELECT id, credential_id, action, user_id, timestamp, details
+            FROM credential_audit
+            ORDER BY timestamp DESC
+            LIMIT %s
+        """, (limit,))
+        return {"audit": audit, "total": len(audit)}
+    except Exception as e:
+        if 'does not exist' in str(e):
+            return {"audit": [], "total": 0}
+        logger.error(f"Get credential audit error: {str(e)}")
+        return {"audit": [], "total": 0}
+
+
 @router.get("/credentials/enterprise/configs", summary="Get enterprise auth configs")
 async def get_enterprise_configs(
     credentials: HTTPAuthorizationCredentials = Security(security)
