@@ -235,12 +235,12 @@ async def test_mcp(
         
         # Try to connect to MCP endpoint
         import httpx
-        async with httpx.AsyncClient(timeout=10.0, verify=False) as client:
+        async with httpx.AsyncClient(timeout=10.0, verify=False, follow_redirects=True) as client:
             # Try common health check endpoints
             for endpoint in ['/api/health', '/health', '/api/v1/health', '/']:
                 try:
                     response = await client.get(f"{url.rstrip('/')}{endpoint}")
-                    if response.status_code == 200:
+                    if response.status_code in [200, 301, 302]:
                         return {"success": True, "data": {"success": True, "message": "Connected successfully"}}
                 except:
                     continue
