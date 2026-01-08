@@ -112,6 +112,7 @@ export function useConnectorActions() {
     try {
       const response = await fetchApi(`/api/v1/connectors/${connectorId}/test`, {
         method: 'POST',
+        timeout: 30000, // 30 seconds for SSH-based connectors
       });
 
       return response;
