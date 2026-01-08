@@ -328,6 +328,24 @@ class AlertManager:
             user_id=user, notes=notes
         )
     
+    async def delete_alert(self, alert_id: UUID) -> bool:
+        """
+        Permanently delete an alert from the database.
+        This action cannot be undone.
+        """
+        try:
+            # Delete history first (foreign key constraint)
+            db_execute("DELETE FROM alert_history WHERE alert_id = %s", (str(alert_id),))
+            
+            # Delete the alert
+            db_execute("DELETE FROM alerts WHERE id = %s", (str(alert_id),))
+            
+            logger.info(f"Permanently deleted alert {alert_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to delete alert {alert_id}: {e}")
+            raise
+    
     async def get_alert(self, alert_id: UUID) -> Optional[Alert]:
         """Get alert by ID."""
         row = db_query_one(

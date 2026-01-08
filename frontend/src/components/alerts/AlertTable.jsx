@@ -4,7 +4,7 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown, Filter } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown, Filter, Trash2, X } from 'lucide-react';
 import { SEVERITY_CONFIG, CATEGORY_CONFIG, formatRelativeTime } from '../../lib/constants';
 
 // Status configuration with colors and order
@@ -31,11 +31,15 @@ export function AlertTable({
   severityStatusCounts = {},
   showResolvedTime = false,  // Show resolved time column instead of age from now
   hideStatusPills = false,   // Hide the status filter pills
+  onDeleteAlerts,  // Callback to delete selected alerts
 }) {
   const [sortConfig, setSortConfig] = useState({ key: 'occurred_at', direction: 'desc' });
   const [openFilter, setOpenFilter] = useState(null);
   const [filterSearch, setFilterSearch] = useState('');
   const [pendingSelections, setPendingSelections] = useState({});
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleting, setDeleting] = useState(false);
   
   // Cache dropdown options when filter is open to prevent scroll reset on data refresh
   const cachedOptionsRef = useRef({});
@@ -384,27 +388,125 @@ export function AlertTable({
     return counts;
   }, [filters.severity, statusCounts, severityStatusCounts]);
 
+  // Handle delete confirmation
+  const handleDeleteConfirm = async () => {
+    if (deleteConfirmText.toLowerCase() !== 'delete' || !onDeleteAlerts) return;
+    
+    setDeleting(true);
+    try {
+      await onDeleteAlerts(selectedIds);
+      setShowDeleteModal(false);
+      setDeleteConfirmText('');
+      onSelectChange?.([]);
+    } catch (err) {
+      console.error('Failed to delete alerts:', err);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  // Delete confirmation modal
+  const DeleteConfirmModal = () => {
+    if (!showDeleteModal) return null;
+    
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md mx-4">
+          <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+            <h2 className="text-lg font-medium text-red-600 dark:text-red-400 flex items-center gap-2">
+              <Trash2 className="h-5 w-5" />
+              Delete {selectedIds.length} Alert{selectedIds.length !== 1 ? 's' : ''}
+            </h2>
+            <button 
+              onClick={() => { setShowDeleteModal(false); setDeleteConfirmText(''); }}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          
+          <div className="p-4">
+            <p className="text-gray-700 dark:text-gray-300 mb-4">
+              This action <strong>cannot be undone</strong>. The selected alerts will be permanently removed from the system.
+            </p>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+              Type <strong className="text-red-600">delete</strong> to confirm:
+            </p>
+            <input
+              type="text"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="Type 'delete' to confirm"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+              autoFocus
+            />
+          </div>
+          
+          <div className="flex justify-end gap-2 p-4 border-t border-gray-200 dark:border-gray-700">
+            <button
+              onClick={() => { setShowDeleteModal(false); setDeleteConfirmText(''); }}
+              className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleDeleteConfirm}
+              disabled={deleteConfirmText.toLowerCase() !== 'delete' || deleting}
+              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {deleting ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4" />
+                  Delete Permanently
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Status filter pills component - always visible
   const StatusFilterPills = () => (
-    <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex items-center gap-2">
-      <span className="text-xs font-medium text-gray-500 dark:text-gray-400 mr-1">Status:</span>
-      {STATUS_ORDER.map((status) => {
-        const config = STATUS_CONFIG[status];
-        const count = filteredStatusCounts[status] || 0;
-        const isSelected = selectedStatuses.includes(status);
-        
-        return (
-          <button
-            key={status}
-            onClick={() => handleStatusToggle(status)}
-            className={`px-2 py-0.5 text-xs font-medium rounded border transition-all ${
-              isSelected ? config.selectedClass : 'bg-white dark:bg-gray-800 text-gray-500 border-gray-300 dark:border-gray-600 hover:border-gray-400'
-            }`}
-          >
-            {config.label} {count > 0 && <span className="ml-1 opacity-75">({count})</span>}
-          </button>
-        );
-      })}
+    <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex items-center justify-between">
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-medium text-gray-500 dark:text-gray-400 mr-1">Status:</span>
+        {STATUS_ORDER.map((status) => {
+          const config = STATUS_CONFIG[status];
+          const count = filteredStatusCounts[status] || 0;
+          const isSelected = selectedStatuses.includes(status);
+          
+          return (
+            <button
+              key={status}
+              onClick={() => handleStatusToggle(status)}
+              className={`px-2 py-0.5 text-xs font-medium rounded border transition-all ${
+                isSelected ? config.selectedClass : 'bg-white dark:bg-gray-800 text-gray-500 border-gray-300 dark:border-gray-600 hover:border-gray-400'
+              }`}
+            >
+              {config.label} {count > 0 && <span className="ml-1 opacity-75">({count})</span>}
+            </button>
+          );
+        })}
+      </div>
+      
+      {/* Delete button - only show when alerts are selected */}
+      {selectedIds.length > 0 && onDeleteAlerts && (
+        <button
+          onClick={() => setShowDeleteModal(true)}
+          className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded border border-red-300 dark:border-red-700 transition-colors"
+          title={`Delete ${selectedIds.length} selected alert${selectedIds.length !== 1 ? 's' : ''}`}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+          Delete ({selectedIds.length})
+        </button>
+      )}
     </div>
   );
 
@@ -433,10 +535,12 @@ export function AlertTable({
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col h-full">
-      {!hideStatusPills && <StatusFilterPills />}
+    <>
+      <DeleteConfirmModal />
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col h-full">
+        {!hideStatusPills && <StatusFilterPills />}
       
-      {/* Table */}
+        {/* Table */}
       <div ref={tableContainerRef} className="overflow-auto flex-1">
         <table className="w-full divide-y divide-gray-200 dark:divide-gray-700" style={{ tableLayout: 'auto' }}>
           <thead className="bg-gray-50 dark:bg-gray-900">
@@ -675,7 +779,8 @@ export function AlertTable({
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }
 

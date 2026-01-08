@@ -10,6 +10,7 @@ import { useAlerts } from '../hooks/useAlerts';
 import { AlertStats, AlertTable } from '../components/alerts';
 import { PageLayout } from '../components/layout/PageLayout';
 import { useAlertWebSocketRefresh } from '../hooks/useAlertWebSocket';
+import { fetchApi } from '../lib/utils';
 
 export function AlertDashboard() {
   const {
@@ -45,6 +46,20 @@ export function AlertDashboard() {
     }, 1000);
     return () => clearInterval(interval);
   }, [lastUpdated]);
+
+  // Handle bulk delete of selected alerts
+  const handleDeleteAlerts = async (alertIds) => {
+    const response = await fetchApi('/api/v1/alerts/bulk/delete', {
+      method: 'POST',
+      body: JSON.stringify({ alert_ids: alertIds }),
+    });
+    
+    if (response.success) {
+      refresh();
+    } else {
+      throw new Error(response.error?.message || 'Failed to delete alerts');
+    }
+  };
 
   return (
     <PageLayout module="alerts">
@@ -130,6 +145,7 @@ export function AlertDashboard() {
             onFilterChange={setFilters}
             statusCounts={stats?.by_status || {}}
             severityStatusCounts={stats?.by_severity_status || {}}
+            onDeleteAlerts={handleDeleteAlerts}
           />
         </div>
       </div>

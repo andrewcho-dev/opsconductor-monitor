@@ -378,3 +378,35 @@ async def bulk_resolve(request: BulkActionRequest):
             "total": len(request.alert_ids),
         }
     )
+
+
+@router.post("/bulk/delete", response_model=BulkActionResponse)
+async def bulk_delete(request: BulkActionRequest):
+    """
+    Permanently delete multiple alerts.
+    This action cannot be undone.
+    """
+    manager = get_alert_manager()
+    user = get_current_user()
+    
+    success_count = 0
+    error_count = 0
+    
+    for alert_id in request.alert_ids:
+        try:
+            uuid = UUID(alert_id)
+            await manager.delete_alert(uuid)
+            success_count += 1
+        except Exception as e:
+            logger.warning(f"Failed to delete alert {alert_id}: {e}")
+            error_count += 1
+    
+    logger.info(f"User {user} deleted {success_count} alerts")
+    
+    return BulkActionResponse(
+        data={
+            "success_count": success_count,
+            "error_count": error_count,
+            "total": len(request.alert_ids),
+        }
+    )
