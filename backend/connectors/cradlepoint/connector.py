@@ -203,21 +203,28 @@ class CradlepointConnector(PollingConnector):
         try:
             async with session.get(f"http://{ip}/api/status/wan/devices/", timeout=10) as response:
                 if response.status == 200:
-                    data = await response.json()
-                    # Find first modem
+                    resp_data = await response.json()
+                    # NCOS API wraps response in {"success": true, "data": {...}}
+                    data = resp_data.get("data", resp_data)
+                    
+                    # Find first modem with signal info
                     for key, device in data.items():
-                        if "mdm" in key.lower():
+                        if "mdm" in key.lower() and isinstance(device, dict):
                             diagnostics["modem_id"] = key
                             diagnostics["connection_state"] = device.get("status", {}).get("connection_state", "")
                             
-                            # Get signal info
-                            info = device.get("diagnostics", {}).get("MODEMINFO", {})
+                            # Get signal info from diagnostics
+                            diag = device.get("diagnostics", {})
+                            info = diag.get("MODEMINFO", {})
                             diagnostics["rssi"] = info.get("DBM")
                             diagnostics["rsrp"] = info.get("RSRP")
                             diagnostics["rsrq"] = info.get("RSRQ")
                             diagnostics["sinr"] = info.get("SINR")
                             diagnostics["carrier"] = info.get("HOMECARRID")
-                            break
+                            
+                            # If this modem has signal info, use it; otherwise keep looking
+                            if diagnostics.get("rsrp") or diagnostics.get("rssi"):
+                                break
         except Exception as e:
             logger.debug(f"Could not get modem diagnostics: {e}")
         
@@ -233,12 +240,14 @@ class CradlepointConnector(PollingConnector):
         try:
             async with session.get(f"http://{ip}/api/status/system/", timeout=10) as response:
                 if response.status == 200:
-                    data = await response.json()
+                    resp_data = await response.json()
+                    # NCOS API wraps response in {"success": true, "data": {...}}
+                    data = resp_data.get("data", resp_data)
                     status["uptime"] = data.get("uptime")
                     status["product_name"] = data.get("product_name")
                     status["serial_number"] = data.get("serial_number")
-                    # Temperature may be in different locations depending on model
-                    status["temperature"] = data.get("temperature") or data.get("cpu_temp")
+                    # Temperature may be in modem_temperature for IBR models
+                    status["temperature"] = data.get("modem_temperature") or data.get("temperature") or data.get("cpu_temp")
         except Exception as e:
             logger.debug(f"Could not get system status: {e}")
         
@@ -254,11 +263,14 @@ class CradlepointConnector(PollingConnector):
         try:
             async with session.get(f"http://{ip}/api/status/gps/", timeout=10) as response:
                 if response.status == 200:
-                    data = await response.json()
-                    gps["fix_type"] = data.get("fix", {}).get("type", "")
-                    gps["latitude"] = data.get("fix", {}).get("latitude")
-                    gps["longitude"] = data.get("fix", {}).get("longitude")
-                    gps["satellites"] = data.get("fix", {}).get("satellites")
+                    resp_data = await response.json()
+                    # NCOS API wraps response in {"success": true, "data": {...}}
+                    data = resp_data.get("data", resp_data)
+                    fix = data.get("fix", {})
+                    gps["fix_type"] = fix.get("type", "") or fix.get("lock_status", "")
+                    gps["latitude"] = fix.get("latitude")
+                    gps["longitude"] = fix.get("longitude")
+                    gps["satellites"] = fix.get("satellites")
         except Exception as e:
             logger.debug(f"Could not get GPS status: {e}")
         
