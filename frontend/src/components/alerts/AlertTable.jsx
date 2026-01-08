@@ -562,6 +562,9 @@ export function AlertTable({
               <th className="px-2 py-2 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
                 ALERT
               </th>
+              <th className="px-2 py-2 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
+                MESSAGE
+              </th>
               <th className="px-1 py-2 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap">
                 SRC
               </th>
@@ -640,11 +643,19 @@ export function AlertTable({
                   <td className="px-3 py-2">
                     <Link
                       to={`/alerts/${alert.id}`}
-                      className="font-mono text-xs text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 truncate block max-w-[280px]"
+                      className="font-mono text-xs text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 truncate block max-w-[200px]"
                       title={alert.title}
                     >
                       {alert.title}
                     </Link>
+                  </td>
+                  <td className="px-3 py-2">
+                    <span 
+                      className="font-mono text-xs text-gray-600 dark:text-gray-300 truncate block max-w-[250px]"
+                      title={alert.message}
+                    >
+                      {alert.message || '-'}
+                    </span>
                   </td>
                   <td className="px-1 py-2">
                     <span className="font-mono text-xs text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap">
