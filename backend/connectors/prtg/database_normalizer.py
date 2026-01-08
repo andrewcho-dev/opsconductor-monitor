@@ -6,6 +6,7 @@ Uses database mappings for configurable alert normalization.
 
 import logging
 import hashlib
+import re
 from datetime import datetime
 from typing import Dict, Any, Optional
 
@@ -14,6 +15,20 @@ from backend.utils.db import db_query
 from backend.utils.ip_utils import validate_device_ip
 
 logger = logging.getLogger(__name__)
+
+
+def strip_html(text: str) -> str:
+    """Strip HTML tags and clean up PRTG message text."""
+    if not text:
+        return ""
+    # Remove HTML tags
+    clean = re.sub(r'<[^>]+>', '', text)
+    # Decode common HTML entities
+    clean = clean.replace('&lt;', '<').replace('&gt;', '>').replace('&amp;', '&')
+    clean = clean.replace('&nbsp;', ' ').replace('&quot;', '"')
+    # Collapse multiple spaces/newlines
+    clean = re.sub(r'\s+', ' ', clean).strip()
+    return clean
 
 
 class PRTGDatabaseNormalizer:
@@ -208,7 +223,7 @@ class PRTGDatabaseNormalizer:
             category=category,
             alert_type=alert_type,
             title=title,
-            message=message,
+            message=strip_html(message),
             occurred_at=occurred_at,
             is_clear=is_clear,
             raw_data=raw,
@@ -269,7 +284,7 @@ class PRTGDatabaseNormalizer:
             category=category,
             alert_type=alert_type,
             title=title,
-            message=message,
+            message=strip_html(message),
             occurred_at=datetime.utcnow(),
             is_clear=is_clear,
             source_status=source_status,

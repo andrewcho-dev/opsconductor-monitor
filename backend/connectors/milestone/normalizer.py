@@ -140,7 +140,22 @@ class MilestoneNormalizer:
         
         # Build title
         title = f"Milestone {event_type.replace('_', ' ').title()} - {device_name}" if device_name else f"Milestone {event_type.replace('_', ' ').title()}"
+        
+        # Build meaningful message from event data
         message = event_data.get("message", "")
+        if not message:
+            # Construct message from available data
+            parts = []
+            if device_name:
+                parts.append(f"Camera: {device_name}")
+            if event_type:
+                parts.append(f"Event: {event_type.replace('_', ' ')}")
+            if event_data.get("reason"):
+                parts.append(f"Reason: {event_data['reason']}")
+            if event_data.get("details"):
+                parts.append(f"Details: {event_data['details']}")
+            message = " | ".join(parts) if parts else f"{event_type.replace('_', ' ')} on {device_name or validated_ip}"
+        
         occurred_at = self._parse_timestamp(timestamp)
         
         # Is this a clear event? (events that resolve previous alerts)
