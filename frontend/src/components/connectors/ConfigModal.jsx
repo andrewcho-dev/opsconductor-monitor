@@ -722,6 +722,298 @@ function AxisConfigForm({ config, setConfig }) {
   );
 }
 
+// Cisco ASA configuration form
+function CiscoASAConfigForm({ config, setConfig }) {
+  const [newTarget, setNewTarget] = useState({ ip: '', name: '', username: '', password: '', port: 22 });
+  const [newPeer, setNewPeer] = useState('');
+
+  const addTarget = () => {
+    if (!newTarget.ip) return;
+    const targets = config.targets || [];
+    setConfig({ 
+      ...config, 
+      targets: [...targets, { ...newTarget, username: newTarget.username || config.default_username || 'admin' }]
+    });
+    setNewTarget({ ip: '', name: '', username: '', password: '', port: 22 });
+  };
+
+  const removeTarget = (index) => {
+    const targets = [...(config.targets || [])];
+    targets.splice(index, 1);
+    setConfig({ ...config, targets });
+  };
+
+  const addVpnPeer = () => {
+    if (!newPeer) return;
+    const peers = config.vpn_peers || [];
+    if (!peers.includes(newPeer)) {
+      setConfig({ ...config, vpn_peers: [...peers, newPeer] });
+    }
+    setNewPeer('');
+  };
+
+  const removeVpnPeer = (index) => {
+    const peers = [...(config.vpn_peers || [])];
+    peers.splice(index, 1);
+    setConfig({ ...config, vpn_peers: peers });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
+        <p className="text-sm text-blue-700 dark:text-blue-300 mb-1 font-medium">Cisco ASA SSH/CLI Monitoring</p>
+        <p className="text-xs text-blue-600 dark:text-blue-400">
+          Monitor IPSec VPN tunnels, system health, and interface status via SSH.
+        </p>
+      </div>
+
+      {/* Default Credentials */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Username</label>
+          <input
+            type="text"
+            placeholder="admin"
+            value={config.default_username || ''}
+            onChange={(e) => setConfig({ ...config, default_username: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Password</label>
+          <input
+            type="password"
+            value={config.default_password || ''}
+            onChange={(e) => setConfig({ ...config, default_password: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+          />
+        </div>
+      </div>
+
+      {/* Poll Interval */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Poll Interval (seconds)</label>
+        <input
+          type="number"
+          min="60"
+          value={config.poll_interval || 300}
+          onChange={(e) => setConfig({ ...config, poll_interval: parseInt(e.target.value) || 300 })}
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+        />
+      </div>
+
+      {/* Thresholds */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Thresholds</label>
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">CPU Warning (%)</label>
+            <input
+              type="number"
+              value={config.thresholds?.cpu_warning || 80}
+              onChange={(e) => setConfig({ 
+                ...config, 
+                thresholds: { ...config.thresholds, cpu_warning: parseInt(e.target.value) }
+              })}
+              className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">CPU Critical (%)</label>
+            <input
+              type="number"
+              value={config.thresholds?.cpu_critical || 95}
+              onChange={(e) => setConfig({ 
+                ...config, 
+                thresholds: { ...config.thresholds, cpu_critical: parseInt(e.target.value) }
+              })}
+              className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Memory Warning (%)</label>
+            <input
+              type="number"
+              value={config.thresholds?.memory_warning || 80}
+              onChange={(e) => setConfig({ 
+                ...config, 
+                thresholds: { ...config.thresholds, memory_warning: parseInt(e.target.value) }
+              })}
+              className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Memory Critical (%)</label>
+            <input
+              type="number"
+              value={config.thresholds?.memory_critical || 95}
+              onChange={(e) => setConfig({ 
+                ...config, 
+                thresholds: { ...config.thresholds, memory_critical: parseInt(e.target.value) }
+              })}
+              className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* ASA Targets */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            ASA Devices ({(config.targets || []).length})
+          </label>
+        </div>
+        
+        {(config.targets || []).length > 0 && (
+          <div className="mb-3 max-h-32 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded">
+            {(config.targets || []).map((target, idx) => (
+              <div key={idx} className="flex items-center justify-between px-3 py-2 border-b border-gray-100 dark:border-gray-700 last:border-0 text-sm">
+                <div>
+                  <span className="font-mono text-gray-700 dark:text-gray-300">{target.ip}</span>
+                  {target.name && <span className="text-gray-500 ml-2">({target.name})</span>}
+                </div>
+                <button
+                  onClick={() => removeTarget(idx)}
+                  className="text-red-500 hover:text-red-700 text-xs"
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="grid grid-cols-5 gap-2">
+          <input
+            type="text"
+            placeholder="IP Address"
+            value={newTarget.ip}
+            onChange={(e) => setNewTarget({ ...newTarget, ip: e.target.value })}
+            className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm"
+          />
+          <input
+            type="text"
+            placeholder="Name"
+            value={newTarget.name}
+            onChange={(e) => setNewTarget({ ...newTarget, name: e.target.value })}
+            className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm"
+          />
+          <input
+            type="text"
+            placeholder="Username"
+            value={newTarget.username}
+            onChange={(e) => setNewTarget({ ...newTarget, username: e.target.value })}
+            className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm"
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={newTarget.password}
+            onChange={(e) => setNewTarget({ ...newTarget, password: e.target.value })}
+            className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm"
+          />
+          <button
+            onClick={addTarget}
+            disabled={!newTarget.ip}
+            className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 text-sm"
+          >
+            Add
+          </button>
+        </div>
+      </div>
+
+      {/* VPN Peers to Monitor */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            VPN Peers to Monitor ({(config.vpn_peers || []).length})
+          </label>
+        </div>
+        <p className="text-xs text-gray-500 mb-2">
+          Add peer IPs to monitor. Leave empty to auto-discover from ASA config.
+        </p>
+        
+        {(config.vpn_peers || []).length > 0 && (
+          <div className="mb-3 flex flex-wrap gap-2">
+            {(config.vpn_peers || []).map((peer, idx) => (
+              <span key={idx} className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-sm">
+                {peer}
+                <button
+                  onClick={() => removeVpnPeer(idx)}
+                  className="text-red-500 hover:text-red-700"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="VPN Peer IP"
+            value={newPeer}
+            onChange={(e) => setNewPeer(e.target.value)}
+            className="flex-1 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm"
+          />
+          <button
+            onClick={addVpnPeer}
+            disabled={!newPeer}
+            className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 text-sm"
+          >
+            Add Peer
+          </button>
+        </div>
+      </div>
+
+      {/* Monitoring Options */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Monitoring Options</label>
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={config.monitor_vpn !== false}
+              onChange={(e) => setConfig({ ...config, monitor_vpn: e.target.checked })}
+              className="rounded border-gray-300 text-blue-600"
+            />
+            <span className="text-gray-700 dark:text-gray-300">IPSec VPN Tunnels</span>
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={config.monitor_system !== false}
+              onChange={(e) => setConfig({ ...config, monitor_system: e.target.checked })}
+              className="rounded border-gray-300 text-blue-600"
+            />
+            <span className="text-gray-700 dark:text-gray-300">CPU/Memory</span>
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={config.monitor_interfaces !== false}
+              onChange={(e) => setConfig({ ...config, monitor_interfaces: e.target.checked })}
+              className="rounded border-gray-300 text-blue-600"
+            />
+            <span className="text-gray-700 dark:text-gray-300">Interfaces</span>
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={config.monitor_failover !== false}
+              onChange={(e) => setConfig({ ...config, monitor_failover: e.target.checked })}
+              className="rounded border-gray-300 text-blue-600"
+            />
+            <span className="text-gray-700 dark:text-gray-300">Failover Status</span>
+          </label>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Generic config form for other connectors
 function GenericConfigForm({ config, setConfig }) {
   return (
@@ -814,7 +1106,8 @@ export default function ConfigModal({ connector, onClose, onSave, getAuthHeader 
   const isAxis = connector.type === 'axis';
   const isMilestone = connector.type === 'milestone';
   const isCradlepoint = connector.type === 'cradlepoint';
-  const hasSpecialForm = isAxis || isMilestone || isCradlepoint;
+  const isCiscoASA = connector.type === 'cisco_asa';
+  const hasSpecialForm = isAxis || isMilestone || isCradlepoint || isCiscoASA;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -839,6 +1132,8 @@ export default function ConfigModal({ connector, onClose, onSave, getAuthHeader 
             <MilestoneConfigForm config={config} setConfig={setConfig} />
           ) : isCradlepoint ? (
             <CradlepointConfigForm config={config} setConfig={setConfig} />
+          ) : isCiscoASA ? (
+            <CiscoASAConfigForm config={config} setConfig={setConfig} />
           ) : Object.keys(config).length === 0 ? (
             <p className="text-gray-500 text-center py-8">No configuration options available</p>
           ) : (
@@ -866,4 +1161,4 @@ export default function ConfigModal({ connector, onClose, onSave, getAuthHeader 
   );
 }
 
-export { AxisConfigForm, MilestoneConfigForm, CradlepointConfigForm, GenericConfigForm };
+export { AxisConfigForm, MilestoneConfigForm, CradlepointConfigForm, CiscoASAConfigForm, GenericConfigForm };

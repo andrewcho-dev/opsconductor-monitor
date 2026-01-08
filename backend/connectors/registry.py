@@ -21,6 +21,7 @@ from .milestone import MilestoneConnector
 from .cradlepoint import CradlepointConnector
 from .siklu import SikluConnector
 from .ubiquiti import UbiquitiConnector
+from .cisco_asa import CiscoASAConnector
 
 # Registry of connector classes
 _CONNECTOR_REGISTRY: Dict[str, Type[BaseConnector]] = {
@@ -34,6 +35,7 @@ _CONNECTOR_REGISTRY: Dict[str, Type[BaseConnector]] = {
     "cradlepoint": CradlepointConnector,
     "siklu": SikluConnector,
     "ubiquiti": UbiquitiConnector,
+    "cisco_asa": CiscoASAConnector,
 }
 
 # List of all connector types (for UI display)
@@ -105,6 +107,13 @@ CONNECTOR_TYPES = [
         "type": "ubiquiti",
         "name": "Ubiquiti UISP",
         "description": "Ubiquiti device monitoring via UISP API",
+        "supports_webhook": False,
+        "supports_polling": True,
+    },
+    {
+        "type": "cisco_asa",
+        "name": "Cisco ASA",
+        "description": "Cisco ASA firewall monitoring via SSH/CLI (IPSec VPN, system health)",
         "supports_webhook": False,
         "supports_polling": True,
     },
