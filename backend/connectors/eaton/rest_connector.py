@@ -14,6 +14,7 @@ from backend.connectors.base import PollingConnector, BaseNormalizer
 from backend.core.models import NormalizedAlert, ConnectorStatus, Severity, Category
 from backend.core.alert_manager import get_alert_manager
 from backend.utils.ip_utils import validate_device_ip
+from backend.db import db_query
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +51,7 @@ ALARM_CODES = {
     "5001": "Informational event",
 }
 
-# Level to severity mapping
+# Level to severity mapping (fallback)
 LEVEL_SEVERITY = {
     "critical": Severity.CRITICAL,
     "warning": Severity.WARNING,
@@ -59,7 +60,63 @@ LEVEL_SEVERITY = {
 
 
 class EatonRESTNormalizer(BaseNormalizer):
-    """Normalizer for Eaton REST API alarms."""
+    """
+    Database-driven normalizer for Eaton REST API alarms.
+    
+    All mappings come from severity_mappings and category_mappings tables.
+    """
+    
+    def __init__(self):
+        self._severity_cache = {}
+        self._category_cache = {}
+        self._cache_loaded = False
+    
+    def _load_mappings(self):
+        """Load mappings from database."""
+        if self._cache_loaded:
+            return
+        
+        try:
+            # Load severity mappings
+            severity_rows = db_query(
+                "SELECT source_value, target_severity, enabled, description FROM severity_mappings WHERE connector_type = %s",
+                ("eaton_rest",)
+            )
+            for row in severity_rows:
+                self._severity_cache[row['source_value']] = {
+                    'severity': row['target_severity'],
+                    'enabled': row['enabled'],
+                    'description': row.get('description', '')
+                }
+            
+            # Load category mappings
+            category_rows = db_query(
+                "SELECT source_value, target_category, enabled, description FROM category_mappings WHERE connector_type = %s",
+                ("eaton_rest",)
+            )
+            for row in category_rows:
+                self._category_cache[row['source_value']] = {
+                    'category': row['target_category'],
+                    'enabled': row['enabled'],
+                    'description': row.get('description', '')
+                }
+            
+            logger.info(f"Loaded eaton_rest mappings: {len(self._severity_cache)} severity, {len(self._category_cache)} category")
+            self._cache_loaded = True
+            
+        except Exception as e:
+            logger.error(f"Failed to load eaton_rest mappings: {e}")
+            self._cache_loaded = True  # Don't retry on every call
+    
+    def is_alarm_enabled(self, alarm_code: str) -> bool:
+        """Check if this alarm code is enabled in mappings."""
+        self._load_mappings()
+        
+        severity_mapping = self._severity_cache.get(alarm_code)
+        if severity_mapping and not severity_mapping.get('enabled', True):
+            return False
+        
+        return True
     
     @property
     def source_system(self) -> str:
@@ -88,6 +145,11 @@ class EatonRESTNormalizer(BaseNormalizer):
         alarm_device = alarm.get("device", {})
         alarm_device_name = alarm_device.get("name", "")
         
+        # Check if this alarm code is enabled in mappings
+        if not self.is_alarm_enabled(alarm_code):
+            logger.debug(f"Skipping disabled Eaton alarm code: {alarm_code}")
+            return None
+        
         # Get human-readable description
         if description.isdigit():
             # Description is a code, look up the actual description
@@ -95,8 +157,13 @@ class EatonRESTNormalizer(BaseNormalizer):
         
         alarm_description = ALARM_CODES.get(alarm_code, description or f"Alarm {alarm_code}")
         
-        # Determine severity
-        severity = LEVEL_SEVERITY.get(level, Severity.WARNING)
+        # Determine severity from database mapping first, then fallback
+        self._load_mappings()
+        severity_mapping = self._severity_cache.get(alarm_code)
+        if severity_mapping:
+            severity = Severity(severity_mapping['severity'])
+        else:
+            severity = LEVEL_SEVERITY.get(level, Severity.WARNING)
         
         # Is this a clear event?
         is_clear = state == "closed" or not lifecycle.get("active", True)
@@ -135,13 +202,20 @@ class EatonRESTNormalizer(BaseNormalizer):
         # source_alert_id must be STABLE for deduplication
         source_alert_id = f"{validated_ip}:{alarm_code}:{alarm_id}"
         
+        # Determine category from database mapping first, then fallback
+        category_mapping = self._category_cache.get(alarm_code)
+        if category_mapping:
+            category = Category(category_mapping['category'])
+        else:
+            category = Category.POWER
+        
         return NormalizedAlert(
             source_system=self.source_system,
             source_alert_id=source_alert_id,
             device_ip=validated_ip,
             device_name=device_name or None,
             severity=severity,
-            category=Category.POWER,
+            category=category,
             alert_type=f"eaton_{alarm_code}",
             title=title,
             message=message,
