@@ -185,7 +185,7 @@ class CradlepointNormalizer:
         # Build title
         base_title = self.EVENT_TITLES.get(event_type, f"Cradlepoint {event_type.replace('_', ' ').title()}")
         title = f"{base_title} - {device_name}" if device_name else base_title
-        message = self._build_message(event_type, metrics)
+        message = self._build_message(event_type, metrics, device_name, validated_ip)
         occurred_at = self._parse_timestamp(timestamp)
         
         # Is this a clear event?
@@ -222,8 +222,18 @@ class CradlepointNormalizer:
         event_type = raw_data.get("alert_type", "")
         return hashlib.sha256(f"cradlepoint:{device_ip}:{event_type}".encode()).hexdigest()
     
-    def _build_message(self, alert_type: str, metrics: Dict) -> str:
+    def _build_message(self, alert_type: str, metrics: Dict, device_name: str = "", device_ip: str = "") -> str:
         lines = []
+        
+        # Always include device info
+        if device_name:
+            lines.append(f"Device: {device_name}")
+        elif device_ip:
+            lines.append(f"Device: {device_ip}")
+        
+        # Alert type
+        if alert_type:
+            lines.append(f"Alert: {alert_type.replace('_', ' ')}")
         
         if metrics.get("rssi") is not None:
             lines.append(f"RSSI: {metrics['rssi']} dBm")
@@ -238,7 +248,7 @@ class CradlepointNormalizer:
         if metrics.get("connection_state"):
             lines.append(f"State: {metrics['connection_state']}")
         
-        return "\n".join(lines)
+        return " | ".join(lines) if lines else f"Cradlepoint {alert_type} on {device_ip}"
     
     def _parse_timestamp(self, timestamp: Any) -> datetime:
         if not timestamp:

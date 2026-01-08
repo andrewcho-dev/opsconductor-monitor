@@ -145,7 +145,7 @@ class EatonNormalizer:
         title = f"{alarm_def['title']} - {device_name}" if device_name else alarm_def['title']
         
         # Build message with metrics
-        message = self._build_message(alarm_def.get("description", ""), metrics)
+        message = self._build_message(alarm_def.get("description", ""), metrics, alarm_type, device_name, device_ip)
         
         # Parse timestamp
         occurred_at = self._parse_timestamp(timestamp)
@@ -192,9 +192,23 @@ class EatonNormalizer:
         alarm_def = self.ALARM_TYPES.get(alarm_type, {})
         return alarm_def.get("is_clear", False)
     
-    def _build_message(self, description: str, metrics: Dict) -> str:
+    def _build_message(self, description: str, metrics: Dict, alarm_type: str = "", device_name: str = "", device_ip: str = "") -> str:
         """Build message with metrics."""
-        lines = [description] if description else []
+        lines = []
+        
+        # Always include device info
+        if device_name:
+            lines.append(f"UPS: {device_name}")
+        elif device_ip:
+            lines.append(f"UPS: {device_ip}")
+        
+        # Alarm type
+        if alarm_type:
+            lines.append(f"Alarm: {alarm_type.replace('_', ' ')}")
+        
+        # Description
+        if description:
+            lines.append(description)
         
         if metrics.get("battery_capacity") is not None:
             lines.append(f"Battery: {metrics['battery_capacity']}%")
@@ -213,7 +227,7 @@ class EatonNormalizer:
         if metrics.get("temperature") is not None:
             lines.append(f"Temperature: {metrics['temperature']}°C")
         
-        return "\n".join(lines)
+        return " | ".join(lines) if lines else f"Eaton UPS {alarm_type} on {device_ip}"
     
     def _parse_timestamp(self, timestamp: Any) -> datetime:
         """Parse timestamp."""

@@ -88,7 +88,7 @@ class SNMPNormalizer:
             title = f"SNMP Trap - {alert_type}"
         
         # Build message from varbinds
-        message = self._format_varbinds(varbinds)
+        message = self._format_varbinds(varbinds, source_ip, trap_oid)
         
         # Parse timestamp
         occurred_at = self._parse_timestamp(timestamp)
@@ -249,18 +249,25 @@ class SNMPNormalizer:
         
         return title
     
-    def _format_varbinds(self, varbinds: Dict) -> str:
+    def _format_varbinds(self, varbinds: Dict, source_ip: str = "", trap_oid: str = "") -> str:
         """Format varbinds into readable message."""
-        if not varbinds:
-            return ""
-        
         lines = []
-        for oid, value in varbinds.items():
-            # Truncate OID for readability
-            short_oid = oid.split(".")[-3:] if "." in oid else oid
-            lines.append(f"{'.'.join(short_oid)}: {value}")
         
-        return "\n".join(lines[:10])  # Limit to 10 varbinds
+        # Always include device info
+        if source_ip:
+            lines.append(f"Device: {source_ip}")
+        
+        # Trap OID
+        if trap_oid:
+            lines.append(f"Trap: {trap_oid}")
+        
+        if varbinds:
+            for oid, value in list(varbinds.items())[:10]:  # Limit to 10 varbinds
+                # Truncate OID for readability
+                short_oid = oid.split(".")[-3:] if "." in oid else oid
+                lines.append(f"{'.'.join(short_oid)}: {value}")
+        
+        return " | ".join(lines) if lines else f"SNMP trap from {source_ip}"
     
     def _parse_timestamp(self, timestamp: Any) -> datetime:
         """Parse timestamp from trap."""

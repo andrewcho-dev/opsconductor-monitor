@@ -75,6 +75,9 @@ class MCPNormalizer:
         # Build title
         title = f"{alarm_type} - {device_name}" if device_name else alarm_type
         
+        # Build message - ensure it's never empty
+        message = self._build_message(description, alarm_type, device_name, device_ip)
+        
         # Is this a clear event?
         is_clear = severity_str in ("CLEARED", "CLEAR") or severity == Severity.CLEAR
         
@@ -87,7 +90,7 @@ class MCPNormalizer:
             category=category,
             alert_type=f"mcp_{alarm_type.lower().replace(' ', '_')}",
             title=title,
-            message=description,
+            message=message,
             occurred_at=occurred_at,
             is_clear=is_clear,
             raw_data=raw_data,
@@ -128,6 +131,26 @@ class MCPNormalizer:
         """Check if this is a clear event."""
         severity_str = str(raw_data.get("severity", "") or raw_data.get("perceivedSeverity", "")).upper()
         return severity_str in ("CLEARED", "CLEAR")
+    
+    def _build_message(self, description: str, alarm_type: str, device_name: str, device_ip: str) -> str:
+        """Build message - ensure it's never empty."""
+        lines = []
+        
+        # Always include device info
+        if device_name:
+            lines.append(f"Device: {device_name}")
+        elif device_ip:
+            lines.append(f"Device: {device_ip}")
+        
+        # Alarm type
+        if alarm_type:
+            lines.append(f"Alarm: {alarm_type}")
+        
+        # Description
+        if description:
+            lines.append(description)
+        
+        return " | ".join(lines) if lines else f"MCP alarm {alarm_type} on {device_ip}"
     
     def _parse_datetime(self, datetime_str: str) -> datetime:
         """Parse MCP datetime string."""

@@ -92,7 +92,7 @@ class SikluNormalizer:
         })
         
         title = f"{alert_def['title']} - {device_name}" if device_name else alert_def['title']
-        message = self._build_message(alert_type, metrics)
+        message = self._build_message(alert_type, metrics, device_name, device_ip)
         occurred_at = self._parse_timestamp(timestamp)
         is_clear = alert_def.get("is_clear", False)
         
@@ -124,8 +124,18 @@ class SikluNormalizer:
         alert_type = raw_data.get("alert_type", "")
         return hashlib.sha256(f"siklu:{device_ip}:{alert_type}".encode()).hexdigest()
     
-    def _build_message(self, alert_type: str, metrics: Dict) -> str:
+    def _build_message(self, alert_type: str, metrics: Dict, device_name: str = "", device_ip: str = "") -> str:
         lines = []
+        
+        # Always include device info
+        if device_name:
+            lines.append(f"Device: {device_name}")
+        elif device_ip:
+            lines.append(f"Device: {device_ip}")
+        
+        # Alert type
+        if alert_type:
+            lines.append(f"Alert: {alert_type.replace('_', ' ')}")
         
         if metrics.get("rsl") is not None:
             lines.append(f"RSL: {metrics['rsl']} dBm")
@@ -140,7 +150,7 @@ class SikluNormalizer:
         if metrics.get("peer_ip"):
             lines.append(f"Peer: {metrics['peer_ip']}")
         
-        return "\n".join(lines)
+        return " | ".join(lines) if lines else f"Siklu {alert_type} on {device_ip}"
     
     def _parse_timestamp(self, timestamp: Any) -> datetime:
         if not timestamp:
