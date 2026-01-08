@@ -725,6 +725,9 @@ function AxisConfigForm({ config, setConfig }) {
 // Eaton REST API configuration form
 function EatonRESTConfigForm({ config, setConfig }) {
   const [newTarget, setNewTarget] = useState({ ip: '', name: '', username: '', password: '' });
+  const [bulkImportText, setBulkImportText] = useState('');
+  const [showBulkImport, setShowBulkImport] = useState(false);
+  const [importError, setImportError] = useState('');
 
   const addTarget = () => {
     if (!newTarget.ip) return;
@@ -744,6 +747,71 @@ function EatonRESTConfigForm({ config, setConfig }) {
     const targets = [...(config.targets || [])];
     targets.splice(index, 1);
     setConfig({ ...config, targets });
+  };
+
+  const clearAllTargets = () => {
+    if (window.confirm(`Remove all ${(config.targets || []).length} UPS devices?`)) {
+      setConfig({ ...config, targets: [] });
+    }
+  };
+
+  const handleBulkImport = () => {
+    setImportError('');
+    const lines = bulkImportText.trim().split('\n').filter(line => line.trim());
+    const newTargets = [];
+    const errors = [];
+
+    lines.forEach((line, idx) => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+
+      // Skip header row
+      if (idx === 0 && (trimmed.toLowerCase().includes('ip') || trimmed.toLowerCase().includes('address'))) {
+        return;
+      }
+
+      const parts = trimmed.split(/[,\t]/).map(p => p.trim());
+      const ip = parts[0];
+      
+      const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
+      if (!ipRegex.test(ip)) {
+        errors.push(`Line ${idx + 1}: Invalid IP "${ip}"`);
+        return;
+      }
+
+      newTargets.push({
+        ip: ip,
+        name: parts[1] || '',
+        username: config.default_username || 'admin',
+        password: parts[2] || config.default_password || '',
+      });
+    });
+
+    if (errors.length > 0) {
+      setImportError(errors.slice(0, 5).join('\n') + (errors.length > 5 ? `\n...and ${errors.length - 5} more errors` : ''));
+      return;
+    }
+
+    if (newTargets.length === 0) {
+      setImportError('No valid UPS devices found in input');
+      return;
+    }
+
+    const existingIPs = new Set((config.targets || []).map(t => t.ip));
+    const uniqueNew = newTargets.filter(t => !existingIPs.has(t.ip));
+    const duplicates = newTargets.length - uniqueNew.length;
+
+    setConfig({ 
+      ...config, 
+      targets: [...(config.targets || []), ...uniqueNew] 
+    });
+    
+    setBulkImportText('');
+    setShowBulkImport(false);
+    
+    if (duplicates > 0) {
+      alert(`Imported ${uniqueNew.length} UPS devices. Skipped ${duplicates} duplicates.`);
+    }
   };
 
   return (
@@ -796,32 +864,65 @@ function EatonRESTConfigForm({ config, setConfig }) {
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
             UPS Devices ({(config.targets || []).length})
           </label>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowBulkImport(!showBulkImport)}
+              className="text-xs px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700"
+            >
+              {showBulkImport ? 'Cancel Import' : 'Bulk Import'}
+            </button>
+            {(config.targets || []).length > 0 && (
+              <button
+                onClick={clearAllTargets}
+                className="text-xs px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700"
+              >
+                Clear All
+              </button>
+            )}
+          </div>
         </div>
+
+        {showBulkImport && (
+          <div className="mb-3 p-3 bg-green-50 dark:bg-green-900/20 rounded border border-green-200 dark:border-green-800">
+            <p className="text-xs text-green-700 dark:text-green-300 mb-2">
+              Paste UPS list (one per line). Formats: IP only, IP,Name, or IP,Name,Password
+            </p>
+            <textarea
+              value={bulkImportText}
+              onChange={(e) => setBulkImportText(e.target.value)}
+              placeholder="10.120.51.71,SNA-UPS01&#10;10.120.51.72,SNA-UPS02"
+              rows={6}
+              className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white font-mono"
+            />
+            {importError && (
+              <p className="text-xs text-red-600 mt-1 whitespace-pre-line">{importError}</p>
+            )}
+            <button
+              onClick={handleBulkImport}
+              disabled={!bulkImportText.trim()}
+              className="mt-2 px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+            >
+              Import UPS Devices
+            </button>
+          </div>
+        )}
         
         {(config.targets || []).length > 0 && (
-          <div className="mb-3 max-h-32 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded">
-            <table className="w-full text-xs">
-              <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0">
-                <tr>
-                  <th className="px-2 py-1 text-left">IP</th>
-                  <th className="px-2 py-1 text-left">Name</th>
-                  <th className="px-2 py-1 text-left">User</th>
-                  <th className="px-2 py-1 w-8"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {(config.targets || []).map((target, idx) => (
-                  <tr key={idx} className="border-t border-gray-100 dark:border-gray-800">
-                    <td className="px-2 py-1 font-mono">{target.ip}</td>
-                    <td className="px-2 py-1">{target.name || '-'}</td>
-                    <td className="px-2 py-1">{target.username || 'admin'}</td>
-                    <td className="px-2 py-1">
-                      <button onClick={() => removeTarget(idx)} className="text-red-500 hover:text-red-700">×</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="mb-3 max-h-48 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded">
+            {(config.targets || []).map((target, idx) => (
+              <div key={idx} className="flex items-center justify-between px-3 py-2 border-b border-gray-100 dark:border-gray-700 last:border-0 text-sm">
+                <div>
+                  <span className="font-mono text-gray-700 dark:text-gray-300">{target.ip}</span>
+                  {target.name && <span className="text-gray-500 ml-2">({target.name})</span>}
+                </div>
+                <button
+                  onClick={() => removeTarget(idx)}
+                  className="text-red-500 hover:text-red-700 text-xs"
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
           </div>
         )}
 
@@ -832,26 +933,26 @@ function EatonRESTConfigForm({ config, setConfig }) {
             placeholder="IP Address"
             value={newTarget.ip}
             onChange={(e) => setNewTarget({ ...newTarget, ip: e.target.value })}
-            className="px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+            className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm"
           />
           <input
             type="text"
             placeholder="Name (optional)"
             value={newTarget.name}
             onChange={(e) => setNewTarget({ ...newTarget, name: e.target.value })}
-            className="px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+            className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm"
           />
           <input
-            type="text"
-            placeholder="Username"
-            value={newTarget.username}
-            onChange={(e) => setNewTarget({ ...newTarget, username: e.target.value })}
-            className="px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+            type="password"
+            placeholder="Password"
+            value={newTarget.password}
+            onChange={(e) => setNewTarget({ ...newTarget, password: e.target.value })}
+            className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm"
           />
           <button
             onClick={addTarget}
             disabled={!newTarget.ip}
-            className="px-3 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+            className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 text-sm"
           >
             Add
           </button>
