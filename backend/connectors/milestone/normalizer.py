@@ -2,138 +2,165 @@
 Milestone VMS Alert Normalizer
 
 Transforms Milestone XProtect event data to standard NormalizedAlert format.
+Uses database mappings for severity and category - NO HARDCODED VALUES.
 """
 
 import logging
 import hashlib
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from backend.core.models import NormalizedAlert, Severity, Category
 from backend.utils.ip_utils import validate_device_ip
+from backend.utils.db import db_query
 
 logger = logging.getLogger(__name__)
 
 
 class MilestoneNormalizer:
-    """Normalizer for Milestone XProtect VMS events."""
+    """
+    Database-driven normalizer for Milestone XProtect VMS events.
     
-    EVENT_TYPES = {
-        # Camera events
-        "camera_connection_error": {
-            "category": Category.VIDEO,
-            "severity": Severity.MAJOR,
-            "title": "Camera Connection Error",
-        },
-        "camera_offline": {
-            "category": Category.VIDEO,
-            "severity": Severity.CRITICAL,
-            "title": "Camera Offline",
-        },
-        "camera_online": {
-            "category": Category.VIDEO,
-            "severity": Severity.CLEAR,
-            "title": "Camera Online",
-            "is_clear": True,
-        },
+    All mappings come from severity_mappings and category_mappings tables.
+    """
+    
+    def __init__(self):
+        self._severity_cache: Dict[str, Dict] = {}
+        self._category_cache: Dict[str, Dict] = {}
+        self._cache_loaded = False
+    
+    def _load_mappings(self):
+        """Load mappings from database."""
+        if self._cache_loaded:
+            return
         
-        # Recording events
-        "recording_started": {
-            "category": Category.VIDEO,
-            "severity": Severity.INFO,
-            "title": "Recording Started",
-        },
-        "recording_stopped": {
-            "category": Category.VIDEO,
-            "severity": Severity.WARNING,
-            "title": "Recording Stopped",
-        },
-        "recording_error": {
-            "category": Category.VIDEO,
-            "severity": Severity.MAJOR,
-            "title": "Recording Error",
-        },
+        try:
+            # Load severity mappings
+            severity_rows = db_query(
+                "SELECT source_value, target_severity, enabled, description FROM severity_mappings WHERE connector_type = %s",
+                ("milestone",)
+            )
+            for row in severity_rows:
+                self._severity_cache[row["source_value"]] = {
+                    "severity": row["target_severity"],
+                    "enabled": row["enabled"],
+                    "description": row.get("description", "")
+                }
+            
+            # Load category mappings
+            category_rows = db_query(
+                "SELECT source_value, target_category, enabled, description FROM category_mappings WHERE connector_type = %s",
+                ("milestone",)
+            )
+            for row in category_rows:
+                self._category_cache[row["source_value"]] = {
+                    "category": row["target_category"],
+                    "enabled": row["enabled"],
+                    "description": row.get("description", "")
+                }
+            
+            self._cache_loaded = True
+            logger.info(f"Loaded {len(self._severity_cache)} severity and {len(self._category_cache)} category mappings for milestone")
+            
+        except Exception as e:
+            logger.error(f"Failed to load milestone mappings: {e}")
+            self._cache_loaded = True
+    
+    def is_event_enabled(self, event_type: str) -> bool:
+        """Check if this event type is enabled in mappings."""
+        self._load_mappings()
         
-        # Motion events
-        "motion_started": {
-            "category": Category.VIDEO,
-            "severity": Severity.INFO,
-            "title": "Motion Detected",
-        },
-        "motion_stopped": {
-            "category": Category.VIDEO,
-            "severity": Severity.CLEAR,
-            "title": "Motion Ended",
-            "is_clear": True,
-        },
+        severity_mapping = self._severity_cache.get(event_type)
+        if severity_mapping and not severity_mapping.get("enabled", True):
+            return False
         
-        # Analytics
-        "analytics_event": {
-            "category": Category.VIDEO,
-            "severity": Severity.WARNING,
-            "title": "Analytics Event",
-        },
+        category_mapping = self._category_cache.get(event_type)
+        if category_mapping and not category_mapping.get("enabled", True):
+            return False
         
-        # Storage
-        "storage_alert": {
-            "category": Category.STORAGE,
-            "severity": Severity.MAJOR,
-            "title": "Storage Alert",
-        },
-        "archive_full": {
-            "category": Category.STORAGE,
-            "severity": Severity.CRITICAL,
-            "title": "Archive Storage Full",
-        },
+        return True
+    
+    def _get_severity(self, event_type: str) -> Severity:
+        """Get severity from database mapping."""
+        self._load_mappings()
         
-        # Server
-        "server_error": {
-            "category": Category.COMPUTE,
-            "severity": Severity.CRITICAL,
-            "title": "Server Error",
-        },
-        "license_warning": {
-            "category": Category.APPLICATION,
-            "severity": Severity.WARNING,
-            "title": "License Warning",
-        },
-        "failover_activated": {
-            "category": Category.APPLICATION,
-            "severity": Severity.MAJOR,
-            "title": "Failover Activated",
-        },
-    }
+        mapping = self._severity_cache.get(event_type)
+        if mapping:
+            try:
+                return Severity(mapping["severity"])
+            except ValueError:
+                pass
+        
+        return Severity.WARNING
+    
+    def _get_category(self, event_type: str) -> Category:
+        """Get category from database mapping."""
+        self._load_mappings()
+        
+        mapping = self._category_cache.get(event_type)
+        if mapping:
+            try:
+                return Category(mapping["category"])
+            except ValueError:
+                pass
+        
+        return Category.VIDEO
     
     @property
     def source_system(self) -> str:
         return "milestone"
     
-    def normalize(self, raw_data: Dict[str, Any]) -> NormalizedAlert:
-        """Transform Milestone event to NormalizedAlert."""
+    def normalize(self, raw_data: Dict[str, Any]) -> Optional[NormalizedAlert]:
+        """
+        Transform Milestone event to NormalizedAlert.
+        
+        Returns None if the event type is disabled in mappings or no valid device_ip.
+        """
         device_ip = raw_data.get("device_ip") or raw_data.get("camera_ip", "")
         device_name = raw_data.get("device_name") or raw_data.get("camera_name", "")
         event_type = raw_data.get("event_type", "unknown").lower().replace(" ", "_")
         event_data = raw_data.get("event_data", {})
         timestamp = raw_data.get("timestamp")
         
-        event_def = self.EVENT_TYPES.get(event_type, {
-            "category": Category.VIDEO,
-            "severity": Severity.WARNING,
-            "title": f"Milestone Event - {event_type}",
-        })
+        # Check if this event type is enabled - skip if disabled
+        if not self.is_event_enabled(event_type):
+            logger.debug(f"Skipping disabled event type: {event_type}")
+            return None
         
-        title = f"{event_def['title']} - {device_name}" if device_name else event_def['title']
+        # Validate device_ip - skip if we can't determine IP
+        try:
+            validated_ip = validate_device_ip(device_ip, device_name)
+        except ValueError as e:
+            logger.warning(f"Skipping Milestone alert - no valid device_ip: {e}")
+            return None
+        
+        # Get severity and category from database mappings
+        severity = self._get_severity(event_type)
+        category = self._get_category(event_type)
+        
+        # Build title
+        title = f"Milestone {event_type.replace('_', ' ').title()} - {device_name}" if device_name else f"Milestone {event_type.replace('_', ' ').title()}"
         message = event_data.get("message", "")
         occurred_at = self._parse_timestamp(timestamp)
-        is_clear = event_def.get("is_clear", False)
+        
+        # Is this a clear event? (events that resolve previous alerts)
+        # Note: recording_stopped is NOT a clear - it's an alert that recording has stopped
+        # motion_stopped IS a clear - it clears motion_started
+        is_clear = event_type in (
+            "camera_online", "server_started", "backup_completed", 
+            "failover_deactivated", "motion_stopped"
+        )
+        
+        # source_alert_id must be STABLE for deduplication - no timestamps!
+        source_alert_id = f"{validated_ip}:{event_type}"
         
         return NormalizedAlert(
             source_system=self.source_system,
-            source_alert_id=f"{device_ip}:{event_type}:{occurred_at.timestamp()}",
-            device_ip=validate_device_ip(device_ip, device_name),
+            source_alert_id=source_alert_id,
+            device_ip=validated_ip,
             device_name=device_name or None,
-            severity=event_def["severity"],
-            category=event_def["category"],
+            severity=severity,
+            category=category,
             alert_type=f"milestone_{event_type}",
             title=title,
             message=message,
@@ -143,14 +170,17 @@ class MilestoneNormalizer:
         )
     
     def get_severity(self, raw_data: Dict[str, Any]) -> Severity:
+        """Determine severity from database mapping."""
         event_type = raw_data.get("event_type", "").lower().replace(" ", "_")
-        return self.EVENT_TYPES.get(event_type, {}).get("severity", Severity.WARNING)
+        return self._get_severity(event_type)
     
     def get_category(self, raw_data: Dict[str, Any]) -> Category:
+        """Determine category from database mapping."""
         event_type = raw_data.get("event_type", "").lower().replace(" ", "_")
-        return self.EVENT_TYPES.get(event_type, {}).get("category", Category.VIDEO)
+        return self._get_category(event_type)
     
     def get_fingerprint(self, raw_data: Dict[str, Any]) -> str:
+        """Generate deduplication fingerprint."""
         device_ip = raw_data.get("device_ip") or raw_data.get("camera_ip", "")
         event_type = raw_data.get("event_type", "")
         return hashlib.sha256(f"milestone:{device_ip}:{event_type}".encode()).hexdigest()

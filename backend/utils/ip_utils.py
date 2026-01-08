@@ -30,19 +30,24 @@ def is_valid_ip(value: str) -> bool:
 
 def extract_ip_from_string(value: str) -> str:
     """
-    Extract IP address from a string that may contain hostname in parentheses.
+    Extract IP address from a string that may contain hostname, URL, or IP in parentheses.
     
     Examples:
         "10.120.4.105" -> "10.120.4.105"
         "10.120.12.22 (BUR-SW02)" -> "10.120.12.22"
+        "http://10.120.81.107/" -> "10.120.81.107"
+        "http://10.120.81.107:8080/path" -> "10.120.81.107"
+        "Device (10.120.1.5)" -> "10.120.1.5"
         "BUR-SW02" -> raises ValueError
     """
     if not value:
         raise ValueError("Value cannot be empty - device_ip is required")
     
-    # Check if it starts with an IP
-    ip_pattern = r'^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'
-    match = re.match(ip_pattern, value.strip())
+    value = value.strip()
+    
+    # Find any IP address pattern anywhere in the string
+    ip_pattern = r'(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'
+    match = re.search(ip_pattern, value)
     
     if match:
         ip = match.group(1)

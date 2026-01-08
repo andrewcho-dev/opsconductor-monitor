@@ -119,6 +119,164 @@ function ConnectorCard({ connector, onTest, onToggle, onConfigure, testing }) {
   );
 }
 
+function MilestoneConfigForm({ config, setConfig }) {
+  return (
+    <div className="space-y-4">
+      {/* Connection Info */}
+      <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
+        <p className="text-sm text-blue-700 dark:text-blue-300 mb-1 font-medium">Milestone XProtect Connection</p>
+        <p className="text-xs text-blue-600 dark:text-blue-400">
+          Connect to the <strong>Management Server</strong> URL. The API will query all Recording Servers and cameras through this central endpoint.
+        </p>
+      </div>
+
+      {/* Management Server URL */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          Management Server URL <span className="text-red-500">*</span>
+        </label>
+        <input
+          type="text"
+          placeholder="https://milestone-server:8081"
+          value={config.url || ''}
+          onChange={(e) => setConfig({ ...config, url: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+        />
+        <p className="text-xs text-gray-500 mt-1">
+          The base URL of your Milestone XProtect Management Server (typically port 8081 for HTTPS or 80 for HTTP)
+        </p>
+      </div>
+
+      {/* Credentials */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Username <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            placeholder="domain\\username or username"
+            value={config.username || ''}
+            onChange={(e) => setConfig({ ...config, username: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Password <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="password"
+            value={config.password || ''}
+            onChange={(e) => setConfig({ ...config, password: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+          />
+        </div>
+      </div>
+
+      {/* SSL Verification */}
+      <div className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          id="verify_ssl"
+          checked={config.verify_ssl || false}
+          onChange={(e) => setConfig({ ...config, verify_ssl: e.target.checked })}
+          className="rounded border-gray-300 text-blue-600"
+        />
+        <label htmlFor="verify_ssl" className="text-sm text-gray-700 dark:text-gray-300">
+          Verify SSL Certificate
+        </label>
+        <span className="text-xs text-gray-500">(disable for self-signed certificates)</span>
+      </div>
+
+      {/* Poll Interval */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Poll Interval (seconds)</label>
+        <input
+          type="number"
+          min="30"
+          value={config.poll_interval || 60}
+          onChange={(e) => setConfig({ ...config, poll_interval: parseInt(e.target.value) || 60 })}
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+        />
+        <p className="text-xs text-gray-500 mt-1">
+          How often to poll for camera status and events (minimum 30 seconds)
+        </p>
+      </div>
+
+      {/* Event Types to Monitor */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Event Types to Monitor</label>
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={config.monitor_camera_status !== false}
+              onChange={(e) => setConfig({ ...config, monitor_camera_status: e.target.checked })}
+              className="rounded border-gray-300 text-blue-600"
+            />
+            <span className="text-gray-700 dark:text-gray-300">Camera Status (online/offline)</span>
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={config.monitor_recording !== false}
+              onChange={(e) => setConfig({ ...config, monitor_recording: e.target.checked })}
+              className="rounded border-gray-300 text-blue-600"
+            />
+            <span className="text-gray-700 dark:text-gray-300">Recording Status</span>
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={config.monitor_storage !== false}
+              onChange={(e) => setConfig({ ...config, monitor_storage: e.target.checked })}
+              className="rounded border-gray-300 text-blue-600"
+            />
+            <span className="text-gray-700 dark:text-gray-300">Storage Alerts</span>
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={config.monitor_server !== false}
+              onChange={(e) => setConfig({ ...config, monitor_server: e.target.checked })}
+              className="rounded border-gray-300 text-blue-600"
+            />
+            <span className="text-gray-700 dark:text-gray-300">Server Health</span>
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={config.monitor_motion || false}
+              onChange={(e) => setConfig({ ...config, monitor_motion: e.target.checked })}
+              className="rounded border-gray-300 text-blue-600"
+            />
+            <span className="text-gray-700 dark:text-gray-300">Motion Events</span>
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={config.monitor_analytics || false}
+              onChange={(e) => setConfig({ ...config, monitor_analytics: e.target.checked })}
+              className="rounded border-gray-300 text-blue-600"
+            />
+            <span className="text-gray-700 dark:text-gray-300">Analytics Events</span>
+          </label>
+        </div>
+      </div>
+
+      {/* Help Text */}
+      <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded border border-gray-200 dark:border-gray-600">
+        <p className="text-xs text-gray-600 dark:text-gray-400">
+          <strong>Note:</strong> The Milestone connector uses the Management Server API to query all Recording Servers. 
+          Ensure the user account has API access permissions. For XProtect Corporate/Expert, use a Windows domain account. 
+          For XProtect Essential+/Express+, use the built-in administrator account.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function AxisConfigForm({ config, setConfig }) {
   const [newCamera, setNewCamera] = useState({ ip: '', name: '', username: '', password: '' });
   
@@ -314,12 +472,14 @@ function ConfigModal({ connector, onClose, onSave }) {
 
   if (!connector) return null;
 
-  // Use specialized form for Axis connector
+  // Use specialized form for specific connectors
   const isAxis = connector.type === 'axis';
+  const isMilestone = connector.type === 'milestone';
+  const hasSpecialForm = isAxis || isMilestone;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full mx-4 ${isAxis ? 'max-w-2xl' : 'max-w-lg'}`}>
+      <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full mx-4 ${hasSpecialForm ? 'max-w-2xl' : 'max-w-lg'}`}>
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           <h2 className="text-lg font-medium text-gray-900 dark:text-white">
             Configure {connector.name}
@@ -336,6 +496,8 @@ function ConfigModal({ connector, onClose, onSave }) {
             </div>
           ) : isAxis ? (
             <AxisConfigForm config={config} setConfig={setConfig} />
+          ) : isMilestone ? (
+            <MilestoneConfigForm config={config} setConfig={setConfig} />
           ) : Object.keys(config).length === 0 ? (
             <p className="text-gray-500 text-center py-8">No configuration options available</p>
           ) : (
