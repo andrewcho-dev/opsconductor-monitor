@@ -30,6 +30,7 @@ export default function ColumnMappingPage() {
     { value: 'cradlepoint', label: 'Cradlepoint' },
     { value: 'siklu', label: 'Siklu' },
     { value: 'ubiquiti', label: 'Ubiquiti' },
+    { value: 'cisco_asa', label: 'Cisco ASA' },
   ];
 
   const loadMappings = async () => {

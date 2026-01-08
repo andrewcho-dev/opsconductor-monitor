@@ -164,6 +164,7 @@ export const CONNECTOR_TYPES = [
   { type: 'cradlepoint', name: 'Cradlepoint', icon: '📶' },
   { type: 'siklu', name: 'Siklu Radios', icon: '📻' },
   { type: 'ubiquiti', name: 'Ubiquiti UISP', icon: '🛜' },
+  { type: 'cisco_asa', name: 'Cisco ASA', icon: '🔒' },
 ];
 
 /**
