@@ -8,7 +8,7 @@ import logging
 import asyncio
 import aiohttp
 from datetime import datetime
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Union
 from base64 import b64encode
 
 from backend.connectors.base import PollingConnector, BaseNormalizer
@@ -106,16 +106,19 @@ class CradlepointConnector(PollingConnector):
         for target in self.targets:
             try:
                 target_alerts = await self._poll_router(target)
-                alerts.extend(target_alerts)
+                # Filter out None alerts (disabled event types)
+                alerts.extend([a for a in target_alerts if a is not None])
             except Exception as e:
                 logger.error(f"Error polling router {target.get('ip')}: {e}")
-                alerts.append(self._create_alert(target, "device_offline", {"error": str(e)}))
+                alert = self._create_alert(target, "device_offline", {"error": str(e)})
+                if alert:
+                    alerts.append(alert)
         
         logger.debug(f"Cradlepoint poll: {len(alerts)} alerts from {len(self.targets)} routers")
         return alerts
     
-    async def _poll_router(self, target: Dict) -> List[NormalizedAlert]:
-        alerts = []
+    async def _poll_router(self, target: Dict) -> List[Optional[NormalizedAlert]]:
+        alerts: List[Optional[NormalizedAlert]] = []
         
         try:
             # Get WAN/modem status
@@ -127,24 +130,49 @@ class CradlepointConnector(PollingConnector):
                 rsrp = diagnostics.get("rsrp")
                 sinr = diagnostics.get("sinr")
                 
-                # RSSI thresholds
-                if rssi is not None:
+                # RSRP thresholds (prefer for LTE)
+                if rsrp is not None:
+                    if rsrp <= self.thresholds.get("rsrp_critical", -110):
+                        alerts.append(self._create_alert(target, "signal_critical", diagnostics))
+                    elif rsrp <= self.thresholds.get("rsrp_warning", -100):
+                        alerts.append(self._create_alert(target, "signal_low", diagnostics))
+                # RSSI thresholds (fallback)
+                elif rssi is not None:
                     if rssi <= self.thresholds.get("rssi_critical", -95):
                         alerts.append(self._create_alert(target, "signal_critical", diagnostics))
                     elif rssi <= self.thresholds.get("rssi_warning", -85):
                         alerts.append(self._create_alert(target, "signal_low", diagnostics))
                 
-                # RSRP thresholds (prefer over RSSI for LTE)
-                elif rsrp is not None:
-                    if rsrp <= self.thresholds.get("rsrp_critical", -110):
-                        alerts.append(self._create_alert(target, "signal_critical", diagnostics))
-                    elif rsrp <= self.thresholds.get("rsrp_warning", -100):
-                        alerts.append(self._create_alert(target, "signal_low", diagnostics))
+                # SINR thresholds
+                if sinr is not None:
+                    if sinr <= self.thresholds.get("sinr_critical", 0):
+                        alerts.append(self._create_alert(target, "sinr_critical", diagnostics))
+                    elif sinr <= self.thresholds.get("sinr_warning", 5):
+                        alerts.append(self._create_alert(target, "sinr_low", diagnostics))
                 
                 # Connection state
                 connection_state = diagnostics.get("connection_state", "").lower()
                 if connection_state in ("disconnected", "error", "none"):
                     alerts.append(self._create_alert(target, "connection_lost", diagnostics))
+                elif connection_state == "connecting":
+                    alerts.append(self._create_alert(target, "connection_connecting", diagnostics))
+            
+            # Get system status (temperature, uptime)
+            system_status = await self._get_system_status(target)
+            if system_status:
+                temp = system_status.get("temperature")
+                if temp is not None:
+                    if temp >= self.thresholds.get("temp_critical", 70):
+                        alerts.append(self._create_alert(target, "temperature_critical", system_status))
+                    elif temp >= self.thresholds.get("temp_warning", 60):
+                        alerts.append(self._create_alert(target, "temperature_high", system_status))
+            
+            # Get GPS status
+            gps_status = await self._get_gps_status(target)
+            if gps_status:
+                gps_fix = gps_status.get("fix_type", "").lower()
+                if gps_fix in ("none", "no fix", ""):
+                    alerts.append(self._create_alert(target, "gps_fix_lost", gps_status))
             
         except Exception as e:
             logger.warning(f"Router {target.get('ip')} appears offline: {e}")
@@ -195,7 +223,49 @@ class CradlepointConnector(PollingConnector):
         
         return diagnostics
     
-    def _create_alert(self, target: Dict, alert_type: str, metrics: Dict) -> NormalizedAlert:
+    async def _get_system_status(self, target: Dict) -> Dict[str, Any]:
+        """Get system status including temperature and uptime."""
+        ip = target.get("ip")
+        session = await self._get_session(target)
+        
+        status = {}
+        
+        try:
+            async with session.get(f"http://{ip}/api/status/system/", timeout=10) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    status["uptime"] = data.get("uptime")
+                    status["product_name"] = data.get("product_name")
+                    status["serial_number"] = data.get("serial_number")
+                    # Temperature may be in different locations depending on model
+                    status["temperature"] = data.get("temperature") or data.get("cpu_temp")
+        except Exception as e:
+            logger.debug(f"Could not get system status: {e}")
+        
+        return status
+    
+    async def _get_gps_status(self, target: Dict) -> Dict[str, Any]:
+        """Get GPS status including fix type and coordinates."""
+        ip = target.get("ip")
+        session = await self._get_session(target)
+        
+        gps = {}
+        
+        try:
+            async with session.get(f"http://{ip}/api/status/gps/", timeout=10) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    gps["fix_type"] = data.get("fix", {}).get("type", "")
+                    gps["latitude"] = data.get("fix", {}).get("latitude")
+                    gps["longitude"] = data.get("fix", {}).get("longitude")
+                    gps["satellites"] = data.get("fix", {}).get("satellites")
+        except Exception as e:
+            logger.debug(f"Could not get GPS status: {e}")
+        
+        return gps
+    
+    def _create_alert(self, target: Dict, alert_type: str, metrics: Dict) -> Optional[NormalizedAlert]:
+        """Create alert. Returns None if event type is disabled or no valid IP."""
         raw_data = {
             "device_ip": target.get("ip"),
             "device_name": target.get("name"),

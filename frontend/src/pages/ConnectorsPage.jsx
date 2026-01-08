@@ -119,6 +119,237 @@ function ConnectorCard({ connector, onTest, onToggle, onConfigure, testing }) {
   );
 }
 
+function CradlepointConfigForm({ config, setConfig }) {
+  const [newRouter, setNewRouter] = useState({ ip: '', name: '', username: '', password: '' });
+  
+  const addRouter = () => {
+    if (!newRouter.ip) return;
+    const targets = config.targets || [];
+    setConfig({ 
+      ...config, 
+      targets: [...targets, { ...newRouter, username: newRouter.username || 'admin' }]
+    });
+    setNewRouter({ ip: '', name: '', username: '', password: '' });
+  };
+  
+  const removeRouter = (index) => {
+    const targets = [...(config.targets || [])];
+    targets.splice(index, 1);
+    setConfig({ ...config, targets });
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Connection Info */}
+      <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
+        <p className="text-sm text-blue-700 dark:text-blue-300 mb-1 font-medium">Cradlepoint IBR900 Direct Connection</p>
+        <p className="text-xs text-blue-600 dark:text-blue-400">
+          Connect directly to Cradlepoint routers via the local NCOS API. Each router is polled individually for signal, connection, and system status.
+        </p>
+      </div>
+
+      {/* Default Credentials */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Username</label>
+          <input
+            type="text"
+            placeholder="admin"
+            value={config.default_username || ''}
+            onChange={(e) => setConfig({ ...config, default_username: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Password</label>
+          <input
+            type="password"
+            value={config.default_password || ''}
+            onChange={(e) => setConfig({ ...config, default_password: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+          />
+        </div>
+      </div>
+
+      {/* Poll Interval */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Poll Interval (seconds)</label>
+        <input
+          type="number"
+          min="30"
+          value={config.poll_interval || 60}
+          onChange={(e) => setConfig({ ...config, poll_interval: parseInt(e.target.value) || 60 })}
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+        />
+      </div>
+
+      {/* Signal Thresholds */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Signal Thresholds</label>
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">RSRP Warning (dBm)</label>
+            <input
+              type="number"
+              value={config.thresholds?.rsrp_warning || -100}
+              onChange={(e) => setConfig({ 
+                ...config, 
+                thresholds: { ...config.thresholds, rsrp_warning: parseInt(e.target.value) }
+              })}
+              className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">RSRP Critical (dBm)</label>
+            <input
+              type="number"
+              value={config.thresholds?.rsrp_critical || -110}
+              onChange={(e) => setConfig({ 
+                ...config, 
+                thresholds: { ...config.thresholds, rsrp_critical: parseInt(e.target.value) }
+              })}
+              className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">SINR Warning (dB)</label>
+            <input
+              type="number"
+              value={config.thresholds?.sinr_warning || 5}
+              onChange={(e) => setConfig({ 
+                ...config, 
+                thresholds: { ...config.thresholds, sinr_warning: parseInt(e.target.value) }
+              })}
+              className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">SINR Critical (dB)</label>
+            <input
+              type="number"
+              value={config.thresholds?.sinr_critical || 0}
+              onChange={(e) => setConfig({ 
+                ...config, 
+                thresholds: { ...config.thresholds, sinr_critical: parseInt(e.target.value) }
+              })}
+              className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Router List */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          Routers ({(config.targets || []).length})
+        </label>
+        
+        {/* Existing routers */}
+        {(config.targets || []).length > 0 && (
+          <div className="mb-3 space-y-2 max-h-40 overflow-y-auto">
+            {(config.targets || []).map((router, idx) => (
+              <div key={idx} className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-700 rounded text-sm">
+                <span className="font-mono text-gray-600 dark:text-gray-300">{router.ip}</span>
+                <span className="text-gray-500">{router.name || 'Unnamed'}</span>
+                <button
+                  onClick={() => removeRouter(idx)}
+                  className="ml-auto text-red-500 hover:text-red-700"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Add new router */}
+        <div className="grid grid-cols-4 gap-2">
+          <input
+            type="text"
+            placeholder="IP Address"
+            value={newRouter.ip}
+            onChange={(e) => setNewRouter({ ...newRouter, ip: e.target.value })}
+            className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm"
+          />
+          <input
+            type="text"
+            placeholder="Name (optional)"
+            value={newRouter.name}
+            onChange={(e) => setNewRouter({ ...newRouter, name: e.target.value })}
+            className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm"
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={newRouter.password}
+            onChange={(e) => setNewRouter({ ...newRouter, password: e.target.value })}
+            className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm"
+          />
+          <button
+            onClick={addRouter}
+            disabled={!newRouter.ip}
+            className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 text-sm"
+          >
+            Add
+          </button>
+        </div>
+      </div>
+
+      {/* Monitoring Options */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Monitoring Options</label>
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={config.monitor_signal !== false}
+              onChange={(e) => setConfig({ ...config, monitor_signal: e.target.checked })}
+              className="rounded border-gray-300 text-blue-600"
+            />
+            <span className="text-gray-700 dark:text-gray-300">Cellular Signal</span>
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={config.monitor_connection !== false}
+              onChange={(e) => setConfig({ ...config, monitor_connection: e.target.checked })}
+              className="rounded border-gray-300 text-blue-600"
+            />
+            <span className="text-gray-700 dark:text-gray-300">Connection State</span>
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={config.monitor_temperature !== false}
+              onChange={(e) => setConfig({ ...config, monitor_temperature: e.target.checked })}
+              className="rounded border-gray-300 text-blue-600"
+            />
+            <span className="text-gray-700 dark:text-gray-300">Temperature</span>
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={config.monitor_gps !== false}
+              onChange={(e) => setConfig({ ...config, monitor_gps: e.target.checked })}
+              className="rounded border-gray-300 text-blue-600"
+            />
+            <span className="text-gray-700 dark:text-gray-300">GPS Status</span>
+          </label>
+        </div>
+      </div>
+
+      {/* Help Text */}
+      <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded border border-gray-200 dark:border-gray-600">
+        <p className="text-xs text-gray-600 dark:text-gray-400">
+          <strong>Note:</strong> This connector polls Cradlepoint routers directly via the local NCOS API (not NetCloud). 
+          Ensure each router is reachable on the network and has API access enabled. Default credentials are used unless 
+          overridden per-router.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function MilestoneConfigForm({ config, setConfig }) {
   return (
     <div className="space-y-4">
@@ -475,7 +706,8 @@ function ConfigModal({ connector, onClose, onSave }) {
   // Use specialized form for specific connectors
   const isAxis = connector.type === 'axis';
   const isMilestone = connector.type === 'milestone';
-  const hasSpecialForm = isAxis || isMilestone;
+  const isCradlepoint = connector.type === 'cradlepoint';
+  const hasSpecialForm = isAxis || isMilestone || isCradlepoint;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -498,6 +730,8 @@ function ConfigModal({ connector, onClose, onSave }) {
             <AxisConfigForm config={config} setConfig={setConfig} />
           ) : isMilestone ? (
             <MilestoneConfigForm config={config} setConfig={setConfig} />
+          ) : isCradlepoint ? (
+            <CradlepointConfigForm config={config} setConfig={setConfig} />
           ) : Object.keys(config).length === 0 ? (
             <p className="text-gray-500 text-center py-8">No configuration options available</p>
           ) : (
