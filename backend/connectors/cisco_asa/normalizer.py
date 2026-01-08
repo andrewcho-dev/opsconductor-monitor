@@ -92,6 +92,18 @@ class CiscoASANormalizer(BaseNormalizer):
         super().__init__()
         self._enabled_events = set(ALERT_TYPES.keys())
     
+    @property
+    def source_system(self) -> str:
+        return "cisco_asa"
+    
+    def get_severity(self, raw_data: Dict[str, Any]) -> Severity:
+        event_type = raw_data.get("event_type", "")
+        return ALERT_TYPES.get(event_type, {}).get("severity", Severity.WARNING)
+    
+    def get_category(self, raw_data: Dict[str, Any]) -> Category:
+        event_type = raw_data.get("event_type", "")
+        return ALERT_TYPES.get(event_type, {}).get("category", Category.NETWORK)
+    
     def normalize(self, raw_event: Dict[str, Any]) -> Optional[NormalizedAlert]:
         """Convert raw ASA event to normalized alert."""
         event_type = raw_event.get("event_type", "")
