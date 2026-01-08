@@ -110,21 +110,6 @@ export function AlertDashboard() {
           />
         </div>
 
-        {/* Selection info */}
-        {selectedIds.length > 0 && (
-          <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg flex items-center justify-between flex-shrink-0">
-            <span className="text-sm text-blue-800 dark:text-blue-200">
-              {selectedIds.length} alert{selectedIds.length !== 1 ? 's' : ''} selected
-            </span>
-            <button
-              onClick={() => setSelectedIds([])}
-              className="px-3 py-1.5 text-gray-600 dark:text-gray-300 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
-            >
-              Clear Selection
-            </button>
-          </div>
-        )}
-
         {/* Error */}
         {error && (
           <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-200 flex-shrink-0">
