@@ -207,24 +207,42 @@ class CradlepointConnector(PollingConnector):
                     # NCOS API wraps response in {"success": true, "data": {...}}
                     data = resp_data.get("data", resp_data)
                     
-                    # Find first modem with signal info
+                    # Find the CONNECTED modem (primary active connection)
+                    # IBR routers can have multiple modems - we want the active one
+                    connected_modem = None
+                    any_modem = None
+                    
                     for key, device in data.items():
                         if "mdm" in key.lower() and isinstance(device, dict):
-                            diagnostics["modem_id"] = key
-                            diagnostics["connection_state"] = device.get("status", {}).get("connection_state", "")
+                            status = device.get("status", {})
+                            conn_state = status.get("connection_state", "")
                             
-                            # Get signal info from diagnostics
-                            diag = device.get("diagnostics", {})
-                            info = diag.get("MODEMINFO", {})
-                            diagnostics["rssi"] = info.get("DBM")
-                            diagnostics["rsrp"] = info.get("RSRP")
-                            diagnostics["rsrq"] = info.get("RSRQ")
-                            diagnostics["sinr"] = info.get("SINR")
-                            diagnostics["carrier"] = info.get("HOMECARRID")
+                            # Track any modem we find
+                            if any_modem is None:
+                                any_modem = (key, device, conn_state)
                             
-                            # If this modem has signal info, use it; otherwise keep looking
-                            if diagnostics.get("rsrp") or diagnostics.get("rssi"):
+                            # Prefer the connected modem
+                            if conn_state == "connected":
+                                connected_modem = (key, device, conn_state)
                                 break
+                    
+                    # Use connected modem if found, otherwise use any modem
+                    modem_info = connected_modem or any_modem
+                    
+                    if modem_info:
+                        key, device, conn_state = modem_info
+                        diagnostics["modem_id"] = key
+                        diagnostics["connection_state"] = conn_state
+                        
+                        # Get signal info from diagnostics
+                        diag = device.get("diagnostics", {})
+                        info = diag.get("MODEMINFO", {})
+                        diagnostics["rssi"] = info.get("DBM")
+                        diagnostics["rsrp"] = info.get("RSRP")
+                        diagnostics["rsrq"] = info.get("RSRQ")
+                        diagnostics["sinr"] = info.get("SINR")
+                        diagnostics["carrier"] = info.get("HOMECARRID")
+                        
         except Exception as e:
             logger.debug(f"Could not get modem diagnostics: {e}")
         
