@@ -1332,7 +1332,7 @@ export default function ConfigModal({ connector, onClose, onSave, getAuthHeader 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await onSave(connector.id, config);
+      await onSave(connector.id, { config });
       onClose();
     } catch (err) {
       console.error('Failed to save:', err);
