@@ -460,6 +460,15 @@ function CradlepointConfigForm({ config, setConfig }) {
             />
             <span className="text-gray-700 dark:text-gray-300">GPS Status</span>
           </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={config.monitor_ethernet || false}
+              onChange={(e) => setConfig({ ...config, monitor_ethernet: e.target.checked })}
+              className="rounded border-gray-300 text-blue-600"
+            />
+            <span className="text-gray-700 dark:text-gray-300">Ethernet Ports</span>
+          </label>
         </div>
       </div>
 

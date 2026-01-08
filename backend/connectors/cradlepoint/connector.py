@@ -183,6 +183,20 @@ class CradlepointConnector(PollingConnector):
                 if gps_fix in ("none", "no fix", ""):
                     alerts.append(self._create_alert(target, "gps_fix_lost", gps_status))
             
+            # Get ethernet port status (only if enabled in config)
+            if self.config.get("monitor_ethernet", False):
+                ethernet_status = await self._get_ethernet_status(target)
+                for port_info in ethernet_status:
+                    port_num = port_info.get("port")
+                    link_state = port_info.get("link", "").lower()
+                    # Alert on ports that are down
+                    if link_state == "down":
+                        alerts.append(self._create_alert(target, "ethernet_link_down", {
+                            "port": port_num,
+                            "link_state": link_state,
+                            "speed": port_info.get("link_speed", "Unknown")
+                        }))
+            
         except Exception as e:
             logger.warning(f"Router {target.get('ip')} appears offline: {e}")
             alerts.append(self._create_alert(target, "device_offline", {"error": str(e)}))
@@ -305,6 +319,27 @@ class CradlepointConnector(PollingConnector):
             logger.debug(f"Could not get GPS status: {e}")
         
         return gps
+    
+    async def _get_ethernet_status(self, target: Dict) -> List[Dict[str, Any]]:
+        """Get ethernet port status (link up/down, speed)."""
+        ip = target.get("ip")
+        session = await self._get_session(target)
+        
+        ports = []
+        
+        try:
+            async with session.get(f"http://{ip}/api/status/ethernet/", timeout=10) as response:
+                if response.status == 200:
+                    resp_data = await response.json()
+                    # NCOS API wraps response in {"success": true, "data": [...]}
+                    data = resp_data.get("data", resp_data)
+                    if isinstance(data, list):
+                        ports = data
+                    logger.debug(f"Got {len(ports)} ethernet ports from {ip}")
+        except Exception as e:
+            logger.debug(f"Could not get ethernet status: {e}")
+        
+        return ports
     
     def _create_alert(self, target: Dict, alert_type: str, metrics: Dict) -> Optional[NormalizedAlert]:
         """Create alert. Returns None if event type is disabled or no valid IP."""
