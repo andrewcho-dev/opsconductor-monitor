@@ -14,7 +14,7 @@ from backend.connectors.base import PollingConnector, BaseNormalizer
 from backend.core.models import NormalizedAlert, ConnectorStatus, Severity, Category
 from backend.core.alert_manager import get_alert_manager
 from backend.utils.ip_utils import validate_device_ip
-from backend.db import db_query
+from backend.utils.db import db_query
 
 logger = logging.getLogger(__name__)
 
