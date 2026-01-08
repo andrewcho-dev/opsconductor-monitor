@@ -217,6 +217,9 @@ class Alert:
     
     # Resolution
     resolved_at: Optional[datetime] = None
+    message_before_resolution: Optional[str] = None  # The message when alert was active
+    resolution_message: Optional[str] = None  # The message from the clear event
+    resolution_source: Optional[str] = None  # What triggered resolution (clear_event, manual, reconciliation)
     
     # Correlation
     correlated_to_id: Optional[UUID] = None

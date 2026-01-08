@@ -92,7 +92,7 @@ class AlertManager:
         
         # Handle clear events
         if normalized.is_clear:
-            await self._handle_clear_event(alert)
+            await self._handle_clear_event(alert, clear_message=normalized.message)
         
         # Store action type on alert for caller to use
         alert._action = action
@@ -225,38 +225,56 @@ class AlertManager:
                 f"Upstream device {parent_alert.device_ip or parent_alert.device_name} has active alert"
             )
     
-    async def _handle_clear_event(self, alert: Alert) -> None:
+    async def _handle_clear_event(self, alert: Alert, clear_message: Optional[str] = None) -> None:
         """Handle clear/recovery event."""
         if alert.status == AlertStatus.ACTIVE:
             await self.resolve_alert(
                 alert.id,
-                notes="Auto-resolved by clear event"
+                notes="Auto-resolved by clear event",
+                resolution_message=clear_message,
+                resolution_source="clear_event"
             )
     
     async def resolve_alert(
         self,
         alert_id: UUID,
-        notes: Optional[str] = None
+        notes: Optional[str] = None,
+        resolution_message: Optional[str] = None,
+        resolution_source: Optional[str] = None
     ) -> Alert:
         """
         Mark alert as resolved.
+        
+        Args:
+            alert_id: ID of the alert to resolve
+            notes: Optional notes about the resolution
+            resolution_message: The message from the clear event that resolved this alert
+            resolution_source: What triggered the resolution (clear_event, manual, reconciliation)
         
         Note: This is typically called by the system during reconciliation,
         not by users. Status changes come from source systems.
         """
         now = datetime.utcnow()
         
-        # Get current status for history
+        # Get current alert for history and to capture message before resolution
         current = await self.get_alert(alert_id)
         old_status = current.status if current else AlertStatus.ACTIVE
+        message_before = current.message if current else None
         
         db_execute("""
             UPDATE alerts SET
                 status = %s,
                 resolved_at = %s,
-                updated_at = %s
+                updated_at = %s,
+                message_before_resolution = COALESCE(message_before_resolution, %s),
+                resolution_message = %s,
+                resolution_source = %s
             WHERE id = %s
-        """, (AlertStatus.RESOLVED.value, now, now, str(alert_id)))
+        """, (
+            AlertStatus.RESOLVED.value, now, now,
+            message_before, resolution_message, resolution_source,
+            str(alert_id)
+        ))
         
         alert = await self.get_alert(alert_id)
         
@@ -570,6 +588,9 @@ class AlertManager:
             priority=Priority(row["priority"]) if row.get("priority") else None,
             source_status=row.get("source_status"),
             resolved_at=row.get("resolved_at"),
+            message_before_resolution=row.get("message_before_resolution"),
+            resolution_message=row.get("resolution_message"),
+            resolution_source=row.get("resolution_source"),
             correlated_to_id=UUID(row["correlated_to_id"]) if row.get("correlated_to_id") else None,
             correlation_rule=row.get("correlation_rule"),
             fingerprint=row.get("fingerprint"),

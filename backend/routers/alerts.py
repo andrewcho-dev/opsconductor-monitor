@@ -45,6 +45,9 @@ class AlertResponse(BaseModel):
     occurred_at: datetime
     received_at: datetime
     resolved_at: Optional[datetime]
+    message_before_resolution: Optional[str] = None
+    resolution_message: Optional[str] = None
+    resolution_source: Optional[str] = None
     correlated_to_id: Optional[str]
     correlation_rule: Optional[str]
     occurrence_count: int
@@ -126,6 +129,9 @@ def alert_to_response(alert) -> AlertResponse:
         occurred_at=alert.occurred_at,
         received_at=alert.received_at,
         resolved_at=alert.resolved_at,
+        message_before_resolution=getattr(alert, 'message_before_resolution', None),
+        resolution_message=getattr(alert, 'resolution_message', None),
+        resolution_source=getattr(alert, 'resolution_source', None),
         correlated_to_id=str(alert.correlated_to_id) if alert.correlated_to_id else None,
         correlation_rule=alert.correlation_rule,
         occurrence_count=alert.occurrence_count,
