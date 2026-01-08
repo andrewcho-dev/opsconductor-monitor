@@ -76,8 +76,9 @@ class AxisConnector(PollingConnector):
         self.targets = config.get("targets", [])
         self.camera_source = config.get("camera_source", "manual")  # manual, prtg
         self.prtg_filter = config.get("prtg_filter", {})  # {tags: "camera"} or {group: "Cameras"}
-        self.default_username = config.get("default_username", "root")
-        self.default_password = config.get("default_password", "")
+        # Support both old (username/password) and new (default_username/default_password) field names
+        self.default_username = config.get("default_username") or config.get("username") or "root"
+        self.default_password = config.get("default_password") or config.get("password") or ""
         self._sessions: Dict[str, aiohttp.ClientSession] = {}
         self._cached_targets: List[Dict] = []
         self._last_target_refresh: Optional[datetime] = None
@@ -100,8 +101,8 @@ class AxisConnector(PollingConnector):
         
         if ip not in self._sessions or self._sessions[ip].closed:
             auth_header = self._get_auth_header(
-                target.get("username", "root"),
-                target.get("password", "")
+                target.get("username") or self.default_username,
+                target.get("password") or self.default_password
             )
             
             connector = aiohttp.TCPConnector(ssl=False)
@@ -281,7 +282,8 @@ class AxisConnector(PollingConnector):
             
         except aiohttp.ClientResponseError as e:
             if e.status in (401, 403):
-                alerts.append(self._create_alert(target, "camera_auth_failed", {"error": str(e), "status": e.status}))
+                # Auth failed is a config issue, just log it, don't create alert
+                logger.warning(f"Camera {ip} auth failed (401/403) - check credentials")
             else:
                 alerts.append(self._create_alert(target, "camera_offline", {"error": str(e)}))
         except Exception as e:
@@ -402,8 +404,8 @@ class AxisConnector(PollingConnector):
         
         return alerts
     
-    def _create_alert(self, target: Dict, event_type: str, event_data: Dict) -> NormalizedAlert:
-        """Create normalized alert from camera event."""
+    def _create_alert(self, target: Dict, event_type: str, event_data: Dict) -> Optional[NormalizedAlert]:
+        """Create normalized alert from camera event. Returns None if event type is disabled."""
         raw_data = {
             "device_ip": target.get("ip"),
             "device_name": target.get("name"),
@@ -415,11 +417,13 @@ class AxisConnector(PollingConnector):
         }
         return self.normalizer.normalize(raw_data)
     
-    async def _process_alerts(self, alerts: List[NormalizedAlert]) -> None:
-        """Process polled alerts."""
+    async def _process_alerts(self, alerts: List[Optional[NormalizedAlert]]) -> None:
+        """Process polled alerts, skipping None (disabled events)."""
         alert_manager = get_alert_manager()
         
         for normalized in alerts:
+            if normalized is None:
+                continue  # Skip disabled event types
             try:
                 await alert_manager.process_alert(normalized)
             except Exception as e:

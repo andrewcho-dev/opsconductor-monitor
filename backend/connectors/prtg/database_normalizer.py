@@ -11,6 +11,7 @@ from typing import Dict, Any, Optional
 
 from backend.core.models import NormalizedAlert, Severity, Category
 from backend.utils.db import db_query
+from backend.utils.ip_utils import validate_device_ip
 
 logger = logging.getLogger(__name__)
 
@@ -160,8 +161,8 @@ class PRTGDatabaseNormalizer:
         else:
             raise ValueError("Unknown PRTG data format")
     
-    def _normalize_webhook(self, raw: Dict[str, Any]) -> NormalizedAlert:
-        """Normalize webhook payload using database mappings."""
+    def _normalize_webhook(self, raw: Dict[str, Any]) -> Optional[NormalizedAlert]:
+        """Normalize webhook payload using database mappings. Returns None if no valid device_ip."""
         # Extract fields
         sensor_id = str(raw.get("sensorid", ""))
         device_id = str(raw.get("deviceid", ""))
@@ -172,6 +173,13 @@ class PRTGDatabaseNormalizer:
         message = raw.get("message", "")
         host = raw.get("host", "")
         datetime_str = raw.get("datetime", "")
+        
+        # Validate device_ip early - skip if we can't determine IP
+        try:
+            device_ip = validate_device_ip(host, device_name)
+        except ValueError as e:
+            logger.warning(f"Skipping PRTG alert - no valid device_ip: {e}")
+            return None
         
         # Parse occurred_at
         occurred_at = self._parse_datetime(datetime_str)
@@ -194,8 +202,8 @@ class PRTGDatabaseNormalizer:
         return NormalizedAlert(
             source_system=self.source_system,
             source_alert_id=sensor_id,
-            device_ip=host if self._is_ip(host) else None,
-            device_name=device_name or host,
+            device_ip=device_ip,
+            device_name=device_name or None,
             severity=severity,
             category=category,
             alert_type=alert_type,
@@ -207,7 +215,7 @@ class PRTGDatabaseNormalizer:
         )
     
     def _normalize_poll(self, raw: Dict[str, Any]) -> Optional[NormalizedAlert]:
-        """Normalize polled sensor data using database mappings."""
+        """Normalize polled sensor data using database mappings. Returns None if no valid device_ip."""
         # Extract fields
         sensor_id = str(raw.get("objid", ""))
         device_name = raw.get("device", "")
@@ -215,6 +223,13 @@ class PRTGDatabaseNormalizer:
         status_raw = raw.get("status_raw") or raw.get("status")
         message = raw.get("message", "")
         host = raw.get("host", "")
+        
+        # Validate device_ip early - skip if we can't determine IP
+        try:
+            device_ip = validate_device_ip(host, device_name)
+        except ValueError as e:
+            logger.warning(f"Skipping PRTG poll alert - no valid device_ip: {e}")
+            return None
         
         # Status could be int or string
         if isinstance(status_raw, int):
@@ -248,8 +263,8 @@ class PRTGDatabaseNormalizer:
         return NormalizedAlert(
             source_system=self.source_system,
             source_alert_id=sensor_id,
-            device_ip=host if self._is_ip(host) else None,
-            device_name=device_name or host,
+            device_ip=device_ip,
+            device_name=device_name or None,
             severity=severity,
             category=category,
             alert_type=alert_type,
@@ -427,16 +442,3 @@ class PRTGDatabaseNormalizer:
         sensor_type = sensor_name.lower().replace(" ", "_") if sensor_name else "sensor"
         return f"prtg_{sensor_type}_{status}"
     
-    def _is_ip(self, value: str) -> bool:
-        """Check if value looks like an IP address."""
-        if not value:
-            return False
-        
-        parts = value.split(".")
-        if len(parts) != 4:
-            return False
-        
-        try:
-            return all(0 <= int(p) <= 255 for p in parts)
-        except ValueError:
-            return False

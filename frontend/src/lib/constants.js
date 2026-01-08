@@ -97,9 +97,14 @@ export const CATEGORY_CONFIG = {
   wireless: { icon: Wifi, label: 'Wireless', color: 'cyan' },
   security: { icon: Shield, label: 'Security', color: 'red' },
   environment: { icon: Thermometer, label: 'Environment', color: 'orange' },
+  environmental: { icon: Thermometer, label: 'Environmental', color: 'orange' },
   compute: { icon: Server, label: 'Compute', color: 'indigo' },
   storage: { icon: HardDrive, label: 'Storage', color: 'slate' },
   application: { icon: Box, label: 'Application', color: 'pink' },
+  availability: { icon: AlertCircle, label: 'Availability', color: 'red' },
+  hardware: { icon: Server, label: 'Hardware', color: 'slate' },
+  maintenance: { icon: Box, label: 'Maintenance', color: 'blue' },
+  performance: { icon: Zap, label: 'Performance', color: 'purple' },
   unknown: { icon: HelpCircle, label: 'Unknown', color: 'gray' },
 };
 

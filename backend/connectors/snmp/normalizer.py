@@ -13,6 +13,7 @@ from typing import Dict, Any, Optional, List
 
 from backend.utils.db import db_query, db_query_one
 from backend.core.models import NormalizedAlert, Severity, Category
+from backend.utils.ip_utils import validate_device_ip
 
 logger = logging.getLogger(__name__)
 
@@ -95,8 +96,8 @@ class SNMPNormalizer:
         return NormalizedAlert(
             source_system=self.source_system,
             source_alert_id=f"{source_ip}:{trap_oid}:{occurred_at.timestamp()}",
-            device_ip=source_ip,
-            device_name=None,  # Could be resolved later from device registry
+            device_ip=validate_device_ip(source_ip, None),
+            device_name=None,
             severity=severity,
             category=category,
             alert_type=alert_type,

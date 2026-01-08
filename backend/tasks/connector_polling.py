@@ -130,7 +130,7 @@ def poll_all_connectors():
             
             # RECONCILIATION: Resolve alerts that are no longer in poll results
             # Only for polling-based connectors (not event/trap based)
-            if connector_type in ('prtg', 'eaton', 'cradlepoint', 'siklu', 'ubiquiti'):
+            if connector_type in ('prtg', 'eaton', 'cradlepoint', 'siklu', 'ubiquiti', 'axis'):
                 resolved_count = reconcile_alerts(
                     db, connector_type, current_fingerprints, publish_alert_event_sync
                 )

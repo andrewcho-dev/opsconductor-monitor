@@ -139,9 +139,9 @@ class NormalizedAlert:
     title: str
     occurred_at: datetime
     
-    # Device identification (at least one required)
-    device_ip: Optional[str] = None
-    device_name: Optional[str] = None
+    # Device identification - device_ip is REQUIRED for cross-system correlation
+    device_ip: str  # Required - must be an IP address
+    device_name: Optional[str] = None  # Optional friendly name
     
     # Content
     message: Optional[str] = None
@@ -160,8 +160,8 @@ class NormalizedAlert:
     
     def __post_init__(self):
         """Validate required fields."""
-        if not self.device_ip and not self.device_name:
-            raise ValueError("At least one of device_ip or device_name is required")
+        if not self.device_ip:
+            raise ValueError("device_ip is required for cross-system correlation")
         
         # Convert string enums if needed
         if isinstance(self.severity, str):
@@ -183,8 +183,8 @@ class Alert:
     source_system: str
     source_alert_id: str
     
-    # Device
-    device_ip: Optional[str]
+    # Device - device_ip is REQUIRED for cross-system correlation
+    device_ip: str
     device_name: Optional[str]
     
     # Classification

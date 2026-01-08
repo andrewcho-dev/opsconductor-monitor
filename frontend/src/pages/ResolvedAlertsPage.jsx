@@ -42,7 +42,7 @@ export function ResolvedAlertsPage() {
       
       if (filters.severity) params.set('severity', filters.severity);
       if (filters.category) params.set('category', filters.category);
-      if (filters.device_name) params.set('device_name', filters.device_name);
+      if (filters.device_ip) params.set('device_ip', filters.device_ip);
       
       const response = await fetchApi(`/api/v1/alerts?${params.toString()}`);
       
@@ -73,14 +73,14 @@ export function ResolvedAlertsPage() {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [pagination.page, pagination.per_page, filters.severity, filters.category, filters.device_name]);
+  }, [pagination.page, pagination.per_page, filters.severity, filters.category, filters.device_ip]);
 
   // Initial fetch
   useEffect(() => {
     if (pagination.page === 1) {
       fetchResolvedAlerts();
     }
-  }, [filters.severity, filters.category, filters.device_name]);
+  }, [filters.severity, filters.category, filters.device_ip]);
 
   // Load more when page changes (for infinite scroll)
   useEffect(() => {

@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import Dict, Any
 
 from backend.core.models import NormalizedAlert, Severity, Category
+from backend.utils.ip_utils import validate_device_ip
 
 logger = logging.getLogger(__name__)
 
@@ -129,8 +130,8 @@ class MilestoneNormalizer:
         return NormalizedAlert(
             source_system=self.source_system,
             source_alert_id=f"{device_ip}:{event_type}:{occurred_at.timestamp()}",
-            device_ip=device_ip if device_ip else None,
-            device_name=device_name if device_name else None,
+            device_ip=validate_device_ip(device_ip, device_name),
+            device_name=device_name or None,
             severity=event_def["severity"],
             category=event_def["category"],
             alert_type=f"milestone_{event_type}",

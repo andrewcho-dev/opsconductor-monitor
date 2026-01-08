@@ -16,14 +16,13 @@ export function AlertDashboard() {
     alerts,
     stats,
     loading,
-    loadingMore,
     error,
     filters,
     setFilters,
     pagination,
-    loadMore,
+    setPage,
     refresh,
-  } = useAlerts({}, { infiniteScroll: true });
+  } = useAlerts({}, { infiniteScroll: false });
 
   // Real-time WebSocket updates - automatically refreshes when alerts change
   const { isConnected } = useAlertWebSocketRefresh(refresh);
@@ -124,8 +123,7 @@ export function AlertDashboard() {
             alerts={alerts}
             loading={loading}
             pagination={pagination}
-            onLoadMore={loadMore}
-            loadingMore={loadingMore}
+            onPageChange={setPage}
             selectedIds={selectedIds}
             onSelectChange={setSelectedIds}
             filters={filters}

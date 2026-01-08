@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import Dict, Any
 
 from backend.core.models import NormalizedAlert, Severity, Category
+from backend.utils.ip_utils import validate_device_ip
 
 logger = logging.getLogger(__name__)
 
@@ -108,8 +109,8 @@ class UbiquitiNormalizer:
         return NormalizedAlert(
             source_system=self.source_system,
             source_alert_id=f"{device_ip}:{alert_type}",
-            device_ip=device_ip,
-            device_name=device_name,
+            device_ip=validate_device_ip(device_ip, device_name),
+            device_name=device_name or None,
             severity=alert_def["severity"],
             category=alert_def["category"],
             alert_type=f"ubiquiti_{alert_type}",

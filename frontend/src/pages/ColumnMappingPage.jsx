@@ -338,11 +338,19 @@ export default function ColumnMappingPage() {
                   <div className="bg-white dark:bg-gray-700 rounded border p-2">
                     {sectionMappings.map((mapping) => (
                       <div key={mapping.id} className="py-1 flex items-center justify-between border-b last:border-b-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-gray-500">{mapping.source_field}:</span>
-                          <span className="font-mono text-sm font-medium">{mapping.source_value}</span>
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <span className="text-xs text-gray-500 shrink-0">{mapping.source_field}:</span>
+                          <span className="font-mono text-sm font-medium shrink-0">{mapping.source_value}</span>
+                          {mapping.description && (
+                            <span 
+                              className="text-xs text-gray-400 dark:text-gray-500 italic truncate" 
+                              title={mapping.description}
+                            >
+                              — {mapping.description.length > 50 ? mapping.description.substring(0, 50) + '...' : mapping.description}
+                            </span>
+                          )}
                         </div>
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1 shrink-0">
                           <input
                             type="checkbox"
                             checked={mapping.enabled}

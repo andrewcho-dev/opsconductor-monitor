@@ -2,6 +2,7 @@
 Axis Camera Alert Normalizer
 
 Transforms Axis VAPIX event data to standard NormalizedAlert format.
+Uses database mappings for severity and category - NO HARDCODED VALUES.
 """
 
 import logging
@@ -10,94 +11,112 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 
 from backend.core.models import NormalizedAlert, Severity, Category
+from backend.utils.ip_utils import validate_device_ip
+from backend.utils.db import db_query
 
 logger = logging.getLogger(__name__)
 
 
 class AxisNormalizer:
     """
-    Normalizer for Axis camera events.
+    Database-driven normalizer for Axis camera events.
     
-    Based on Axis VAPIX API event types.
+    All mappings come from severity_mappings and category_mappings tables.
     """
     
-    # Axis event type to alert mapping - see docs/mappings/AXIS_ALERT_MAPPING.md
-    EVENT_TYPES = {
-        # Availability
-        "camera_offline": {"category": Category.AVAILABILITY, "severity": Severity.CRITICAL, "title": "Camera Offline"},
-        "camera_auth_failed": {"category": Category.AVAILABILITY, "severity": Severity.MAJOR, "title": "Camera Auth Failed"},
-        "camera_unreachable": {"category": Category.AVAILABILITY, "severity": Severity.CRITICAL, "title": "Camera Unreachable"},
+    def __init__(self):
+        self._severity_cache: Dict[str, Dict] = {}
+        self._category_cache: Dict[str, Dict] = {}
+        self._cache_loaded = False
+    
+    def _load_mappings(self):
+        """Load mappings from database."""
+        if self._cache_loaded:
+            return
         
-        # Storage
-        "storage_failure": {"category": Category.HARDWARE, "severity": Severity.CRITICAL, "title": "Storage Failure"},
-        "storage_full": {"category": Category.HARDWARE, "severity": Severity.CRITICAL, "title": "Storage Full"},
-        "storage_warning": {"category": Category.HARDWARE, "severity": Severity.WARNING, "title": "Storage Warning"},
-        "storage_missing": {"category": Category.HARDWARE, "severity": Severity.MAJOR, "title": "No Storage Detected"},
-        "storage_readonly": {"category": Category.HARDWARE, "severity": Severity.MAJOR, "title": "Storage Read-Only"},
+        try:
+            # Load severity mappings
+            severity_rows = db_query(
+                "SELECT source_value, target_severity, enabled, description FROM severity_mappings WHERE connector_type = %s",
+                ("axis",)
+            )
+            for row in severity_rows:
+                self._severity_cache[row["source_value"]] = {
+                    "severity": row["target_severity"],
+                    "enabled": row["enabled"],
+                    "description": row.get("description", "")
+                }
+            
+            # Load category mappings
+            category_rows = db_query(
+                "SELECT source_value, target_category, enabled, description FROM category_mappings WHERE connector_type = %s",
+                ("axis",)
+            )
+            for row in category_rows:
+                self._category_cache[row["source_value"]] = {
+                    "category": row["target_category"],
+                    "enabled": row["enabled"],
+                    "description": row.get("description", "")
+                }
+            
+            self._cache_loaded = True
+            logger.info(f"Loaded {len(self._severity_cache)} severity and {len(self._category_cache)} category mappings for axis")
+            
+        except Exception as e:
+            logger.error(f"Failed to load axis mappings: {e}")
+            self._cache_loaded = True  # Don't retry on every call
+    
+    def is_event_enabled(self, event_type: str) -> bool:
+        """Check if this event type is enabled in mappings."""
+        self._load_mappings()
         
-        # Recording
-        "recording_stopped": {"category": Category.APPLICATION, "severity": Severity.CRITICAL, "title": "Recording Stopped"},
-        "recording_error": {"category": Category.APPLICATION, "severity": Severity.MAJOR, "title": "Recording Error"},
+        severity_mapping = self._severity_cache.get(event_type)
+        if severity_mapping and not severity_mapping.get("enabled", True):
+            return False
         
-        # Video
-        "video_loss": {"category": Category.HARDWARE, "severity": Severity.CRITICAL, "title": "Video Loss"},
-        "stream_timeout": {"category": Category.APPLICATION, "severity": Severity.MAJOR, "title": "Stream Timeout"},
+        category_mapping = self._category_cache.get(event_type)
+        if category_mapping and not category_mapping.get("enabled", True):
+            return False
         
-        # Security/Tampering
-        "tampering_detected": {"category": Category.SECURITY, "severity": Severity.CRITICAL, "title": "Camera Tampering"},
-        "tampering_physical": {"category": Category.SECURITY, "severity": Severity.CRITICAL, "title": "Physical Tampering"},
-        "camera_moved": {"category": Category.SECURITY, "severity": Severity.MAJOR, "title": "Camera Position Changed"},
-        "unauthorized_access": {"category": Category.SECURITY, "severity": Severity.MAJOR, "title": "Unauthorized Access Attempt"},
+        return True
+    
+    def _get_severity(self, event_type: str) -> Severity:
+        """Get severity from database mapping."""
+        self._load_mappings()
         
-        # Power
-        "power_insufficient": {"category": Category.HARDWARE, "severity": Severity.MAJOR, "title": "Insufficient Power"},
-        "poe_warning": {"category": Category.HARDWARE, "severity": Severity.WARNING, "title": "PoE Power Warning"},
-        "power_supply_error": {"category": Category.HARDWARE, "severity": Severity.CRITICAL, "title": "Power Supply Error"},
+        mapping = self._severity_cache.get(event_type)
+        if mapping:
+            try:
+                return Severity(mapping["severity"])
+            except ValueError:
+                pass
         
-        # PTZ
-        "ptz_error": {"category": Category.HARDWARE, "severity": Severity.MAJOR, "title": "PTZ Error"},
-        "ptz_power_insufficient": {"category": Category.HARDWARE, "severity": Severity.MAJOR, "title": "PTZ Power Insufficient"},
-        "ptz_motor_failure": {"category": Category.HARDWARE, "severity": Severity.CRITICAL, "title": "PTZ Motor Failure"},
-        "ptz_preset_failure": {"category": Category.HARDWARE, "severity": Severity.WARNING, "title": "PTZ Preset Failure"},
+        # Default fallback
+        return Severity.WARNING
+    
+    def _get_category(self, event_type: str) -> Category:
+        """Get category from database mapping."""
+        self._load_mappings()
         
-        # Environmental
-        "temperature_critical": {"category": Category.ENVIRONMENTAL, "severity": Severity.CRITICAL, "title": "Camera Overheating"},
-        "temperature_warning": {"category": Category.ENVIRONMENTAL, "severity": Severity.WARNING, "title": "Camera Temperature Warning"},
-        "temperature_low": {"category": Category.ENVIRONMENTAL, "severity": Severity.WARNING, "title": "Camera Temperature Low"},
-        "heater_failure": {"category": Category.ENVIRONMENTAL, "severity": Severity.MAJOR, "title": "Heater Failure"},
-        "fan_failure": {"category": Category.ENVIRONMENTAL, "severity": Severity.CRITICAL, "title": "Fan Failure"},
-        "housing_open": {"category": Category.ENVIRONMENTAL, "severity": Severity.MAJOR, "title": "Housing Open"},
+        mapping = self._category_cache.get(event_type)
+        if mapping:
+            try:
+                return Category(mapping["category"])
+            except ValueError:
+                pass
         
-        # Hardware
-        "lens_error": {"category": Category.HARDWARE, "severity": Severity.MAJOR, "title": "Lens Error"},
-        "focus_failure": {"category": Category.HARDWARE, "severity": Severity.WARNING, "title": "Auto-Focus Failed"},
-        "ir_failure": {"category": Category.HARDWARE, "severity": Severity.WARNING, "title": "IR Illuminator Failure"},
-        "sensor_failure": {"category": Category.HARDWARE, "severity": Severity.CRITICAL, "title": "Image Sensor Failure"},
-        "audio_failure": {"category": Category.HARDWARE, "severity": Severity.WARNING, "title": "Audio System Failure"},
-        "io_error": {"category": Category.HARDWARE, "severity": Severity.WARNING, "title": "I/O Port Error"},
-        
-        # Network
-        "network_config_error": {"category": Category.NETWORK, "severity": Severity.MAJOR, "title": "Network Config Error"},
-        "network_degraded": {"category": Category.NETWORK, "severity": Severity.WARNING, "title": "Network Degraded"},
-        "ip_conflict": {"category": Category.NETWORK, "severity": Severity.MAJOR, "title": "IP Address Conflict"},
-        "dns_failure": {"category": Category.NETWORK, "severity": Severity.WARNING, "title": "DNS Resolution Failure"},
-        
-        # Firmware/System
-        "firmware_outdated": {"category": Category.MAINTENANCE, "severity": Severity.INFO, "title": "Firmware Outdated"},
-        "camera_rebooted": {"category": Category.MAINTENANCE, "severity": Severity.INFO, "title": "Camera Rebooted"},
-        "config_changed": {"category": Category.MAINTENANCE, "severity": Severity.INFO, "title": "Configuration Changed"},
-        "certificate_expiring": {"category": Category.MAINTENANCE, "severity": Severity.WARNING, "title": "Certificate Expiring"},
-        "certificate_expired": {"category": Category.MAINTENANCE, "severity": Severity.MAJOR, "title": "Certificate Expired"},
-        "system_error": {"category": Category.MAINTENANCE, "severity": Severity.MAJOR, "title": "System Error"},
-    }
+        # Default fallback
+        return Category.VIDEO
     
     @property
     def source_system(self) -> str:
         return "axis"
     
-    def normalize(self, raw_data: Dict[str, Any]) -> NormalizedAlert:
+    def normalize(self, raw_data: Dict[str, Any]) -> Optional[NormalizedAlert]:
         """
         Transform Axis event to NormalizedAlert.
+        
+        Returns None if the event type is disabled in mappings.
         
         Expected raw_data format:
         {
@@ -114,15 +133,17 @@ class AxisNormalizer:
         event_data = raw_data.get("event_data", {})
         timestamp = raw_data.get("timestamp")
         
-        # Get event definition
-        event_def = self.EVENT_TYPES.get(event_type, {
-            "category": Category.VIDEO,
-            "severity": Severity.INFO,
-            "title": f"Axis Event - {event_type}",
-        })
+        # Check if this event type is enabled - skip if disabled
+        if not self.is_event_enabled(event_type):
+            logger.debug(f"Skipping disabled event type: {event_type}")
+            return None
+        
+        # Get severity and category from database mappings
+        severity = self._get_severity(event_type)
+        category = self._get_category(event_type)
         
         # Build title with device name
-        title = f"{event_def['title']} - {device_name}" if device_name else event_def['title']
+        title = f"Axis {event_type.replace('_', ' ').title()} - {device_name}" if device_name else f"Axis {event_type.replace('_', ' ').title()}"
         
         # Build message from event data
         message = self._build_message(event_type, event_data)
@@ -130,16 +151,19 @@ class AxisNormalizer:
         # Parse timestamp
         occurred_at = self._parse_timestamp(timestamp)
         
-        # Is this a clear event?
-        is_clear = event_def.get("is_clear", False)
+        # Is this a clear event? (event types ending in _restored, _up, _online, etc.)
+        is_clear = event_type.endswith(("_restored", "_up", "_online", "_ok", "_normal", "_cleared"))
+        
+        # source_alert_id must be STABLE for deduplication - no timestamps!
+        source_alert_id = f"{device_ip}:{event_type}"
         
         return NormalizedAlert(
             source_system=self.source_system,
-            source_alert_id=f"{device_ip}:{event_type}:{occurred_at.timestamp()}",
-            device_ip=device_ip,
-            device_name=device_name,
-            severity=event_def["severity"],
-            category=event_def["category"],
+            source_alert_id=source_alert_id,
+            device_ip=validate_device_ip(device_ip, device_name),
+            device_name=device_name or None,
+            severity=severity,
+            category=category,
             alert_type=f"axis_{event_type}",
             title=title,
             message=message,
@@ -149,16 +173,14 @@ class AxisNormalizer:
         )
     
     def get_severity(self, raw_data: Dict[str, Any]) -> Severity:
-        """Determine severity from event type."""
+        """Determine severity from database mapping."""
         event_type = raw_data.get("event_type", "").lower()
-        event_def = self.EVENT_TYPES.get(event_type, {})
-        return event_def.get("severity", Severity.INFO)
+        return self._get_severity(event_type)
     
     def get_category(self, raw_data: Dict[str, Any]) -> Category:
-        """Determine category from event type."""
+        """Determine category from database mapping."""
         event_type = raw_data.get("event_type", "").lower()
-        event_def = self.EVENT_TYPES.get(event_type, {})
-        return event_def.get("category", Category.VIDEO)
+        return self._get_category(event_type)
     
     def get_fingerprint(self, raw_data: Dict[str, Any]) -> str:
         """Generate deduplication fingerprint."""
@@ -171,8 +193,7 @@ class AxisNormalizer:
     def is_clear_event(self, raw_data: Dict[str, Any]) -> bool:
         """Check if this is a clear event."""
         event_type = raw_data.get("event_type", "").lower()
-        event_def = self.EVENT_TYPES.get(event_type, {})
-        return event_def.get("is_clear", False)
+        return event_type.endswith(("_restored", "_up", "_online", "_ok", "_normal", "_cleared"))
     
     def _build_message(self, event_type: str, event_data: Dict) -> str:
         """Build message from event data."""

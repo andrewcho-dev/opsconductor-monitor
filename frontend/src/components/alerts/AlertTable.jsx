@@ -76,9 +76,9 @@ export function AlertTable({
           aVal = a.occurrence_count || 1;
           bVal = b.occurrence_count || 1;
           break;
-        case 'device_name':
-          aVal = (a.device_name || a.device_ip || '').toLowerCase();
-          bVal = (b.device_name || b.device_ip || '').toLowerCase();
+        case 'device_ip':
+          aVal = (a.device_ip || '').toLowerCase();
+          bVal = (b.device_ip || '').toLowerCase();
           break;
         case 'occurred_at':
           aVal = new Date(a.occurred_at).getTime();
@@ -125,7 +125,7 @@ export function AlertTable({
     [alerts]
   );
   const uniqueDevices = useMemo(() => 
-    [...new Set(alerts.map(a => a.device_name || a.device_ip))].filter(Boolean).sort(),
+    [...new Set(alerts.map(a => a.device_ip))].filter(Boolean).sort(),
     [alerts]
   );
   const uniqueStatuses = useMemo(() => 
@@ -158,7 +158,7 @@ export function AlertTable({
     setFilterSearch('');
   };
 
-  // Multi-select filter for device_name field
+  // Multi-select filter for device_ip field
   const handleMultiFilterToggle = (field, value) => {
     setPendingSelections(prev => {
       const current = prev[field] || (filters[field] ? filters[field].split(',') : []);
@@ -233,9 +233,9 @@ export function AlertTable({
     );
   };
 
-  // Multi-select dropdown with search for device_name
+  // Multi-select dropdown with search for device_ip
   const DeviceFilterDropdown = ({ options, currentValue, label }) => {
-    const field = 'device_name';
+    const field = 'device_ip';
     const isOpen = openFilter === field;
     const hasFilter = currentValue && currentValue !== 'all';
     
@@ -438,22 +438,10 @@ export function AlertTable({
       
       {/* Table */}
       <div ref={tableContainerRef} className="overflow-auto flex-1">
-        <table className="w-full divide-y divide-gray-200 dark:divide-gray-700" style={{ tableLayout: 'fixed' }}>
-          <colgroup>
-            <col style={{ width: '40px' }} />
-            <col style={{ width: '80px' }} />
-            <col style={{ width: '50px' }} />
-            <col style={{ width: '280px' }} />
-            <col style={{ width: '200px' }} />
-            <col style={{ width: '100px' }} />
-            <col style={{ width: '140px' }} />
-            {showResolvedTime && <col style={{ width: '140px' }} />}
-            <col style={{ width: '70px' }} />
-            <col style={{ width: '90px' }} />
-          </colgroup>
+        <table className="w-full divide-y divide-gray-200 dark:divide-gray-700" style={{ tableLayout: 'auto' }}>
           <thead className="bg-gray-50 dark:bg-gray-900">
             <tr>
-              <th style={{ width: '40px' }} className="px-3 py-2">
+              <th className="w-8 px-2 py-2">
                 <input
                   type="checkbox"
                   checked={selectedIds.length === alerts.length && alerts.length > 0}
@@ -461,27 +449,26 @@ export function AlertTable({
                   className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
               </th>
-              <th style={{ width: '80px' }} className="px-3 py-2 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
-                SEVERITY
+              <th className="px-2 py-2 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap">
+                SEV
               </th>
-              <th
-                style={{ width: '50px' }}
-                className="px-2 py-2 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase"
-              >
+              <th className="px-1 py-2 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap">
                 #
               </th>
-              <th style={{ width: '250px' }} className="px-3 py-2 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-2 py-2 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
                 ALERT
               </th>
-              <th style={{ width: '180px' }} className="px-4 py-2 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
-                DEVICE
+              <th className="px-1 py-2 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap">
+                SRC
               </th>
-              <th style={{ width: '100px' }} className="px-3 py-2 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-2 py-2 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
+                <DeviceFilterDropdown options={uniqueDevices} currentValue={filters.device_ip} label="Device" />
+              </th>
+              <th className="px-2 py-2 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap">
                 <FilterDropdown field="category" options={uniqueCategories} currentValue={filters.category} label="Category" />
               </th>
               <th
-                style={{ width: '140px' }}
-                className="px-3 py-2 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                className="px-2 py-2 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 whitespace-nowrap"
                 onClick={() => handleSort('occurred_at')}
               >
                 <div className="flex items-center gap-1">
@@ -491,8 +478,7 @@ export function AlertTable({
               </th>
               {showResolvedTime && (
                 <th
-                  style={{ width: '140px' }}
-                  className="px-3 py-2 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                  className="px-2 py-2 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 whitespace-nowrap"
                   onClick={() => handleSort('resolved_at')}
                 >
                   <div className="flex items-center gap-1">
@@ -502,16 +488,15 @@ export function AlertTable({
                 </th>
               )}
               <th
-                style={{ width: '70px' }}
-                className="px-3 py-2 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                className="px-2 py-2 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 whitespace-nowrap"
                 onClick={() => handleSort('occurred_at')}
               >
                 <div className="flex items-center gap-1">
-                  {showResolvedTime ? 'DURATION' : 'AGE'}
+                  {showResolvedTime ? 'DUR' : 'AGE'}
                   <SortIcon columnKey="occurred_at" />
                 </div>
               </th>
-              <th style={{ width: '90px' }} className="px-3 py-2 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-2 py-2 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap">
                 STATUS
               </th>
             </tr>
@@ -557,9 +542,14 @@ export function AlertTable({
                       {alert.title}
                     </Link>
                   </td>
+                  <td className="px-1 py-2">
+                    <span className="font-mono text-xs text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap">
+                      {alert.source_system === 'axis' ? 'VAPIX' : (alert.source_system || '-').toUpperCase()}
+                    </span>
+                  </td>
                   <td className="px-3 py-2">
-                    <span className="font-mono text-xs text-gray-900 dark:text-white truncate block" title={alert.device_name || alert.device_ip}>
-                      {alert.device_name || alert.device_ip || '-'}
+                    <span className="font-mono text-xs text-gray-900 dark:text-white truncate block" title={alert.device_ip}>
+                      {alert.device_ip || '-'}
                     </span>
                   </td>
                   <td className="px-3 py-2">
@@ -641,13 +631,28 @@ export function AlertTable({
         )}
       </div>
 
-      {/* Pagination - only show if not using infinite scroll */}
-      {!onLoadMore && pagination.pages > 1 && (
+      {/* Pagination */}
+      {pagination.total > 0 && (
         <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
-          <div className="text-sm text-gray-500">
-            Showing {((pagination.page - 1) * pagination.per_page) + 1} to{' '}
-            {Math.min(pagination.page * pagination.per_page, pagination.total)} of{' '}
-            {pagination.total} alerts
+          <div className="flex items-center gap-4">
+            <div className="text-sm text-gray-500">
+              Showing {((pagination.page - 1) * pagination.per_page) + 1} to{' '}
+              {Math.min(pagination.page * pagination.per_page, pagination.total)} of{' '}
+              {pagination.total} alerts
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-500">Per page:</span>
+              <select
+                value={pagination.per_page || 100}
+                onChange={(e) => onPageChange?.(1, parseInt(e.target.value))}
+                className="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-800"
+              >
+                <option value={100}>100</option>
+                <option value={250}>250</option>
+                <option value={500}>500</option>
+                <option value={1000}>1000</option>
+              </select>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -658,7 +663,7 @@ export function AlertTable({
               <ChevronLeft className="h-4 w-4" />
             </button>
             <span className="text-sm text-gray-700 dark:text-gray-300">
-              Page {pagination.page} of {pagination.pages}
+              Page {pagination.page} of {pagination.pages || 1}
             </span>
             <button
               onClick={() => onPageChange?.(pagination.page + 1)}

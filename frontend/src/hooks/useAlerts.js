@@ -27,7 +27,7 @@ export function useAlerts(initialFilters = {}, { infiniteScroll = false } = {}) 
   });
   const [pagination, setPagination] = useState({
     page: 1,
-    per_page: 50,
+    per_page: parseInt(localStorage.getItem('alerts_per_page') || '100'),
     total: 0,
     pages: 0,
   });
@@ -125,8 +125,15 @@ export function useAlerts(initialFilters = {}, { infiniteScroll = false } = {}) 
     fetchStats();
   }, [fetchAlerts, fetchStats, infiniteScroll]);
 
-  const setPage = useCallback((page) => {
-    setPagination(prev => ({ ...prev, page }));
+  const setPage = useCallback((page, perPage) => {
+    if (perPage) {
+      localStorage.setItem('alerts_per_page', perPage.toString());
+    }
+    setPagination(prev => ({ 
+      ...prev, 
+      page,
+      ...(perPage ? { per_page: perPage } : {})
+    }));
   }, []);
 
   const loadMore = useCallback(() => {

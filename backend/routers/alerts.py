@@ -154,7 +154,7 @@ async def list_alerts(
     from_time: Optional[datetime] = Query(None, alias="from", description="Start time"),
     to_time: Optional[datetime] = Query(None, alias="to", description="End time"),
     page: int = Query(1, ge=1, description="Page number"),
-    per_page: int = Query(50, ge=1, le=200, description="Items per page"),
+    per_page: int = Query(100, ge=1, le=1000, description="Items per page"),
 ):
     """
     List alerts with filtering and pagination.
