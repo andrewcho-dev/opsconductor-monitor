@@ -170,6 +170,42 @@ export function AlertDetailPage() {
               </div>
             )}
 
+            {/* Resolution Info - Show for resolved alerts */}
+            {alert.status === 'resolved' && (alert.message_before_resolution || alert.resolution_message) && (
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border-l-4 border-green-500">
+                <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-4 flex items-center gap-2">
+                  <CheckCheck className="h-4 w-4 text-green-500" />
+                  Resolution Details
+                </h2>
+                <div className="space-y-4">
+                  {alert.message_before_resolution && (
+                    <div>
+                      <h3 className="text-xs font-medium text-red-600 dark:text-red-400 uppercase tracking-wide mb-1">Before (Problem State)</h3>
+                      <pre className="text-gray-900 dark:text-white whitespace-pre-wrap font-mono text-sm bg-red-50 dark:bg-red-900/20 p-3 rounded border border-red-200 dark:border-red-800">
+                        {alert.message_before_resolution}
+                      </pre>
+                    </div>
+                  )}
+                  {alert.resolution_message && (
+                    <div>
+                      <h3 className="text-xs font-medium text-green-600 dark:text-green-400 uppercase tracking-wide mb-1">After (Resolved State)</h3>
+                      <pre className="text-gray-900 dark:text-white whitespace-pre-wrap font-mono text-sm bg-green-50 dark:bg-green-900/20 p-3 rounded border border-green-200 dark:border-green-800">
+                        {alert.resolution_message}
+                      </pre>
+                    </div>
+                  )}
+                  {alert.resolution_source && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Resolved by: <span className="font-medium">{alert.resolution_source.replace('_', ' ')}</span>
+                      {alert.resolved_at && (
+                        <span> at {new Date(alert.resolved_at).toLocaleString()}</span>
+                      )}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* History */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
               <div className="flex items-center justify-between mb-4">
