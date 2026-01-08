@@ -119,12 +119,166 @@ function ConnectorCard({ connector, onTest, onToggle, onConfigure, testing }) {
   );
 }
 
+function AxisConfigForm({ config, setConfig }) {
+  const [newCamera, setNewCamera] = useState({ ip: '', name: '', username: '', password: '' });
+  
+  const addCamera = () => {
+    if (!newCamera.ip) return;
+    const targets = config.targets || [];
+    setConfig({ 
+      ...config, 
+      targets: [...targets, { ...newCamera, username: newCamera.username || config.default_username || 'root' }]
+    });
+    setNewCamera({ ip: '', name: '', username: '', password: '' });
+  };
+  
+  const removeCamera = (index) => {
+    const targets = [...(config.targets || [])];
+    targets.splice(index, 1);
+    setConfig({ ...config, targets });
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Camera Source */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Camera Source</label>
+        <select
+          value={config.camera_source || 'manual'}
+          onChange={(e) => setConfig({ ...config, camera_source: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+        >
+          <option value="manual">Manual List</option>
+          <option value="prtg">From PRTG (auto-discover)</option>
+        </select>
+      </div>
+
+      {/* PRTG Filter (if PRTG source) */}
+      {config.camera_source === 'prtg' && (
+        <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
+          <p className="text-sm text-blue-700 dark:text-blue-300 mb-2">PRTG Filter (cameras matching these criteria)</p>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-xs text-gray-600 dark:text-gray-400">Tag Contains</label>
+              <input
+                type="text"
+                placeholder="e.g., camera"
+                value={config.prtg_filter?.tags || ''}
+                onChange={(e) => setConfig({ ...config, prtg_filter: { ...config.prtg_filter, tags: e.target.value } })}
+                className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-600 dark:text-gray-400">Group Contains</label>
+              <input
+                type="text"
+                placeholder="e.g., Cameras"
+                value={config.prtg_filter?.group || ''}
+                onChange={(e) => setConfig({ ...config, prtg_filter: { ...config.prtg_filter, group: e.target.value } })}
+                className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Default Credentials */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Username</label>
+          <input
+            type="text"
+            value={config.default_username || 'root'}
+            onChange={(e) => setConfig({ ...config, default_username: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Password</label>
+          <input
+            type="password"
+            value={config.default_password || ''}
+            onChange={(e) => setConfig({ ...config, default_password: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+          />
+        </div>
+      </div>
+
+      {/* Poll Interval */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Poll Interval (seconds)</label>
+        <input
+          type="number"
+          value={config.poll_interval || 60}
+          onChange={(e) => setConfig({ ...config, poll_interval: parseInt(e.target.value) || 60 })}
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+        />
+      </div>
+
+      {/* Manual Camera List (if manual source) */}
+      {config.camera_source !== 'prtg' && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Cameras ({(config.targets || []).length})
+          </label>
+          
+          {/* Camera List */}
+          <div className="max-h-40 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded mb-2">
+            {(config.targets || []).length === 0 ? (
+              <p className="text-sm text-gray-500 p-3 text-center">No cameras configured</p>
+            ) : (config.targets || []).map((cam, idx) => (
+              <div key={idx} className="flex items-center justify-between px-3 py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
+                <div className="text-sm">
+                  <span className="font-medium">{cam.ip}</span>
+                  {cam.name && <span className="text-gray-500 ml-2">({cam.name})</span>}
+                </div>
+                <button onClick={() => removeCamera(idx)} className="text-red-500 hover:text-red-700 text-xs">Remove</button>
+              </div>
+            ))}
+          </div>
+
+          {/* Add Camera Form */}
+          <div className="grid grid-cols-4 gap-2">
+            <input
+              type="text"
+              placeholder="IP Address"
+              value={newCamera.ip}
+              onChange={(e) => setNewCamera({ ...newCamera, ip: e.target.value })}
+              className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900"
+            />
+            <input
+              type="text"
+              placeholder="Name (optional)"
+              value={newCamera.name}
+              onChange={(e) => setNewCamera({ ...newCamera, name: e.target.value })}
+              className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900"
+            />
+            <input
+              type="text"
+              placeholder="Username"
+              value={newCamera.username}
+              onChange={(e) => setNewCamera({ ...newCamera, username: e.target.value })}
+              className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900"
+            />
+            <button
+              onClick={addCamera}
+              disabled={!newCamera.ip}
+              className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+            >
+              Add
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ConfigModal({ connector, onClose, onSave }) {
   const [config, setConfig] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // Fetch full connector details with config
   useEffect(() => {
     if (!connector?.id) return;
     
@@ -160,9 +314,12 @@ function ConfigModal({ connector, onClose, onSave }) {
 
   if (!connector) return null;
 
+  // Use specialized form for Axis connector
+  const isAxis = connector.type === 'axis';
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-lg mx-4">
+      <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full mx-4 ${isAxis ? 'max-w-2xl' : 'max-w-lg'}`}>
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           <h2 className="text-lg font-medium text-gray-900 dark:text-white">
             Configure {connector.name}
@@ -172,49 +329,55 @@ function ConfigModal({ connector, onClose, onSave }) {
           </button>
         </div>
 
-        <div className="p-4 space-y-4 max-h-96 overflow-y-auto">
+        <div className="p-4 max-h-[70vh] overflow-y-auto">
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <RefreshCw className="h-6 w-6 animate-spin text-blue-600" />
             </div>
+          ) : isAxis ? (
+            <AxisConfigForm config={config} setConfig={setConfig} />
           ) : Object.keys(config).length === 0 ? (
             <p className="text-gray-500 text-center py-8">No configuration options available</p>
-          ) : Object.entries(config).map(([key, value]) => (
-            <div key={key}>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-              </label>
-              {key.includes('password') || key.includes('token') || key.includes('secret') ? (
-                <input
-                  type="password"
-                  value={value}
-                  onChange={(e) => setConfig({ ...config, [key]: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-                />
-              ) : typeof value === 'boolean' ? (
-                <input
-                  type="checkbox"
-                  checked={value}
-                  onChange={(e) => setConfig({ ...config, [key]: e.target.checked })}
-                  className="rounded border-gray-300 text-blue-600"
-                />
-              ) : typeof value === 'number' ? (
-                <input
-                  type="number"
-                  value={value}
-                  onChange={(e) => setConfig({ ...config, [key]: parseInt(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-                />
-              ) : (
-                <input
-                  type="text"
-                  value={value}
-                  onChange={(e) => setConfig({ ...config, [key]: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-                />
-              )}
+          ) : (
+            <div className="space-y-4">
+              {Object.entries(config).map(([key, value]) => (
+                <div key={key}>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                  </label>
+                  {key.includes('password') || key.includes('token') || key.includes('secret') ? (
+                    <input
+                      type="password"
+                      value={value}
+                      onChange={(e) => setConfig({ ...config, [key]: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                    />
+                  ) : typeof value === 'boolean' ? (
+                    <input
+                      type="checkbox"
+                      checked={value}
+                      onChange={(e) => setConfig({ ...config, [key]: e.target.checked })}
+                      className="rounded border-gray-300 text-blue-600"
+                    />
+                  ) : typeof value === 'number' ? (
+                    <input
+                      type="number"
+                      value={value}
+                      onChange={(e) => setConfig({ ...config, [key]: parseInt(e.target.value) || 0 })}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                    />
+                  ) : (
+                    <input
+                      type="text"
+                      value={value}
+                      onChange={(e) => setConfig({ ...config, [key]: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                    />
+                  )}
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
 
         <div className="flex justify-end gap-2 p-4 border-t border-gray-200 dark:border-gray-700">
