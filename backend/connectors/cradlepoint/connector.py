@@ -159,9 +159,13 @@ class CradlepointConnector(PollingConnector):
                     elif sinr <= self.thresholds.get("sinr_warning", 5):
                         alerts.append(self._create_alert(target, "sinr_low", diagnostics))
                 
-                # Connection state
+                # Connection state - only alert if NO modem is connected
+                # (don't alert on disconnected secondary/backup modems)
                 connection_state = diagnostics.get("connection_state", "").lower()
-                if connection_state in ("disconnected", "error", "none"):
+                has_connected_modem = diagnostics.get("has_connected_modem", False)
+                
+                if connection_state in ("disconnected", "error", "none") and not has_connected_modem:
+                    # Only alert if there's no connected modem at all
                     alerts.append(self._create_alert(target, "connection_lost", diagnostics))
                 elif connection_state == "connecting":
                     alerts.append(self._create_alert(target, "connection_connecting", diagnostics))
@@ -249,7 +253,10 @@ class CradlepointConnector(PollingConnector):
                                 connected_modem = (key, device, conn_state)
                                 break
                     
-                    # Use connected modem if found, otherwise use any modem
+                    # Track if ANY modem is connected (for connection_lost alerting)
+                    diagnostics["has_connected_modem"] = connected_modem is not None
+                    
+                    # Use connected modem if found, otherwise use any modem for signal data
                     modem_info = connected_modem or any_modem
                     
                     if modem_info:
