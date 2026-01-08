@@ -146,7 +146,7 @@ class AxisNormalizer:
         title = f"Axis {event_type.replace('_', ' ').title()} - {device_name}" if device_name else f"Axis {event_type.replace('_', ' ').title()}"
         
         # Build message from event data
-        message = self._build_message(event_type, event_data)
+        message = self._build_message(event_type, event_data, device_ip, device_name)
         
         # Parse timestamp
         occurred_at = self._parse_timestamp(timestamp)
@@ -195,32 +195,44 @@ class AxisNormalizer:
         event_type = raw_data.get("event_type", "").lower()
         return event_type.endswith(("_restored", "_up", "_online", "_ok", "_normal", "_cleared"))
     
-    def _build_message(self, event_type: str, event_data: Dict) -> str:
+    def _build_message(self, event_type: str, event_data: Dict, device_ip: str = "", device_name: str = "") -> str:
         """Build message from event data."""
-        if not event_data:
-            return ""
-        
         lines = []
         
-        # Common fields
-        if event_data.get("source"):
-            lines.append(f"Source: {event_data['source']}")
-        if event_data.get("channel"):
-            lines.append(f"Channel: {event_data['channel']}")
-        if event_data.get("region"):
-            lines.append(f"Region: {event_data['region']}")
+        # Always include device info
+        if device_name:
+            lines.append(f"Camera: {device_name}")
+        elif device_ip:
+            lines.append(f"Camera: {device_ip}")
         
-        # Storage-specific
-        if event_data.get("disk_id"):
-            lines.append(f"Disk: {event_data['disk_id']}")
-        if event_data.get("used_percent"):
-            lines.append(f"Usage: {event_data['used_percent']}%")
+        # Event type
+        if event_type:
+            lines.append(f"Event: {event_type.replace('_', ' ')}")
         
-        # Temperature-specific
-        if event_data.get("temperature"):
-            lines.append(f"Temperature: {event_data['temperature']}°C")
+        if event_data:
+            # Error info
+            if event_data.get("error"):
+                lines.append(f"Error: {event_data['error']}")
+            
+            # Common fields
+            if event_data.get("source"):
+                lines.append(f"Source: {event_data['source']}")
+            if event_data.get("channel"):
+                lines.append(f"Channel: {event_data['channel']}")
+            if event_data.get("region"):
+                lines.append(f"Region: {event_data['region']}")
+            
+            # Storage-specific
+            if event_data.get("disk_id"):
+                lines.append(f"Disk: {event_data['disk_id']}")
+            if event_data.get("used_percent"):
+                lines.append(f"Usage: {event_data['used_percent']}%")
+            
+            # Temperature-specific
+            if event_data.get("temperature"):
+                lines.append(f"Temperature: {event_data['temperature']}°C")
         
-        return "\n".join(lines)
+        return " | ".join(lines) if lines else f"{event_type} on {device_ip}"
     
     def _parse_timestamp(self, timestamp: Any) -> datetime:
         """Parse timestamp."""
