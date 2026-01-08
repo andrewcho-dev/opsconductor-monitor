@@ -87,6 +87,7 @@ export default function ConnectorPollingPage() {
       const response = await fetchApi(`/api/v1/connectors/${connectorId}/poll`, {
         method: 'POST',
         headers: getAuthHeader(),
+        timeout: 60000, // 60 seconds for SSH-based connectors
       });
       
       if (response.success) {
