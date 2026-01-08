@@ -121,13 +121,16 @@ function ConnectorCard({ connector, onTest, onToggle, onConfigure, testing }) {
 
 function CradlepointConfigForm({ config, setConfig }) {
   const [newRouter, setNewRouter] = useState({ ip: '', name: '', username: '', password: '' });
+  const [bulkImportText, setBulkImportText] = useState('');
+  const [showBulkImport, setShowBulkImport] = useState(false);
+  const [importError, setImportError] = useState('');
   
   const addRouter = () => {
     if (!newRouter.ip) return;
     const targets = config.targets || [];
     setConfig({ 
       ...config, 
-      targets: [...targets, { ...newRouter, username: newRouter.username || 'admin' }]
+      targets: [...targets, { ...newRouter, username: newRouter.username || config.default_username || 'admin' }]
     });
     setNewRouter({ ip: '', name: '', username: '', password: '' });
   };
@@ -136,6 +139,77 @@ function CradlepointConfigForm({ config, setConfig }) {
     const targets = [...(config.targets || [])];
     targets.splice(index, 1);
     setConfig({ ...config, targets });
+  };
+
+  const clearAllRouters = () => {
+    if (window.confirm(`Remove all ${(config.targets || []).length} routers?`)) {
+      setConfig({ ...config, targets: [] });
+    }
+  };
+
+  const handleBulkImport = () => {
+    setImportError('');
+    const lines = bulkImportText.trim().split('\n').filter(line => line.trim());
+    const newTargets = [];
+    const errors = [];
+
+    lines.forEach((line, idx) => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+
+      // Support formats:
+      // 1. IP only: 10.1.2.3
+      // 2. IP,Name: 10.1.2.3,Router-1
+      // 3. IP,Name,Password: 10.1.2.3,Router-1,secret123
+      // 4. CSV with header (skip header line)
+      if (idx === 0 && (trimmed.toLowerCase().includes('ip') || trimmed.toLowerCase().includes('address'))) {
+        return; // Skip header row
+      }
+
+      const parts = trimmed.split(/[,\t]/).map(p => p.trim());
+      const ip = parts[0];
+      
+      // Validate IP format
+      const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
+      if (!ipRegex.test(ip)) {
+        errors.push(`Line ${idx + 1}: Invalid IP "${ip}"`);
+        return;
+      }
+
+      newTargets.push({
+        ip: ip,
+        name: parts[1] || '',
+        username: config.default_username || 'admin',
+        password: parts[2] || config.default_password || '',
+      });
+    });
+
+    if (errors.length > 0) {
+      setImportError(errors.slice(0, 5).join('\n') + (errors.length > 5 ? `\n...and ${errors.length - 5} more errors` : ''));
+      return;
+    }
+
+    if (newTargets.length === 0) {
+      setImportError('No valid routers found in input');
+      return;
+    }
+
+    // Merge with existing, avoiding duplicates by IP
+    const existingIPs = new Set((config.targets || []).map(t => t.ip));
+    const uniqueNew = newTargets.filter(t => !existingIPs.has(t.ip));
+    const duplicates = newTargets.length - uniqueNew.length;
+
+    setConfig({ 
+      ...config, 
+      targets: [...(config.targets || []), ...uniqueNew] 
+    });
+    
+    setBulkImportText('');
+    setShowBulkImport(false);
+    
+    if (duplicates > 0) {
+      alert(`Imported ${uniqueNew.length} routers. Skipped ${duplicates} duplicates.`);
+    }
   };
 
   return (
@@ -240,22 +314,73 @@ function CradlepointConfigForm({ config, setConfig }) {
 
       {/* Router List */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-          Routers ({(config.targets || []).length})
-        </label>
+        <div className="flex items-center justify-between mb-2">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Routers ({(config.targets || []).length})
+          </label>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowBulkImport(!showBulkImport)}
+              className="text-xs px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700"
+            >
+              {showBulkImport ? 'Cancel Import' : 'Bulk Import'}
+            </button>
+            {(config.targets || []).length > 0 && (
+              <button
+                onClick={clearAllRouters}
+                className="text-xs px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700"
+              >
+                Clear All
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Bulk Import Panel */}
+        {showBulkImport && (
+          <div className="mb-3 p-3 bg-green-50 dark:bg-green-900/20 rounded border border-green-200 dark:border-green-800">
+            <p className="text-xs text-green-700 dark:text-green-300 mb-2">
+              Paste router list (one per line). Formats supported:
+            </p>
+            <ul className="text-xs text-green-600 dark:text-green-400 mb-2 list-disc list-inside">
+              <li>IP only: <code>10.1.2.3</code></li>
+              <li>IP,Name: <code>10.1.2.3,Site-Router-1</code></li>
+              <li>IP,Name,Password: <code>10.1.2.3,Site-Router-1,secret123</code></li>
+            </ul>
+            <textarea
+              value={bulkImportText}
+              onChange={(e) => setBulkImportText(e.target.value)}
+              placeholder="10.1.2.3,Router-1&#10;10.1.2.4,Router-2&#10;10.1.2.5,Router-3"
+              rows={6}
+              className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white font-mono"
+            />
+            {importError && (
+              <p className="text-xs text-red-600 mt-1 whitespace-pre-line">{importError}</p>
+            )}
+            <button
+              onClick={handleBulkImport}
+              disabled={!bulkImportText.trim()}
+              className="mt-2 px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+            >
+              Import Routers
+            </button>
+          </div>
+        )}
         
         {/* Existing routers */}
         {(config.targets || []).length > 0 && (
-          <div className="mb-3 space-y-2 max-h-40 overflow-y-auto">
+          <div className="mb-3 max-h-48 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded">
             {(config.targets || []).map((router, idx) => (
-              <div key={idx} className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-700 rounded text-sm">
-                <span className="font-mono text-gray-600 dark:text-gray-300">{router.ip}</span>
-                <span className="text-gray-500">{router.name || 'Unnamed'}</span>
+              <div key={idx} className="flex items-center justify-between px-3 py-2 border-b border-gray-100 dark:border-gray-700 last:border-0 text-sm">
+                <div>
+                  <span className="font-mono text-gray-700 dark:text-gray-300">{router.ip}</span>
+                  {router.name && <span className="text-gray-500 ml-2">({router.name})</span>}
+                </div>
                 <button
                   onClick={() => removeRouter(idx)}
-                  className="ml-auto text-red-500 hover:text-red-700"
+                  className="text-red-500 hover:text-red-700 text-xs"
                 >
-                  <X className="h-4 w-4" />
+                  Remove
                 </button>
               </div>
             ))}
@@ -510,6 +635,9 @@ function MilestoneConfigForm({ config, setConfig }) {
 
 function AxisConfigForm({ config, setConfig }) {
   const [newCamera, setNewCamera] = useState({ ip: '', name: '', username: '', password: '' });
+  const [bulkImportText, setBulkImportText] = useState('');
+  const [showBulkImport, setShowBulkImport] = useState(false);
+  const [importError, setImportError] = useState('');
   
   const addCamera = () => {
     if (!newCamera.ip) return;
@@ -525,6 +653,77 @@ function AxisConfigForm({ config, setConfig }) {
     const targets = [...(config.targets || [])];
     targets.splice(index, 1);
     setConfig({ ...config, targets });
+  };
+
+  const clearAllCameras = () => {
+    if (window.confirm(`Remove all ${(config.targets || []).length} cameras?`)) {
+      setConfig({ ...config, targets: [] });
+    }
+  };
+
+  const handleBulkImport = () => {
+    setImportError('');
+    const lines = bulkImportText.trim().split('\n').filter(line => line.trim());
+    const newTargets = [];
+    const errors = [];
+
+    lines.forEach((line, idx) => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+
+      // Support formats:
+      // 1. IP only: 10.1.2.3
+      // 2. IP,Name: 10.1.2.3,Camera-1
+      // 3. IP,Name,Username,Password: 10.1.2.3,Camera-1,root,pass123
+      // 4. CSV with header (skip header line)
+      if (idx === 0 && (trimmed.toLowerCase().includes('ip') || trimmed.toLowerCase().includes('address'))) {
+        return; // Skip header row
+      }
+
+      const parts = trimmed.split(/[,\t]/).map(p => p.trim());
+      const ip = parts[0];
+      
+      // Validate IP format
+      const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
+      if (!ipRegex.test(ip)) {
+        errors.push(`Line ${idx + 1}: Invalid IP "${ip}"`);
+        return;
+      }
+
+      newTargets.push({
+        ip: ip,
+        name: parts[1] || '',
+        username: parts[2] || config.default_username || 'root',
+        password: parts[3] || config.default_password || '',
+      });
+    });
+
+    if (errors.length > 0) {
+      setImportError(errors.slice(0, 5).join('\n') + (errors.length > 5 ? `\n...and ${errors.length - 5} more errors` : ''));
+      return;
+    }
+
+    if (newTargets.length === 0) {
+      setImportError('No valid cameras found in input');
+      return;
+    }
+
+    // Merge with existing, avoiding duplicates by IP
+    const existingIPs = new Set((config.targets || []).map(t => t.ip));
+    const uniqueNew = newTargets.filter(t => !existingIPs.has(t.ip));
+    const duplicates = newTargets.length - uniqueNew.length;
+
+    setConfig({ 
+      ...config, 
+      targets: [...(config.targets || []), ...uniqueNew] 
+    });
+    
+    setBulkImportText('');
+    setShowBulkImport(false);
+    
+    if (duplicates > 0) {
+      alert(`Imported ${uniqueNew.length} cameras. Skipped ${duplicates} duplicates.`);
+    }
   };
 
   return (
@@ -607,18 +806,67 @@ function AxisConfigForm({ config, setConfig }) {
       {/* Manual Camera List (if manual source) */}
       {config.camera_source !== 'prtg' && (
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Cameras ({(config.targets || []).length})
-          </label>
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Cameras ({(config.targets || []).length})
+            </label>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowBulkImport(!showBulkImport)}
+                className="text-xs px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700"
+              >
+                {showBulkImport ? 'Cancel Import' : 'Bulk Import'}
+              </button>
+              {(config.targets || []).length > 0 && (
+                <button
+                  onClick={clearAllCameras}
+                  className="text-xs px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700"
+                >
+                  Clear All
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Bulk Import Panel */}
+          {showBulkImport && (
+            <div className="mb-3 p-3 bg-green-50 dark:bg-green-900/20 rounded border border-green-200 dark:border-green-800">
+              <p className="text-xs text-green-700 dark:text-green-300 mb-2">
+                Paste camera list (one per line). Formats supported:
+              </p>
+              <ul className="text-xs text-green-600 dark:text-green-400 mb-2 list-disc list-inside">
+                <li>IP only: <code>10.1.2.3</code></li>
+                <li>IP,Name: <code>10.1.2.3,Camera-1</code></li>
+                <li>IP,Name,Username,Password: <code>10.1.2.3,Camera-1,root,pass123</code></li>
+              </ul>
+              <textarea
+                value={bulkImportText}
+                onChange={(e) => setBulkImportText(e.target.value)}
+                placeholder="10.1.2.3,Camera-1&#10;10.1.2.4,Camera-2&#10;10.1.2.5,Camera-3"
+                rows={6}
+                className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white font-mono"
+              />
+              {importError && (
+                <p className="text-xs text-red-600 mt-1 whitespace-pre-line">{importError}</p>
+              )}
+              <button
+                onClick={handleBulkImport}
+                disabled={!bulkImportText.trim()}
+                className="mt-2 px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+              >
+                Import Cameras
+              </button>
+            </div>
+          )}
           
           {/* Camera List */}
-          <div className="max-h-40 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded mb-2">
+          <div className="max-h-48 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded mb-2">
             {(config.targets || []).length === 0 ? (
               <p className="text-sm text-gray-500 p-3 text-center">No cameras configured</p>
             ) : (config.targets || []).map((cam, idx) => (
               <div key={idx} className="flex items-center justify-between px-3 py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
                 <div className="text-sm">
-                  <span className="font-medium">{cam.ip}</span>
+                  <span className="font-medium font-mono">{cam.ip}</span>
                   {cam.name && <span className="text-gray-500 ml-2">({cam.name})</span>}
                 </div>
                 <button onClick={() => removeCamera(idx)} className="text-red-500 hover:text-red-700 text-xs">Remove</button>
