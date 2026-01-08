@@ -174,8 +174,8 @@ class AxisConnector(PollingConnector):
         # Get targets (from manual list or PRTG)
         targets = await self._get_targets()
         
-        # Poll cameras in batches for efficiency
-        batch_size = 50
+        # Poll cameras in batches - 200 concurrent is safe for most systems
+        batch_size = 200
         for i in range(0, len(targets), batch_size):
             batch = targets[i:i + batch_size]
             batch_results = await asyncio.gather(
@@ -297,7 +297,7 @@ class AxisConnector(PollingConnector):
         
         async with session.get(
             f"http://{ip}/axis-cgi/basicdeviceinfo.cgi",
-            timeout=10
+            timeout=aiohttp.ClientTimeout(total=3)
         ) as response:
             response.raise_for_status()
             text = await response.text()
@@ -323,7 +323,7 @@ class AxisConnector(PollingConnector):
         try:
             async with session.get(
                 f"http://{ip}/axis-cgi/disks/list.cgi",
-                timeout=10
+                timeout=aiohttp.ClientTimeout(total=3)
             ) as response:
                 if response.status == 200:
                     text = await response.text()
@@ -339,7 +339,7 @@ class AxisConnector(PollingConnector):
         ip = target.get("ip")
         session = await self._get_session(target)
         try:
-            async with session.get(f"http://{ip}/axis-cgi/systemlog.cgi", timeout=10) as response:
+            async with session.get(f"http://{ip}/axis-cgi/systemlog.cgi", timeout=aiohttp.ClientTimeout(total=3)) as response:
                 if response.status == 200:
                     return await response.text()
         except Exception:
@@ -369,7 +369,7 @@ class AxisConnector(PollingConnector):
         ip = target.get("ip")
         session = await self._get_session(target)
         try:
-            async with session.get(f"http://{ip}/axis-cgi/param.cgi?action=list&group=Status.Temperature", timeout=10) as response:
+            async with session.get(f"http://{ip}/axis-cgi/param.cgi?action=list&group=Status.Temperature", timeout=aiohttp.ClientTimeout(total=3)) as response:
                 if response.status == 200:
                     text = await response.text()
                     for line in text.split("\n"):

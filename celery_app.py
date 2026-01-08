@@ -23,7 +23,7 @@ def _make_celery() -> Celery:
         "opsconductor_monitor",
         broker=broker_url,
         backend=result_backend,
-        include=["backend.tasks.job_tasks", "backend.tasks.polling_tasks", "backend.tasks.generic_polling_task", "backend.tasks.connector_polling"],
+        include=["backend.tasks.job_tasks", "backend.tasks.polling_tasks", "backend.tasks.generic_polling_task"],
     )
 
     # Optimized for high-throughput SNMP/SSH polling of 1000+ devices

@@ -16,6 +16,8 @@ import { useAuth } from '../contexts/AuthContext';
 // Axis-specific configuration form
 function AxisConfigForm({ config, setConfig }) {
   const [newCamera, setNewCamera] = useState({ ip: '', name: '', username: '' });
+  const [bulkInput, setBulkInput] = useState('');
+  const [showBulk, setShowBulk] = useState(false);
   
   const addCamera = () => {
     if (!newCamera.ip) return;
@@ -32,6 +34,70 @@ function AxisConfigForm({ config, setConfig }) {
     targets.splice(index, 1);
     setConfig({ ...config, targets });
   };
+
+  const clearAllCameras = () => {
+    if (confirm('Remove all cameras?')) {
+      setConfig({ ...config, targets: [] });
+    }
+  };
+
+  // Expand IP range like 10.120.38.101-111 to individual IPs
+  const expandIpRange = (ipRange) => {
+    const match = ipRange.match(/^(\d{1,3}\.\d{1,3}\.\d{1,3}\.)(\d{1,3})-(\d{1,3})$/);
+    if (match) {
+      const prefix = match[1];
+      const start = parseInt(match[2]);
+      const end = parseInt(match[3]);
+      if (start <= end && end <= 255) {
+        const ips = [];
+        for (let i = start; i <= end; i++) {
+          ips.push(prefix + i);
+        }
+        return ips;
+      }
+    }
+    return null;
+  };
+
+  // Bulk import: one IP per line, ranges (10.120.38.101-111), or CSV: ip,name,username
+  const importBulk = () => {
+    const lines = bulkInput.trim().split('\n').filter(l => l.trim());
+    const newTargets = [];
+    for (const line of lines) {
+      const parts = line.split(',').map(p => p.trim());
+      const ipPart = parts[0];
+      
+      // Check if it's a range
+      const expandedIps = expandIpRange(ipPart);
+      if (expandedIps) {
+        for (const ip of expandedIps) {
+          newTargets.push({
+            ip,
+            name: parts[1] || '',
+            username: parts[2] || config.default_username || 'root'
+          });
+        }
+      } else if (ipPart && /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(ipPart)) {
+        // Single IP
+        newTargets.push({
+          ip: ipPart,
+          name: parts[1] || '',
+          username: parts[2] || config.default_username || 'root'
+        });
+      }
+    }
+    if (newTargets.length > 0) {
+      setConfig({ ...config, targets: [...(config.targets || []), ...newTargets] });
+      setBulkInput('');
+      setShowBulk(false);
+    }
+  };
+
+  const cameraCount = (config.targets || []).length;
+  const pollInterval = config.poll_interval || 60;
+  // Estimate: ~0.5s per batch of 200 concurrent connections
+  const estimatedPollTime = Math.ceil(cameraCount / 200) * 0.5;
+  const canKeepUp = estimatedPollTime < pollInterval * 0.8;
 
   return (
     <div className="space-y-4">
@@ -100,45 +166,89 @@ function AxisConfigForm({ config, setConfig }) {
         <label className="block text-sm font-medium text-gray-700 mb-1">Poll Interval (seconds)</label>
         <input
           type="number"
-          value={config.poll_interval || 60}
+          value={pollInterval}
           onChange={(e) => setConfig({ ...config, poll_interval: parseInt(e.target.value) || 60 })}
           className="w-full px-3 py-2 border border-gray-300 rounded"
         />
       </div>
 
+      {/* Polling Estimate */}
+      {cameraCount > 0 && (
+        <div className={`p-3 rounded border text-sm ${canKeepUp ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
+          <p className="font-medium">{cameraCount} cameras</p>
+          <p>Estimated poll time: ~{estimatedPollTime.toFixed(1)}s (200 concurrent connections)</p>
+          <p>Poll interval: {pollInterval}s</p>
+          {!canKeepUp && (
+            <p className="text-yellow-700 mt-1">Warning: Poll time may exceed interval. Consider increasing interval to {Math.ceil(estimatedPollTime * 1.5)}s+</p>
+          )}
+        </div>
+      )}
+
       {config.camera_source !== 'prtg' && (
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Cameras ({(config.targets || []).length})
-          </label>
-          <div className="max-h-40 overflow-y-auto border border-gray-200 rounded mb-2">
-            {(config.targets || []).length === 0 ? (
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-sm font-medium text-gray-700">Cameras ({cameraCount})</label>
+            <div className="flex gap-2">
+              <button onClick={() => setShowBulk(!showBulk)} className="text-xs text-blue-600 hover:underline">
+                {showBulk ? 'Single Add' : 'Bulk Import'}
+              </button>
+              {cameraCount > 0 && (
+                <button onClick={clearAllCameras} className="text-xs text-red-600 hover:underline">Clear All</button>
+              )}
+            </div>
+          </div>
+
+          {/* Bulk Import */}
+          {showBulk && (
+            <div className="mb-3 p-3 bg-gray-50 rounded border">
+              <p className="text-xs text-gray-600 mb-2">Paste IPs, ranges (10.120.38.101-111), or CSV: ip,name,username</p>
+              <textarea
+                value={bulkInput}
+                onChange={(e) => setBulkInput(e.target.value)}
+                placeholder="10.120.38.101-111&#10;10.120.39.101-123&#10;192.168.1.50,Lobby Cam"
+                rows={5}
+                className="w-full px-2 py-1 text-sm border border-gray-300 rounded font-mono"
+              />
+              <button onClick={importBulk} disabled={!bulkInput.trim()}
+                className="mt-2 px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50">
+                Import cameras
+              </button>
+            </div>
+          )}
+
+          {/* Camera List */}
+          <div className="max-h-48 overflow-y-auto border border-gray-200 rounded mb-2">
+            {cameraCount === 0 ? (
               <p className="text-sm text-gray-500 p-3 text-center">No cameras configured</p>
             ) : (config.targets || []).map((cam, idx) => (
-              <div key={idx} className="flex items-center justify-between px-3 py-2 border-b last:border-0">
+              <div key={idx} className="flex items-center justify-between px-3 py-2 border-b last:border-0 hover:bg-gray-50">
                 <div className="text-sm">
-                  <span className="font-medium">{cam.ip}</span>
-                  {cam.name && <span className="text-gray-500 ml-2">({cam.name})</span>}
+                  <span className="font-mono">{cam.ip}</span>
+                  {cam.name && <span className="text-gray-500 ml-2">{cam.name}</span>}
                 </div>
                 <button onClick={() => removeCamera(idx)} className="text-red-500 hover:text-red-700 text-xs">Remove</button>
               </div>
             ))}
           </div>
-          <div className="grid grid-cols-4 gap-2">
-            <input type="text" placeholder="IP Address" value={newCamera.ip}
-              onChange={(e) => setNewCamera({ ...newCamera, ip: e.target.value })}
-              className="px-2 py-1 text-sm border border-gray-300 rounded" />
-            <input type="text" placeholder="Name" value={newCamera.name}
-              onChange={(e) => setNewCamera({ ...newCamera, name: e.target.value })}
-              className="px-2 py-1 text-sm border border-gray-300 rounded" />
-            <input type="text" placeholder="Username" value={newCamera.username}
-              onChange={(e) => setNewCamera({ ...newCamera, username: e.target.value })}
-              className="px-2 py-1 text-sm border border-gray-300 rounded" />
-            <button onClick={addCamera} disabled={!newCamera.ip}
-              className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">
-              Add
-            </button>
-          </div>
+
+          {/* Single Add */}
+          {!showBulk && (
+            <div className="grid grid-cols-4 gap-2">
+              <input type="text" placeholder="IP Address" value={newCamera.ip}
+                onChange={(e) => setNewCamera({ ...newCamera, ip: e.target.value })}
+                className="px-2 py-1 text-sm border border-gray-300 rounded" />
+              <input type="text" placeholder="Name" value={newCamera.name}
+                onChange={(e) => setNewCamera({ ...newCamera, name: e.target.value })}
+                className="px-2 py-1 text-sm border border-gray-300 rounded" />
+              <input type="text" placeholder="Username" value={newCamera.username}
+                onChange={(e) => setNewCamera({ ...newCamera, username: e.target.value })}
+                className="px-2 py-1 text-sm border border-gray-300 rounded" />
+              <button onClick={addCamera} disabled={!newCamera.ip}
+                className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">
+                Add
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
