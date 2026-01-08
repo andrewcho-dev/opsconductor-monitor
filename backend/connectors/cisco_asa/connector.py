@@ -258,44 +258,73 @@ class CiscoASAConnector(PollingConnector):
         """Check IPSec VPN tunnel status."""
         alerts = []
         
-        # Get IPSec SA status
-        ipsec_output = await self._run_command(conn, "show crypto ipsec sa")
+        # Get configured peers from crypto map (these SHOULD be up)
+        crypto_map_output = await self._run_command(conn, "show running-config crypto map | include set peer")
+        configured_peers = self._parse_configured_peers(crypto_map_output)
         
-        # Get IKE SA status (try both v1 and v2)
-        ikev1_output = await self._run_command(conn, "show crypto isakmp sa")
-        ikev2_output = await self._run_command(conn, "show crypto ikev2 sa")
-        
-        # Get VPN session summary
+        # Get active VPN sessions
         vpn_sessions = await self._run_command(conn, "show vpn-sessiondb l2l")
+        active_sessions = self._parse_active_sessions(vpn_sessions)
         
-        # Parse and check expected VPN peers
-        active_peers = self._parse_vpn_peers(ipsec_output, ikev1_output, ikev2_output, vpn_sessions)
+        # Get tunnel-group names for better alert messages
+        tunnel_groups = await self._run_command(conn, "show running-config tunnel-group | include tunnel-group.*ipsec-l2l")
+        tunnel_names = self._parse_tunnel_names(tunnel_groups)
         
-        # Check each expected peer
-        for peer_ip in self.vpn_peers:
-            peer_status = active_peers.get(peer_ip, {})
-            
-            if not peer_status.get("ipsec_active", False):
+        logger.info(f"ASA {target.get('ip')}: {len(configured_peers)} configured peers, {len(active_sessions)} active sessions")
+        
+        # Check each configured peer - if not in active sessions, it's DOWN
+        for peer_ip in configured_peers:
+            if peer_ip not in active_sessions:
+                # Find tunnel name if available
+                tunnel_name = None
+                for name, ip in tunnel_names.items():
+                    if ip == peer_ip:
+                        tunnel_name = name
+                        break
+                
                 alerts.append(self._create_alert(target, "ipsec_tunnel_down", {
                     "peer_ip": peer_ip,
-                    "ike_status": peer_status.get("ike_status", "unknown"),
-                    "details": f"IPSec tunnel to {peer_ip} is down"
-                }))
-            elif not peer_status.get("ike_active", False):
-                alerts.append(self._create_alert(target, "ike_tunnel_down", {
-                    "peer_ip": peer_ip,
-                    "ipsec_status": "active",
-                    "details": f"IKE SA to {peer_ip} not established"
+                    "tunnel_name": tunnel_name or "unknown",
+                    "details": f"IPSec tunnel to {peer_ip} ({tunnel_name or 'unknown'}) is DOWN - configured but not active"
                 }))
         
-        # Also check for any tunnels that are down (auto-discovered)
-        if not self.vpn_peers:
-            # Auto-discover mode - alert on any down tunnels found in config
-            down_tunnels = self._find_down_tunnels(ipsec_output, ikev1_output, ikev2_output)
-            for tunnel_info in down_tunnels:
-                alerts.append(self._create_alert(target, "ipsec_tunnel_down", tunnel_info))
+        # Also check manually specified peers (if any)
+        for peer_ip in self.vpn_peers:
+            if peer_ip not in active_sessions and peer_ip not in configured_peers:
+                alerts.append(self._create_alert(target, "ipsec_tunnel_down", {
+                    "peer_ip": peer_ip,
+                    "details": f"IPSec tunnel to {peer_ip} is DOWN - manually monitored peer"
+                }))
         
         return alerts
+    
+    def _parse_configured_peers(self, output: str) -> set:
+        """Parse crypto map output to get configured peer IPs."""
+        peers = set()
+        # Match: crypto map outside_map0 1 set peer 107.91.179.170
+        pattern = r'set peer\s+(\d+\.\d+\.\d+\.\d+)'
+        for match in re.finditer(pattern, output):
+            peers.add(match.group(1))
+        return peers
+    
+    def _parse_active_sessions(self, output: str) -> set:
+        """Parse vpn-sessiondb l2l output to get active session peer IPs."""
+        sessions = set()
+        # Match: IP Addr      : 107.89.21.97
+        pattern = r'IP Addr\s*:\s*(\d+\.\d+\.\d+\.\d+)'
+        for match in re.finditer(pattern, output):
+            sessions.add(match.group(1))
+        return sessions
+    
+    def _parse_tunnel_names(self, output: str) -> Dict[str, str]:
+        """Parse tunnel-group config to map names to IPs (best effort)."""
+        # This returns tunnel names, we'll need to correlate with peer IPs separately
+        names = {}
+        # Match: tunnel-group ind_tunnel type ipsec-l2l
+        pattern = r'tunnel-group\s+(\S+)\s+type\s+ipsec-l2l'
+        for match in re.finditer(pattern, output):
+            names[match.group(1)] = None  # IP will be filled in later if possible
+        return names
     
     def _parse_vpn_peers(self, ipsec_output: str, ikev1_output: str, ikev2_output: str, vpn_sessions: str) -> Dict[str, Dict]:
         """Parse VPN outputs to get peer status."""
