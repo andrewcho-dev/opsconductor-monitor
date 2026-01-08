@@ -28,15 +28,20 @@ class Severity(str, Enum):
 
 class Category(str, Enum):
     """Alert categories (ITIL/MOF based)."""
+    AVAILABILITY = "availability"
     NETWORK = "network"
     POWER = "power"
     VIDEO = "video"
     WIRELESS = "wireless"
     SECURITY = "security"
     ENVIRONMENT = "environment"
+    ENVIRONMENTAL = "environmental"  # Alias for environment
     COMPUTE = "compute"
     STORAGE = "storage"
+    HARDWARE = "hardware"
     APPLICATION = "application"
+    MAINTENANCE = "maintenance"
+    PERFORMANCE = "performance"
     UNKNOWN = "unknown"
 
 

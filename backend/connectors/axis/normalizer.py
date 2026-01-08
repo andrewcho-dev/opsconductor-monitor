@@ -21,107 +21,74 @@ class AxisNormalizer:
     Based on Axis VAPIX API event types.
     """
     
-    # Axis event type to alert mapping
+    # Axis event type to alert mapping - see docs/mappings/AXIS_ALERT_MAPPING.md
     EVENT_TYPES = {
-        # Video Analytics
-        "motion": {
-            "category": Category.VIDEO,
-            "severity": Severity.INFO,
-            "title": "Motion Detected",
-        },
-        "vmd3": {
-            "category": Category.VIDEO,
-            "severity": Severity.INFO,
-            "title": "Video Motion Detection",
-        },
-        "objectanalytics": {
-            "category": Category.VIDEO,
-            "severity": Severity.INFO,
-            "title": "Object Analytics Event",
-        },
-        "crosslinedetection": {
-            "category": Category.VIDEO,
-            "severity": Severity.WARNING,
-            "title": "Crossline Detection",
-        },
-        
-        # Security
-        "tampering": {
-            "category": Category.SECURITY,
-            "severity": Severity.MAJOR,
-            "title": "Camera Tampering Detected",
-        },
-        "casing_open": {
-            "category": Category.SECURITY,
-            "severity": Severity.MAJOR,
-            "title": "Camera Casing Opened",
-        },
+        # Availability
+        "camera_offline": {"category": Category.AVAILABILITY, "severity": Severity.CRITICAL, "title": "Camera Offline"},
+        "camera_auth_failed": {"category": Category.AVAILABILITY, "severity": Severity.MAJOR, "title": "Camera Auth Failed"},
+        "camera_unreachable": {"category": Category.AVAILABILITY, "severity": Severity.CRITICAL, "title": "Camera Unreachable"},
         
         # Storage
-        "storage_failure": {
-            "category": Category.STORAGE,
-            "severity": Severity.CRITICAL,
-            "title": "Storage Failure",
-        },
-        "storage_full": {
-            "category": Category.STORAGE,
-            "severity": Severity.MAJOR,
-            "title": "Storage Full",
-        },
-        "storage_disruption": {
-            "category": Category.STORAGE,
-            "severity": Severity.MAJOR,
-            "title": "Storage Disruption",
-        },
-        "recording_error": {
-            "category": Category.VIDEO,
-            "severity": Severity.MAJOR,
-            "title": "Recording Error",
-        },
+        "storage_failure": {"category": Category.HARDWARE, "severity": Severity.CRITICAL, "title": "Storage Failure"},
+        "storage_full": {"category": Category.HARDWARE, "severity": Severity.CRITICAL, "title": "Storage Full"},
+        "storage_warning": {"category": Category.HARDWARE, "severity": Severity.WARNING, "title": "Storage Warning"},
+        "storage_missing": {"category": Category.HARDWARE, "severity": Severity.MAJOR, "title": "No Storage Detected"},
+        "storage_readonly": {"category": Category.HARDWARE, "severity": Severity.MAJOR, "title": "Storage Read-Only"},
         
-        # Network
-        "network_lost": {
-            "category": Category.NETWORK,
-            "severity": Severity.CRITICAL,
-            "title": "Network Connection Lost",
-        },
-        "network_restored": {
-            "category": Category.NETWORK,
-            "severity": Severity.CLEAR,
-            "title": "Network Connection Restored",
-            "is_clear": True,
-        },
+        # Recording
+        "recording_stopped": {"category": Category.APPLICATION, "severity": Severity.CRITICAL, "title": "Recording Stopped"},
+        "recording_error": {"category": Category.APPLICATION, "severity": Severity.MAJOR, "title": "Recording Error"},
+        
+        # Video
+        "video_loss": {"category": Category.HARDWARE, "severity": Severity.CRITICAL, "title": "Video Loss"},
+        "stream_timeout": {"category": Category.APPLICATION, "severity": Severity.MAJOR, "title": "Stream Timeout"},
+        
+        # Security/Tampering
+        "tampering_detected": {"category": Category.SECURITY, "severity": Severity.CRITICAL, "title": "Camera Tampering"},
+        "tampering_physical": {"category": Category.SECURITY, "severity": Severity.CRITICAL, "title": "Physical Tampering"},
+        "camera_moved": {"category": Category.SECURITY, "severity": Severity.MAJOR, "title": "Camera Position Changed"},
+        "unauthorized_access": {"category": Category.SECURITY, "severity": Severity.MAJOR, "title": "Unauthorized Access Attempt"},
+        
+        # Power
+        "power_insufficient": {"category": Category.HARDWARE, "severity": Severity.MAJOR, "title": "Insufficient Power"},
+        "poe_warning": {"category": Category.HARDWARE, "severity": Severity.WARNING, "title": "PoE Power Warning"},
+        "power_supply_error": {"category": Category.HARDWARE, "severity": Severity.CRITICAL, "title": "Power Supply Error"},
+        
+        # PTZ
+        "ptz_error": {"category": Category.HARDWARE, "severity": Severity.MAJOR, "title": "PTZ Error"},
+        "ptz_power_insufficient": {"category": Category.HARDWARE, "severity": Severity.MAJOR, "title": "PTZ Power Insufficient"},
+        "ptz_motor_failure": {"category": Category.HARDWARE, "severity": Severity.CRITICAL, "title": "PTZ Motor Failure"},
+        "ptz_preset_failure": {"category": Category.HARDWARE, "severity": Severity.WARNING, "title": "PTZ Preset Failure"},
+        
+        # Environmental
+        "temperature_critical": {"category": Category.ENVIRONMENTAL, "severity": Severity.CRITICAL, "title": "Camera Overheating"},
+        "temperature_warning": {"category": Category.ENVIRONMENTAL, "severity": Severity.WARNING, "title": "Camera Temperature Warning"},
+        "temperature_low": {"category": Category.ENVIRONMENTAL, "severity": Severity.WARNING, "title": "Camera Temperature Low"},
+        "heater_failure": {"category": Category.ENVIRONMENTAL, "severity": Severity.MAJOR, "title": "Heater Failure"},
+        "fan_failure": {"category": Category.ENVIRONMENTAL, "severity": Severity.CRITICAL, "title": "Fan Failure"},
+        "housing_open": {"category": Category.ENVIRONMENTAL, "severity": Severity.MAJOR, "title": "Housing Open"},
         
         # Hardware
-        "temperature_high": {
-            "category": Category.ENVIRONMENT,
-            "severity": Severity.WARNING,
-            "title": "High Temperature",
-        },
-        "fan_failure": {
-            "category": Category.ENVIRONMENT,
-            "severity": Severity.MAJOR,
-            "title": "Fan Failure",
-        },
+        "lens_error": {"category": Category.HARDWARE, "severity": Severity.MAJOR, "title": "Lens Error"},
+        "focus_failure": {"category": Category.HARDWARE, "severity": Severity.WARNING, "title": "Auto-Focus Failed"},
+        "ir_failure": {"category": Category.HARDWARE, "severity": Severity.WARNING, "title": "IR Illuminator Failure"},
+        "sensor_failure": {"category": Category.HARDWARE, "severity": Severity.CRITICAL, "title": "Image Sensor Failure"},
+        "audio_failure": {"category": Category.HARDWARE, "severity": Severity.WARNING, "title": "Audio System Failure"},
+        "io_error": {"category": Category.HARDWARE, "severity": Severity.WARNING, "title": "I/O Port Error"},
         
-        # System
-        "system_ready": {
-            "category": Category.APPLICATION,
-            "severity": Severity.CLEAR,
-            "title": "System Ready",
-            "is_clear": True,
-        },
-        "device_offline": {
-            "category": Category.NETWORK,
-            "severity": Severity.CRITICAL,
-            "title": "Camera Offline",
-        },
-        "device_online": {
-            "category": Category.NETWORK,
-            "severity": Severity.CLEAR,
-            "title": "Camera Online",
-            "is_clear": True,
-        },
+        # Network
+        "network_config_error": {"category": Category.NETWORK, "severity": Severity.MAJOR, "title": "Network Config Error"},
+        "network_degraded": {"category": Category.NETWORK, "severity": Severity.WARNING, "title": "Network Degraded"},
+        "ip_conflict": {"category": Category.NETWORK, "severity": Severity.MAJOR, "title": "IP Address Conflict"},
+        "dns_failure": {"category": Category.NETWORK, "severity": Severity.WARNING, "title": "DNS Resolution Failure"},
+        
+        # Firmware/System
+        "firmware_outdated": {"category": Category.MAINTENANCE, "severity": Severity.INFO, "title": "Firmware Outdated"},
+        "camera_rebooted": {"category": Category.MAINTENANCE, "severity": Severity.INFO, "title": "Camera Rebooted"},
+        "config_changed": {"category": Category.MAINTENANCE, "severity": Severity.INFO, "title": "Configuration Changed"},
+        "certificate_expiring": {"category": Category.MAINTENANCE, "severity": Severity.WARNING, "title": "Certificate Expiring"},
+        "certificate_expired": {"category": Category.MAINTENANCE, "severity": Severity.MAJOR, "title": "Certificate Expired"},
+        "system_error": {"category": Category.MAINTENANCE, "severity": Severity.MAJOR, "title": "System Error"},
     }
     
     @property

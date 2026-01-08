@@ -2,13 +2,15 @@
 Axis Camera Connector
 
 Polls Axis cameras via VAPIX API for status and events.
+See docs/mappings/AXIS_ALERT_MAPPING.md for alert mapping documentation.
 """
 
+import re
 import logging
 import asyncio
 import aiohttp
 from datetime import datetime
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 from base64 import b64encode
 
 from backend.connectors.base import PollingConnector, BaseNormalizer
@@ -19,19 +21,66 @@ from .normalizer import AxisNormalizer
 
 logger = logging.getLogger(__name__)
 
+# System log patterns for detecting issues - see AXIS_ALERT_MAPPING.md
+SYSTEM_LOG_PATTERNS: List[Tuple[str, str, str]] = [
+    # (regex_pattern, alert_type, description)
+    # Power
+    (r"insufficient power", "power_insufficient", "Insufficient power detected"),
+    (r"PoE budget", "power_insufficient", "PoE budget exceeded"),
+    (r"power limit", "power_insufficient", "Power limit reached"),
+    (r"power supply", "power_supply_error", "Power supply error"),
+    # PTZ
+    (r"not enough power for PTZ", "ptz_power_insufficient", "Insufficient power for PTZ"),
+    (r"PTZ.*error", "ptz_error", "PTZ error detected"),
+    (r"PTZ.*fail", "ptz_error", "PTZ failure"),
+    (r"motor.*fail", "ptz_motor_failure", "PTZ motor failure"),
+    (r"pan.*fail", "ptz_motor_failure", "Pan motor failure"),
+    (r"tilt.*fail", "ptz_motor_failure", "Tilt motor failure"),
+    # Hardware
+    (r"fan.*fail", "fan_failure", "Fan failure detected"),
+    (r"heater.*fail", "heater_failure", "Heater failure"),
+    (r"lens.*error", "lens_error", "Lens error"),
+    (r"focus.*fail", "focus_failure", "Auto-focus failure"),
+    (r"IR.*fail", "ir_failure", "IR illuminator failure"),
+    (r"illuminator.*fail", "ir_failure", "Illuminator failure"),
+    (r"sensor.*fail", "sensor_failure", "Image sensor failure"),
+    (r"imager.*fail", "sensor_failure", "Imager failure"),
+    (r"audio.*fail", "audio_failure", "Audio system failure"),
+    (r"microphone.*fail", "audio_failure", "Microphone failure"),
+    # Network
+    (r"IP conflict", "ip_conflict", "IP address conflict"),
+    (r"duplicate IP", "ip_conflict", "Duplicate IP detected"),
+    (r"DNS.*fail", "dns_failure", "DNS resolution failure"),
+    # Security
+    (r"login.*fail", "unauthorized_access", "Failed login attempt"),
+    (r"authentication.*fail", "unauthorized_access", "Authentication failure"),
+    # Storage
+    (r"disk.*fail", "storage_failure", "Disk failure"),
+    (r"SD card.*fail", "storage_failure", "SD card failure"),
+    (r"storage.*error", "storage_failure", "Storage error"),
+]
+
 
 class AxisConnector(PollingConnector):
     """
     Axis camera connector using VAPIX API.
     
-    Monitors camera status and events via HTTP polling.
+    Supports:
+    - Manual camera list configuration
+    - PRTG-based camera discovery (camera_source: "prtg")
+    - System log parsing for hardware/power alerts
     """
     
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
         self.targets = config.get("targets", [])
-        self.event_types = config.get("event_types", ["motion", "tampering", "storage_failure"])
+        self.camera_source = config.get("camera_source", "manual")  # manual, prtg
+        self.prtg_filter = config.get("prtg_filter", {})  # {tags: "camera"} or {group: "Cameras"}
+        self.default_username = config.get("default_username", "root")
+        self.default_password = config.get("default_password", "")
         self._sessions: Dict[str, aiohttp.ClientSession] = {}
+        self._cached_targets: List[Dict] = []
+        self._last_target_refresh: Optional[datetime] = None
     
     @property
     def connector_type(self) -> str:
@@ -122,22 +171,80 @@ class AxisConnector(PollingConnector):
         """Poll all camera targets for alerts."""
         alerts = []
         
-        for target in self.targets:
-            try:
-                target_alerts = await self._poll_camera(target)
-                alerts.extend(target_alerts)
-            except Exception as e:
-                logger.error(f"Error polling camera {target.get('ip')}: {e}")
-                
-                # Generate offline alert
-                alerts.append(self._create_alert(
-                    target,
-                    "device_offline",
-                    {"error": str(e)}
-                ))
+        # Get targets (from manual list or PRTG)
+        targets = await self._get_targets()
         
-        logger.debug(f"Axis poll: {len(alerts)} alerts from {len(self.targets)} cameras")
+        # Poll cameras in batches for efficiency
+        batch_size = 50
+        for i in range(0, len(targets), batch_size):
+            batch = targets[i:i + batch_size]
+            batch_results = await asyncio.gather(
+                *[self._poll_camera_safe(target) for target in batch],
+                return_exceptions=True
+            )
+            for result in batch_results:
+                if isinstance(result, list):
+                    alerts.extend(result)
+        
+        logger.debug(f"Axis poll: {len(alerts)} alerts from {len(targets)} cameras")
         return alerts
+    
+    async def _poll_camera_safe(self, target: Dict) -> List[NormalizedAlert]:
+        """Safely poll a camera, catching exceptions."""
+        try:
+            return await self._poll_camera(target)
+        except Exception as e:
+            logger.error(f"Error polling camera {target.get('ip')}: {e}")
+            return [self._create_alert(target, "camera_offline", {"error": str(e)})]
+    
+    async def _get_targets(self) -> List[Dict]:
+        """Get camera targets from configured source."""
+        if self.camera_source == "prtg":
+            # Refresh from PRTG every 5 minutes
+            now = datetime.utcnow()
+            if not self._cached_targets or not self._last_target_refresh or \
+               (now - self._last_target_refresh).seconds > 300:
+                self._cached_targets = await self._fetch_cameras_from_prtg()
+                self._last_target_refresh = now
+            return self._cached_targets
+        return self.targets
+    
+    async def _fetch_cameras_from_prtg(self) -> List[Dict]:
+        """Fetch camera list from PRTG based on filter."""
+        try:
+            from backend.database import DatabaseConnection
+            db = DatabaseConnection()
+            
+            # Build query based on filter
+            query = "SELECT device_name, host FROM prtg_devices WHERE 1=1"
+            params = []
+            
+            if self.prtg_filter.get("tags"):
+                query += " AND tags ILIKE %s"
+                params.append(f"%{self.prtg_filter['tags']}%")
+            if self.prtg_filter.get("group"):
+                query += " AND device_group ILIKE %s"
+                params.append(f"%{self.prtg_filter['group']}%")
+            
+            with db.cursor() as cursor:
+                cursor.execute(query, tuple(params))
+                rows = cursor.fetchall()
+            
+            cameras = []
+            for row in rows:
+                if row.get("host"):
+                    cameras.append({
+                        "ip": row["host"],
+                        "name": row.get("device_name", row["host"]),
+                        "username": self.default_username,
+                        "password": self.default_password,
+                    })
+            
+            logger.info(f"Loaded {len(cameras)} cameras from PRTG")
+            return cameras
+        except Exception as e:
+            logger.error(f"Failed to fetch cameras from PRTG: {e}")
+            return self._cached_targets or []
     
     async def _poll_camera(self, target: Dict) -> List[NormalizedAlert]:
         """Poll single camera for status and events."""
@@ -145,29 +252,41 @@ class AxisConnector(PollingConnector):
         ip = target.get("ip")
         
         try:
-            # Check camera is reachable
+            # Check camera is reachable and get device info
             info = await self._get_device_info(target)
+            target["_model"] = info.get("model", "")
+            target["_firmware"] = info.get("firmware", "")
             
             # Check storage status
             try:
                 storage = await self._get_storage_status(target)
                 if storage:
-                    storage_alerts = self._check_storage(target, storage)
-                    alerts.extend(storage_alerts)
+                    alerts.extend(self._check_storage(target, storage))
             except Exception as e:
                 logger.debug(f"Could not get storage status for {ip}: {e}")
             
-            # Check recording status
+            # Check system log for hardware/power issues
             try:
-                recording = await self._get_recording_status(target)
-                if recording and not recording.get("active"):
-                    alerts.append(self._create_alert(target, "recording_error", recording))
+                log_alerts = await self._check_system_log(target)
+                alerts.extend(log_alerts)
             except Exception as e:
-                logger.debug(f"Could not get recording status for {ip}: {e}")
+                logger.debug(f"Could not get system log for {ip}: {e}")
             
+            # Check temperature
+            try:
+                temp_alerts = await self._check_temperature(target)
+                alerts.extend(temp_alerts)
+            except Exception as e:
+                logger.debug(f"Could not get temperature for {ip}: {e}")
+            
+        except aiohttp.ClientResponseError as e:
+            if e.status in (401, 403):
+                alerts.append(self._create_alert(target, "camera_auth_failed", {"error": str(e), "status": e.status}))
+            else:
+                alerts.append(self._create_alert(target, "camera_offline", {"error": str(e)}))
         except Exception as e:
             logger.warning(f"Camera {ip} appears offline: {e}")
-            alerts.append(self._create_alert(target, "device_offline", {"error": str(e)}))
+            alerts.append(self._create_alert(target, "camera_offline", {"error": str(e)}))
         
         return alerts
     
@@ -215,10 +334,57 @@ class AxisConnector(PollingConnector):
         
         return None
     
-    async def _get_recording_status(self, target: Dict) -> Optional[Dict]:
-        """Get recording status."""
-        # This varies by camera model
-        return None
+    async def _get_system_log(self, target: Dict) -> str:
+        """Get system log via VAPIX."""
+        ip = target.get("ip")
+        session = await self._get_session(target)
+        try:
+            async with session.get(f"http://{ip}/axis-cgi/systemlog.cgi", timeout=10) as response:
+                if response.status == 200:
+                    return await response.text()
+        except Exception:
+            pass
+        return ""
+    
+    async def _check_system_log(self, target: Dict) -> List[NormalizedAlert]:
+        """Parse system log for hardware/power alerts."""
+        alerts = []
+        log_text = await self._get_system_log(target)
+        if not log_text:
+            return alerts
+        
+        recent_lines = log_text.strip().split("\n")[-50:]
+        detected_types = set()
+        
+        for line in recent_lines:
+            for pattern, alert_type, description in SYSTEM_LOG_PATTERNS:
+                if alert_type not in detected_types and re.search(pattern, line, re.IGNORECASE):
+                    detected_types.add(alert_type)
+                    alerts.append(self._create_alert(target, alert_type, {"log_entry": line, "description": description}))
+        return alerts
+    
+    async def _check_temperature(self, target: Dict) -> List[NormalizedAlert]:
+        """Check camera temperature via VAPIX."""
+        alerts = []
+        ip = target.get("ip")
+        session = await self._get_session(target)
+        try:
+            async with session.get(f"http://{ip}/axis-cgi/param.cgi?action=list&group=Status.Temperature", timeout=10) as response:
+                if response.status == 200:
+                    text = await response.text()
+                    for line in text.split("\n"):
+                        if "Temperature" in line and "=" in line:
+                            try:
+                                temp = float(re.sub(r"[^\d.]", "", line.split("=")[1]))
+                                if temp > 70:
+                                    alerts.append(self._create_alert(target, "temperature_critical", {"temperature": temp}))
+                                elif temp > 60:
+                                    alerts.append(self._create_alert(target, "temperature_warning", {"temperature": temp}))
+                            except (ValueError, IndexError):
+                                pass
+        except Exception:
+            pass
+        return alerts
     
     def _check_storage(self, target: Dict, storage: Dict) -> List[NormalizedAlert]:
         """Check storage status and generate alerts if needed."""
@@ -241,11 +407,12 @@ class AxisConnector(PollingConnector):
         raw_data = {
             "device_ip": target.get("ip"),
             "device_name": target.get("name"),
+            "camera_model": target.get("_model", ""),
+            "firmware_version": target.get("_firmware", ""),
             "event_type": event_type,
             "event_data": event_data,
             "timestamp": datetime.utcnow().isoformat(),
         }
-        
         return self.normalizer.normalize(raw_data)
     
     async def _process_alerts(self, alerts: List[NormalizedAlert]) -> None:
