@@ -117,6 +117,15 @@ class CradlepointConnector(PollingConnector):
         logger.debug(f"Cradlepoint poll: {len(alerts)} alerts from {len(self.targets)} routers")
         return alerts
     
+    def _safe_float(self, value) -> Optional[float]:
+        """Safely convert value to float for comparison."""
+        if value is None:
+            return None
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            return None
+
     async def _poll_router(self, target: Dict) -> List[Optional[NormalizedAlert]]:
         alerts: List[Optional[NormalizedAlert]] = []
         
@@ -125,10 +134,10 @@ class CradlepointConnector(PollingConnector):
             diagnostics = await self._get_diagnostics(target)
             
             if diagnostics:
-                # Check signal levels
-                rssi = diagnostics.get("rssi")
-                rsrp = diagnostics.get("rsrp")
-                sinr = diagnostics.get("sinr")
+                # Check signal levels - convert to float for comparison
+                rssi = self._safe_float(diagnostics.get("rssi"))
+                rsrp = self._safe_float(diagnostics.get("rsrp"))
+                sinr = self._safe_float(diagnostics.get("sinr"))
                 
                 # RSRP thresholds (prefer for LTE)
                 if rsrp is not None:
@@ -160,7 +169,7 @@ class CradlepointConnector(PollingConnector):
             # Get system status (temperature, uptime)
             system_status = await self._get_system_status(target)
             if system_status:
-                temp = system_status.get("temperature")
+                temp = self._safe_float(system_status.get("temperature"))
                 if temp is not None:
                     if temp >= self.thresholds.get("temp_critical", 70):
                         alerts.append(self._create_alert(target, "temperature_critical", system_status))
@@ -235,13 +244,16 @@ class CradlepointConnector(PollingConnector):
                         diagnostics["connection_state"] = conn_state
                         
                         # Get signal info from diagnostics
+                        # Signal data can be in diagnostics directly OR in diagnostics.MODEMINFO
                         diag = device.get("diagnostics", {})
-                        info = diag.get("MODEMINFO", {})
+                        info = diag.get("MODEMINFO", diag)  # Fall back to diag itself
+                        
                         diagnostics["rssi"] = info.get("DBM")
                         diagnostics["rsrp"] = info.get("RSRP")
                         diagnostics["rsrq"] = info.get("RSRQ")
                         diagnostics["sinr"] = info.get("SINR")
-                        diagnostics["carrier"] = info.get("HOMECARRID")
+                        diagnostics["carrier"] = info.get("HOMECARRID") or info.get("CARRID")
+                        diagnostics["modem_temp"] = info.get("MODEMTEMP")
                         
         except Exception as e:
             logger.debug(f"Could not get modem diagnostics: {e}")
