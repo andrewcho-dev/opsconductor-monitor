@@ -48,6 +48,7 @@ const moduleNavigation = {
         title: 'Monitoring',
         items: [
           { id: 'dashboard', label: 'Alert Dashboard', icon: LayoutDashboard, path: '/alerts' },
+          { id: 'resolved', label: 'Resolved Alerts', icon: ShieldCheck, path: '/alerts/resolved' },
         ]
       }
     ]

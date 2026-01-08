@@ -13,16 +13,17 @@ export default defineConfig({
     proxy: {
       // ============================================================
       // OpenAPI 3.x Domain-Based Endpoints (Primary API)
+      // These use /api prefix to avoid conflicts with frontend routes
       // ============================================================
-      '/identity': API_SERVER,      // Authentication, users, roles
-      '/inventory': API_SERVER,     // Devices, interfaces, topology
-      '/monitoring': API_SERVER,    // Metrics, alerts, polling
-      '/automation': API_SERVER,    // Workflows, jobs, scheduling
-      '/integrations': API_SERVER,  // NetBox, PRTG, MCP
-      '/system': API_SERVER,        // Settings, logs, health
-      '/credentials': API_SERVER,   // Credential vault
-      '/notifications': API_SERVER, // Notification channels
-      '/admin': API_SERVER,         // Administrative operations
+      '/api/identity': API_SERVER,      // Authentication, users, roles
+      '/api/inventory': API_SERVER,     // Devices, interfaces, topology
+      '/api/monitoring': API_SERVER,    // Metrics, alerts, polling
+      '/api/automation': API_SERVER,    // Workflows, jobs, scheduling
+      '/api/integrations': API_SERVER,  // NetBox, PRTG, MCP
+      '/api/system': API_SERVER,        // Settings, logs, health
+      '/api/credentials': API_SERVER,   // Credential vault
+      '/api/notifications': API_SERVER, // Notification channels
+      '/api/admin': API_SERVER,         // Administrative operations
       '/auth': API_SERVER,          // Login/logout endpoints
       
       // ============================================================

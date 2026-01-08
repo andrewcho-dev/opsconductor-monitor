@@ -2,7 +2,7 @@
  * Alert Table Component
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown, Filter } from 'lucide-react';
 import { SEVERITY_CONFIG, CATEGORY_CONFIG, formatRelativeTime } from '../../lib/constants';
@@ -21,15 +21,45 @@ export function AlertTable({
   loading = false,
   pagination = {},
   onPageChange,
+  onLoadMore,  // For infinite scroll - called when user scrolls near bottom
+  loadingMore = false,  // Show loading indicator at bottom during infinite scroll
   selectedIds = [],
   onSelectChange,
   filters = {},
   onFilterChange,
   statusCounts = {},
   severityStatusCounts = {},
+  showResolvedTime = false,  // Show resolved time column instead of age from now
+  hideStatusPills = false,   // Hide the status filter pills
 }) {
   const [sortConfig, setSortConfig] = useState({ key: 'occurred_at', direction: 'desc' });
   const [openFilter, setOpenFilter] = useState(null);
+  const [filterSearch, setFilterSearch] = useState('');
+  const [pendingSelections, setPendingSelections] = useState({});
+  
+  // Cache dropdown options when filter is open to prevent scroll reset on data refresh
+  const cachedOptionsRef = useRef({});
+  const dropdownRef = useRef(null);
+  const tableContainerRef = useRef(null);
+  const loadMoreTriggerRef = useRef(null);
+  
+  // Infinite scroll - observe when user scrolls near bottom
+  useEffect(() => {
+    if (!onLoadMore || !loadMoreTriggerRef.current) return;
+    
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (entry.isIntersecting && !loading && !loadingMore && pagination.page < pagination.pages) {
+          onLoadMore();
+        }
+      },
+      { threshold: 0.1, root: tableContainerRef.current }
+    );
+    
+    observer.observe(loadMoreTriggerRef.current);
+    return () => observer.disconnect();
+  }, [onLoadMore, loading, loadingMore, pagination.page, pagination.pages]);
 
   // Severity order for sorting
   const SEVERITY_ORDER = { critical: 0, major: 1, minor: 2, warning: 3, info: 4, clear: 5 };
@@ -125,8 +155,37 @@ export function AlertTable({
   const handleFilterSelect = (field, value) => {
     onFilterChange?.({ [field]: value || null });
     setOpenFilter(null);
+    setFilterSearch('');
   };
 
+  // Multi-select filter for device_name field
+  const handleMultiFilterToggle = (field, value) => {
+    setPendingSelections(prev => {
+      const current = prev[field] || (filters[field] ? filters[field].split(',') : []);
+      if (current.includes(value)) {
+        return { ...prev, [field]: current.filter(v => v !== value) };
+      } else {
+        return { ...prev, [field]: [...current, value] };
+      }
+    });
+  };
+
+  const applyMultiFilter = (field) => {
+    const selections = pendingSelections[field] || [];
+    onFilterChange?.({ [field]: selections.length > 0 ? selections.join(',') : null });
+    setOpenFilter(null);
+    setFilterSearch('');
+    setPendingSelections(prev => ({ ...prev, [field]: undefined }));
+  };
+
+  const clearMultiFilter = (field) => {
+    onFilterChange?.({ [field]: null });
+    setOpenFilter(null);
+    setFilterSearch('');
+    setPendingSelections(prev => ({ ...prev, [field]: undefined }));
+  };
+
+  // Simple single-select dropdown for severity/category
   const FilterDropdown = ({ field, options, currentValue, label }) => {
     const isOpen = openFilter === field;
     const hasFilter = currentValue && currentValue !== 'all';
@@ -134,19 +193,26 @@ export function AlertTable({
     return (
       <div className="relative">
         <button
-          onClick={() => setOpenFilter(isOpen ? null : field)}
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpenFilter(isOpen ? null : field);
+            setFilterSearch('');
+          }}
           className={`flex items-center gap-1 ${hasFilter ? 'text-blue-600' : ''}`}
         >
-          {label}
+          <span className="uppercase font-semibold">{label}</span>
           <Filter className={`w-3 h-3 ${hasFilter ? 'text-blue-600' : 'text-gray-400'}`} />
         </button>
         {isOpen && (
           <>
             <div className="fixed inset-0 z-10" onClick={() => setOpenFilter(null)} />
-            <div className="absolute top-full left-0 mt-1 w-40 bg-white dark:bg-gray-800 rounded shadow-lg border border-gray-200 dark:border-gray-700 z-20 py-1 max-h-48 overflow-y-auto">
+            <div 
+              className="absolute top-full left-0 mt-1 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-20 py-1"
+              onClick={(e) => e.stopPropagation()}
+            >
               <button
                 onClick={() => handleFilterSelect(field, null)}
-                className={`w-full text-left px-3 py-1 text-xs hover:bg-gray-100 dark:hover:bg-gray-700 ${!currentValue ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600' : ''}`}
+                className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 ${!currentValue ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 font-medium' : ''}`}
               >
                 All
               </button>
@@ -154,12 +220,124 @@ export function AlertTable({
                 <button
                   key={opt}
                   onClick={() => handleFilterSelect(field, opt)}
-                  className={`w-full text-left px-3 py-1 text-xs hover:bg-gray-100 dark:hover:bg-gray-700 truncate ${currentValue === opt ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600' : ''}`}
+                  className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 truncate ${currentValue === opt ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 font-medium' : ''}`}
                 >
                   {field === 'severity' ? (SEVERITY_CONFIG[opt]?.label || opt) : 
                    field === 'category' ? (CATEGORY_CONFIG[opt]?.label || opt) : opt}
                 </button>
               ))}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
+
+  // Multi-select dropdown with search for device_name
+  const DeviceFilterDropdown = ({ options, currentValue, label }) => {
+    const field = 'device_name';
+    const isOpen = openFilter === field;
+    const hasFilter = currentValue && currentValue !== 'all';
+    
+    // Cache options when opening
+    useEffect(() => {
+      if (isOpen && options.length > 0 && !cachedOptionsRef.current[field]) {
+        cachedOptionsRef.current[field] = options;
+      }
+    }, [isOpen, options]);
+    
+    // Clear cache when closing
+    useEffect(() => {
+      if (!isOpen) {
+        cachedOptionsRef.current[field] = null;
+      }
+    }, [isOpen]);
+    
+    const displayOptions = cachedOptionsRef.current[field] || options;
+    
+    // Get current selections (from pending or from filters)
+    const currentSelections = pendingSelections[field] || (currentValue ? currentValue.split(',') : []);
+    
+    // Filter options by search
+    const filteredOptions = displayOptions.filter(opt => 
+      opt.toLowerCase().includes(filterSearch.toLowerCase())
+    );
+    
+    return (
+      <div className="relative">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!isOpen) {
+              cachedOptionsRef.current[field] = options;
+              setPendingSelections(prev => ({ ...prev, [field]: currentValue ? currentValue.split(',') : [] }));
+            }
+            setOpenFilter(isOpen ? null : field);
+            setFilterSearch('');
+          }}
+          className={`flex items-center gap-1 ${hasFilter ? 'text-blue-600' : ''}`}
+        >
+          <span className="uppercase font-semibold">{label}</span>
+          {hasFilter && <span className="text-xs bg-blue-100 text-blue-600 px-1 rounded">{currentValue.split(',').length}</span>}
+          <Filter className={`w-3 h-3 ${hasFilter ? 'text-blue-600' : 'text-gray-400'}`} />
+        </button>
+        {isOpen && (
+          <>
+            <div className="fixed inset-0 z-10" onClick={() => { setOpenFilter(null); setFilterSearch(''); }} />
+            <div 
+              ref={dropdownRef}
+              className="absolute top-full left-0 mt-1 w-72 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-20 flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Search input */}
+              <div className="p-2 border-b border-gray-200 dark:border-gray-700">
+                <input
+                  type="text"
+                  placeholder="Search devices..."
+                  value={filterSearch}
+                  onChange={(e) => setFilterSearch(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  autoFocus
+                />
+              </div>
+              
+              {/* Options list */}
+              <div className="max-h-64 overflow-y-auto">
+                {filteredOptions.length === 0 ? (
+                  <div className="px-4 py-3 text-sm text-gray-500">No devices found</div>
+                ) : (
+                  filteredOptions.map((opt) => (
+                    <label
+                      key={opt}
+                      className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={currentSelections.includes(opt)}
+                        onChange={() => handleMultiFilterToggle(field, opt)}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="truncate">{opt}</span>
+                    </label>
+                  ))
+                )}
+              </div>
+              
+              {/* Action buttons */}
+              <div className="p-2 border-t border-gray-200 dark:border-gray-700 flex gap-2">
+                <button
+                  onClick={() => clearMultiFilter(field)}
+                  className="flex-1 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                >
+                  Clear
+                </button>
+                <button
+                  onClick={() => applyMultiFilter(field)}
+                  className="flex-1 px-3 py-1.5 text-sm bg-blue-600 text-white hover:bg-blue-700 rounded font-medium"
+                >
+                  Apply ({currentSelections.length})
+                </button>
+              </div>
             </div>
           </>
         )}
@@ -233,7 +411,7 @@ export function AlertTable({
   if (loading) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col h-full">
-        <StatusFilterPills />
+        {!hideStatusPills && <StatusFilterPills />}
         <div className="flex items-center justify-center p-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
           <span className="ml-3 text-gray-500">Loading alerts...</span>
@@ -245,7 +423,7 @@ export function AlertTable({
   if (alerts.length === 0) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col h-full">
-        <StatusFilterPills />
+        {!hideStatusPills && <StatusFilterPills />}
         <div className="text-center text-gray-500 p-8">
           <p className="text-lg font-medium">No alerts found</p>
           <p className="text-sm">Try adjusting your filters</p>
@@ -256,10 +434,10 @@ export function AlertTable({
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col h-full">
-      <StatusFilterPills />
+      {!hideStatusPills && <StatusFilterPills />}
       
       {/* Table */}
-      <div className="overflow-auto flex-1">
+      <div ref={tableContainerRef} className="overflow-auto flex-1">
         <table className="w-full divide-y divide-gray-200 dark:divide-gray-700" style={{ tableLayout: 'fixed' }}>
           <colgroup>
             <col style={{ width: '40px' }} />
@@ -268,7 +446,8 @@ export function AlertTable({
             <col style={{ width: '280px' }} />
             <col style={{ width: '200px' }} />
             <col style={{ width: '100px' }} />
-            <col style={{ width: '160px' }} />
+            <col style={{ width: '140px' }} />
+            {showResolvedTime && <col style={{ width: '140px' }} />}
             <col style={{ width: '70px' }} />
             <col style={{ width: '90px' }} />
           </colgroup>
@@ -282,50 +461,58 @@ export function AlertTable({
                   className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
               </th>
-              <th style={{ width: '80px' }} className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                <FilterDropdown field="severity" options={uniqueSeverities} currentValue={filters.severity} label="Severity" />
+              <th style={{ width: '80px' }} className="px-3 py-2 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
+                SEVERITY
               </th>
               <th
                 style={{ width: '50px' }}
-                className="px-2 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
-                onClick={() => handleSort('occurrence_count')}
+                className="px-2 py-2 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase"
               >
-                <div className="flex items-center justify-center gap-1">
-                  #
-                  <SortIcon columnKey="occurrence_count" />
-                </div>
+                #
               </th>
-              <th style={{ width: '250px' }} className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                Alert
+              <th style={{ width: '250px' }} className="px-3 py-2 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
+                ALERT
               </th>
-              <th style={{ width: '180px' }} className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                <FilterDropdown field="device_name" options={uniqueDevices} currentValue={filters.device_name} label="Device" />
+              <th style={{ width: '180px' }} className="px-4 py-2 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
+                DEVICE
               </th>
-              <th style={{ width: '100px' }} className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th style={{ width: '100px' }} className="px-3 py-2 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
                 <FilterDropdown field="category" options={uniqueCategories} currentValue={filters.category} label="Category" />
               </th>
               <th
-                style={{ width: '160px' }}
-                className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                style={{ width: '140px' }}
+                className="px-3 py-2 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                 onClick={() => handleSort('occurred_at')}
               >
                 <div className="flex items-center gap-1">
-                  First Seen
+                  FIRST SEEN
                   <SortIcon columnKey="occurred_at" />
                 </div>
               </th>
+              {showResolvedTime && (
+                <th
+                  style={{ width: '140px' }}
+                  className="px-3 py-2 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                  onClick={() => handleSort('resolved_at')}
+                >
+                  <div className="flex items-center gap-1">
+                    RESOLVED
+                    <SortIcon columnKey="resolved_at" />
+                  </div>
+                </th>
+              )}
               <th
                 style={{ width: '70px' }}
-                className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                className="px-3 py-2 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                 onClick={() => handleSort('occurred_at')}
               >
                 <div className="flex items-center gap-1">
-                  Age
+                  {showResolvedTime ? 'DURATION' : 'AGE'}
                   <SortIcon columnKey="occurred_at" />
                 </div>
               </th>
-              <th style={{ width: '90px' }} className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                Status
+              <th style={{ width: '90px' }} className="px-3 py-2 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
+                STATUS
               </th>
             </tr>
           </thead>
@@ -392,11 +579,27 @@ export function AlertTable({
                       return `${mm}/${dd}/${yy} ${hh}:${min} ${tz}`;
                     })()}
                   </td>
+                  {showResolvedTime && (
+                    <td className="px-3 py-2 font-mono text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                      {(() => {
+                        const d = new Date(alert.resolved_at || alert.updated_at);
+                        const mm = String(d.getMonth() + 1).padStart(2, '0');
+                        const dd = String(d.getDate()).padStart(2, '0');
+                        const yy = String(d.getFullYear()).slice(-2);
+                        const hh = String(d.getHours()).padStart(2, '0');
+                        const min = String(d.getMinutes()).padStart(2, '0');
+                        const tz = d.toLocaleTimeString('en-US', { timeZoneName: 'short' }).split(' ').pop();
+                        return `${mm}/${dd}/${yy} ${hh}:${min} ${tz}`;
+                      })()}
+                    </td>
+                  )}
                   <td className="px-3 py-2 font-mono text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
                     {(() => {
-                      const now = new Date();
+                      // For resolved alerts, show duration between occurred and resolved
+                      // For active alerts, show age from occurred to now
+                      const endTime = showResolvedTime ? new Date(alert.resolved_at || alert.updated_at) : new Date();
                       const occurred = new Date(alert.occurred_at);
-                      const diffMs = now - occurred;
+                      const diffMs = endTime - occurred;
                       const diffMins = Math.floor(diffMs / 60000);
                       const diffHrs = Math.floor(diffMins / 60);
                       const diffDays = Math.floor(diffHrs / 24);
@@ -420,10 +623,26 @@ export function AlertTable({
             })}
           </tbody>
         </table>
+        
+        {/* Infinite scroll trigger and loading indicator */}
+        {onLoadMore && (
+          <div ref={loadMoreTriggerRef} className="py-4 text-center">
+            {loadingMore ? (
+              <div className="flex items-center justify-center gap-2 text-gray-500">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                <span className="text-sm">Loading more...</span>
+              </div>
+            ) : pagination.page < pagination.pages ? (
+              <span className="text-sm text-gray-400">Scroll for more</span>
+            ) : alerts.length > 0 ? (
+              <span className="text-sm text-gray-400">All {pagination.total} alerts loaded</span>
+            ) : null}
+          </div>
+        )}
       </div>
 
-      {/* Pagination */}
-      {pagination.pages > 1 && (
+      {/* Pagination - only show if not using infinite scroll */}
+      {!onLoadMore && pagination.pages > 1 && (
         <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
           <div className="text-sm text-gray-500">
             Showing {((pagination.page - 1) * pagination.per_page) + 1} to{' '}

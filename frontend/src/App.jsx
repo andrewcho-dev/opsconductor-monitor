@@ -18,6 +18,7 @@ import MibMappingsPage from "./pages/monitor/MibMappingsPage";
 // Alert Aggregation Module (MVP)
 import { AlertDashboard } from "./pages/AlertDashboard";
 import { AlertDetailPage } from "./pages/AlertDetailPage";
+import { ResolvedAlertsPage } from "./pages/ResolvedAlertsPage";
 import { ConnectorsPage } from "./pages/ConnectorsPage";
 import { DependenciesPage } from "./pages/DependenciesPage";
 
@@ -89,6 +90,7 @@ function App() {
 
         {/* ALERT AGGREGATION MODULE (MVP) */}
         <Route path="/alerts" element={<ProtectedRoute><AlertDashboard /></ProtectedRoute>} />
+        <Route path="/alerts/resolved" element={<ProtectedRoute><ResolvedAlertsPage /></ProtectedRoute>} />
         <Route path="/alerts/:alertId" element={<ProtectedRoute><AlertDetailPage /></ProtectedRoute>} />
         <Route path="/connectors" element={<ProtectedRoute><ConnectorsPage /></ProtectedRoute>} />
         <Route path="/dependencies" element={<ProtectedRoute><DependenciesPage /></ProtectedRoute>} />

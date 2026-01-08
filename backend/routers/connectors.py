@@ -4,6 +4,7 @@ OpsConductor Connectors API Router
 REST endpoints for connector management and webhooks.
 """
 
+import json
 import logging
 from typing import Optional, List
 from uuid import UUID
@@ -98,13 +99,19 @@ async def list_connectors():
     rows = db_query("""
         SELECT id, name, type, enabled, status, error_message,
                last_poll_at, alerts_received, alerts_today,
-               created_at, updated_at
+               created_at, updated_at, config
         FROM connectors
         ORDER BY name
     """)
     
     connectors = []
     for row in rows:
+        # Include config but mask sensitive values
+        config = dict(row.get("config") or {})
+        for key in ["password", "passhash", "api_token", "secret"]:
+            if key in config:
+                config[key] = "********"
+        
         connectors.append({
             "id": str(row["id"]),
             "name": row["name"],
@@ -112,6 +119,7 @@ async def list_connectors():
             "enabled": row["enabled"],
             "status": row["status"],
             "error_message": row.get("error_message"),
+            "config": config,
             "last_poll_at": row["last_poll_at"].isoformat() if row.get("last_poll_at") else None,
             "alerts_received": row.get("alerts_received", 0),
             "alerts_today": row.get("alerts_today", 0),
@@ -211,7 +219,7 @@ async def update_connector(connector_id: str, request: UpdateConnectorRequest):
             if value != "********":  # Don't overwrite with masked value
                 current_config[key] = value
         updates.append("config = %s")
-        params.append(str(current_config))
+        params.append(json.dumps(current_config))
     
     if updates:
         params.append(connector_id)

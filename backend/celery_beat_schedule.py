@@ -12,10 +12,10 @@ from tasks.connector_polling import poll_all_connectors
 
 # Schedule for connector polling
 celery_app.conf.beat_schedule = {
-    # Poll connectors every 60 seconds
+    # Check connectors every 10 seconds - each connector has its own poll_interval
     'poll-connectors': {
         'task': 'poll_all_connectors',
-        'schedule': 60.0,  # seconds
+        'schedule': 10.0,  # Check frequently, actual polling respects each connector's poll_interval
     },
     
     # Reset daily alert counters at midnight

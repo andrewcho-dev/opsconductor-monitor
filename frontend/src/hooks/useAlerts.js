@@ -10,10 +10,11 @@ import { fetchApi } from '../lib/utils';
 /**
  * Hook to fetch alerts with filtering, pagination, and real-time updates
  */
-export function useAlerts(initialFilters = {}) {
+export function useAlerts(initialFilters = {}, { infiniteScroll = false } = {}) {
   const [alerts, setAlerts] = useState([]);
   const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState({
     status: 'active,acknowledged,suppressed',  // Default: show all non-resolved
@@ -31,8 +32,12 @@ export function useAlerts(initialFilters = {}) {
     pages: 0,
   });
 
-  const fetchAlerts = useCallback(async () => {
-    setLoading(true);
+  const fetchAlerts = useCallback(async (isLoadMore = false) => {
+    if (isLoadMore) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+    }
     setError(null);
 
     try {
@@ -64,7 +69,13 @@ export function useAlerts(initialFilters = {}) {
       const response = await fetchApi(`/api/v1/alerts?${params.toString()}`);
       
       if (response.success) {
-        setAlerts(response.data || []);
+        if (infiniteScroll && isLoadMore) {
+          // Append to existing alerts for infinite scroll
+          setAlerts(prev => [...prev, ...(response.data || [])]);
+        } else {
+          // Replace alerts
+          setAlerts(response.data || []);
+        }
         setPagination(prev => ({
           ...prev,
           total: response.meta?.total || 0,
@@ -77,8 +88,9 @@ export function useAlerts(initialFilters = {}) {
       setError(err.message || 'Failed to fetch alerts');
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
-  }, [filters, pagination.page, pagination.per_page]);
+  }, [filters, pagination.page, pagination.per_page, infiniteScroll]);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -104,13 +116,31 @@ export function useAlerts(initialFilters = {}) {
   }, [fetchStats]);
 
   const refresh = useCallback(() => {
+    if (infiniteScroll) {
+      // For infinite scroll, reset to page 1 and clear alerts
+      setPagination(prev => ({ ...prev, page: 1 }));
+      setAlerts([]);
+    }
     fetchAlerts();
     fetchStats();
-  }, [fetchAlerts, fetchStats]);
+  }, [fetchAlerts, fetchStats, infiniteScroll]);
 
   const setPage = useCallback((page) => {
     setPagination(prev => ({ ...prev, page }));
   }, []);
+
+  const loadMore = useCallback(() => {
+    if (!loadingMore && pagination.page < pagination.pages) {
+      setPagination(prev => ({ ...prev, page: prev.page + 1 }));
+    }
+  }, [loadingMore, pagination.page, pagination.pages]);
+
+  // For infinite scroll, fetch more when page changes (except page 1)
+  useEffect(() => {
+    if (infiniteScroll && pagination.page > 1) {
+      fetchAlerts(true);
+    }
+  }, [pagination.page, infiniteScroll]);
 
   const updateFilters = useCallback((newFilters) => {
     setFilters(prev => ({ ...prev, ...newFilters }));
@@ -121,11 +151,13 @@ export function useAlerts(initialFilters = {}) {
     alerts,
     stats,
     loading,
+    loadingMore,
     error,
     filters,
     setFilters: updateFilters,
     pagination,
     setPage,
+    loadMore,
     refresh,
   };
 }
