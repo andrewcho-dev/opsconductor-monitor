@@ -7,11 +7,12 @@ Handles deduplication, correlation, storage, and event emission.
 
 import logging
 import hashlib
+import json
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 from uuid import UUID
 
-from utils.db import db_query, db_query_one, db_execute
+from backend.utils.db import db_query, db_query_one, db_execute
 
 from .models import (
     NormalizedAlert, Alert, AlertStatus, Severity, Category,
@@ -72,10 +73,12 @@ class AlertManager:
             # Update existing alert
             alert = await self._update_existing(existing, normalized)
             logger.debug(f"Updated existing alert {alert.id}")
+            action = "updated"
         else:
             # Create new alert
             alert = await self._create_new(normalized, fingerprint)
             logger.info(f"Created new alert {alert.id}: {alert.title}")
+            action = "created"
             
             # Check for correlation (suppress if upstream has active alert)
             await self._check_correlation(alert)
@@ -91,6 +94,8 @@ class AlertManager:
         if normalized.is_clear:
             await self._handle_clear_event(alert)
         
+        # Store action type on alert for caller to use
+        alert._action = action
         return alert
     
     def _generate_fingerprint(self, normalized: NormalizedAlert) -> str:
@@ -106,11 +111,11 @@ class AlertManager:
         return hashlib.sha256(fingerprint_str.encode()).hexdigest()
     
     async def _find_duplicate(self, fingerprint: str) -> Optional[Alert]:
-        """Find existing active alert with same fingerprint."""
+        """Find existing non-resolved alert with same fingerprint."""
         row = db_query_one("""
             SELECT * FROM alerts 
             WHERE fingerprint = %s 
-            AND status IN ('active', 'acknowledged')
+            AND status != 'resolved'
             ORDER BY occurred_at DESC
             LIMIT 1
         """, (fingerprint,))
@@ -120,20 +125,29 @@ class AlertManager:
         return None
     
     async def _update_existing(self, existing: Alert, normalized: NormalizedAlert) -> Alert:
-        """Update existing alert with new occurrence."""
+        """Update existing alert with new occurrence and current source status."""
         now = datetime.utcnow()
+        
+        # Determine new status from normalized alert
+        new_status = normalized.status if normalized.status else existing.status.value
+        if hasattr(new_status, 'value'):
+            new_status = new_status.value
         
         db_execute("""
             UPDATE alerts SET
                 occurrence_count = occurrence_count + 1,
                 last_occurrence_at = %s,
                 message = COALESCE(%s, message),
+                status = %s,
+                source_status = COALESCE(%s, source_status),
                 updated_at = %s
             WHERE id = %s
-        """, (now, normalized.message, now, str(existing.id)))
+        """, (now, normalized.message, new_status, normalized.source_status, now, str(existing.id)))
         
         existing.occurrence_count += 1
         existing.last_occurrence_at = now
+        existing.status = AlertStatus(new_status)
+        existing.source_status = normalized.source_status or existing.source_status
         existing.updated_at = now
         
         # Emit update event
@@ -162,7 +176,7 @@ class AlertManager:
                 device_ip, device_name,
                 severity, category, alert_type,
                 title, message,
-                status, is_clear,
+                status, is_clear, source_status,
                 occurred_at, received_at,
                 fingerprint, occurrence_count,
                 raw_data, created_at, updated_at
@@ -171,7 +185,7 @@ class AlertManager:
                 %s, %s,
                 %s, %s, %s,
                 %s, %s,
-                %s, %s,
+                %s, %s, %s,
                 %s, %s,
                 %s, %s,
                 %s, %s, %s
@@ -181,14 +195,14 @@ class AlertManager:
             alert.device_ip, alert.device_name,
             alert.severity.value, alert.category.value, alert.alert_type,
             alert.title, alert.message,
-            alert.status.value, alert.is_clear,
+            alert.status.value, alert.is_clear, alert.source_status,
             alert.occurred_at, alert.received_at,
             alert.fingerprint, alert.occurrence_count,
-            str(alert.raw_data), now, now
+            json.dumps(alert.raw_data), now, now
         ))
         
         # Add history entry
-        await self._add_history(alert.id, "created", None, AlertStatus.ACTIVE)
+        await self._add_history(alert.id, "created", None, alert.status)
         
         return alert
     
@@ -216,51 +230,20 @@ class AlertManager:
         if alert.status == AlertStatus.ACTIVE:
             await self.resolve_alert(
                 alert.id,
-                resolved_by="system",
                 notes="Auto-resolved by clear event"
             )
-    
-    async def acknowledge_alert(
-        self,
-        alert_id: UUID,
-        user: str,
-        notes: Optional[str] = None
-    ) -> Alert:
-        """Mark alert as acknowledged."""
-        now = datetime.utcnow()
-        
-        db_execute("""
-            UPDATE alerts SET
-                status = %s,
-                acknowledged_at = %s,
-                acknowledged_by = %s,
-                updated_at = %s
-            WHERE id = %s
-        """, (AlertStatus.ACKNOWLEDGED.value, now, user, now, str(alert_id)))
-        
-        alert = await self.get_alert(alert_id)
-        
-        await self._add_history(
-            alert_id, "acknowledged",
-            AlertStatus.ACTIVE, AlertStatus.ACKNOWLEDGED,
-            user_id=user, notes=notes
-        )
-        
-        await self._event_bus.publish(
-            EventType.ALERT_ACKNOWLEDGED,
-            alert,
-            source="alert_manager"
-        )
-        
-        return alert
     
     async def resolve_alert(
         self,
         alert_id: UUID,
-        resolved_by: str = "system",
         notes: Optional[str] = None
     ) -> Alert:
-        """Mark alert as resolved."""
+        """
+        Mark alert as resolved.
+        
+        Note: This is typically called by the system during reconciliation,
+        not by users. Status changes come from source systems.
+        """
         now = datetime.utcnow()
         
         # Get current status for history
@@ -271,17 +254,16 @@ class AlertManager:
             UPDATE alerts SET
                 status = %s,
                 resolved_at = %s,
-                resolved_by = %s,
                 updated_at = %s
             WHERE id = %s
-        """, (AlertStatus.RESOLVED.value, now, resolved_by, now, str(alert_id)))
+        """, (AlertStatus.RESOLVED.value, now, now, str(alert_id)))
         
         alert = await self.get_alert(alert_id)
         
         await self._add_history(
             alert_id, "resolved",
             old_status, AlertStatus.RESOLVED,
-            user_id=resolved_by, notes=notes
+            notes=notes
         )
         
         await self._event_bus.publish(
@@ -452,27 +434,38 @@ class AlertManager:
     
     async def get_alert_stats(self) -> Dict[str, Any]:
         """Get alert statistics."""
-        # Active count by severity
-        severity_rows = db_query("""
-            SELECT severity, COUNT(*) as count
+        # Count by severity and status (ALL statuses including resolved)
+        severity_status_rows = db_query("""
+            SELECT severity, status, COUNT(*) as count
             FROM alerts
-            WHERE status = 'active'
-            GROUP BY severity
+            GROUP BY severity, status
         """)
         
-        by_severity = {row["severity"]: row["count"] for row in severity_rows}
+        # Build nested structure: by_severity[severity][status] = count
+        by_severity_status = {}
+        for row in severity_status_rows:
+            sev = row["severity"]
+            status = row["status"]
+            if sev not in by_severity_status:
+                by_severity_status[sev] = {"active": 0, "acknowledged": 0, "suppressed": 0, "resolved": 0}
+            by_severity_status[sev][status] = row["count"]
         
-        # Active count by category
+        # Also compute totals per severity (non-resolved)
+        by_severity = {}
+        for sev, statuses in by_severity_status.items():
+            by_severity[sev] = sum(statuses.values())
+        
+        # Active count by category (non-resolved)
         category_rows = db_query("""
             SELECT category, COUNT(*) as count
             FROM alerts
-            WHERE status = 'active'
+            WHERE status != 'resolved'
             GROUP BY category
         """)
         
         by_category = {row["category"]: row["count"] for row in category_rows}
         
-        # Count by status
+        # Count by status (all statuses)
         status_rows = db_query("""
             SELECT status, COUNT(*) as count
             FROM alerts
@@ -481,9 +474,13 @@ class AlertManager:
         
         by_status = {row["status"]: row["count"] for row in status_rows}
         
+        # Total non-resolved
+        total_non_resolved = sum(by_severity.values())
+        
         return {
-            "total_active": by_status.get("active", 0),
+            "total_active": total_non_resolved,
             "by_severity": by_severity,
+            "by_severity_status": by_severity_status,
             "by_category": by_category,
             "by_status": by_status,
         }
@@ -553,10 +550,8 @@ class AlertManager:
             impact=Impact(row["impact"]) if row.get("impact") else None,
             urgency=Urgency(row["urgency"]) if row.get("urgency") else None,
             priority=Priority(row["priority"]) if row.get("priority") else None,
-            acknowledged_at=row.get("acknowledged_at"),
-            acknowledged_by=row.get("acknowledged_by"),
+            source_status=row.get("source_status"),
             resolved_at=row.get("resolved_at"),
-            resolved_by=row.get("resolved_by"),
             correlated_to_id=UUID(row["correlated_to_id"]) if row.get("correlated_to_id") else None,
             correlation_rule=row.get("correlation_rule"),
             fingerprint=row.get("fingerprint"),

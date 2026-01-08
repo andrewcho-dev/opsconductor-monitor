@@ -22,9 +22,9 @@ export function GeneralSettings() {
   const loadSettings = async () => {
     try {
       setLoading(true);
-      const data = await fetchApi('/get_settings');
-      if (data) {
-        setSettings(prev => ({ ...prev, ...data }));
+      const response = await fetchApi('/system/v1/settings');
+      if (response) {
+        setSettings(prev => ({ ...prev, ...response }));
       }
     } catch (err) {
       console.error('Failed to load settings:', err);
@@ -37,11 +37,9 @@ export function GeneralSettings() {
     try {
       setSaving(true);
       setMessage(null);
-      await fetchApi('/save_settings', {
-        method: 'POST',
-        body: JSON.stringify(settings),
-      });
-      setMessage({ type: 'success', text: 'Settings saved successfully' });
+      // For now, just show a message since the backend endpoint structure is different
+      // TODO: Implement proper settings save with correct API
+      setMessage({ type: 'info', text: 'Settings save not yet implemented' });
     } catch (err) {
       setMessage({ type: 'error', text: err.message });
     } finally {

@@ -93,7 +93,7 @@ export function GlobalNav() {
         />
         <div className="hidden sm:block">
           <div className="font-bold text-lg leading-tight">OpsConductor</div>
-          <div className="text-xs text-slate-400 leading-tight">Network Monitor</div>
+          <div className="text-xs text-slate-400 leading-tight">Operations Management System</div>
         </div>
       </div>
 

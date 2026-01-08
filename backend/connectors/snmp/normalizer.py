@@ -11,8 +11,8 @@ import re
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 
-from utils.db import db_query, db_query_one
-from core.models import NormalizedAlert, Severity, Category
+from backend.utils.db import db_query, db_query_one
+from backend.core.models import NormalizedAlert, Severity, Category
 
 logger = logging.getLogger(__name__)
 

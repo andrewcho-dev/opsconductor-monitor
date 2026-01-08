@@ -16,6 +16,7 @@ from .notifications import router as notifications_router
 from .alerts import router as alerts_router
 from .dependencies import router as dependencies_router
 from .connectors import router as connectors_router
+from .normalization import router as normalization_router
 
 __all__ = [
     'system_router',
@@ -30,4 +31,5 @@ __all__ = [
     'alerts_router',
     'dependencies_router',
     'connectors_router',
+    'normalization_router',
 ]

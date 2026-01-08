@@ -23,7 +23,7 @@ def _make_celery() -> Celery:
         "opsconductor_monitor",
         broker=broker_url,
         backend=result_backend,
-        include=["backend.tasks.job_tasks", "backend.tasks.polling_tasks", "backend.tasks.generic_polling_task"],
+        include=["backend.tasks.job_tasks", "backend.tasks.polling_tasks", "backend.tasks.generic_polling_task", "backend.tasks.connector_polling"],
     )
 
     # Optimized for high-throughput SNMP/SSH polling of 1000+ devices
@@ -83,6 +83,11 @@ def _make_celery() -> Celery:
             "opsconductor-polling-scheduler": {
                 "task": "polling.scheduler_tick",
                 "schedule": 30.0,  # Check for due polls every 30 seconds
+            },
+            # Connector polling - polls PRTG, MCP, etc. for alerts
+            "opsconductor-connector-polling": {
+                "task": "poll_all_connectors",
+                "schedule": 60.0,  # Check every 60 seconds (individual intervals in task)
             },
         },
     )

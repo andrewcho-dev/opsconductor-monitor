@@ -16,7 +16,7 @@ export function useAlerts(initialFilters = {}) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState({
-    status: 'active',
+    status: 'active,acknowledged,suppressed',  // Default: show all non-resolved
     severity: null,
     category: null,
     device_ip: null,

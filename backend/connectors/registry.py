@@ -11,8 +11,30 @@ from .base import BaseConnector
 
 logger = logging.getLogger(__name__)
 
+# Import connector classes
+from .prtg import PRTGConnector
+from .mcp import MCPConnector
+from .snmp import SNMPTrapConnector
+from .eaton import EatonConnector
+from .axis import AxisConnector
+from .milestone import MilestoneConnector
+from .cradlepoint import CradlepointConnector
+from .siklu import SikluConnector
+from .ubiquiti import UbiquitiConnector
+
 # Registry of connector classes
-_CONNECTOR_REGISTRY: Dict[str, Type[BaseConnector]] = {}
+_CONNECTOR_REGISTRY: Dict[str, Type[BaseConnector]] = {
+    "prtg": PRTGConnector,
+    "mcp": MCPConnector,
+    "snmp_trap": SNMPTrapConnector,
+    "snmp_poll": SNMPTrapConnector,  # Reuse for now
+    "eaton": EatonConnector,
+    "axis": AxisConnector,
+    "milestone": MilestoneConnector,
+    "cradlepoint": CradlepointConnector,
+    "siklu": SikluConnector,
+    "ubiquiti": UbiquitiConnector,
+}
 
 # List of all connector types (for UI display)
 CONNECTOR_TYPES = [

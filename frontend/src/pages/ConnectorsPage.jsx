@@ -4,7 +4,7 @@
  * Configure and monitor alert source connectors.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   RefreshCw, Settings, Play, Pause, TestTube, Check, X,
   Wifi, WifiOff, AlertCircle, Clock
@@ -80,19 +80,19 @@ function ConnectorCard({ connector, onTest, onToggle, onConfigure, testing }) {
           onClick={() => onToggle(connector.id, !connector.enabled)}
           className={`flex-1 flex items-center justify-center gap-1 px-3 py-2 rounded text-sm font-medium ${
             connector.enabled
-              ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
-              : 'bg-blue-600 text-white hover:bg-blue-700'
+              ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50 border border-green-300 dark:border-green-700'
+              : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 border border-gray-300 dark:border-gray-600'
           }`}
         >
           {connector.enabled ? (
             <>
-              <Pause className="h-4 w-4" />
-              Disable
+              <Check className="h-4 w-4" />
+              Enabled
             </>
           ) : (
             <>
-              <Play className="h-4 w-4" />
-              Enable
+              <Pause className="h-4 w-4" />
+              Disabled
             </>
           )}
         </button>
@@ -120,8 +120,31 @@ function ConnectorCard({ connector, onTest, onToggle, onConfigure, testing }) {
 }
 
 function ConfigModal({ connector, onClose, onSave }) {
-  const [config, setConfig] = useState(connector?.config || {});
+  const [config, setConfig] = useState({});
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  // Fetch full connector details with config
+  useEffect(() => {
+    if (!connector?.id) return;
+    
+    const fetchConfig = async () => {
+      setLoading(true);
+      try {
+        const response = await fetch(`/api/v1/connectors/${connector.id}`);
+        const data = await response.json();
+        if (data.success && data.data?.config) {
+          setConfig(data.data.config);
+        }
+      } catch (err) {
+        console.error('Failed to fetch config:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchConfig();
+  }, [connector?.id]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -150,7 +173,13 @@ function ConfigModal({ connector, onClose, onSave }) {
         </div>
 
         <div className="p-4 space-y-4 max-h-96 overflow-y-auto">
-          {Object.entries(config).map(([key, value]) => (
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <RefreshCw className="h-6 w-6 animate-spin text-blue-600" />
+            </div>
+          ) : Object.keys(config).length === 0 ? (
+            <p className="text-gray-500 text-center py-8">No configuration options available</p>
+          ) : Object.entries(config).map(([key, value]) => (
             <div key={key}>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}

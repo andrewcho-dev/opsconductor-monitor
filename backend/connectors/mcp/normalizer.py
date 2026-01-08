@@ -9,7 +9,7 @@ import hashlib
 from datetime import datetime
 from typing import Dict, Any, Optional
 
-from core.models import NormalizedAlert, Severity, Category
+from backend.core.models import NormalizedAlert, Severity, Category
 
 logger = logging.getLogger(__name__)
 

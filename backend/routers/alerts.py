@@ -37,16 +37,14 @@ class AlertResponse(BaseModel):
     title: str
     message: Optional[str]
     status: str
+    source_status: Optional[str]
     is_clear: bool
     priority: Optional[str]
     impact: Optional[str]
     urgency: Optional[str]
     occurred_at: datetime
     received_at: datetime
-    acknowledged_at: Optional[datetime]
-    acknowledged_by: Optional[str]
     resolved_at: Optional[datetime]
-    resolved_by: Optional[str]
     correlated_to_id: Optional[str]
     correlation_rule: Optional[str]
     occurrence_count: int
@@ -120,16 +118,14 @@ def alert_to_response(alert) -> AlertResponse:
         title=alert.title,
         message=alert.message,
         status=alert.status.value if hasattr(alert.status, 'value') else alert.status,
+        source_status=alert.source_status,
         is_clear=alert.is_clear,
         priority=alert.priority.value if alert.priority and hasattr(alert.priority, 'value') else alert.priority,
         impact=alert.impact.value if alert.impact and hasattr(alert.impact, 'value') else alert.impact,
         urgency=alert.urgency.value if alert.urgency and hasattr(alert.urgency, 'value') else alert.urgency,
         occurred_at=alert.occurred_at,
         received_at=alert.received_at,
-        acknowledged_at=alert.acknowledged_at,
-        acknowledged_by=alert.acknowledged_by,
         resolved_at=alert.resolved_at,
-        resolved_by=alert.resolved_by,
         correlated_to_id=str(alert.correlated_to_id) if alert.correlated_to_id else None,
         correlation_rule=alert.correlation_rule,
         occurrence_count=alert.occurrence_count,

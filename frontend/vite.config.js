@@ -26,6 +26,20 @@ export default defineConfig({
       '/auth': API_SERVER,          // Login/logout endpoints
       
       // ============================================================
+      // MVP Alert Aggregation API
+      // ============================================================
+      '/api/v1': API_SERVER,        // Alerts, connectors, dependencies
+      
+      // ============================================================
+      // WebSocket for Real-Time Updates
+      // ============================================================
+      '/ws': {
+        target: API_SERVER,
+        ws: true,
+        changeOrigin: true,
+      },
+      
+      // ============================================================
       // API Documentation
       // ============================================================
       '/api/docs': API_SERVER,

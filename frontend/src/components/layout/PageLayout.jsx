@@ -12,12 +12,12 @@ import { ModuleSidebar } from './ModuleSidebar';
  */
 export function PageLayout({ module, children, sidebarContent, fullWidth = false }) {
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
       {/* Global Navigation Bar */}
       <GlobalNav />
       
       {/* Main Content Area */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex min-h-0">
         {/* Sidebar - hidden if fullWidth */}
         {!fullWidth && (
           <ModuleSidebar module={module}>
@@ -26,7 +26,7 @@ export function PageLayout({ module, children, sidebarContent, fullWidth = false
         )}
         
         {/* Page Content */}
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 overflow-hidden">
           {children}
         </main>
       </div>

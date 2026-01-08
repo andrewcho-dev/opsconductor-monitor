@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 from uuid import UUID, uuid4
 
-from utils.db import db_query, db_query_one, db_execute
+from backend.utils.db import db_query, db_query_one, db_execute
 
 from .models import Dependency, DependencyType, Alert, AlertStatus
 

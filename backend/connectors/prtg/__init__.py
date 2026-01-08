@@ -1,6 +1,6 @@
 """PRTG Connector Package."""
 
 from .connector import PRTGConnector
-from .normalizer import PRTGNormalizer
+from .database_normalizer import PRTGDatabaseNormalizer
 
-__all__ = ["PRTGConnector", "PRTGNormalizer"]
+__all__ = ["PRTGConnector", "PRTGDatabaseNormalizer"]

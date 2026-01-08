@@ -4,11 +4,12 @@
  * Main alert monitoring interface.
  */
 
-import { useState, useCallback } from 'react';
-import { RefreshCw, Check, CheckCheck } from 'lucide-react';
-import { useAlerts, useAlertActions } from '../hooks/useAlerts';
-import { AlertStats, AlertFilters, AlertTable } from '../components/alerts';
+import { useState, useEffect } from 'react';
+import { RefreshCw, Wifi, WifiOff } from 'lucide-react';
+import { useAlerts } from '../hooks/useAlerts';
+import { AlertStats, AlertTable } from '../components/alerts';
 import { PageLayout } from '../components/layout/PageLayout';
+import { useAlertWebSocketRefresh } from '../hooks/useAlertWebSocket';
 
 export function AlertDashboard() {
   const {
@@ -23,55 +24,33 @@ export function AlertDashboard() {
     refresh,
   } = useAlerts();
 
-  const { acknowledgeAlert, resolveAlert, bulkAcknowledge, bulkResolve, loading: actionLoading } = useAlertActions();
+  // Real-time WebSocket updates - automatically refreshes when alerts change
+  const { isConnected } = useAlertWebSocketRefresh(refresh);
   
   const [selectedIds, setSelectedIds] = useState([]);
+  const [lastUpdated, setLastUpdated] = useState(new Date());
+  const [secondsAgo, setSecondsAgo] = useState(0);
 
-  const handleAcknowledge = useCallback(async (alertId) => {
-    try {
-      await acknowledgeAlert(alertId);
-      refresh();
-    } catch (err) {
-      console.error('Failed to acknowledge:', err);
+  // Update lastUpdated when alerts change
+  useEffect(() => {
+    if (alerts?.length >= 0) {
+      setLastUpdated(new Date());
     }
-  }, [acknowledgeAlert, refresh]);
+  }, [alerts]);
 
-  const handleResolve = useCallback(async (alertId) => {
-    try {
-      await resolveAlert(alertId);
-      refresh();
-    } catch (err) {
-      console.error('Failed to resolve:', err);
-    }
-  }, [resolveAlert, refresh]);
-
-  const handleBulkAcknowledge = useCallback(async () => {
-    if (selectedIds.length === 0) return;
-    try {
-      await bulkAcknowledge(selectedIds);
-      setSelectedIds([]);
-      refresh();
-    } catch (err) {
-      console.error('Failed to bulk acknowledge:', err);
-    }
-  }, [selectedIds, bulkAcknowledge, refresh]);
-
-  const handleBulkResolve = useCallback(async () => {
-    if (selectedIds.length === 0) return;
-    try {
-      await bulkResolve(selectedIds);
-      setSelectedIds([]);
-      refresh();
-    } catch (err) {
-      console.error('Failed to bulk resolve:', err);
-    }
-  }, [selectedIds, bulkResolve, refresh]);
+  // Update seconds ago counter
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setSecondsAgo(Math.floor((Date.now() - lastUpdated.getTime()) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [lastUpdated]);
 
   return (
     <PageLayout module="alerts">
-      <div className="p-6">
+      <div className="p-6 h-full flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-4 flex-shrink-0">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
               Alert Dashboard
@@ -80,77 +59,79 @@ export function AlertDashboard() {
               Monitor and manage alerts from all connected systems
             </p>
           </div>
-          <button
-            onClick={refresh}
-            disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </button>
+          <div className="flex items-center gap-3">
+            {/* Real-time connection status and last updated */}
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${
+              isConnected 
+                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' 
+                : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+            }`}>
+              {isConnected ? (
+                <Wifi className="h-3.5 w-3.5" />
+              ) : (
+                <WifiOff className="h-3.5 w-3.5" />
+              )}
+              <span>
+                {secondsAgo < 5 ? 'Just now' : `${secondsAgo}s ago`}
+              </span>
+              <button
+                onClick={refresh}
+                disabled={loading}
+                className="p-0.5 hover:bg-green-200 dark:hover:bg-green-800 rounded transition-colors"
+                title="Refresh now"
+              >
+                <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+          </div>
         </div>
 
-        {/* Stats */}
-        <div className="mb-6">
-          <AlertStats stats={stats} />
+        {/* Stats - clickable to filter by severity */}
+        <div className="mb-4 flex-shrink-0">
+          <AlertStats 
+            stats={stats} 
+            activeFilter={filters.severity}
+            onFilterChange={(severity) => setFilters({ severity })}
+          />
         </div>
 
-        {/* Filters */}
-        <div className="mb-6">
-          <AlertFilters filters={filters} onChange={setFilters} />
-        </div>
-
-        {/* Bulk Actions */}
+        {/* Selection info */}
         {selectedIds.length > 0 && (
-          <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg flex items-center justify-between">
+          <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg flex items-center justify-between flex-shrink-0">
             <span className="text-sm text-blue-800 dark:text-blue-200">
               {selectedIds.length} alert{selectedIds.length !== 1 ? 's' : ''} selected
             </span>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleBulkAcknowledge}
-                disabled={actionLoading}
-                className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50"
-              >
-                <Check className="h-4 w-4" />
-                Acknowledge
-              </button>
-              <button
-                onClick={handleBulkResolve}
-                disabled={actionLoading}
-                className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white rounded text-sm hover:bg-green-700 disabled:opacity-50"
-              >
-                <CheckCheck className="h-4 w-4" />
-                Resolve
-              </button>
-              <button
-                onClick={() => setSelectedIds([])}
-                className="px-3 py-1.5 text-gray-600 dark:text-gray-300 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
-              >
-                Clear
-              </button>
-            </div>
+            <button
+              onClick={() => setSelectedIds([])}
+              className="px-3 py-1.5 text-gray-600 dark:text-gray-300 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+            >
+              Clear Selection
+            </button>
           </div>
         )}
 
         {/* Error */}
         {error && (
-          <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-200">
+          <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-200 flex-shrink-0">
             {error}
           </div>
         )}
 
         {/* Alert Table */}
-        <AlertTable
-          alerts={alerts}
-          loading={loading}
-          pagination={pagination}
-          onPageChange={setPage}
-          onAcknowledge={handleAcknowledge}
-          onResolve={handleResolve}
-          selectedIds={selectedIds}
-          onSelectChange={setSelectedIds}
-        />
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <AlertTable
+            alerts={alerts}
+            loading={loading}
+            pagination={pagination}
+            onPageChange={setPage}
+            selectedIds={selectedIds}
+            onSelectChange={setSelectedIds}
+            filters={filters}
+            onFilterChange={setFilters}
+            statusCounts={stats?.by_status || {}}
+            severityStatusCounts={stats?.by_severity_status || {}}
+          />
+        </div>
       </div>
     </PageLayout>
   );

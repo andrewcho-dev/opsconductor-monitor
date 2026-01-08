@@ -49,14 +49,6 @@ const moduleNavigation = {
         items: [
           { id: 'dashboard', label: 'Alert Dashboard', icon: LayoutDashboard, path: '/alerts' },
         ]
-      },
-      {
-        title: 'Filter By Status',
-        items: [
-          { id: 'active', label: 'Active Alerts', icon: AlertTriangle, path: '/alerts?status=active' },
-          { id: 'acknowledged', label: 'Acknowledged', icon: Circle, path: '/alerts?status=acknowledged' },
-          { id: 'resolved', label: 'Resolved', icon: ShieldCheck, path: '/alerts?status=resolved' },
-        ]
       }
     ]
   },
@@ -100,6 +92,8 @@ const moduleNavigation = {
         title: 'Configuration',
         items: [
           { id: 'settings', label: 'Settings', icon: Settings, path: '/system/settings' },
+          { id: 'normalization', label: 'Normalization Rules', icon: FileKey, path: '/system/normalization' },
+          { id: 'polling', label: 'Connector Polling', icon: Clock, path: '/system/polling' },
         ]
       },
       {

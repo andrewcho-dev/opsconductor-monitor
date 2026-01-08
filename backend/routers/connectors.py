@@ -8,11 +8,13 @@ import logging
 from typing import Optional, List
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query, Request, Form
+from fastapi import APIRouter, HTTPException, Query, Request, Form, Security
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 
-from utils.db import db_query, db_query_one, db_execute
+from backend.utils.db import db_query, db_query_one, db_execute
 from connectors.registry import CONNECTOR_TYPES, get_connector_class, create_connector
+from core.alert_manager import get_alert_manager
 
 logger = logging.getLogger(__name__)
 
@@ -335,6 +337,13 @@ async def prtg_webhook(request: Request):
         
         alert = await connector.handle_webhook(data)
         
+        # Process alert through AlertManager
+        if alert:
+            from core.alert_manager import get_alert_manager
+            alert_manager = get_alert_manager()
+            stored_alert = await alert_manager.process_alert(alert)
+            logger.info(f"Stored alert {stored_alert.id}")
+        
         # Update connector stats
         db_execute("""
             UPDATE connectors 
@@ -349,6 +358,72 @@ async def prtg_webhook(request: Request):
     except Exception as e:
         logger.exception("Error processing PRTG webhook")
         return {"success": False, "message": str(e)}
+
+
+@router.post("/{connector_id}/poll", summary="Manually trigger connector polling")
+async def poll_connector(
+    connector_id: str,
+    credentials: HTTPAuthorizationCredentials = Security(HTTPBearer())
+):
+    """
+    Manually trigger polling for a specific connector.
+    
+    This is useful for testing or immediate data refresh.
+    """
+    try:
+        # Get connector
+        row = db_query_one(
+            "SELECT id, name, type, config, enabled FROM connectors WHERE id = %s",
+            (connector_id,)
+        )
+        
+        if not row:
+            raise HTTPException(status_code=404, detail="Connector not found")
+        
+        if not row["enabled"]:
+            raise HTTPException(status_code=400, detail="Connector is not enabled")
+        
+        # Create connector and poll
+        from connectors.registry import create_connector
+        connector = create_connector(row["type"], dict(row.get("config", {})))
+        if not connector:
+            raise HTTPException(status_code=400, detail=f"Unknown connector type: {row['type']}")
+        
+        logger.info(f"Manual poll triggered for {row['name']}")
+        
+        # Poll for alerts
+        alerts = await connector.poll()
+        
+        if alerts:
+            # Process alerts through AlertManager
+            alert_manager = get_alert_manager()
+            for alert in alerts:
+                stored_alert = await alert_manager.process_alert(alert)
+                logger.info(f"Stored alert {stored_alert.id} from {row['name']}")
+        
+        # Update connector stats
+        db_execute("""
+            UPDATE connectors 
+            SET last_poll_at = NOW(),
+                alerts_received = alerts_received + %s,
+                alerts_today = alerts_today + %s,
+                status = 'connected',
+                error_message = NULL
+            WHERE id = %s
+        """, (len(alerts), len(alerts), connector_id))
+        
+        return {
+            "success": True,
+            "message": f"Poll completed for {row['name']}",
+            "alerts": len(alerts),
+            "connector": row["name"]
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Manual poll error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/axis/webhook")

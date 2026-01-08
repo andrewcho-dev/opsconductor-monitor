@@ -10,11 +10,11 @@ import aiohttp
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 
-from connectors.base import WebhookConnector, PollingConnector, BaseNormalizer
-from core.models import NormalizedAlert, ConnectorStatus
-from core.alert_manager import get_alert_manager
+from backend.connectors.base import WebhookConnector, PollingConnector, BaseNormalizer
+from backend.core.models import NormalizedAlert, ConnectorStatus
+from backend.core.alert_manager import get_alert_manager
 
-from .normalizer import PRTGNormalizer
+from .database_normalizer import PRTGDatabaseNormalizer
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ class PRTGConnector(WebhookConnector):
         return "prtg"
     
     def _create_normalizer(self) -> BaseNormalizer:
-        return PRTGNormalizer()
+        return PRTGDatabaseNormalizer()
     
     def _get_auth_params(self) -> Dict[str, str]:
         """Get authentication parameters."""
@@ -162,10 +162,7 @@ class PRTGConnector(WebhookConnector):
             
             logger.info(f"PRTG webhook: {normalized.title} ({normalized.severity.value})")
             
-            # Process through alert manager
-            alert_manager = get_alert_manager()
-            await alert_manager.process_alert(normalized)
-            
+            # Return normalized alert - router will process through AlertManager
             return normalized
             
         except Exception as e:
@@ -177,11 +174,12 @@ class PRTGConnector(WebhookConnector):
         alerts = []
         
         try:
-            # Get sensors in alert states (down, warning, unusual)
+            # Get sensors in alert states (down, warning, unusual, paused, acknowledged)
+            # Include paused sensors so we can show them as "suppressed" rather than incorrectly resolving
             params = {
                 "content": "sensors",
                 "columns": "objid,sensor,device,group,probe,status,status_raw,message,lastvalue,priority,type,host",
-                "filter_status": [4, 5, 10, 13, 14],  # Warning, Down, Unusual, Down Ack, Down Partial
+                "filter_status": [4, 5, 7, 8, 9, 10, 11, 12, 13, 14],  # Warning, Down, Paused variants, Unusual, Down Ack, Down Partial
                 "count": 5000,
             }
             
@@ -191,7 +189,8 @@ class PRTGConnector(WebhookConnector):
             for sensor in sensors:
                 try:
                     normalized = self.normalizer.normalize(sensor)
-                    alerts.append(normalized)
+                    if normalized is not None:  # Skip paused sensors (normalizer returns None)
+                        alerts.append(normalized)
                 except Exception as e:
                     logger.warning(f"Failed to normalize PRTG sensor {sensor.get('objid')}: {e}")
             
@@ -264,8 +263,3 @@ class PRTGConnector(WebhookConnector):
         except Exception as e:
             logger.error(f"Error acknowledging PRTG alarm: {e}")
             return False
-
-
-# Register the connector
-from connectors.registry import register_connector
-register_connector("prtg", PRTGConnector)

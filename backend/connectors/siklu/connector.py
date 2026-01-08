@@ -11,9 +11,9 @@ from datetime import datetime
 from typing import Dict, Any, Optional, List
 from base64 import b64encode
 
-from connectors.base import PollingConnector, BaseNormalizer
-from core.models import NormalizedAlert, ConnectorStatus
-from core.alert_manager import get_alert_manager
+from backend.connectors.base import PollingConnector, BaseNormalizer
+from backend.core.models import NormalizedAlert, ConnectorStatus
+from backend.core.alert_manager import get_alert_manager
 
 from .normalizer import SikluNormalizer
 
@@ -208,7 +208,3 @@ class SikluConnector(PollingConnector):
                 await alert_manager.process_alert(normalized)
             except Exception as e:
                 logger.warning(f"Failed to process Siklu alert: {e}")
-
-
-from connectors.registry import register_connector
-register_connector("siklu", SikluConnector)

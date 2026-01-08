@@ -9,9 +9,9 @@ import asyncio
 from datetime import datetime
 from typing import Dict, Any, Optional, List, Tuple
 
-from connectors.base import BaseConnector, BaseNormalizer
-from core.models import NormalizedAlert, ConnectorStatus
-from core.alert_manager import get_alert_manager
+from backend.connectors.base import BaseConnector, BaseNormalizer
+from backend.core.models import NormalizedAlert, ConnectorStatus
+from backend.core.alert_manager import get_alert_manager
 
 from .normalizer import SNMPNormalizer
 
@@ -270,8 +270,3 @@ class SNMPTrapProtocol(asyncio.DatagramProtocol):
     
     def error_received(self, exc):
         logger.error(f"SNMP trap receiver error: {exc}")
-
-
-# Register the connector
-from connectors.registry import register_connector
-register_connector("snmp_trap", SNMPTrapConnector)

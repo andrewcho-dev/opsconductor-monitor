@@ -10,7 +10,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 
-from core.models import NormalizedAlert, Severity, Category, ConnectorStatus
+from backend.core.models import NormalizedAlert, Severity, Category, ConnectorStatus
 
 logger = logging.getLogger(__name__)
 
@@ -329,7 +329,7 @@ class PollingConnector(BaseConnector):
         Override to customize processing, or leave default
         to publish to event bus.
         """
-        from core.event_bus import get_event_bus, EventType
+        from backend.core.event_bus import get_event_bus, EventType
         
         bus = get_event_bus()
         for alert in alerts:

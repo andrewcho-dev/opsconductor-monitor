@@ -26,12 +26,14 @@ import {
   SystemOverviewPage, 
   AlertsPage as SystemAlertsPage,
   SettingsPage as SystemSettingsPage,
-  NotificationsPage,
   LogsPage,
-  AboutPage,
-  UsersPage,
-  RolesPage
+  AboutPage
 } from "./pages/system";
+import NotificationsPage from "./pages/system/NotificationsPage.jsx";
+import UsersPage from "./pages/system/UsersPage.jsx";
+import RolesPage from "./pages/system/RolesPage.jsx";
+import NormalizationRulesPage from "./pages/ColumnMappingPage.jsx";
+import ConnectorPollingPage from "./pages/ConnectorPollingPage.jsx";
 
 // Credentials Module
 import { CredentialVaultPage } from "./pages/credentials";
@@ -114,6 +116,8 @@ function App() {
           <Route path="mcp" element={<MCPSettings />} />
           <Route path="backup" element={<BackupSettings />} />
         </Route>
+        <Route path="/system/normalization" element={<ProtectedRoute permission="system.settings.view"><NormalizationRulesPage /></ProtectedRoute>} />
+        <Route path="/system/polling" element={<ProtectedRoute permission="system.settings.view"><ConnectorPollingPage /></ProtectedRoute>} />
         <Route path="/system/notifications" element={<ProtectedRoute permission="system.settings.view"><NotificationsPage /></ProtectedRoute>} />
         <Route path="/system/credentials" element={<ProtectedRoute><Navigate to="/credentials" replace /></ProtectedRoute>} />
         <Route path="/system/logs" element={<ProtectedRoute permission="system.audit.view"><LogsPage /></ProtectedRoute>} />

@@ -94,40 +94,97 @@ Standard operational categories based on **ITIL/MOF** service classification.
 
 ## 3. Alert Status
 
-Lifecycle states for alert management.
+Alert status reflects the **source system's state**. OpsConductor does not manage its own lifecycle - it mirrors what the originating system reports.
 
-| Status | Code | Description | Transitions From | Transitions To |
-|--------|------|-------------|------------------|----------------|
-| Active | `active` | New alert, needs attention | (new) | acknowledged, suppressed, resolved |
-| Acknowledged | `acknowledged` | Someone is investigating | active | resolved, active (re-alert) |
-| Suppressed | `suppressed` | Correlated to parent alert | active | resolved |
-| Resolved | `resolved` | Issue fixed or cleared | active, acknowledged, suppressed | (terminal) |
-| Expired | `expired` | Auto-closed after timeout | active, acknowledged | (terminal) |
+| Status | Code | Description | Source System Meaning |
+|--------|------|-------------|----------------------|
+| Active | `active` | Alert is currently active | Source reports problem state (down, warning, error, etc.) |
+| Acknowledged | `acknowledged` | Alert acknowledged at source | Source reports alert is ack'd but issue persists |
+| Suppressed | `suppressed` | Alert paused/hidden at source | Source has paused, muted, or suppressed the alert |
+| Resolved | `resolved` | Issue resolved | Source reports OK/clear, or alert no longer present in poll |
+
+### Key Principles
+
+1. **OpsConductor is read-only** - Status changes come from source systems, not user actions in OpsConductor
+2. **Polling reconciliation** - For polled sources, alerts that disappear from poll results are marked `resolved`
+3. **Explicit clears** - For event-based sources, `resolved` requires an explicit clear event (`is_clear=true`)
+4. **Suppression visibility** - Suppressed alerts are still shown (not hidden) but marked as `suppressed`
+
+### Source System Status Mappings
+
+#### PRTG
+
+| PRTG Status | Code | OpsConductor Status |
+|-------------|------|--------------------|
+| Up | 3 | `resolved` |
+| Warning | 4 | `active` |
+| Down | 5 | `active` |
+| Paused by User | 7 | `suppressed` |
+| Paused by Dependency | 8 | `suppressed` |
+| Paused by Schedule | 9 | `suppressed` |
+| Unusual | 10 | `active` |
+| Paused Until | 11 | `suppressed` |
+| Down (Acknowledged) | 13 | `acknowledged` |
+| Down (Partial) | 14 | `active` |
+| Not in poll results | - | `resolved` |
+
+#### Eaton UPS
+
+| Eaton State | OpsConductor Status |
+|-------------|--------------------|
+| Alarm active | `active` |
+| Alarm cleared | `resolved` |
+
+#### SNMP Traps
+
+| Trap Type | OpsConductor Status |
+|-----------|--------------------|
+| Alert trap | `active` |
+| Clear trap (`is_clear=true`) | `resolved` |
+
+#### Axis Cameras
+
+| Axis Event | OpsConductor Status |
+|------------|--------------------|
+| Event active | `active` |
+| Event cleared | `resolved` |
+
+#### Cradlepoint / Siklu / Ubiquiti
+
+| State | OpsConductor Status |
+|-------|--------------------|
+| Alert active | `active` |
+| Alert cleared | `resolved` |
 
 ### Status Workflow
 
 ```
-                    ┌─────────────┐
-                    │    NEW      │
-                    │   ALERT     │
-                    └──────┬──────┘
-                           │
-                           ▼
-                    ┌─────────────┐
-           ┌────────│   ACTIVE    │────────┐
-           │        └──────┬──────┘        │
-           │               │               │
-           ▼               ▼               ▼
-    ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
-    │ ACKNOWLEDGED│ │ SUPPRESSED  │ │  EXPIRED    │
-    └──────┬──────┘ └──────┬──────┘ └─────────────┘
-           │               │               
-           └───────┬───────┘               
-                   ▼                       
-            ┌─────────────┐                
-            │  RESOLVED   │                
-            └─────────────┘                
+    ┌─────────────────────────────────────────────────────────┐
+    │                   SOURCE SYSTEM                         │
+    │  (PRTG, Eaton, SNMP, Axis, Cradlepoint, etc.)          │
+    └─────────────────────────┬───────────────────────────────┘
+                              │
+                              ▼
+    ┌─────────────────────────────────────────────────────────┐
+    │                   OPSCONDUCTOR                          │
+    │                                                         │
+    │   Source says alerting ──────────► ACTIVE               │
+    │   Source says ack'd ─────────────► ACKNOWLEDGED         │
+    │   Source says paused ────────────► SUPPRESSED           │
+    │   Source says OK/clear ──────────► RESOLVED             │
+    │   Alert disappears from poll ────► RESOLVED             │
+    │                                                         │
+    └─────────────────────────────────────────────────────────┘
 ```
+
+### Reconciliation Logic (Polled Sources)
+
+For connectors that poll for current state (PRTG, Eaton, etc.):
+
+1. Before poll: Note all `active`/`acknowledged`/`suppressed` alerts from this source
+2. After poll: Compare returned alerts against existing
+3. Any existing alert NOT in poll results → mark as `resolved`
+4. Only reconcile if connector poll was successful (no errors)
 
 ---
 
@@ -195,15 +252,13 @@ All alerts MUST conform to this schema after normalization.
   "title": "string (max 255 chars)",
   "message": "string (detailed description)",
   
-  "status": "active|acknowledged|suppressed|resolved|expired",
+  "status": "active|acknowledged|suppressed|resolved",
+  "source_status": "string (raw status from source system)",
   "is_clear": false,
   
   "occurred_at": "ISO 8601 timestamp",
   "received_at": "ISO 8601 timestamp",
-  "acknowledged_at": "ISO 8601 timestamp or null",
-  "acknowledged_by": "string or null",
   "resolved_at": "ISO 8601 timestamp or null",
-  "resolved_by": "string or null",
   
   "correlated_to_id": "uuid or null",
   "correlation_rule": "string or null",
@@ -234,9 +289,9 @@ These fields MUST be present on every normalized alert:
 
 These fields may be null or omitted:
 
+- `source_status` (raw status string from source)
 - `impact`, `urgency`, `priority` (calculated later)
-- `acknowledged_at`, `acknowledged_by`
-- `resolved_at`, `resolved_by`
+- `resolved_at`
 - `correlated_to_id`, `correlation_rule`
 - `tags`, `custom_fields`
 

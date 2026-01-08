@@ -41,12 +41,16 @@ class Category(str, Enum):
 
 
 class AlertStatus(str, Enum):
-    """Alert lifecycle states."""
-    ACTIVE = "active"
-    ACKNOWLEDGED = "acknowledged"
-    SUPPRESSED = "suppressed"
-    RESOLVED = "resolved"
-    EXPIRED = "expired"
+    """
+    Alert status reflecting source system state.
+    
+    OpsConductor mirrors the originating system's status - it does not
+    manage its own lifecycle. Status changes come from source systems.
+    """
+    ACTIVE = "active"           # Source reports problem state (down, warning, error)
+    ACKNOWLEDGED = "acknowledged"  # Source reports alert is ack'd but issue persists
+    SUPPRESSED = "suppressed"   # Source has paused, muted, or suppressed the alert
+    RESOLVED = "resolved"       # Source reports OK/clear, or alert no longer in poll
 
 
 class Priority(str, Enum):
@@ -139,6 +143,8 @@ class NormalizedAlert:
     
     # State
     is_clear: bool = False
+    source_status: Optional[str] = None  # Raw status from source system
+    status: Optional[str] = None  # OpsConductor status (active, acknowledged, suppressed, resolved)
     
     # Raw data for debugging
     raw_data: Dict[str, Any] = field(default_factory=dict)
@@ -201,13 +207,11 @@ class Alert:
     urgency: Optional[Urgency] = None
     priority: Optional[Priority] = None
     
-    # Acknowledgment
-    acknowledged_at: Optional[datetime] = None
-    acknowledged_by: Optional[str] = None
+    # Source system status (raw value from source)
+    source_status: Optional[str] = None
     
     # Resolution
     resolved_at: Optional[datetime] = None
-    resolved_by: Optional[str] = None
     
     # Correlation
     correlated_to_id: Optional[UUID] = None
@@ -229,6 +233,12 @@ class Alert:
     @classmethod
     def from_normalized(cls, normalized: NormalizedAlert, **kwargs) -> "Alert":
         """Create Alert from NormalizedAlert."""
+        # Use status from normalized alert if provided, otherwise default to ACTIVE
+        if normalized.status:
+            status = AlertStatus(normalized.status)
+        else:
+            status = AlertStatus.ACTIVE
+        
         return cls(
             id=normalized.id,
             source_system=normalized.source_system,
@@ -240,11 +250,12 @@ class Alert:
             alert_type=normalized.alert_type,
             title=normalized.title,
             message=normalized.message,
-            status=AlertStatus.ACTIVE,
+            status=status,
             is_clear=normalized.is_clear,
             occurred_at=normalized.occurred_at,
             received_at=normalized.received_at,
             raw_data=normalized.raw_data,
+            source_status=normalized.source_status,
             **kwargs
         )
     

@@ -7,10 +7,15 @@ Wants=postgresql.service redis.service
 Type=simple
 User=opsconductor
 Group=opsconductor
-WorkingDirectory=/home/opsconductor/opsconductor-monitor/CascadeProjects/windsurf-project
-Environment="PATH=/home/opsconductor/.local/bin:/usr/local/bin:/usr/bin:/bin"
-ExecStart=/home/opsconductor/.local/bin/celery -A celery_app beat \
-    --loglevel=info
+WorkingDirectory=/home/opsconductor/opsconductor-monitor/CascadeProjects/windsurf-project/backend
+Environment="PATH=/home/opsconductor/.local/bin:/usr/bin:/bin"
+Environment="PYTHONPATH=/home/opsconductor/opsconductor-monitor/CascadeProjects/windsurf-project:/home/opsconductor/opsconductor-monitor/CascadeProjects/windsurf-project/backend"
+Environment="PG_HOST=localhost"
+Environment="PG_PORT=5432"
+Environment="PG_DATABASE=network_scan"
+Environment="PG_USER=postgres"
+Environment="PG_PASSWORD=postgres"
+ExecStart=/home/opsconductor/.local/bin/celery -A celery_app beat -l info   --loglevel=info
 ExecStop=/bin/kill -s TERM $MAINPID
 Restart=always
 RestartSec=10

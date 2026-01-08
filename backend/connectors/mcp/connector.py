@@ -10,9 +10,9 @@ import aiohttp
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 
-from connectors.base import PollingConnector, BaseNormalizer
-from core.models import NormalizedAlert, ConnectorStatus
-from core.alert_manager import get_alert_manager
+from backend.connectors.base import PollingConnector, BaseNormalizer
+from backend.core.models import NormalizedAlert, ConnectorStatus
+from backend.core.alert_manager import get_alert_manager
 
 from .normalizer import MCPNormalizer
 
@@ -198,8 +198,3 @@ class MCPConnector(PollingConnector):
         filter_param = f"&filter=status=={status}" if status else ""
         result = await self._request("GET", f"/nsi/api/search/alarms?limit=500{filter_param}")
         return result.get("data", [])
-
-
-# Register the connector
-from connectors.registry import register_connector
-register_connector("mcp", MCPConnector)

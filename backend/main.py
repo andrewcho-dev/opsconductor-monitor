@@ -26,6 +26,14 @@ logger = get_logger(__name__, LogSource.SYSTEM)
 async def lifespan(app: FastAPI):
     """Application lifespan handler"""
     logger.info("OpsConductor API starting up...")
+    
+    # Setup WebSocket event subscriptions (in-process events)
+    from backend.core.websocket_manager import setup_event_subscriptions, setup_redis_subscriptions
+    setup_event_subscriptions()
+    
+    # Setup Redis pub/sub for cross-process events (from Celery workers)
+    await setup_redis_subscriptions()
+    
     yield
     logger.info("OpsConductor API shutting down...")
 
@@ -82,7 +90,9 @@ from backend.routers import (
     alerts_router,
     dependencies_router,
     connectors_router,
+    normalization_router,
 )
+from backend.routers.websocket import router as websocket_router
 
 # Include all routers
 app.include_router(system_router)
@@ -99,6 +109,10 @@ app.include_router(notifications_router)
 app.include_router(alerts_router, prefix="/api/v1/alerts", tags=["alerts"])
 app.include_router(dependencies_router, prefix="/api/v1/dependencies", tags=["dependencies"])
 app.include_router(connectors_router, prefix="/api/v1/connectors", tags=["connectors"])
+app.include_router(normalization_router, prefix="/api/v1/normalization", tags=["normalization"])
+
+# WebSocket router for real-time updates
+app.include_router(websocket_router)
 
 
 # Root endpoint
