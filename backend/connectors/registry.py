@@ -16,6 +16,7 @@ from .prtg import PRTGConnector
 from .mcp import MCPConnector
 from .snmp import SNMPTrapConnector
 from .eaton import EatonConnector
+from .eaton.rest_connector import EatonRESTConnector
 from .axis import AxisConnector
 from .milestone import MilestoneConnector
 from .cradlepoint import CradlepointConnector
@@ -30,6 +31,7 @@ _CONNECTOR_REGISTRY: Dict[str, Type[BaseConnector]] = {
     "snmp_trap": SNMPTrapConnector,
     "snmp_poll": SNMPTrapConnector,  # Reuse for now
     "eaton": EatonConnector,
+    "eaton_rest": EatonRESTConnector,
     "axis": AxisConnector,
     "milestone": MilestoneConnector,
     "cradlepoint": CradlepointConnector,
@@ -70,8 +72,15 @@ CONNECTOR_TYPES = [
     },
     {
         "type": "eaton",
-        "name": "Eaton UPS",
+        "name": "Eaton UPS (SNMP)",
         "description": "Eaton UPS monitoring via SNMP (XUPS-MIB)",
+        "supports_webhook": False,
+        "supports_polling": True,
+    },
+    {
+        "type": "eaton_rest",
+        "name": "Eaton UPS (REST API)",
+        "description": "Eaton Network-M2 card alarms via REST API",
         "supports_webhook": False,
         "supports_polling": True,
     },

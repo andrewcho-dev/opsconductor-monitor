@@ -722,6 +722,145 @@ function AxisConfigForm({ config, setConfig }) {
   );
 }
 
+// Eaton REST API configuration form
+function EatonRESTConfigForm({ config, setConfig }) {
+  const [newTarget, setNewTarget] = useState({ ip: '', name: '', username: '', password: '' });
+
+  const addTarget = () => {
+    if (!newTarget.ip) return;
+    const targets = config.targets || [];
+    setConfig({ 
+      ...config, 
+      targets: [...targets, { 
+        ...newTarget, 
+        username: newTarget.username || config.default_username || 'admin',
+        password: newTarget.password || config.default_password || ''
+      }]
+    });
+    setNewTarget({ ip: '', name: '', username: '', password: '' });
+  };
+
+  const removeTarget = (index) => {
+    const targets = [...(config.targets || [])];
+    targets.splice(index, 1);
+    setConfig({ ...config, targets });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded border border-green-200 dark:border-green-800">
+        <p className="text-sm text-green-700 dark:text-green-300 mb-1 font-medium">Eaton Network-M2 REST API</p>
+        <p className="text-xs text-green-600 dark:text-green-400">
+          Poll active alarms from Eaton UPS Network-M2 cards via REST API.
+        </p>
+      </div>
+
+      {/* Default Credentials */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Username</label>
+          <input
+            type="text"
+            placeholder="admin"
+            value={config.default_username || ''}
+            onChange={(e) => setConfig({ ...config, default_username: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Password</label>
+          <input
+            type="password"
+            value={config.default_password || ''}
+            onChange={(e) => setConfig({ ...config, default_password: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+          />
+        </div>
+      </div>
+
+      {/* Poll Interval */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Poll Interval (seconds)</label>
+        <input
+          type="number"
+          min="60"
+          value={config.poll_interval || 300}
+          onChange={(e) => setConfig({ ...config, poll_interval: parseInt(e.target.value) || 300 })}
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+        />
+      </div>
+
+      {/* UPS Targets */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            UPS Devices ({(config.targets || []).length})
+          </label>
+        </div>
+        
+        {(config.targets || []).length > 0 && (
+          <div className="mb-3 max-h-32 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded">
+            <table className="w-full text-xs">
+              <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0">
+                <tr>
+                  <th className="px-2 py-1 text-left">IP</th>
+                  <th className="px-2 py-1 text-left">Name</th>
+                  <th className="px-2 py-1 text-left">User</th>
+                  <th className="px-2 py-1 w-8"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {(config.targets || []).map((target, idx) => (
+                  <tr key={idx} className="border-t border-gray-100 dark:border-gray-800">
+                    <td className="px-2 py-1 font-mono">{target.ip}</td>
+                    <td className="px-2 py-1">{target.name || '-'}</td>
+                    <td className="px-2 py-1">{target.username || 'admin'}</td>
+                    <td className="px-2 py-1">
+                      <button onClick={() => removeTarget(idx)} className="text-red-500 hover:text-red-700">×</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Add new UPS */}
+        <div className="grid grid-cols-4 gap-2">
+          <input
+            type="text"
+            placeholder="IP Address"
+            value={newTarget.ip}
+            onChange={(e) => setNewTarget({ ...newTarget, ip: e.target.value })}
+            className="px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+          />
+          <input
+            type="text"
+            placeholder="Name (optional)"
+            value={newTarget.name}
+            onChange={(e) => setNewTarget({ ...newTarget, name: e.target.value })}
+            className="px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+          />
+          <input
+            type="text"
+            placeholder="Username"
+            value={newTarget.username}
+            onChange={(e) => setNewTarget({ ...newTarget, username: e.target.value })}
+            className="px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+          />
+          <button
+            onClick={addTarget}
+            disabled={!newTarget.ip}
+            className="px-3 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+          >
+            Add
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Cisco ASA configuration form
 function CiscoASAConfigForm({ config, setConfig }) {
   const [newTarget, setNewTarget] = useState({ ip: '', name: '', username: '', password: '', port: 22 });
@@ -1107,7 +1246,8 @@ export default function ConfigModal({ connector, onClose, onSave, getAuthHeader 
   const isMilestone = connector.type === 'milestone';
   const isCradlepoint = connector.type === 'cradlepoint';
   const isCiscoASA = connector.type === 'cisco_asa';
-  const hasSpecialForm = isAxis || isMilestone || isCradlepoint || isCiscoASA;
+  const isEatonREST = connector.type === 'eaton_rest';
+  const hasSpecialForm = isAxis || isMilestone || isCradlepoint || isCiscoASA || isEatonREST;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -1134,6 +1274,8 @@ export default function ConfigModal({ connector, onClose, onSave, getAuthHeader 
             <CradlepointConfigForm config={config} setConfig={setConfig} />
           ) : isCiscoASA ? (
             <CiscoASAConfigForm config={config} setConfig={setConfig} />
+          ) : isEatonREST ? (
+            <EatonRESTConfigForm config={config} setConfig={setConfig} />
           ) : Object.keys(config).length === 0 ? (
             <p className="text-gray-500 text-center py-8">No configuration options available</p>
           ) : (
@@ -1161,4 +1303,4 @@ export default function ConfigModal({ connector, onClose, onSave, getAuthHeader 
   );
 }
 
-export { AxisConfigForm, MilestoneConfigForm, CradlepointConfigForm, CiscoASAConfigForm, GenericConfigForm };
+export { AxisConfigForm, MilestoneConfigForm, CradlepointConfigForm, CiscoASAConfigForm, EatonRESTConfigForm, GenericConfigForm };
