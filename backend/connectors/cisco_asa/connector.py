@@ -94,11 +94,56 @@ class CiscoASAConnector(PollingConnector):
         return client
     
     def _run_command_sync(self, client: paramiko.SSHClient, command: str) -> str:
-        """Run a command on the ASA and return output (synchronous)."""
+        """Run a command on the ASA and return output (synchronous).
+        
+        ASA uses interactive shell, so we use invoke_shell instead of exec_command.
+        """
         try:
-            stdin, stdout, stderr = client.exec_command(command, timeout=30)
-            output = stdout.read().decode('utf-8', errors='ignore')
-            return output
+            # Get or create shell channel
+            if not hasattr(client, '_asa_shell') or client._asa_shell is None or client._asa_shell.closed:
+                shell = client.invoke_shell(width=200, height=50)
+                client._asa_shell = shell
+                # Wait for initial prompt and clear buffer
+                import time
+                time.sleep(1)
+                while shell.recv_ready():
+                    shell.recv(65535)
+                # Disable paging
+                shell.send("terminal pager 0\n")
+                time.sleep(0.5)
+                while shell.recv_ready():
+                    shell.recv(65535)
+            
+            shell = client._asa_shell
+            
+            # Send command
+            shell.send(command + "\n")
+            
+            # Wait for output
+            import time
+            time.sleep(1)
+            
+            output = ""
+            timeout = 10
+            start = time.time()
+            while time.time() - start < timeout:
+                if shell.recv_ready():
+                    chunk = shell.recv(65535).decode('utf-8', errors='ignore')
+                    output += chunk
+                    # Check if we got the prompt back
+                    if output.rstrip().endswith('#') or output.rstrip().endswith('>'):
+                        break
+                else:
+                    time.sleep(0.2)
+            
+            # Remove the command echo and prompt from output
+            lines = output.split('\n')
+            if lines and command in lines[0]:
+                lines = lines[1:]
+            if lines and (lines[-1].strip().endswith('#') or lines[-1].strip().endswith('>')):
+                lines = lines[:-1]
+            
+            return '\n'.join(lines)
         except Exception as e:
             logger.error(f"Command failed: {command} - {e}")
             return ""
