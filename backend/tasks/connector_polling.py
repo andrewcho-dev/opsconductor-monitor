@@ -208,15 +208,26 @@ def reconcile_alerts(db, source_system: str, current_fingerprints: Set[str], pub
         
         # If this alert's fingerprint is NOT in current poll results, resolve it
         if fingerprint and fingerprint not in current_fingerprints:
+            # Get current message before resolution
+            with db.cursor() as cursor:
+                cursor.execute("SELECT message FROM alerts WHERE id = %s", (alert_id,))
+                msg_row = cursor.fetchone()
+                message_before = msg_row['message'] if msg_row else None
+            
             with db.cursor() as cursor:
                 cursor.execute("""
                     UPDATE alerts
                     SET status = 'resolved',
                         resolved_at = %s,
-                        updated_at = %s
+                        updated_at = %s,
+                        message_before_resolution = COALESCE(message_before_resolution, %s),
+                        resolution_message = %s,
+                        resolution_source = %s
                     WHERE id = %s
                     AND status IN ('active', 'acknowledged', 'suppressed')
-                """, (now, now, alert_id))
+                """, (now, now, message_before, 
+                      "Alert no longer present in source system poll results",
+                      "reconciliation", alert_id))
                 db.get_connection().commit()
                 
                 if cursor.rowcount > 0:
@@ -232,6 +243,7 @@ def reconcile_alerts(db, source_system: str, current_fingerprints: Set[str], pub
                         "source_system": source_system,
                         "status": "resolved",
                         "resolved_by": "system",
+                        "resolution_source": "reconciliation",
                         "notes": "Alert no longer present in source system"
                     })
     
