@@ -3,9 +3,9 @@
  */
 
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown, Filter, Trash2, X } from 'lucide-react';
 import { SEVERITY_CONFIG, CATEGORY_CONFIG, formatRelativeTime } from '../../lib/constants';
+import { AlertDetailModal } from './AlertDetailModal';
 
 // Status configuration with colors and order
 const STATUS_CONFIG = {
@@ -40,6 +40,7 @@ export function AlertTable({
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
+  const [selectedAlert, setSelectedAlert] = useState(null);
   
   // Cache dropdown options when filter is open to prevent scroll reset on data refresh
   const cachedOptionsRef = useRef({});
@@ -641,13 +642,13 @@ export function AlertTable({
                     </span>
                   </td>
                   <td className="px-3 py-2">
-                    <Link
-                      to={`/alerts/${alert.id}`}
-                      className="font-mono text-xs text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 truncate block max-w-[200px]"
+                    <button
+                      onClick={() => setSelectedAlert(alert)}
+                      className="font-mono text-xs text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 truncate block max-w-[200px] text-left"
                       title={alert.title}
                     >
                       {alert.title}
-                    </Link>
+                    </button>
                   </td>
                   <td className="px-3 py-2">
                     <span 
@@ -791,6 +792,11 @@ export function AlertTable({
         </div>
       )}
       </div>
+
+      {/* Alert Detail Modal */}
+      {selectedAlert && (
+        <AlertDetailModal alert={selectedAlert} onClose={() => setSelectedAlert(null)} />
+      )}
     </>
   );
 }
