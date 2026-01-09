@@ -208,7 +208,7 @@ export function ConnectorsContent() {
   };
 
   const handleSaveConfig = async (connectorId, data) => {
-    await updateConnector(connectorId, data);
+    await updateConnector(connectorId, { config: data });
     refresh();
   };
 
