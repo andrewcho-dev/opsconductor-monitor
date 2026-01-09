@@ -149,17 +149,6 @@ export function PollingContent() {
           </p>
         </div>
 
-        {/* Global Polling Info */}
-        <div className="mb-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Clock className="h-5 w-5 text-blue-600" />
-            <h3 className="font-medium text-gray-900 dark:text-white">Global Polling Schedule</h3>
-          </div>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            All connectors are checked every 60 seconds. Individual connectors poll only if their interval has elapsed.
-          </p>
-        </div>
-
         {/* Connectors Table */}
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
           <table className="w-full">
