@@ -47,6 +47,14 @@ export function AlertDashboard() {
     return () => clearInterval(interval);
   }, [lastUpdated]);
 
+  // Periodic refresh fallback (every 30 seconds) to ensure data stays in sync
+  useEffect(() => {
+    const interval = setInterval(() => {
+      refresh();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [refresh]);
+
   // Handle bulk delete of selected alerts
   const handleDeleteAlerts = async (alertIds) => {
     const response = await fetchApi('/api/v1/alerts/bulk/delete', {

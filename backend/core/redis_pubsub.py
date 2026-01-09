@@ -112,13 +112,16 @@ class RedisPubSub:
     
     async def _listen(self):
         """Listen for messages and dispatch to handlers."""
+        logger.info(f"Redis listener started for PID {self._pid}")
         try:
             async for message in self._pubsub.listen():
                 if message["type"] == "message":
                     channel = message["channel"]
+                    logger.info(f"Received Redis message on {channel}")
                     try:
                         data = json.loads(message["data"])
                         handlers = self._handlers.get(channel, [])
+                        logger.info(f"Dispatching to {len(handlers)} handlers")
                         for handler in handlers:
                             try:
                                 await handler(data)

@@ -30,9 +30,14 @@ async def lifespan(app: FastAPI):
     # Setup WebSocket event subscriptions (in-process events)
     from backend.core.websocket_manager import setup_event_subscriptions, setup_redis_subscriptions
     setup_event_subscriptions()
+    logger.info("WebSocket event subscriptions configured")
     
     # Setup Redis pub/sub for cross-process events (from Celery workers)
-    await setup_redis_subscriptions()
+    try:
+        await setup_redis_subscriptions()
+        logger.info("Redis pub/sub subscriptions configured")
+    except Exception as e:
+        logger.error(f"Failed to setup Redis subscriptions: {e}")
     
     # Start SNMP trap receiver if enabled
     snmp_trap_connector = None
