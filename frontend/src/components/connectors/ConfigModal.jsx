@@ -1367,6 +1367,153 @@ function GenericConfigForm({ config, setConfig }) {
   );
 }
 
+// Ubiquiti UISP configuration form
+function UbiquitiConfigForm({ config, setConfig }) {
+  return (
+    <div className="space-y-4">
+      <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
+        <p className="text-sm text-blue-700 dark:text-blue-300 mb-1 font-medium">Ubiquiti UISP Connection</p>
+        <p className="text-xs text-blue-600 dark:text-blue-400">
+          Connect to UISP for device monitoring and alerts.
+        </p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          UISP Server URL <span className="text-red-500">*</span>
+        </label>
+        <input
+          type="text"
+          placeholder="https://uisp.example.com"
+          value={config.url || ''}
+          onChange={(e) => setConfig({ ...config, url: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+        />
+        <p className="text-xs text-gray-500 mt-1">UISP server URL without trailing slash</p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          API Token <span className="text-red-500">*</span>
+        </label>
+        <input
+          type="password"
+          placeholder="Enter API token"
+          value={config.api_token || ''}
+          onChange={(e) => setConfig({ ...config, api_token: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+        />
+        <p className="text-xs text-gray-500 mt-1">Generate in UISP: Settings → Users → API Tokens</p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Poll Interval (seconds)</label>
+        <input
+          type="number"
+          min="30"
+          value={config.poll_interval || 60}
+          onChange={(e) => setConfig({ ...config, poll_interval: parseInt(e.target.value) || 60 })}
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Alert Thresholds</label>
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">CPU Warning (%)</label>
+            <input
+              type="number"
+              min="1"
+              max="100"
+              value={config.thresholds?.cpu_warning || 80}
+              onChange={(e) => setConfig({ 
+                ...config, 
+                thresholds: { ...config.thresholds, cpu_warning: parseInt(e.target.value) || 80 }
+              })}
+              className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Memory Warning (%)</label>
+            <input
+              type="number"
+              min="1"
+              max="100"
+              value={config.thresholds?.memory_warning || 80}
+              onChange={(e) => setConfig({ 
+                ...config, 
+                thresholds: { ...config.thresholds, memory_warning: parseInt(e.target.value) || 80 }
+              })}
+              className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Monitoring Options</label>
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={config.monitor_offline !== false}
+              onChange={(e) => setConfig({ ...config, monitor_offline: e.target.checked })}
+              className="rounded border-gray-300 text-blue-600"
+            />
+            <span className="text-gray-700 dark:text-gray-300">Device Offline</span>
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={config.monitor_cpu !== false}
+              onChange={(e) => setConfig({ ...config, monitor_cpu: e.target.checked })}
+              className="rounded border-gray-300 text-blue-600"
+            />
+            <span className="text-gray-700 dark:text-gray-300">High CPU</span>
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={config.monitor_memory !== false}
+              onChange={(e) => setConfig({ ...config, monitor_memory: e.target.checked })}
+              className="rounded border-gray-300 text-blue-600"
+            />
+            <span className="text-gray-700 dark:text-gray-300">High Memory</span>
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={config.monitor_signal !== false}
+              onChange={(e) => setConfig({ ...config, monitor_signal: e.target.checked })}
+              className="rounded border-gray-300 text-blue-600"
+            />
+            <span className="text-gray-700 dark:text-gray-300">Signal Degraded</span>
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={config.monitor_outages !== false}
+              onChange={(e) => setConfig({ ...config, monitor_outages: e.target.checked })}
+              className="rounded border-gray-300 text-blue-600"
+            />
+            <span className="text-gray-700 dark:text-gray-300">Outages</span>
+          </label>
+        </div>
+      </div>
+
+      <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700">
+        <p className="text-xs text-gray-600 dark:text-gray-400">
+          <strong>Alert Types:</strong> device_offline, device_online, high_cpu, high_memory, signal_degraded, outage, firmware_update
+        </p>
+        <p className="text-xs text-gray-500 mt-1">
+          Configure severity/category mappings in Connectors → Normalization Rules
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // Main ConfigModal component
 export default function ConfigModal({ connector, onClose, onSave, getAuthHeader }) {
   const [config, setConfig] = useState({});
@@ -1414,7 +1561,8 @@ export default function ConfigModal({ connector, onClose, onSave, getAuthHeader 
   const isCiscoASA = connector.type === 'cisco_asa';
   const isEatonREST = connector.type === 'eaton_rest';
   const isSNMPTrap = connector.type === 'snmp_trap';
-  const hasSpecialForm = isAxis || isMilestone || isCradlepoint || isCiscoASA || isEatonREST || isSNMPTrap;
+  const isUbiquiti = connector.type === 'ubiquiti';
+  const hasSpecialForm = isAxis || isMilestone || isCradlepoint || isCiscoASA || isEatonREST || isSNMPTrap || isUbiquiti;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -1445,6 +1593,8 @@ export default function ConfigModal({ connector, onClose, onSave, getAuthHeader 
             <EatonRESTConfigForm config={config} setConfig={setConfig} />
           ) : isSNMPTrap ? (
             <SNMPTrapConfigForm config={config} setConfig={setConfig} />
+          ) : isUbiquiti ? (
+            <UbiquitiConfigForm config={config} setConfig={setConfig} />
           ) : Object.keys(config).length === 0 ? (
             <p className="text-gray-500 text-center py-8">No configuration options available</p>
           ) : (
@@ -1472,4 +1622,4 @@ export default function ConfigModal({ connector, onClose, onSave, getAuthHeader 
   );
 }
 
-export { AxisConfigForm, MilestoneConfigForm, CradlepointConfigForm, CiscoASAConfigForm, EatonRESTConfigForm, SNMPTrapConfigForm, GenericConfigForm };
+export { AxisConfigForm, MilestoneConfigForm, CradlepointConfigForm, CiscoASAConfigForm, EatonRESTConfigForm, SNMPTrapConfigForm, UbiquitiConfigForm, GenericConfigForm };
