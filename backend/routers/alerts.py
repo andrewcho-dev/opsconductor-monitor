@@ -128,6 +128,7 @@ def get_source_description(source_system: str, alert_type: str) -> Optional[str]
         return row['description']
     
     # Try without connector prefix (e.g., cradlepoint_sinr_low -> sinr_low)
+    stripped_type = alert_type
     if alert_type.startswith(connector_type + '_'):
         stripped_type = alert_type[len(connector_type) + 1:]
         row = db_query_one("""
@@ -137,6 +138,18 @@ def get_source_description(source_system: str, alert_type: str) -> Optional[str]
         """, (connector_type, stripped_type))
         if row:
             return row['description']
+    
+    # Try case-insensitive partial match on source_value
+    row = db_query_one("""
+        SELECT description FROM severity_mappings 
+        WHERE connector_type = %s AND LOWER(%s) LIKE '%%' || LOWER(source_value) || '%%'
+        AND description IS NOT NULL AND description != ''
+        ORDER BY LENGTH(source_value) DESC
+        LIMIT 1
+    """, (connector_type, stripped_type))
+    
+    if row:
+        return row['description']
     
     return None
 
