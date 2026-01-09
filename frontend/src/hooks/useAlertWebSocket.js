@@ -5,7 +5,7 @@
  * Automatically reconnects on disconnection.
  */
 
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 
 const RECONNECT_DELAY = 3000; // 3 seconds
 const PING_INTERVAL = 30000; // 30 seconds
@@ -207,10 +207,20 @@ export function useAlertWebSocket({
  * @returns {Object} - WebSocket state
  */
 export function useAlertWebSocketRefresh(refetch, options = {}) {
-  const handleAlertChange = useCallback(() => {
-    // Refetch data when any alert changes
-    refetch?.();
+  // Use a ref to always have access to the latest refetch function
+  // This prevents stale closure issues when refetch changes
+  const refetchRef = useRef(refetch);
+  
+  // Keep the ref updated with the latest refetch function
+  useEffect(() => {
+    refetchRef.current = refetch;
   }, [refetch]);
+
+  // Stable callback that always calls the latest refetch
+  const handleAlertChange = useCallback(() => {
+    console.log('[WebSocket] Alert change detected, triggering refresh');
+    refetchRef.current?.();
+  }, []); // No dependencies - uses ref instead
 
   return useAlertWebSocket({
     onAlertCreated: handleAlertChange,
