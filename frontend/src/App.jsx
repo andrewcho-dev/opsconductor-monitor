@@ -45,6 +45,7 @@ import {
   NetBoxSettings,
   BackupSettings,
   PRTGSettings,
+  UbiquitiSettings,
   MCPSettings,
 } from "./pages/system/settings";
 
@@ -118,6 +119,7 @@ function App() {
           <Route path="logging" element={<LoggingSettings />} />
           <Route path="netbox" element={<NetBoxSettings />} />
           <Route path="prtg" element={<PRTGSettings />} />
+          <Route path="ubiquiti" element={<UbiquitiSettings />} />
           <Route path="mcp" element={<MCPSettings />} />
           <Route path="backup" element={<BackupSettings />} />
         </Route>

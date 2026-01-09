@@ -118,6 +118,7 @@ const settingsNavigation = [
   { id: 'logging', label: 'Logging', icon: ScrollText, path: '/system/settings/logging' },
   { id: 'netbox', label: 'NetBox', icon: Server, path: '/system/settings/netbox' },
   { id: 'prtg', label: 'PRTG', icon: Activity, path: '/system/settings/prtg' },
+  { id: 'ubiquiti', label: 'Ubiquiti UISP', icon: Radio, path: '/system/settings/ubiquiti' },
   { id: 'mcp', label: 'Ciena MCP', icon: Network, path: '/system/settings/mcp' },
   { id: 'backup', label: 'Backup', icon: Archive, path: '/system/settings/backup' },
 ];

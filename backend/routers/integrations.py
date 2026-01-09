@@ -299,6 +299,131 @@ async def mcp_settings(credentials: HTTPAuthorizationCredentials = Security(secu
         return {"success": False, "error": str(e)}
 
 
+# Ubiquiti UISP integration
+@router.get("/ubiquiti/settings", summary="Get Ubiquiti UISP settings")
+async def ubiquiti_settings(credentials: HTTPAuthorizationCredentials = Security(security)):
+    """Get Ubiquiti UISP integration settings"""
+    try:
+        url = get_setting('ubiquiti_url') or ''
+        token = get_setting('ubiquiti_api_token') or ''
+        poll_interval = int(get_setting('ubiquiti_poll_interval') or '60')
+        enabled = get_setting('ubiquiti_enabled') == 'true'
+        cpu_warning = int(get_setting('ubiquiti_cpu_warning') or '80')
+        memory_warning = int(get_setting('ubiquiti_memory_warning') or '80')
+        return {
+            "success": True,
+            "data": {
+                "url": url,
+                "api_token": token,
+                "enabled": enabled,
+                "poll_interval": poll_interval,
+                "thresholds": {
+                    "cpu_warning": cpu_warning,
+                    "memory_warning": memory_warning
+                }
+            }
+        }
+    except Exception as e:
+        logger.error(f"Get Ubiquiti settings error: {str(e)}")
+        return {"success": False, "error": str(e)}
+
+
+@router.put("/ubiquiti/settings", summary="Update Ubiquiti UISP settings")
+async def update_ubiquiti_settings(
+    config: Dict[str, Any] = Body(...),
+    credentials: HTTPAuthorizationCredentials = Security(security)
+):
+    """Update Ubiquiti UISP integration settings"""
+    from backend.utils.db import set_setting
+    try:
+        if 'url' in config:
+            set_setting('ubiquiti_url', config['url'])
+        if 'api_token' in config:
+            set_setting('ubiquiti_api_token', config['api_token'])
+        if 'enabled' in config:
+            set_setting('ubiquiti_enabled', 'true' if config['enabled'] else 'false')
+        if 'poll_interval' in config:
+            set_setting('ubiquiti_poll_interval', str(config['poll_interval']))
+        if 'thresholds' in config:
+            thresholds = config['thresholds']
+            if 'cpu_warning' in thresholds:
+                set_setting('ubiquiti_cpu_warning', str(thresholds['cpu_warning']))
+            if 'memory_warning' in thresholds:
+                set_setting('ubiquiti_memory_warning', str(thresholds['memory_warning']))
+        return {"success": True, "message": "Settings saved"}
+    except Exception as e:
+        logger.error(f"Update Ubiquiti settings error: {str(e)}")
+        return {"success": False, "error": str(e)}
+
+
+@router.get("/ubiquiti/status", summary="Get Ubiquiti UISP status")
+async def ubiquiti_status(credentials: HTTPAuthorizationCredentials = Security(security)):
+    """Get Ubiquiti UISP connection status"""
+    try:
+        url = get_setting('ubiquiti_url')
+        if not url:
+            return {"success": True, "data": {"connected": False}}
+        
+        # Check connector status from database
+        connector = db_query_one("""
+            SELECT status, last_poll_at, error_message 
+            FROM connectors WHERE connector_type = 'ubiquiti' LIMIT 1
+        """)
+        
+        if connector:
+            return {
+                "success": True,
+                "data": {
+                    "connected": connector['status'] == 'connected',
+                    "last_poll": connector['last_poll_at'].isoformat() if connector['last_poll_at'] else None,
+                    "error": connector['error_message']
+                }
+            }
+        return {"success": True, "data": {"connected": False}}
+    except Exception as e:
+        logger.error(f"Ubiquiti status error: {str(e)}")
+        return {"success": True, "data": {"connected": False, "error": str(e)}}
+
+
+@router.post("/ubiquiti/test", summary="Test Ubiquiti UISP connection")
+async def test_ubiquiti(
+    config: Dict[str, Any] = Body(...),
+    credentials: HTTPAuthorizationCredentials = Security(security)
+):
+    """Test Ubiquiti UISP connection"""
+    try:
+        url = config.get('url') or get_setting('ubiquiti_url') or ''
+        api_token = config.get('api_token') or get_setting('ubiquiti_api_token') or ''
+        
+        if not url:
+            return {"success": True, "data": {"success": False, "message": "UISP URL not configured"}}
+        if not api_token:
+            return {"success": True, "data": {"success": False, "message": "API token not configured"}}
+        
+        import httpx
+        async with httpx.AsyncClient(timeout=15.0, verify=True) as client:
+            response = await client.get(
+                f"{url.rstrip('/')}/nms/api/v2.1/devices?count=1",
+                headers={"x-auth-token": api_token}
+            )
+            if response.status_code == 200:
+                data = response.json()
+                return {
+                    "success": True,
+                    "data": {
+                        "success": True,
+                        "message": "Connected to UISP",
+                        "details": {"device_count": len(data) if isinstance(data, list) else 0}
+                    }
+                }
+            elif response.status_code == 401:
+                return {"success": True, "data": {"success": False, "message": "Invalid API token"}}
+            else:
+                return {"success": True, "data": {"success": False, "message": f"HTTP {response.status_code}"}}
+    except Exception as e:
+        return {"success": True, "data": {"success": False, "message": str(e)}}
+
+
 @router.get("/test", include_in_schema=False)
 async def test_api():
     """Test Integrations API"""

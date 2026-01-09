@@ -4,6 +4,7 @@ export { PasswordPolicySettings } from './PasswordPolicySettings';
 export { LoggingSettings } from './LoggingSettings';
 export { NetBoxSettings } from './NetBoxSettings';
 export { default as PRTGSettings } from './PRTGSettings';
+export { default as UbiquitiSettings } from './UbiquitiSettings';
 export { default as MCPSettings } from './MCPSettings';
 
 // SecuritySettings now uses PasswordPolicySettings
