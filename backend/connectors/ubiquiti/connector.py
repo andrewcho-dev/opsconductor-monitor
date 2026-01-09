@@ -72,11 +72,12 @@ class UbiquitiConnector(PollingConnector):
         for target in self.targets[:5]:  # Test first 5
             ip = target.get("ip", "")
             try:
-                result = await self._poll_device(target)
-                if result:
+                reachable = await self._check_device_reachable(target)
+                if reachable:
                     success_count += 1
                 else:
                     fail_count += 1
+                    errors.append(f"{ip}: No response")
             except Exception as e:
                 fail_count += 1
                 errors.append(f"{ip}: {str(e)[:50]}")
@@ -93,6 +94,37 @@ class UbiquitiConnector(PollingConnector):
                 "message": f"Failed to connect. {errors[0] if errors else 'Check credentials'}",
                 "details": {"errors": errors[:3]}
             }
+    
+    async def _check_device_reachable(self, target: Dict) -> bool:
+        """Simple reachability check - returns True if device responds to HTTPS/HTTP."""
+        ip = target.get("ip", "")
+        
+        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        ssl_context.set_ciphers('DEFAULT:@SECLEVEL=0')
+        
+        connector = aiohttp.TCPConnector(ssl=ssl_context)
+        timeout = aiohttp.ClientTimeout(total=5)
+        
+        async with aiohttp.ClientSession(connector=connector, timeout=timeout) as session:
+            # Try HTTPS
+            try:
+                async with session.get(f"https://{ip}/", allow_redirects=False) as response:
+                    if response.status in [200, 301, 302, 401, 403]:
+                        return True
+            except:
+                pass
+            
+            # Try HTTP
+            try:
+                async with session.get(f"http://{ip}/", allow_redirects=False) as response:
+                    if response.status in [200, 301, 302, 401, 403]:
+                        return True
+            except:
+                pass
+        
+        return False
     
     async def poll(self) -> List[NormalizedAlert]:
         alerts = []
