@@ -128,10 +128,11 @@ class UbiquitiConnector(PollingConnector):
         
         alerts = []
         
-        # Create SSL context that doesn't verify (self-signed certs on devices)
-        ssl_context = ssl.create_default_context()
+        # Create SSL context for older Ubiquiti devices with legacy TLS
+        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
         ssl_context.check_hostname = False
         ssl_context.verify_mode = ssl.CERT_NONE
+        ssl_context.set_ciphers('DEFAULT:@SECLEVEL=0')  # Allow older ciphers
         
         connector = aiohttp.TCPConnector(ssl=ssl_context)
         timeout = aiohttp.ClientTimeout(total=10)
@@ -149,38 +150,25 @@ class UbiquitiConnector(PollingConnector):
         return alerts
     
     async def _get_device_info(self, session: aiohttp.ClientSession, ip: str, username: str, password: str) -> Optional[Dict]:
-        """Try to get device info from UniFi device local API."""
+        """Check if Ubiquiti device is reachable via HTTP/HTTPS."""
         
-        # Try different API endpoints that UniFi devices expose
-        endpoints = [
-            f"https://{ip}/status.cgi",
-            f"https://{ip}/api/s/default/stat/device",
-            f"http://{ip}/status.cgi",
-            f"https://{ip}:443/status.cgi",
-        ]
-        
-        auth = aiohttp.BasicAuth(username, password)
-        
-        for url in endpoints:
-            try:
-                async with session.get(url, auth=auth) as response:
-                    if response.status == 200:
-                        try:
-                            data = await response.json()
-                            return data
-                        except:
-                            text = await response.text()
-                            return {"raw": text, "reachable": True}
-            except Exception:
-                continue
-        
-        # Last resort: just try to ping/reach the device
+        # Try HTTPS first (most Ubiquiti devices use HTTPS)
         try:
-            async with session.get(f"https://{ip}/", auth=auth) as response:
-                if response.status in [200, 302, 401, 403]:
-                    return {"reachable": True, "status_code": response.status}
-        except Exception:
-            pass
+            async with session.get(f"https://{ip}/", allow_redirects=False) as response:
+                # Any HTTP response means device is reachable
+                # AirOS devices return 302 redirect to login
+                if response.status in [200, 301, 302, 401, 403]:
+                    return {"reachable": True, "status_code": response.status, "ip": ip}
+        except Exception as e:
+            logger.debug(f"HTTPS check failed for {ip}: {e}")
+        
+        # Try HTTP as fallback
+        try:
+            async with session.get(f"http://{ip}/", allow_redirects=False) as response:
+                if response.status in [200, 301, 302, 401, 403]:
+                    return {"reachable": True, "status_code": response.status, "ip": ip}
+        except Exception as e:
+            logger.debug(f"HTTP check failed for {ip}: {e}")
         
         return None
     
