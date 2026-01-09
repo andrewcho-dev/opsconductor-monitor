@@ -120,7 +120,8 @@ function ConnectorCard({ connector, onTest, onToggle, onConfigure, testing }) {
   );
 }
 
-export function ConnectorsPage() {
+// Content component without PageLayout wrapper (for use in ConnectorsLayout)
+export function ConnectorsContent() {
   const { connectors, loading, error, refresh } = useConnectors();
   const { testConnection, enableConnector, disableConnector, updateConnector } = useConnectorActions();
   
@@ -161,8 +162,7 @@ export function ConnectorsPage() {
   };
 
   return (
-    <PageLayout module="connectors">
-      <div className="p-6">
+    <div className="p-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -243,7 +243,15 @@ export function ConnectorsPage() {
             onSave={handleSaveConfig}
           />
         )}
-      </div>
+    </div>
+  );
+}
+
+// Standalone page with PageLayout (for backward compatibility)
+export function ConnectorsPage() {
+  return (
+    <PageLayout module="connectors">
+      <ConnectorsContent />
     </PageLayout>
   );
 }

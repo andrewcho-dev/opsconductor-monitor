@@ -100,6 +100,10 @@ class AlertManager:
     
     def _generate_fingerprint(self, normalized: NormalizedAlert) -> str:
         """Generate deduplication fingerprint."""
+        # Use normalizer-provided fingerprint if available (for raise/clear correlation)
+        if normalized.fingerprint:
+            return normalized.fingerprint
+        
         # Key fields for fingerprint
         parts = [
             normalized.source_system,

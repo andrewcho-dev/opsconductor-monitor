@@ -20,6 +20,8 @@ import { AlertDashboard } from "./pages/AlertDashboard";
 import { AlertDetailPage } from "./pages/AlertDetailPage";
 import { ResolvedAlertsPage } from "./pages/ResolvedAlertsPage";
 import { ConnectorsPage } from "./pages/ConnectorsPage";
+import NormalizationRulesPage from "./pages/ColumnMappingPage.jsx";
+import ConnectorPollingPage from "./pages/ConnectorPollingPage.jsx";
 import { DependenciesPage } from "./pages/DependenciesPage";
 
 // System Module
@@ -33,8 +35,6 @@ import {
 import NotificationsPage from "./pages/system/NotificationsPage.jsx";
 import UsersPage from "./pages/system/UsersPage.jsx";
 import RolesPage from "./pages/system/RolesPage.jsx";
-import NormalizationRulesPage from "./pages/ColumnMappingPage.jsx";
-import ConnectorPollingPage from "./pages/ConnectorPollingPage.jsx";
 
 // Credentials Module
 import { CredentialVaultPage } from "./pages/credentials";
@@ -92,7 +92,12 @@ function App() {
         <Route path="/alerts" element={<ProtectedRoute><AlertDashboard /></ProtectedRoute>} />
         <Route path="/alerts/resolved" element={<ProtectedRoute><ResolvedAlertsPage /></ProtectedRoute>} />
         <Route path="/alerts/:alertId" element={<ProtectedRoute><AlertDetailPage /></ProtectedRoute>} />
+        
+        {/* CONNECTORS MODULE */}
         <Route path="/connectors" element={<ProtectedRoute><ConnectorsPage /></ProtectedRoute>} />
+        <Route path="/connectors/polling" element={<ProtectedRoute><ConnectorPollingPage /></ProtectedRoute>} />
+        <Route path="/connectors/normalization" element={<ProtectedRoute><NormalizationRulesPage /></ProtectedRoute>} />
+        
         <Route path="/dependencies" element={<ProtectedRoute><DependenciesPage /></ProtectedRoute>} />
 
         {/* CREDENTIALS MODULE */}
@@ -118,8 +123,9 @@ function App() {
           <Route path="mcp" element={<MCPSettings />} />
           <Route path="backup" element={<BackupSettings />} />
         </Route>
-        <Route path="/system/normalization" element={<ProtectedRoute permission="system.settings.view"><NormalizationRulesPage /></ProtectedRoute>} />
-        <Route path="/system/polling" element={<ProtectedRoute permission="system.settings.view"><ConnectorPollingPage /></ProtectedRoute>} />
+        {/* Legacy redirects to new connectors module */}
+        <Route path="/system/normalization" element={<Navigate to="/connectors/normalization" replace />} />
+        <Route path="/system/polling" element={<Navigate to="/connectors/polling" replace />} />
         <Route path="/system/notifications" element={<ProtectedRoute permission="system.settings.view"><NotificationsPage /></ProtectedRoute>} />
         <Route path="/system/credentials" element={<ProtectedRoute><Navigate to="/credentials" replace /></ProtectedRoute>} />
         <Route path="/system/logs" element={<ProtectedRoute permission="system.audit.view"><LogsPage /></ProtectedRoute>} />

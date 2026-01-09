@@ -154,6 +154,10 @@ class NormalizedAlert:
     # Raw data for debugging
     raw_data: Dict[str, Any] = field(default_factory=dict)
     
+    # Optional fingerprint override - if set, AlertManager uses this instead of generating one
+    # Useful for raise/clear trap correlation where both should have same fingerprint
+    fingerprint: Optional[str] = None
+    
     # Generated fields
     id: UUID = field(default_factory=uuid4)
     received_at: datetime = field(default_factory=lambda: datetime.utcnow())

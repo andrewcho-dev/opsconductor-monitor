@@ -962,201 +962,6 @@ function EatonRESTConfigForm({ config, setConfig }) {
   );
 }
 
-// Siklu Radio configuration form
-function SikluConfigForm({ config, setConfig }) {
-  const [newTarget, setNewTarget] = useState({ ip: '', name: '', peer_ip: '', username: '', password: '' });
-  const [bulkImportText, setBulkImportText] = useState('');
-  const [showBulkImport, setShowBulkImport] = useState(false);
-  const [importError, setImportError] = useState('');
-
-  const addTarget = () => {
-    if (!newTarget.ip) return;
-    const targets = config.targets || [];
-    setConfig({ 
-      ...config, 
-      targets: [...targets, { 
-        ...newTarget, 
-        username: newTarget.username || config.default_username || 'admin',
-        password: newTarget.password || config.default_password || ''
-      }]
-    });
-    setNewTarget({ ip: '', name: '', peer_ip: '', username: '', password: '' });
-  };
-
-  const removeTarget = (index) => {
-    const targets = [...(config.targets || [])];
-    targets.splice(index, 1);
-    setConfig({ ...config, targets });
-  };
-
-  const clearAllTargets = () => {
-    if (window.confirm(`Remove all ${(config.targets || []).length} radios?`)) {
-      setConfig({ ...config, targets: [] });
-    }
-  };
-
-  const handleBulkImport = () => {
-    setImportError('');
-    const lines = bulkImportText.trim().split('\n').filter(line => line.trim());
-    const newTargets = [];
-    const errors = [];
-
-    lines.forEach((line, idx) => {
-      const trimmed = line.trim();
-      if (!trimmed) return;
-      if (idx === 0 && (trimmed.toLowerCase().includes('ip') || trimmed.toLowerCase().includes('address'))) return;
-
-      const parts = trimmed.split(/[,\t]/).map(p => p.trim());
-      const ip = parts[0];
-      
-      const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
-      if (!ipRegex.test(ip)) {
-        errors.push(`Line ${idx + 1}: Invalid IP "${ip}"`);
-        return;
-      }
-
-      newTargets.push({
-        ip: ip,
-        name: parts[1] || '',
-        peer_ip: parts[2] || '',
-        username: config.default_username || 'admin',
-        password: config.default_password || '',
-      });
-    });
-
-    if (errors.length > 0) {
-      setImportError(errors.slice(0, 5).join('\n') + (errors.length > 5 ? `\n...and ${errors.length - 5} more errors` : ''));
-      return;
-    }
-
-    if (newTargets.length === 0) {
-      setImportError('No valid radios found in input');
-      return;
-    }
-
-    const existingIPs = new Set((config.targets || []).map(t => t.ip));
-    const uniqueNew = newTargets.filter(t => !existingIPs.has(t.ip));
-    const duplicates = newTargets.length - uniqueNew.length;
-
-    setConfig({ ...config, targets: [...(config.targets || []), ...uniqueNew] });
-    setBulkImportText('');
-    setShowBulkImport(false);
-    
-    if (duplicates > 0) {
-      alert(`Imported ${uniqueNew.length} radios. Skipped ${duplicates} duplicates.`);
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded border border-purple-200 dark:border-purple-800">
-        <p className="text-sm text-purple-700 dark:text-purple-300 mb-1 font-medium">Siklu EtherHaul Radios</p>
-        <p className="text-xs text-purple-600 dark:text-purple-400">
-          Poll Siklu radios for link status, RSL, modulation, and temperature.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Username</label>
-          <input type="text" placeholder="admin" value={config.default_username || ''}
-            onChange={(e) => setConfig({ ...config, default_username: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Password</label>
-          <input type="password" value={config.default_password || ''}
-            onChange={(e) => setConfig({ ...config, default_password: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white" />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">RSL Warning Threshold (dBm)</label>
-          <input type="number" value={config.thresholds?.rsl_warning || -55}
-            onChange={(e) => setConfig({ ...config, thresholds: { ...config.thresholds, rsl_warning: parseInt(e.target.value) } })}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">RSL Critical Threshold (dBm)</label>
-          <input type="number" value={config.thresholds?.rsl_critical || -60}
-            onChange={(e) => setConfig({ ...config, thresholds: { ...config.thresholds, rsl_critical: parseInt(e.target.value) } })}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white" />
-        </div>
-      </div>
-
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Radios ({(config.targets || []).length})
-          </label>
-          <div className="flex gap-2">
-            <button onClick={() => setShowBulkImport(!showBulkImport)}
-              className="text-xs px-2 py-1 bg-purple-600 text-white rounded hover:bg-purple-700">
-              {showBulkImport ? 'Cancel Import' : 'Bulk Import'}
-            </button>
-            {(config.targets || []).length > 0 && (
-              <button onClick={clearAllTargets}
-                className="text-xs px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700">
-                Clear All
-              </button>
-            )}
-          </div>
-        </div>
-
-        {showBulkImport && (
-          <div className="mb-3 p-3 bg-purple-50 dark:bg-purple-900/20 rounded border border-purple-200 dark:border-purple-800">
-            <p className="text-xs text-purple-700 dark:text-purple-300 mb-2">
-              Paste radio list (one per line). Formats: IP only, IP,Name, or IP,Name,PeerIP
-            </p>
-            <textarea value={bulkImportText} onChange={(e) => setBulkImportText(e.target.value)}
-              placeholder="10.120.51.10,SNA-SIKLU-01,10.120.51.11&#10;10.120.51.12,SNA-SIKLU-02" rows={6}
-              className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white font-mono" />
-            {importError && <p className="text-xs text-red-600 mt-1 whitespace-pre-line">{importError}</p>}
-            <button onClick={handleBulkImport} disabled={!bulkImportText.trim()}
-              className="mt-2 px-3 py-1 text-sm bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50">
-              Import Radios
-            </button>
-          </div>
-        )}
-        
-        {(config.targets || []).length > 0 && (
-          <div className="mb-3 max-h-48 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded">
-            {(config.targets || []).map((target, idx) => (
-              <div key={idx} className="flex items-center justify-between px-3 py-2 border-b border-gray-100 dark:border-gray-700 last:border-0 text-sm">
-                <div>
-                  <span className="font-mono text-gray-700 dark:text-gray-300">{target.ip}</span>
-                  {target.name && <span className="text-gray-500 ml-2">({target.name})</span>}
-                  {target.peer_ip && <span className="text-purple-500 ml-2">→ {target.peer_ip}</span>}
-                </div>
-                <button onClick={() => removeTarget(idx)} className="text-red-500 hover:text-red-700 text-xs">Remove</button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div className="grid grid-cols-5 gap-2">
-          <input type="text" placeholder="IP Address" value={newTarget.ip}
-            onChange={(e) => setNewTarget({ ...newTarget, ip: e.target.value })}
-            className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm" />
-          <input type="text" placeholder="Name" value={newTarget.name}
-            onChange={(e) => setNewTarget({ ...newTarget, name: e.target.value })}
-            className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm" />
-          <input type="text" placeholder="Peer IP" value={newTarget.peer_ip}
-            onChange={(e) => setNewTarget({ ...newTarget, peer_ip: e.target.value })}
-            className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm" />
-          <input type="password" placeholder="Password" value={newTarget.password}
-            onChange={(e) => setNewTarget({ ...newTarget, password: e.target.value })}
-            className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm" />
-          <button onClick={addTarget} disabled={!newTarget.ip}
-            className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 text-sm">Add</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // Cisco ASA configuration form
 function CiscoASAConfigForm({ config, setConfig }) {
   const [newTarget, setNewTarget] = useState({ ip: '', name: '', username: '', password: '', port: 22 });
@@ -1449,6 +1254,71 @@ function CiscoASAConfigForm({ config, setConfig }) {
   );
 }
 
+// SNMP Traps config form
+function SNMPTrapConfigForm({ config, setConfig }) {
+  return (
+    <div className="space-y-4">
+      {/* Status Info */}
+      <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+        <h4 className="font-medium text-green-800 dark:text-green-200 mb-2">SNMP Trap Receiver Status</h4>
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          <div className="text-gray-600 dark:text-gray-400">Listen Address:</div>
+          <div className="font-mono text-gray-900 dark:text-white">{config.listen_address || '0.0.0.0'}:{config.port || 1162}</div>
+          <div className="text-gray-600 dark:text-gray-400">Community:</div>
+          <div className="font-mono text-gray-900 dark:text-white">{config.community || 'public'}</div>
+        </div>
+      </div>
+
+      {/* Configuration */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          Listen Port
+        </label>
+        <input
+          type="number"
+          value={config.port || 1162}
+          onChange={(e) => setConfig({ ...config, port: parseInt(e.target.value) || 1162 })}
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+        />
+        <p className="text-xs text-gray-500 mt-1">Default: 1162 (requires restart to change)</p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          Community String
+        </label>
+        <input
+          type="text"
+          value={config.community || 'public'}
+          onChange={(e) => setConfig({ ...config, community: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+        />
+      </div>
+
+      {/* How to Use */}
+      <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+        <h4 className="font-medium text-blue-800 dark:text-blue-200 mb-2">How to Configure Devices</h4>
+        <ol className="text-sm text-gray-700 dark:text-gray-300 space-y-1 list-decimal list-inside">
+          <li>Configure your devices to send SNMP traps to this server's IP on port {config.port || 1162}</li>
+          <li>Use community string: <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">{config.community || 'public'}</code></li>
+          <li>Go to <strong>System → Normalization → SNMP Traps</strong> to map trap OIDs to severities/categories</li>
+          <li>Use the vendor filter to organize mappings by device vendor (Siklu, Ciena, etc.)</li>
+        </ol>
+      </div>
+
+      {/* Vendor Mappings Link */}
+      <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded border border-gray-200 dark:border-gray-600">
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          <strong>Configured Vendors:</strong> Siklu, Standard (IF-MIB)
+        </p>
+        <p className="text-xs text-gray-500 mt-1">
+          Add more vendors by creating trap OID mappings in System → Normalization
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // Generic config form for other connectors
 function GenericConfigForm({ config, setConfig }) {
   return (
@@ -1527,7 +1397,7 @@ export default function ConfigModal({ connector, onClose, onSave, getAuthHeader 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await onSave(connector.id, { config });
+      await onSave(connector.id, config);
       onClose();
     } catch (err) {
       console.error('Failed to save:', err);
@@ -1543,8 +1413,8 @@ export default function ConfigModal({ connector, onClose, onSave, getAuthHeader 
   const isCradlepoint = connector.type === 'cradlepoint';
   const isCiscoASA = connector.type === 'cisco_asa';
   const isEatonREST = connector.type === 'eaton_rest';
-  const isSiklu = connector.type === 'siklu';
-  const hasSpecialForm = isAxis || isMilestone || isCradlepoint || isCiscoASA || isEatonREST || isSiklu;
+  const isSNMPTrap = connector.type === 'snmp_trap';
+  const hasSpecialForm = isAxis || isMilestone || isCradlepoint || isCiscoASA || isEatonREST || isSNMPTrap;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -1573,8 +1443,8 @@ export default function ConfigModal({ connector, onClose, onSave, getAuthHeader 
             <CiscoASAConfigForm config={config} setConfig={setConfig} />
           ) : isEatonREST ? (
             <EatonRESTConfigForm config={config} setConfig={setConfig} />
-          ) : isSiklu ? (
-            <SikluConfigForm config={config} setConfig={setConfig} />
+          ) : isSNMPTrap ? (
+            <SNMPTrapConfigForm config={config} setConfig={setConfig} />
           ) : Object.keys(config).length === 0 ? (
             <p className="text-gray-500 text-center py-8">No configuration options available</p>
           ) : (
@@ -1602,4 +1472,4 @@ export default function ConfigModal({ connector, onClose, onSave, getAuthHeader 
   );
 }
 
-export { AxisConfigForm, MilestoneConfigForm, CradlepointConfigForm, CiscoASAConfigForm, EatonRESTConfigForm, SikluConfigForm, GenericConfigForm };
+export { AxisConfigForm, MilestoneConfigForm, CradlepointConfigForm, CiscoASAConfigForm, EatonRESTConfigForm, SNMPTrapConfigForm, GenericConfigForm };

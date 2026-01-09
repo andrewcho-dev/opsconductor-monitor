@@ -12,8 +12,11 @@ import {
 import { PageLayout } from '../components/layout/PageLayout';
 import { fetchApi } from '../lib/utils';
 
-export default function ColumnMappingPage() {
+// Content component without PageLayout (for use in ConnectorsLayout)
+export function NormalizationContent() {
   const [selectedConnector, setSelectedConnector] = useState('prtg');
+  const [selectedVendor, setSelectedVendor] = useState('');
+  const [vendors, setVendors] = useState([]);
   const [mappings, setMappings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -29,20 +32,42 @@ export default function ColumnMappingPage() {
     { value: 'axis', label: 'Axis Cameras' },
     { value: 'milestone', label: 'Milestone VMS' },
     { value: 'cradlepoint', label: 'Cradlepoint' },
-    { value: 'siklu', label: 'Siklu' },
     { value: 'ubiquiti', label: 'Ubiquiti' },
     { value: 'cisco_asa', label: 'Cisco ASA' },
   ];
+
+  // Load vendors for snmp_trap connector
+  const loadVendors = async () => {
+    if (selectedConnector === 'snmp_trap') {
+      try {
+        const response = await fetchApi(`/api/v1/normalization/vendors?connector_type=${selectedConnector}`);
+        if (response.success) {
+          setVendors(response.data || []);
+        }
+      } catch (err) {
+        console.error('Failed to load vendors:', err);
+      }
+    } else {
+      setVendors([]);
+      setSelectedVendor('');
+    }
+  };
 
   const loadMappings = async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const severityResponse = await fetchApi(`/api/v1/normalization/severity-mappings?connector_type=${selectedConnector}`);
+      // Build query params with optional vendor filter
+      let queryParams = `connector_type=${selectedConnector}`;
+      if (selectedVendor) {
+        queryParams += `&vendor=${selectedVendor}`;
+      }
+
+      const severityResponse = await fetchApi(`/api/v1/normalization/severity-mappings?${queryParams}`);
       const severityData = severityResponse.success ? severityResponse.data || [] : [];
 
-      const categoryResponse = await fetchApi(`/api/v1/normalization/category-mappings?connector_type=${selectedConnector}`);
+      const categoryResponse = await fetchApi(`/api/v1/normalization/category-mappings?${queryParams}`);
       const categoryData = categoryResponse.success ? categoryResponse.data || [] : [];
 
       const combined = [
@@ -61,9 +86,15 @@ export default function ColumnMappingPage() {
     }
   };
 
+  // Load vendors when connector changes
+  useEffect(() => {
+    loadVendors();
+  }, [selectedConnector]);
+
+  // Load mappings when connector or vendor changes
   useEffect(() => {
     loadMappings();
-  }, [selectedConnector]);
+  }, [selectedConnector, selectedVendor]);
 
   // Group mappings by logical sections
   const groupMappings = (mappings) => {
@@ -188,22 +219,17 @@ export default function ColumnMappingPage() {
 
   
   if (loading) return (
-    <PageLayout module="system">
-      <div className="p-6"><RefreshCw className="h-6 w-6 animate-spin" /></div>
-    </PageLayout>
+    <div className="p-6"><RefreshCw className="h-6 w-6 animate-spin" /></div>
   );
 
   if (error) return (
-    <PageLayout module="system">
-      <div className="p-6 text-red-600">Error: {error}</div>
-    </PageLayout>
+    <div className="p-6 text-red-600">Error: {error}</div>
   );
 
   const groupedMappings = groupMappings(mappings);
 
   return (
-    <PageLayout module="system">
-      <div className="p-6">
+    <div className="p-6">
         {/* Header */}
         <div className="mb-4 flex justify-between items-center">
           <div>
@@ -214,13 +240,31 @@ export default function ColumnMappingPage() {
           <div className="flex gap-2">
             <select
               value={selectedConnector}
-              onChange={(e) => setSelectedConnector(e.target.value)}
+              onChange={(e) => {
+                setSelectedConnector(e.target.value);
+                setSelectedVendor('');
+              }}
               className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900"
             >
               {connectors.map(conn => (
                 <option key={conn.value} value={conn.value}>{conn.label}</option>
               ))}
             </select>
+            
+            {/* Vendor filter - only show for snmp_trap */}
+            {selectedConnector === 'snmp_trap' && vendors.length > 0 && (
+              <select
+                value={selectedVendor}
+                onChange={(e) => setSelectedVendor(e.target.value)}
+                className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900"
+              >
+                <option value="">All Vendors</option>
+                {vendors.map(v => (
+                  <option key={v} value={v}>{v.charAt(0).toUpperCase() + v.slice(1)}</option>
+                ))}
+              </select>
+            )}
+            
             <button
               onClick={() => setCreating(true)}
               className="flex items-center gap-1 px-2 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
@@ -439,7 +483,15 @@ export default function ColumnMappingPage() {
             </button>
           </div>
         )}
-      </div>
+    </div>
+  );
+}
+
+// Standalone page with PageLayout
+export default function ColumnMappingPage() {
+  return (
+    <PageLayout module="connectors">
+      <NormalizationContent />
     </PageLayout>
   );
 }

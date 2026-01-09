@@ -48,12 +48,15 @@ class SNMPTrapConnector(BaseConnector):
             return
         
         try:
-            # Create UDP server
+            # Create UDP server with SO_REUSEPORT for multi-worker support
+            # This allows multiple uvicorn workers to share the same UDP port
+            # The kernel load-balances incoming packets across workers using a hash
             loop = asyncio.get_event_loop()
             
             self._transport, self._protocol = await loop.create_datagram_endpoint(
                 lambda: SNMPTrapProtocol(self),
-                local_addr=(self.bind_address, self.port)
+                local_addr=(self.bind_address, self.port),
+                reuse_port=True  # Enable SO_REUSEPORT for multi-worker load balancing
             )
             
             self._running = True
@@ -172,72 +175,77 @@ class SNMPTrapConnector(BaseConnector):
             return None
     
     def _decode_with_pysnmp(self, source_ip: str, data: bytes) -> Optional[Dict[str, Any]]:
-        """Decode trap using pysnmp library."""
-        from pysnmp.proto import api
-        from pysnmp.proto.rfc1902 import ObjectName
-        from pysnmp import debug
+        """Decode trap using pysnmp library (v7 API with snake_case methods)."""
+        from pysnmp.proto.api import v1, v2c, decodeMessageVersion
+        from pyasn1.codec.ber import decoder as ber_decoder
         
-        # Try v2c first, then v1
-        for version in [api.protoVersion2c, api.protoVersion1]:
-            try:
-                proto_module = api.protoModules[version]
-                req_msg, _ = proto_module.apiMessage.getDecoder()(data)
+        try:
+            # Determine SNMP version
+            version = decodeMessageVersion(data)
+            
+            trap_oid = ""
+            enterprise_oid = ""
+            varbinds = {}
+            community = ""
+            
+            if version == 1:  # SNMPv2c
+                msg, _ = ber_decoder.decode(data, asn1Spec=v2c.Message())
+                community = str(msg["community"])
+                pdu = v2c.apiMessage.get_pdu(msg)
                 
-                # Get PDU
-                req_pdu = proto_module.apiMessage.getPDU(req_msg)
-                
-                if version == api.protoVersion2c:
-                    # SNMPv2c trap
-                    trap_oid = None
-                    varbinds = {}
+                for oid, val in v2c.apiPDU.get_varbinds(pdu):
+                    oid_str = str(oid)
+                    val_str = val.prettyPrint() if hasattr(val, 'prettyPrint') else str(val)
                     
-                    for oid, val in proto_module.apiPDU.getVarBinds(req_pdu):
-                        oid_str = str(oid)
-                        val_str = str(val) if val else ""
-                        
-                        # snmpTrapOID
-                        if oid_str == "1.3.6.1.6.3.1.1.4.1.0":
-                            trap_oid = val_str
-                        else:
-                            varbinds[oid_str] = val_str
-                    
-                    return {
-                        "source_ip": source_ip,
-                        "trap_oid": trap_oid or "",
-                        "enterprise_oid": "",
-                        "varbinds": varbinds,
-                        "timestamp": datetime.utcnow(),
-                        "version": "v2c"
-                    }
-                else:
-                    # SNMPv1 trap
-                    enterprise = str(proto_module.apiTrapPDU.getEnterprise(req_pdu))
-                    generic_trap = proto_module.apiTrapPDU.getGenericTrap(req_pdu)
-                    specific_trap = proto_module.apiTrapPDU.getSpecificTrap(req_pdu)
-                    
-                    # Build trap OID
-                    if generic_trap < 6:
-                        # Standard trap
-                        trap_oid = f"1.3.6.1.6.3.1.1.5.{generic_trap + 1}"
+                    # snmpTrapOID.0
+                    if oid_str == "1.3.6.1.6.3.1.1.4.1.0":
+                        trap_oid = val_str
                     else:
-                        # Enterprise-specific trap
-                        trap_oid = f"{enterprise}.0.{specific_trap}"
-                    
-                    varbinds = {}
-                    for oid, val in proto_module.apiTrapPDU.getVarBinds(req_pdu):
-                        varbinds[str(oid)] = str(val) if val else ""
-                    
-                    return {
-                        "source_ip": source_ip,
-                        "trap_oid": trap_oid,
-                        "enterprise_oid": enterprise,
-                        "varbinds": varbinds,
-                        "timestamp": datetime.utcnow(),
-                        "version": "v1"
-                    }
-                    
-            except Exception:
-                continue
+                        varbinds[oid_str] = val_str
+                
+                return {
+                    "source_ip": source_ip,
+                    "trap_oid": trap_oid,
+                    "enterprise_oid": enterprise_oid,
+                    "varbinds": varbinds,
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "version": "v2c",
+                    "community": community
+                }
+            
+            elif version == 0:  # SNMPv1
+                msg, _ = ber_decoder.decode(data, asn1Spec=v1.Message())
+                community = str(msg["community"])
+                pdu = v1.apiMessage.get_pdu(msg)
+                
+                # Get trap-specific fields
+                enterprise_oid = str(v1.apiTrapPDU.get_enterprise(pdu))
+                generic_trap = int(v1.apiTrapPDU.get_generic_trap(pdu))
+                specific_trap = int(v1.apiTrapPDU.get_specific_trap(pdu))
+                
+                # Build trap OID
+                if generic_trap < 6:
+                    trap_oid = f"1.3.6.1.6.3.1.1.5.{generic_trap + 1}"
+                else:
+                    trap_oid = f"{enterprise_oid}.0.{specific_trap}"
+                
+                for oid, val in v1.apiTrapPDU.get_varbinds(pdu):
+                    oid_str = str(oid)
+                    val_str = val.prettyPrint() if hasattr(val, 'prettyPrint') else str(val)
+                    varbinds[oid_str] = val_str
+                
+                return {
+                    "source_ip": source_ip,
+                    "trap_oid": trap_oid,
+                    "enterprise_oid": enterprise_oid,
+                    "varbinds": varbinds,
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "version": "v1",
+                    "community": community
+                }
+            
+        except Exception as e:
+            logger.debug(f"pysnmp decode failed: {e}")
         
         return None
     

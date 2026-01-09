@@ -74,6 +74,7 @@ class TrapRouter:
     VENDOR_OIDS = {
         '1.3.6.1.4.1.6141': 'ciena',      # Ciena WWP (SAOS)
         '1.3.6.1.4.1.1271': 'ciena',      # Ciena CES
+        '1.3.6.1.4.1.31926': 'siklu',     # Siklu EtherHaul
         '1.3.6.1.4.1.9': 'cisco',          # Cisco
         '1.3.6.1.4.1.2636': 'juniper',     # Juniper
         '1.3.6.1.4.1.8072': 'linux',       # Net-SNMP (Linux)
@@ -346,6 +347,115 @@ class CienaTrapHandler:
         )
 
 
+class SikluTrapHandler:
+    """Handler for Siklu EtherHaul radio traps with alarm correlation."""
+    
+    # Siklu Enterprise OID: 1.3.6.1.4.1.31926
+    # Trap OID pairs: raise OID ends in .1, clear OID ends in .2
+    TRAP_TYPES = {
+        # RF Link State
+        '1.3.6.1.4.1.31926.1.1.2.1.1': ('rfLinkDown', 'critical', False),
+        '1.3.6.1.4.1.31926.1.1.2.1.2': ('rfLinkUp', 'cleared', True),
+        # RSSI Threshold
+        '1.3.6.1.4.1.31926.1.2.1.3.1': ('rssiLow', 'major', False),
+        '1.3.6.1.4.1.31926.1.2.1.3.2': ('rssiNormal', 'cleared', True),
+        # Modulation Degraded
+        '1.3.6.1.4.1.31926.1.2.2.4.1': ('modulationDegraded', 'warning', False),
+        '1.3.6.1.4.1.31926.1.2.2.4.2': ('modulationRestored', 'cleared', True),
+        # Temperature
+        '1.3.6.1.4.1.31926.1.3.1.1.1': ('temperatureHigh', 'major', False),
+        '1.3.6.1.4.1.31926.1.3.1.1.2': ('temperatureNormal', 'cleared', True),
+        # Power Fault
+        '1.3.6.1.4.1.31926.1.3.2.2.1': ('powerFault', 'critical', False),
+        '1.3.6.1.4.1.31926.1.3.2.2.2': ('powerNormal', 'cleared', True),
+        # Sync Lost
+        '1.3.6.1.4.1.31926.1.4.1.1.1': ('syncLost', 'major', False),
+        '1.3.6.1.4.1.31926.1.4.1.1.2': ('syncRestored', 'cleared', True),
+        # One-shot events (no clear)
+        '1.3.6.1.4.1.31926.1.5.1.0': ('deviceReboot', 'warning', False),
+        '1.3.6.1.4.1.31926.1.5.2.0': ('configChange', 'info', False),
+        # Standard link traps (IF-MIB)
+        '1.3.6.1.6.3.1.1.5.3': ('linkDown', 'warning', False),
+        '1.3.6.1.6.3.1.1.5.4': ('linkUp', 'info', True),
+    }
+    
+    # Map trap types to their alarm correlation key (raise and clear share same key)
+    ALARM_CORRELATION = {
+        'rfLinkDown': 'rf_link',
+        'rfLinkUp': 'rf_link',
+        'rssiLow': 'rssi',
+        'rssiNormal': 'rssi',
+        'modulationDegraded': 'modulation',
+        'modulationRestored': 'modulation',
+        'temperatureHigh': 'temperature',
+        'temperatureNormal': 'temperature',
+        'powerFault': 'power',
+        'powerNormal': 'power',
+        'syncLost': 'sync',
+        'syncRestored': 'sync',
+        'linkDown': 'link',
+        'linkUp': 'link',
+    }
+    
+    def handle(self, trap: DecodedTrap) -> Optional[TrapEvent]:
+        """Process Siklu trap and return normalized event."""
+        trap_info = self.TRAP_TYPES.get(trap.trap_oid)
+        
+        if trap_info:
+            trap_name, severity, is_clear = trap_info
+            correlation_key = self.ALARM_CORRELATION.get(trap_name)
+            
+            # Generate alarm_id for correlation (same for raise/clear pairs)
+            alarm_id = None
+            if correlation_key:
+                alarm_id = f"{trap.source_ip}:siklu:{correlation_key}"
+            
+            # Build description
+            description = f"Siklu {trap_name}"
+            if trap.varbinds:
+                # Try to extract useful info from varbinds
+                for oid, val in trap.varbinds.items():
+                    if val and str(val).strip():
+                        description = f"Siklu {trap_name}: {val}"
+                        break
+            
+            return TrapEvent(
+                event_type=trap_name,
+                source_ip=trap.source_ip,
+                device_name=None,
+                severity=severity,
+                object_type='radio',
+                object_id=None,
+                description=description,
+                details={
+                    'trap_oid': trap.trap_oid,
+                    'varbinds': trap.varbinds,
+                    'vendor': 'siklu',
+                },
+                alarm_id=alarm_id,
+                is_clear=is_clear,
+            )
+        
+        # Unknown Siklu trap
+        return TrapEvent(
+            event_type='unknown',
+            source_ip=trap.source_ip,
+            device_name=None,
+            severity='info',
+            object_type='radio',
+            object_id=None,
+            description=f"Unknown Siklu trap: {trap.trap_oid}",
+            details={
+                'trap_oid': trap.trap_oid,
+                'enterprise_oid': trap.enterprise_oid,
+                'varbinds': trap.varbinds,
+                'vendor': 'siklu',
+            },
+            alarm_id=None,
+            is_clear=False,
+        )
+
+
 class GenericTrapHandler:
     """Handler for unknown/generic traps."""
     
@@ -415,6 +525,7 @@ class SNMPTrapReceiver:
         self.router = TrapRouter()
         self.handlers = {
             'ciena': CienaTrapHandler(),
+            'siklu': SikluTrapHandler(),
             'generic': GenericTrapHandler(),
             'standard': GenericTrapHandler(),
             'cisco': GenericTrapHandler(),

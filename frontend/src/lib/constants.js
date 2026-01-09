@@ -162,7 +162,6 @@ export const CONNECTOR_TYPES = [
   { type: 'axis', name: 'Axis Cameras', icon: '📹' },
   { type: 'milestone', name: 'Milestone VMS', icon: '🎬' },
   { type: 'cradlepoint', name: 'Cradlepoint', icon: '📶' },
-  { type: 'siklu', name: 'Siklu Radios', icon: '📻' },
   { type: 'ubiquiti', name: 'Ubiquiti UISP', icon: '🛜' },
   { type: 'cisco_asa', name: 'Cisco ASA', icon: '🔒' },
 ];

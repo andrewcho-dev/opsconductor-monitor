@@ -34,7 +34,26 @@ async def lifespan(app: FastAPI):
     # Setup Redis pub/sub for cross-process events (from Celery workers)
     await setup_redis_subscriptions()
     
+    # Start SNMP trap receiver if enabled
+    snmp_trap_connector = None
+    try:
+        from backend.core.connector_manager import start_snmp_trap_receiver
+        snmp_trap_connector = await start_snmp_trap_receiver()
+        if snmp_trap_connector:
+            logger.info("SNMP trap receiver started")
+    except Exception as e:
+        logger.warning(f"Failed to start SNMP trap receiver: {e}")
+    
     yield
+    
+    # Stop SNMP trap receiver
+    if snmp_trap_connector:
+        try:
+            await snmp_trap_connector.stop()
+            logger.info("SNMP trap receiver stopped")
+        except Exception as e:
+            logger.warning(f"Error stopping SNMP trap receiver: {e}")
+    
     logger.info("OpsConductor API shutting down...")
 
 

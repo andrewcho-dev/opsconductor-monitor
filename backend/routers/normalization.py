@@ -100,25 +100,70 @@ class CreateDeduplicationRuleRequest(BaseModel):
 
 
 # =============================================================================
-# Severity Mappings
+# Vendors (for SNMP trap filtering)
 # =============================================================================
 
-@router.get("/severity-mappings", response_model=SeverityMappingResponse)
-async def list_severity_mappings(connector_type: Optional[str] = None):
-    """List severity mappings."""
+@router.get("/vendors")
+async def list_vendors(connector_type: Optional[str] = None):
+    """List distinct vendors for a connector type (mainly for snmp_trap)."""
     query = """
-        SELECT id, connector_type, source_value, source_field,
-               target_severity, priority, enabled, description,
-               created_at, updated_at
-        FROM severity_mappings
+        SELECT DISTINCT vendor FROM (
+            SELECT vendor FROM severity_mappings WHERE vendor IS NOT NULL
+            UNION
+            SELECT vendor FROM category_mappings WHERE vendor IS NOT NULL
+        ) AS vendors
     """
     params = []
     
     if connector_type:
-        query += " WHERE connector_type = %s"
+        query = """
+            SELECT DISTINCT vendor FROM (
+                SELECT vendor FROM severity_mappings WHERE connector_type = %s AND vendor IS NOT NULL
+                UNION
+                SELECT vendor FROM category_mappings WHERE connector_type = %s AND vendor IS NOT NULL
+            ) AS vendors
+        """
+        params = [connector_type, connector_type]
+    
+    query += " ORDER BY vendor"
+    
+    rows = db_query(query, params)
+    vendors = [row["vendor"] for row in rows if row["vendor"]]
+    
+    return {"success": True, "data": vendors}
+
+
+# =============================================================================
+# Severity Mappings
+# =============================================================================
+
+@router.get("/severity-mappings", response_model=SeverityMappingResponse)
+async def list_severity_mappings(
+    connector_type: Optional[str] = None,
+    vendor: Optional[str] = None
+):
+    """List severity mappings. For snmp_trap, can filter by vendor."""
+    query = """
+        SELECT id, connector_type, source_value, source_field,
+               target_severity, priority, enabled, description, vendor,
+               created_at, updated_at
+        FROM severity_mappings
+    """
+    params = []
+    conditions = []
+    
+    if connector_type:
+        conditions.append("connector_type = %s")
         params.append(connector_type)
     
-    query += " ORDER BY connector_type, priority, source_value"
+    if vendor:
+        conditions.append("vendor = %s")
+        params.append(vendor)
+    
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
+    
+    query += " ORDER BY connector_type, vendor, priority, source_value"
     
     rows = db_query(query, params)
     
@@ -133,6 +178,7 @@ async def list_severity_mappings(connector_type: Optional[str] = None):
             "priority": row["priority"],
             "enabled": row["enabled"],
             "description": row.get("description"),
+            "vendor": row.get("vendor"),
             "created_at": row["created_at"].isoformat() if row.get("created_at") else None,
             "updated_at": row["updated_at"].isoformat() if row.get("updated_at") else None,
         })
@@ -212,21 +258,32 @@ async def delete_severity_mapping(mapping_id: str):
 # =============================================================================
 
 @router.get("/category-mappings", response_model=CategoryMappingResponse)
-async def list_category_mappings(connector_type: Optional[str] = None):
-    """List category mappings."""
+async def list_category_mappings(
+    connector_type: Optional[str] = None,
+    vendor: Optional[str] = None
+):
+    """List category mappings. For snmp_trap, can filter by vendor."""
     query = """
         SELECT id, connector_type, source_value, source_field,
-               target_category, priority, enabled, description,
+               target_category, priority, enabled, description, vendor,
                created_at, updated_at
         FROM category_mappings
     """
     params = []
+    conditions = []
     
     if connector_type:
-        query += " WHERE connector_type = %s"
+        conditions.append("connector_type = %s")
         params.append(connector_type)
     
-    query += " ORDER BY connector_type, priority, source_value"
+    if vendor:
+        conditions.append("vendor = %s")
+        params.append(vendor)
+    
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
+    
+    query += " ORDER BY connector_type, vendor, priority, source_value"
     
     rows = db_query(query, params)
     
@@ -241,6 +298,7 @@ async def list_category_mappings(connector_type: Optional[str] = None):
             "priority": row["priority"],
             "enabled": row["enabled"],
             "description": row.get("description"),
+            "vendor": row.get("vendor"),
             "created_at": row["created_at"].isoformat() if row.get("created_at") else None,
             "updated_at": row["updated_at"].isoformat() if row.get("updated_at") else None,
         })

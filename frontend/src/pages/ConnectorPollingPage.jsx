@@ -14,7 +14,8 @@ import { fetchApi } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import ConfigModal from '../components/connectors/ConfigModal';
 
-export default function ConnectorPollingPage() {
+// Content component without PageLayout (for use in ConnectorsLayout)
+export function PollingContent() {
   const { getAuthHeader } = useAuth();
   const [connectors, setConnectors] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -129,20 +130,15 @@ export default function ConnectorPollingPage() {
   };
 
   if (loading) return (
-    <PageLayout module="system">
-      <div className="p-6"><RefreshCw className="h-6 w-6 animate-spin" /></div>
-    </PageLayout>
+    <div className="p-6"><RefreshCw className="h-6 w-6 animate-spin" /></div>
   );
 
   if (error) return (
-    <PageLayout module="system">
-      <div className="p-6 text-red-600">Error: {error}</div>
-    </PageLayout>
+    <div className="p-6 text-red-600">Error: {error}</div>
   );
 
   return (
-    <PageLayout module="system">
-      <div className="p-6">
+    <div className="p-6">
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -193,7 +189,7 @@ export default function ConnectorPollingPage() {
               </tr>
             </thead>
             <tbody>
-              {connectors.map((connector) => (
+              {connectors.filter(c => c.type !== 'snmp_trap').map((connector) => (
                 <tr key={connector.id} className="border-b hover:bg-gray-50 dark:hover:bg-gray-700">
                   <td className="px-4 py-3">
                     <div>
@@ -303,7 +299,15 @@ export default function ConnectorPollingPage() {
             getAuthHeader={getAuthHeader}
           />
         )}
-      </div>
+    </div>
+  );
+}
+
+// Standalone page with PageLayout
+export default function ConnectorPollingPage() {
+  return (
+    <PageLayout module="connectors">
+      <PollingContent />
     </PageLayout>
   );
 }
