@@ -403,9 +403,11 @@ async def poll_connector(
         alerts = await connector.poll()
         
         if alerts:
-            # Process alerts through AlertManager
+            # Process alerts through AlertManager (filter out None from disabled event types)
             alert_manager = get_alert_manager()
             for alert in alerts:
+                if alert is None:
+                    continue
                 stored_alert = await alert_manager.process_alert(alert)
                 logger.info(f"Stored alert {stored_alert.id} from {row['name']}")
         
