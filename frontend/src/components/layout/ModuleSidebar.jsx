@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Server, 
@@ -26,6 +26,7 @@ import {
   Archive,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   KeyRound,
   Clock,
   History,
@@ -35,7 +36,9 @@ import {
   Circle,
   Battery,
   Download,
-  Radio
+  Radio,
+  PanelLeftClose,
+  PanelLeft
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -123,6 +126,15 @@ export function ModuleSidebar({ module, children }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [expandedSections, setExpandedSections] = React.useState({});
+  const [collapsed, setCollapsed] = useState(() => {
+    const saved = localStorage.getItem('sidebar-collapsed');
+    return saved === 'true';
+  });
+  
+  // Persist collapsed state
+  useEffect(() => {
+    localStorage.setItem('sidebar-collapsed', collapsed);
+  }, [collapsed]);
   
   const nav = moduleNavigation[module];
   if (!nav) return null;
@@ -141,13 +153,63 @@ export function ModuleSidebar({ module, children }) {
     return location.pathname === path || location.pathname.startsWith(path + '/');
   };
 
+  // Collapsed state - show only icons
+  if (collapsed) {
+    return (
+      <aside className="w-12 bg-white border-r border-gray-200 flex flex-col h-full">
+        {/* Expand button */}
+        <button
+          onClick={() => setCollapsed(false)}
+          className="p-3 hover:bg-gray-100 border-b border-gray-200 flex items-center justify-center"
+          title="Expand sidebar"
+        >
+          <ChevronRight className="w-4 h-4 text-gray-500" />
+        </button>
+        
+        {/* Icon-only nav */}
+        <div className="flex-1 py-2">
+          {nav.sections.map((section) => (
+            <div key={section.title} className="space-y-1">
+              {section.items.map((item) => {
+                const Icon = item.icon;
+                const active = isActive(item.path);
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => navigate(item.path)}
+                    className={cn(
+                      "w-full flex items-center justify-center p-3 transition-colors",
+                      active
+                        ? "bg-blue-50 text-blue-700 border-r-2 border-blue-600"
+                        : "text-gray-500 hover:bg-gray-50 hover:text-gray-700"
+                    )}
+                    title={item.label}
+                  >
+                    <Icon className="w-4 h-4" />
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </aside>
+    );
+  }
+
   return (
     <aside className="w-64 bg-white border-r border-gray-200 flex flex-col h-full">
-      {/* Module Title */}
-      <div className="px-4 py-3 border-b border-gray-200">
+      {/* Module Title with collapse button */}
+      <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
           {nav.title}
         </h2>
+        <button
+          onClick={() => setCollapsed(true)}
+          className="p-1 hover:bg-gray-100 rounded"
+          title="Collapse sidebar"
+        >
+          <ChevronLeft className="w-4 h-4 text-gray-400" />
+        </button>
       </div>
 
       {/* Navigation Sections */}
