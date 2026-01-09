@@ -1,6 +1,6 @@
 /**
  * Compact Alert Detail Modal
- * Dense, efficient display of alert information
+ * Dense, organized display of alert information
  */
 
 import { X } from 'lucide-react';
@@ -21,65 +21,103 @@ export function AlertDetailModal({ alert, onClose }) {
     });
   };
 
-  const Row = ({ label, value, mono = false }) => (
-    <div className="flex border-b border-gray-100 dark:border-gray-700 py-1">
-      <span className="w-24 text-xs text-gray-500 flex-shrink-0">{label}</span>
-      <span className={`text-xs text-gray-900 dark:text-white flex-1 break-all ${mono ? 'font-mono' : ''}`}>
+  const Field = ({ label, value, mono = false, className = '' }) => (
+    <div className={`${className}`}>
+      <span className="text-[10px] text-gray-400 uppercase tracking-wide">{label}</span>
+      <div className={`text-xs text-gray-900 dark:text-white ${mono ? 'font-mono' : ''}`}>
         {value || '-'}
-      </span>
+      </div>
+    </div>
+  );
+
+  const Section = ({ title, children }) => (
+    <div className="mb-3">
+      <div className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-b border-gray-200 dark:border-gray-700 pb-1 mb-2">
+        {title}
+      </div>
+      {children}
     </div>
   );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
       <div 
-        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[80vh] overflow-hidden"
+        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-xl w-full mx-4 max-h-[85vh] overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className={`px-3 py-2 flex items-center justify-between ${severityConfig.bgClass}`}>
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="text-xs font-bold uppercase">{alert.severity}</span>
-            <span className="text-xs truncate">{alert.title}</span>
+        <div className={`px-4 py-2.5 flex items-center justify-between ${severityConfig.bgClass}`}>
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="text-xs font-bold uppercase px-2 py-0.5 bg-black/10 rounded">{alert.severity}</span>
+            <span className="text-sm font-medium truncate">{alert.title}</span>
           </div>
-          <button onClick={onClose} className="p-0.5 hover:bg-black/10 rounded">
+          <button onClick={onClose} className="p-1 hover:bg-black/10 rounded">
             <X className="h-4 w-4" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="px-3 py-2 overflow-y-auto max-h-[calc(80vh-40px)]">
-          <Row label="ID" value={alert.id} mono />
-          <Row label="Status" value={alert.status?.toUpperCase()} />
-          <Row label="Category" value={categoryConfig.label} />
-          <Row label="Device IP" value={alert.device_ip} mono />
-          <Row label="Device" value={alert.device_name} />
-          <Row label="Source" value={alert.source_system?.toUpperCase()} />
-          <Row label="Source ID" value={alert.source_alert_id} mono />
-          <Row label="Alert Type" value={alert.alert_type} mono />
-          <Row label="Occurred" value={formatDate(alert.occurred_at)} mono />
-          <Row label="Created" value={formatDate(alert.created_at)} mono />
-          <Row label="Updated" value={formatDate(alert.updated_at)} mono />
-          {alert.resolved_at && <Row label="Resolved" value={formatDate(alert.resolved_at)} mono />}
-          <Row label="Occurrences" value={alert.occurrence_count || 1} />
-          <Row label="Fingerprint" value={alert.fingerprint} mono />
+        <div className="px-4 py-3 overflow-y-auto max-h-[calc(85vh-52px)]">
           
-          {/* Message - full width */}
-          <div className="border-b border-gray-100 dark:border-gray-700 py-1">
-            <span className="text-xs text-gray-500 block mb-0.5">Message</span>
-            <span className="text-xs text-gray-900 dark:text-white font-mono break-all whitespace-pre-wrap">
+          {/* Status & Classification */}
+          <Section title="Classification">
+            <div className="grid grid-cols-4 gap-3">
+              <Field label="Status" value={alert.status?.toUpperCase()} />
+              <Field label="Severity" value={alert.severity?.toUpperCase()} />
+              <Field label="Category" value={categoryConfig.label} />
+              <Field label="Count" value={alert.occurrence_count || 1} />
+            </div>
+          </Section>
+
+          {/* Device Information */}
+          <Section title="Device">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="IP Address" value={alert.device_ip} mono />
+              <Field label="Name" value={alert.device_name} />
+            </div>
+          </Section>
+
+          {/* Source Information */}
+          <Section title="Source">
+            <div className="grid grid-cols-3 gap-3">
+              <Field label="System" value={alert.source_system?.toUpperCase()} />
+              <Field label="Alert Type" value={alert.alert_type} mono />
+              <Field label="Source ID" value={alert.source_alert_id} mono />
+            </div>
+          </Section>
+
+          {/* Timestamps */}
+          <Section title="Timeline">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Occurred" value={formatDate(alert.occurred_at)} mono />
+              <Field label="Created" value={formatDate(alert.created_at)} mono />
+              <Field label="Updated" value={formatDate(alert.updated_at)} mono />
+              {alert.resolved_at && <Field label="Resolved" value={formatDate(alert.resolved_at)} mono />}
+            </div>
+          </Section>
+
+          {/* Message */}
+          <Section title="Message">
+            <div className="bg-gray-50 dark:bg-gray-900 rounded p-2 text-xs font-mono text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-all max-h-24 overflow-y-auto">
               {alert.message || '-'}
-            </span>
-          </div>
+            </div>
+          </Section>
+
+          {/* Identifiers */}
+          <Section title="Identifiers">
+            <div className="space-y-1">
+              <Field label="Alert ID" value={alert.id} mono />
+              <Field label="Fingerprint" value={alert.fingerprint} mono />
+            </div>
+          </Section>
 
           {/* Raw Data if present */}
           {alert.raw_data && Object.keys(alert.raw_data).length > 0 && (
-            <div className="py-1">
-              <span className="text-xs text-gray-500 block mb-0.5">Raw Data</span>
-              <pre className="text-[10px] text-gray-700 dark:text-gray-300 font-mono bg-gray-50 dark:bg-gray-900 p-1 rounded overflow-x-auto max-h-32">
-                {JSON.stringify(alert.raw_data, null, 1)}
+            <Section title="Raw Data">
+              <pre className="text-[10px] text-gray-700 dark:text-gray-300 font-mono bg-gray-50 dark:bg-gray-900 p-2 rounded overflow-x-auto max-h-28">
+                {JSON.stringify(alert.raw_data, null, 2)}
               </pre>
-            </div>
+            </Section>
           )}
         </div>
       </div>
