@@ -79,11 +79,11 @@ export function AlertDetailModal({ alert, onClose }) {
 
           {/* Source Information */}
           <Section title="Source">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3 mb-2">
               <Field label="System" value={alert.source_system?.toUpperCase()} />
-              <Field label="Alert Type" value={alert.alert_type} mono />
               <Field label="Source ID" value={alert.source_alert_id} mono />
             </div>
+            <Field label="Alert Type" value={alert.alert_type} mono />
           </Section>
 
           {/* Timestamps */}
