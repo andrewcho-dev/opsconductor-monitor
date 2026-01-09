@@ -42,7 +42,7 @@ export function AlertDetailModal({ alert, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
       <div 
-        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-3xl w-full mx-4 max-h-[85vh] overflow-hidden"
+        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-3xl w-full mx-4 max-h-[92vh] overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -57,7 +57,7 @@ export function AlertDetailModal({ alert, onClose }) {
         </div>
 
         {/* Content */}
-        <div className="px-4 py-3 overflow-y-auto max-h-[calc(85vh-52px)]">
+        <div className="px-4 py-3 overflow-y-auto max-h-[calc(92vh-52px)]">
           
           {/* Status & Classification */}
           <Section title="Classification">
