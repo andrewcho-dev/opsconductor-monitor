@@ -103,6 +103,15 @@ export function AlertDetailModal({ alert, onClose }) {
             </div>
           </Section>
 
+          {/* Source Description - explains what this alert type means */}
+          {alert.source_description && (
+            <Section title="What This Means">
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded p-2 text-xs text-blue-800 dark:text-blue-200">
+                {alert.source_description}
+              </div>
+            </Section>
+          )}
+
           {/* Identifiers */}
           <Section title="Identifiers">
             <div className="space-y-1">

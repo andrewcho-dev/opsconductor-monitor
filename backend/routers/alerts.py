@@ -52,6 +52,7 @@ class AlertResponse(BaseModel):
     correlation_rule: Optional[str]
     occurrence_count: int
     tags: List[str] = []
+    source_description: Optional[str] = None  # Description from mapping table
 
     class Config:
         from_attributes = True
@@ -107,8 +108,30 @@ class BulkActionResponse(BaseModel):
 # Helper Functions
 # =============================================================================
 
-def alert_to_response(alert) -> AlertResponse:
+def get_source_description(source_system: str, alert_type: str) -> Optional[str]:
+    """Look up the source description from severity_mappings table."""
+    from backend.utils.db import db_query_one
+    
+    # Map source_system to connector_type
+    connector_type = source_system
+    if source_system == 'snmp':
+        connector_type = 'snmp_trap'
+    
+    row = db_query_one("""
+        SELECT description FROM severity_mappings 
+        WHERE connector_type = %s AND source_value = %s AND description IS NOT NULL AND description != ''
+        LIMIT 1
+    """, (connector_type, alert_type))
+    
+    return row['description'] if row else None
+
+
+def alert_to_response(alert, include_description: bool = True) -> AlertResponse:
     """Convert Alert model to response."""
+    source_description = None
+    if include_description:
+        source_description = get_source_description(alert.source_system, alert.alert_type)
+    
     return AlertResponse(
         id=str(alert.id),
         source_system=alert.source_system,
@@ -136,6 +159,7 @@ def alert_to_response(alert) -> AlertResponse:
         correlation_rule=alert.correlation_rule,
         occurrence_count=alert.occurrence_count,
         tags=alert.tags or [],
+        source_description=source_description,
     )
 
 
