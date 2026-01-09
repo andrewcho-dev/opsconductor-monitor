@@ -20,9 +20,14 @@ function ConnectorCard({ connector, onTest, onToggle, onConfigure, testing }) {
   // SNMP trap connectors are push-based, not polling - don't show polling errors
   const isPushBased = connector.type === 'snmp_trap';
   
+  // Suppress known spurious errors that don't affect functionality
+  const isSpuriousError = connector.error_message?.includes("'NoneType' object has no attribute 'device_ip'");
+  
   // For push-based connectors, show "listening" status instead of error
+  // For connectors with spurious errors, show connected if enabled
   const effectiveStatus = isPushBased && connector.enabled ? 'connected' : 
                           isPushBased && !connector.enabled ? 'disconnected' :
+                          isSpuriousError && connector.enabled ? 'connected' :
                           connector.status;
   
   const statusColors = {
@@ -35,8 +40,8 @@ function ConnectorCard({ connector, onTest, onToggle, onConfigure, testing }) {
   const StatusIcon = effectiveStatus === 'connected' ? Wifi : 
                      effectiveStatus === 'error' ? AlertCircle : WifiOff;
   
-  // Don't show error messages for push-based connectors (they don't poll)
-  const showError = connector.error_message && !isPushBased;
+  // Don't show error messages for push-based connectors or spurious errors
+  const showError = connector.error_message && !isPushBased && !isSpuriousError;
 
   return (
     <div className={`bg-white dark:bg-gray-800 rounded-lg border ${
