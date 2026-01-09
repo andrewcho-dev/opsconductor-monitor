@@ -1369,6 +1369,89 @@ function GenericConfigForm({ config, setConfig }) {
 
 // Ubiquiti UISP configuration form
 function UbiquitiConfigForm({ config, setConfig }) {
+  const [newDevice, setNewDevice] = useState({ ip: '', name: '' });
+  const [bulkImportText, setBulkImportText] = useState('');
+  const [showBulkImport, setShowBulkImport] = useState(false);
+  const [importError, setImportError] = useState('');
+
+  const addDevice = () => {
+    if (!newDevice.ip) return;
+    const targets = config.targets || [];
+    setConfig({ 
+      ...config, 
+      targets: [...targets, { ...newDevice }]
+    });
+    setNewDevice({ ip: '', name: '' });
+  };
+
+  const removeDevice = (index) => {
+    const targets = [...(config.targets || [])];
+    targets.splice(index, 1);
+    setConfig({ ...config, targets });
+  };
+
+  const clearAllDevices = () => {
+    if (window.confirm(`Remove all ${(config.targets || []).length} devices?`)) {
+      setConfig({ ...config, targets: [] });
+    }
+  };
+
+  const handleBulkImport = () => {
+    setImportError('');
+    const lines = bulkImportText.trim().split('\n').filter(line => line.trim());
+    const newTargets = [];
+    const errors = [];
+
+    lines.forEach((line, idx) => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+
+      if (idx === 0 && (trimmed.toLowerCase().includes('ip') || trimmed.toLowerCase().includes('address'))) {
+        return;
+      }
+
+      const parts = trimmed.split(/[,\t]/).map(p => p.trim());
+      const ip = parts[0];
+      
+      const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
+      if (!ipRegex.test(ip)) {
+        errors.push(`Line ${idx + 1}: Invalid IP "${ip}"`);
+        return;
+      }
+
+      newTargets.push({
+        ip: ip,
+        name: parts[1] || '',
+      });
+    });
+
+    if (errors.length > 0) {
+      setImportError(errors.slice(0, 5).join('\n') + (errors.length > 5 ? `\n...and ${errors.length - 5} more errors` : ''));
+      return;
+    }
+
+    if (newTargets.length === 0) {
+      setImportError('No valid devices found in input');
+      return;
+    }
+
+    const existingIPs = new Set((config.targets || []).map(t => t.ip));
+    const uniqueNew = newTargets.filter(t => !existingIPs.has(t.ip));
+    const duplicates = newTargets.length - uniqueNew.length;
+
+    setConfig({ 
+      ...config, 
+      targets: [...(config.targets || []), ...uniqueNew] 
+    });
+    
+    setBulkImportText('');
+    setShowBulkImport(false);
+    
+    if (duplicates > 0) {
+      alert(`Imported ${uniqueNew.length} devices. Skipped ${duplicates} duplicates.`);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
@@ -1448,6 +1531,98 @@ function UbiquitiConfigForm({ config, setConfig }) {
               className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
             />
           </div>
+        </div>
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Devices ({(config.targets || []).length})
+          </label>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowBulkImport(!showBulkImport)}
+              className="text-xs px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700"
+            >
+              {showBulkImport ? 'Cancel Import' : 'Bulk Import'}
+            </button>
+            {(config.targets || []).length > 0 && (
+              <button
+                onClick={clearAllDevices}
+                className="text-xs px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700"
+              >
+                Clear All
+              </button>
+            )}
+          </div>
+        </div>
+
+        {showBulkImport && (
+          <div className="mb-3 p-3 bg-green-50 dark:bg-green-900/20 rounded border border-green-200 dark:border-green-800">
+            <p className="text-xs text-green-700 dark:text-green-300 mb-2">
+              Paste device list (one per line). Formats: IP only, or IP,Name
+            </p>
+            <textarea
+              value={bulkImportText}
+              onChange={(e) => setBulkImportText(e.target.value)}
+              placeholder="10.1.2.3,Device-1&#10;10.1.2.4,Device-2&#10;10.1.2.5"
+              rows={6}
+              className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white font-mono"
+            />
+            {importError && (
+              <p className="text-xs text-red-600 mt-1 whitespace-pre-line">{importError}</p>
+            )}
+            <button
+              onClick={handleBulkImport}
+              disabled={!bulkImportText.trim()}
+              className="mt-2 px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+            >
+              Import Devices
+            </button>
+          </div>
+        )}
+        
+        {(config.targets || []).length > 0 && (
+          <div className="mb-3 max-h-48 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded">
+            {(config.targets || []).map((device, idx) => (
+              <div key={idx} className="flex items-center justify-between px-3 py-2 border-b border-gray-100 dark:border-gray-700 last:border-0 text-sm">
+                <div>
+                  <span className="font-mono text-gray-700 dark:text-gray-300">{device.ip}</span>
+                  {device.name && <span className="text-gray-500 ml-2">({device.name})</span>}
+                </div>
+                <button
+                  onClick={() => removeDevice(idx)}
+                  className="text-red-500 hover:text-red-700 text-xs"
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="grid grid-cols-3 gap-2">
+          <input
+            type="text"
+            placeholder="IP Address"
+            value={newDevice.ip}
+            onChange={(e) => setNewDevice({ ...newDevice, ip: e.target.value })}
+            className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm"
+          />
+          <input
+            type="text"
+            placeholder="Name (optional)"
+            value={newDevice.name}
+            onChange={(e) => setNewDevice({ ...newDevice, name: e.target.value })}
+            className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm"
+          />
+          <button
+            onClick={addDevice}
+            disabled={!newDevice.ip}
+            className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 text-sm"
+          >
+            Add
+          </button>
         </div>
       </div>
 
