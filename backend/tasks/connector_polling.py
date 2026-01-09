@@ -157,7 +157,9 @@ def poll_all_connectors():
             
         except Exception as e:
             import traceback
-            logger.error(f"Error polling connector {row['name']}: {e}\n{traceback.format_exc()}")
+            tb = traceback.format_exc()
+            logger.error(f"CONNECTOR POLL ERROR - {row['name']} ({connector_type}): {e}")
+            logger.error(f"FULL TRACEBACK:\n{tb}")
             
             # Update error status
             with db.cursor() as cursor:
