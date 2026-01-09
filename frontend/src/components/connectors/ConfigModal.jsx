@@ -1367,9 +1367,9 @@ function GenericConfigForm({ config, setConfig }) {
   );
 }
 
-// Ubiquiti UISP configuration form
+// Ubiquiti Direct Device configuration form
 function UbiquitiConfigForm({ config, setConfig }) {
-  const [newDevice, setNewDevice] = useState({ ip: '', name: '' });
+  const [newDevice, setNewDevice] = useState({ ip: '', name: '', username: '', password: '' });
   const [bulkImportText, setBulkImportText] = useState('');
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [importError, setImportError] = useState('');
@@ -1381,7 +1381,7 @@ function UbiquitiConfigForm({ config, setConfig }) {
       ...config, 
       targets: [...targets, { ...newDevice }]
     });
-    setNewDevice({ ip: '', name: '' });
+    setNewDevice({ ip: '', name: '', username: '', password: '' });
   };
 
   const removeDevice = (index) => {
@@ -1422,6 +1422,8 @@ function UbiquitiConfigForm({ config, setConfig }) {
       newTargets.push({
         ip: ip,
         name: parts[1] || '',
+        username: parts[2] || '',
+        password: parts[3] || '',
       });
     });
 
@@ -1455,39 +1457,35 @@ function UbiquitiConfigForm({ config, setConfig }) {
   return (
     <div className="space-y-4">
       <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
-        <p className="text-sm text-blue-700 dark:text-blue-300 mb-1 font-medium">Ubiquiti UISP Connection</p>
+        <p className="text-sm text-blue-700 dark:text-blue-300 mb-1 font-medium">Ubiquiti Access Points</p>
         <p className="text-xs text-blue-600 dark:text-blue-400">
-          Connect to UISP for device monitoring and alerts.
+          Poll individual Ubiquiti UniFi devices directly. Each device can have its own credentials.
         </p>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          UISP Server URL <span className="text-red-500">*</span>
-        </label>
-        <input
-          type="text"
-          placeholder="https://uisp.example.com"
-          value={config.url || ''}
-          onChange={(e) => setConfig({ ...config, url: e.target.value })}
-          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-        />
-        <p className="text-xs text-gray-500 mt-1">UISP server URL without trailing slash</p>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Username</label>
+          <input
+            type="text"
+            placeholder="ubnt"
+            value={config.default_username || ''}
+            onChange={(e) => setConfig({ ...config, default_username: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Password</label>
+          <input
+            type="password"
+            placeholder="Default password for all devices"
+            value={config.default_password || ''}
+            onChange={(e) => setConfig({ ...config, default_password: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+          />
+        </div>
       </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          API Token <span className="text-red-500">*</span>
-        </label>
-        <input
-          type="password"
-          placeholder="Enter API token"
-          value={config.api_token || ''}
-          onChange={(e) => setConfig({ ...config, api_token: e.target.value })}
-          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-        />
-        <p className="text-xs text-gray-500 mt-1">Generate in UISP: Settings → Users → API Tokens</p>
-      </div>
+      <p className="text-xs text-gray-500 -mt-2">Used for devices without individual credentials</p>
 
       <div>
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Poll Interval (seconds)</label>
@@ -1502,7 +1500,7 @@ function UbiquitiConfigForm({ config, setConfig }) {
 
       <div>
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Alert Thresholds</label>
-        <div className="grid grid-cols-2 gap-3 text-sm">
+        <div className="grid grid-cols-3 gap-3 text-sm">
           <div>
             <label className="block text-xs text-gray-500 mb-1">CPU Warning (%)</label>
             <input
@@ -1527,6 +1525,20 @@ function UbiquitiConfigForm({ config, setConfig }) {
               onChange={(e) => setConfig({ 
                 ...config, 
                 thresholds: { ...config.thresholds, memory_warning: parseInt(e.target.value) || 80 }
+              })}
+              className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Signal Warning (dBm)</label>
+            <input
+              type="number"
+              min="-100"
+              max="0"
+              value={config.thresholds?.signal_warning || -70}
+              onChange={(e) => setConfig({ 
+                ...config, 
+                thresholds: { ...config.thresholds, signal_warning: parseInt(e.target.value) || -70 }
               })}
               className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
             />
@@ -1560,12 +1572,12 @@ function UbiquitiConfigForm({ config, setConfig }) {
         {showBulkImport && (
           <div className="mb-3 p-3 bg-green-50 dark:bg-green-900/20 rounded border border-green-200 dark:border-green-800">
             <p className="text-xs text-green-700 dark:text-green-300 mb-2">
-              Paste device list (one per line). Formats: IP only, or IP,Name
+              Paste device list (one per line). Format: IP,Name,Username,Password (Username/Password optional)
             </p>
             <textarea
               value={bulkImportText}
               onChange={(e) => setBulkImportText(e.target.value)}
-              placeholder="10.1.2.3,Device-1&#10;10.1.2.4,Device-2&#10;10.1.2.5"
+              placeholder="10.1.2.3,AP-Office&#10;10.1.2.4,AP-Warehouse,admin,secret&#10;10.1.2.5,AP-Lobby"
               rows={6}
               className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white font-mono"
             />
@@ -1589,6 +1601,7 @@ function UbiquitiConfigForm({ config, setConfig }) {
                 <div>
                   <span className="font-mono text-gray-700 dark:text-gray-300">{device.ip}</span>
                   {device.name && <span className="text-gray-500 ml-2">({device.name})</span>}
+                  {device.username && <span className="text-blue-500 ml-2 text-xs">[custom auth]</span>}
                 </div>
                 <button
                   onClick={() => removeDevice(idx)}
@@ -1601,7 +1614,7 @@ function UbiquitiConfigForm({ config, setConfig }) {
           </div>
         )}
 
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-5 gap-2">
           <input
             type="text"
             placeholder="IP Address"
@@ -1611,9 +1624,23 @@ function UbiquitiConfigForm({ config, setConfig }) {
           />
           <input
             type="text"
-            placeholder="Name (optional)"
+            placeholder="Name"
             value={newDevice.name}
             onChange={(e) => setNewDevice({ ...newDevice, name: e.target.value })}
+            className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm"
+          />
+          <input
+            type="text"
+            placeholder="User (opt)"
+            value={newDevice.username}
+            onChange={(e) => setNewDevice({ ...newDevice, username: e.target.value })}
+            className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm"
+          />
+          <input
+            type="password"
+            placeholder="Pass (opt)"
+            value={newDevice.password}
+            onChange={(e) => setNewDevice({ ...newDevice, password: e.target.value })}
             className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm"
           />
           <button
@@ -1624,65 +1651,15 @@ function UbiquitiConfigForm({ config, setConfig }) {
             Add
           </button>
         </div>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Monitoring Options</label>
-        <div className="grid grid-cols-2 gap-2 text-sm">
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={config.monitor_offline !== false}
-              onChange={(e) => setConfig({ ...config, monitor_offline: e.target.checked })}
-              className="rounded border-gray-300 text-blue-600"
-            />
-            <span className="text-gray-700 dark:text-gray-300">Device Offline</span>
-          </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={config.monitor_cpu !== false}
-              onChange={(e) => setConfig({ ...config, monitor_cpu: e.target.checked })}
-              className="rounded border-gray-300 text-blue-600"
-            />
-            <span className="text-gray-700 dark:text-gray-300">High CPU</span>
-          </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={config.monitor_memory !== false}
-              onChange={(e) => setConfig({ ...config, monitor_memory: e.target.checked })}
-              className="rounded border-gray-300 text-blue-600"
-            />
-            <span className="text-gray-700 dark:text-gray-300">High Memory</span>
-          </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={config.monitor_signal !== false}
-              onChange={(e) => setConfig({ ...config, monitor_signal: e.target.checked })}
-              className="rounded border-gray-300 text-blue-600"
-            />
-            <span className="text-gray-700 dark:text-gray-300">Signal Degraded</span>
-          </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={config.monitor_outages !== false}
-              onChange={(e) => setConfig({ ...config, monitor_outages: e.target.checked })}
-              className="rounded border-gray-300 text-blue-600"
-            />
-            <span className="text-gray-700 dark:text-gray-300">Outages</span>
-          </label>
-        </div>
+        <p className="text-xs text-gray-500 mt-1">Leave username/password empty to use defaults</p>
       </div>
 
       <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700">
         <p className="text-xs text-gray-600 dark:text-gray-400">
-          <strong>Alert Types:</strong> device_offline, device_online, high_cpu, high_memory, signal_degraded, outage, firmware_update
+          <strong>Alert Types:</strong> device_offline, high_cpu, high_memory, signal_degraded
         </p>
         <p className="text-xs text-gray-500 mt-1">
-          Configure severity/category mappings in Connectors → Normalization Rules
+          Polls devices directly via their local HTTP/HTTPS interface
         </p>
       </div>
     </div>
