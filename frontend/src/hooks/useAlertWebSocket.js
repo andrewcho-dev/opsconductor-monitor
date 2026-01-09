@@ -50,6 +50,11 @@ export function useAlertWebSocket({
 
   // Handle incoming messages
   const handleMessage = useCallback((event) => {
+    // Ignore pong responses (plain text, not JSON)
+    if (event.data === 'pong') {
+      return;
+    }
+    
     try {
       const message = JSON.parse(event.data);
       setLastMessage(message);
