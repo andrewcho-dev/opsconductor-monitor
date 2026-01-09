@@ -10,8 +10,8 @@ import { AlertDetailModal } from './AlertDetailModal';
 // Status configuration with colors and order
 const STATUS_CONFIG = {
   active: { label: 'Active', color: 'red', bgClass: 'bg-red-100 text-red-700 border-red-300', selectedClass: 'bg-red-500 text-white border-red-500' },
-  acknowledged: { label: 'Ack', color: 'blue', bgClass: 'bg-blue-100 text-blue-700 border-blue-300', selectedClass: 'bg-blue-500 text-white border-blue-500' },
-  suppressed: { label: 'Supp', color: 'yellow', bgClass: 'bg-yellow-100 text-yellow-700 border-yellow-300', selectedClass: 'bg-yellow-500 text-white border-yellow-500' },
+  acknowledged: { label: 'Acknowledged', color: 'blue', bgClass: 'bg-blue-100 text-blue-700 border-blue-300', selectedClass: 'bg-blue-500 text-white border-blue-500' },
+  suppressed: { label: 'Suppressed', color: 'yellow', bgClass: 'bg-yellow-100 text-yellow-700 border-yellow-300', selectedClass: 'bg-yellow-500 text-white border-yellow-500' },
   resolved: { label: 'Resolved', color: 'green', bgClass: 'bg-green-100 text-green-700 border-green-300', selectedClass: 'bg-green-500 text-white border-green-500' },
 };
 const STATUS_ORDER = ['active', 'acknowledged', 'suppressed', 'resolved'];
@@ -477,7 +477,6 @@ export function AlertTable({
   const StatusFilterPills = () => (
     <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex items-center justify-between">
       <div className="flex items-center gap-2">
-        <span className="text-xs font-medium text-gray-500 dark:text-gray-400 mr-1">Status:</span>
         {STATUS_ORDER.map((status) => {
           const config = STATUS_CONFIG[status];
           const count = filteredStatusCounts[status] || 0;
@@ -555,7 +554,7 @@ export function AlertTable({
                 />
               </th>
               <th className="px-2 py-2 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap">
-                SEV
+                SEVERITY
               </th>
               <th className="px-1 py-2 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap">
                 #
@@ -567,7 +566,7 @@ export function AlertTable({
                 MESSAGE
               </th>
               <th className="px-1 py-2 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap">
-                SRC
+                SOURCE
               </th>
               <th className="px-2 py-2 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
                 <DeviceFilterDropdown options={uniqueDevices} currentValue={filters.device_ip} label="Device" />
@@ -580,7 +579,7 @@ export function AlertTable({
                 onClick={() => handleSort('occurred_at')}
               >
                 <div className="flex items-center gap-1">
-                  FIRST SEEN
+                  FIRST
                   <SortIcon columnKey="occurred_at" />
                 </div>
               </th>
