@@ -641,18 +641,18 @@ export function AlertTable({
                       {alert.occurrence_count > 1 ? alert.occurrence_count : ''}
                     </span>
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-1.5 py-2">
                     <button
                       onClick={() => setSelectedAlert(alert)}
-                      className="font-mono text-xs text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 truncate block max-w-[300px] text-left"
+                      className="font-mono text-xs text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 truncate block max-w-[320px] text-left"
                       title={alert.title}
                     >
                       {alert.title}
                     </button>
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-1.5 py-2">
                     <span 
-                      className="font-mono text-xs text-gray-600 dark:text-gray-300 truncate block max-w-[350px]"
+                      className="font-mono text-xs text-gray-600 dark:text-gray-300 truncate block max-w-[380px]"
                       title={alert.message}
                     >
                       {alert.message || '-'}
