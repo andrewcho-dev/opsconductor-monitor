@@ -117,13 +117,28 @@ def get_source_description(source_system: str, alert_type: str) -> Optional[str]
     if source_system == 'snmp':
         connector_type = 'snmp_trap'
     
+    # Try exact match first
     row = db_query_one("""
         SELECT description FROM severity_mappings 
         WHERE connector_type = %s AND source_value = %s AND description IS NOT NULL AND description != ''
         LIMIT 1
     """, (connector_type, alert_type))
     
-    return row['description'] if row else None
+    if row:
+        return row['description']
+    
+    # Try without connector prefix (e.g., cradlepoint_sinr_low -> sinr_low)
+    if alert_type.startswith(connector_type + '_'):
+        stripped_type = alert_type[len(connector_type) + 1:]
+        row = db_query_one("""
+            SELECT description FROM severity_mappings 
+            WHERE connector_type = %s AND source_value = %s AND description IS NOT NULL AND description != ''
+            LIMIT 1
+        """, (connector_type, stripped_type))
+        if row:
+            return row['description']
+    
+    return None
 
 
 def alert_to_response(alert, include_description: bool = True) -> AlertResponse:
