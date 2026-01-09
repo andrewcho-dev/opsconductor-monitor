@@ -103,29 +103,39 @@ def poll_all_connectors():
             # Process alerts through AlertManager
             alert_manager = get_alert_manager()
             for alert in (alerts or []):
-                # Skip None alerts (disabled event types return None from normalizer)
-                if alert is None:
-                    continue
-                # Generate fingerprint for reconciliation
-                device_id = alert.device_ip or alert.device_name or ""
-                fp = generate_fingerprint(alert.source_system, alert.source_alert_id, device_id, alert.alert_type)
-                current_fingerprints.add(fp)
-                
-                stored_alert = asyncio.run(alert_manager.process_alert(alert))
-                action = getattr(stored_alert, '_action', 'created')
-                logger.debug(f"{action.title()} alert {stored_alert.id} from {row['name']}")
-                
-                # Publish alert event to Redis for real-time WebSocket updates
-                publish_alert_event_sync(action, {
-                    "id": str(stored_alert.id),
-                    "title": stored_alert.title,
-                    "severity": stored_alert.severity.value if hasattr(stored_alert.severity, 'value') else str(stored_alert.severity),
-                    "device_name": stored_alert.device_name,
-                    "device_ip": stored_alert.device_ip,
-                    "source_system": stored_alert.source_system,
-                    "status": stored_alert.status.value if hasattr(stored_alert.status, 'value') else str(stored_alert.status),
-                    "source_status": getattr(stored_alert, 'source_status', None),
-                })
+                try:
+                    # Skip None alerts (disabled event types return None from normalizer)
+                    if alert is None:
+                        continue
+                    # Validate alert is a proper NormalizedAlert object
+                    if not hasattr(alert, 'device_ip'):
+                        logger.warning(f"Invalid alert object from {row['name']}: {type(alert)}")
+                        continue
+                    # Generate fingerprint for reconciliation
+                    device_id = alert.device_ip or alert.device_name or ""
+                    fp = generate_fingerprint(alert.source_system, alert.source_alert_id, device_id, alert.alert_type)
+                    current_fingerprints.add(fp)
+                    
+                    stored_alert = asyncio.run(alert_manager.process_alert(alert))
+                    if stored_alert is None:
+                        logger.warning(f"process_alert returned None for alert from {row['name']}")
+                        continue
+                    action = getattr(stored_alert, '_action', 'created')
+                    logger.debug(f"{action.title()} alert {stored_alert.id} from {row['name']}")
+                    
+                    # Publish alert event to Redis for real-time WebSocket updates
+                    publish_alert_event_sync(action, {
+                        "id": str(stored_alert.id),
+                        "title": stored_alert.title,
+                        "severity": stored_alert.severity.value if hasattr(stored_alert.severity, 'value') else str(stored_alert.severity),
+                        "device_name": stored_alert.device_name,
+                        "device_ip": stored_alert.device_ip,
+                        "source_system": stored_alert.source_system,
+                        "status": stored_alert.status.value if hasattr(stored_alert.status, 'value') else str(stored_alert.status),
+                        "source_status": getattr(stored_alert, 'source_status', None),
+                    })
+                except Exception as alert_err:
+                    logger.warning(f"Error processing individual alert from {row['name']}: {alert_err}")
             
             if alert_count > 0:
                 total_alerts += alert_count
