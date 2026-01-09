@@ -1,13 +1,13 @@
 """
 Ubiquiti Direct Device Connector
 
-Polls individual Ubiquiti UniFi access points and devices directly via their local API.
+Polls individual Ubiquiti AirOS access points directly via SSH.
+Uses mca-status command to get device metrics.
 """
 
 import logging
 import asyncio
-import aiohttp
-import ssl
+import asyncssh
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 
@@ -24,8 +24,8 @@ class UbiquitiConnector(PollingConnector):
     """
     Ubiquiti Direct Device Connector.
     
-    Polls individual Ubiquiti access points directly via their local HTTP API.
-    Each device is polled independently with its own credentials.
+    Polls individual Ubiquiti AirOS access points directly via SSH.
+    Uses mca-status command to get device metrics (CPU, memory, signal, etc).
     """
     
     def __init__(self, config: Dict[str, Any]):
@@ -38,7 +38,6 @@ class UbiquitiConnector(PollingConnector):
             "memory_warning": 80,
             "signal_warning": -70,
         })
-        self._sessions: Dict[str, aiohttp.ClientSession] = {}
     
     @property
     def connector_type(self) -> str:
@@ -51,13 +50,9 @@ class UbiquitiConnector(PollingConnector):
         if not self.targets:
             logger.warning("Ubiquiti connector: no targets configured")
         await super().start()
-        logger.info(f"Ubiquiti connector started ({len(self.targets)} devices, poll interval: {self.poll_interval}s)")
+        logger.info(f"Ubiquiti connector started ({len(self.targets)} devices via SSH, poll interval: {self.poll_interval}s)")
     
     async def stop(self) -> None:
-        for session in self._sessions.values():
-            if session and not session.closed:
-                await session.close()
-        self._sessions.clear()
         await super().stop()
         logger.info("Ubiquiti connector stopped")
     
@@ -71,13 +66,16 @@ class UbiquitiConnector(PollingConnector):
         
         for target in self.targets[:5]:  # Test first 5
             ip = target.get("ip", "")
+            username = target.get("username") or self.default_username
+            password = target.get("password") or self.default_password
+            
             try:
-                reachable = await self._check_device_reachable(target)
-                if reachable:
+                device_info = await self._get_device_info_ssh(ip, username, password)
+                if device_info:
                     success_count += 1
                 else:
                     fail_count += 1
-                    errors.append(f"{ip}: No response")
+                    errors.append(f"{ip}: SSH failed")
             except Exception as e:
                 fail_count += 1
                 errors.append(f"{ip}: {str(e)[:50]}")
@@ -95,37 +93,6 @@ class UbiquitiConnector(PollingConnector):
                 "details": {"errors": errors[:3]}
             }
     
-    async def _check_device_reachable(self, target: Dict) -> bool:
-        """Simple reachability check - returns True if device responds to HTTPS/HTTP."""
-        ip = target.get("ip", "")
-        
-        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-        ssl_context.check_hostname = False
-        ssl_context.verify_mode = ssl.CERT_NONE
-        ssl_context.set_ciphers('DEFAULT:@SECLEVEL=0')
-        
-        connector = aiohttp.TCPConnector(ssl=ssl_context)
-        timeout = aiohttp.ClientTimeout(total=5)
-        
-        async with aiohttp.ClientSession(connector=connector, timeout=timeout) as session:
-            # Try HTTPS
-            try:
-                async with session.get(f"https://{ip}/", allow_redirects=False) as response:
-                    if response.status in [200, 301, 302, 401, 403]:
-                        return True
-            except:
-                pass
-            
-            # Try HTTP
-            try:
-                async with session.get(f"http://{ip}/", allow_redirects=False) as response:
-                    if response.status in [200, 301, 302, 401, 403]:
-                        return True
-            except:
-                pass
-        
-        return False
-    
     async def poll(self) -> List[NormalizedAlert]:
         alerts = []
         
@@ -138,7 +105,6 @@ class UbiquitiConnector(PollingConnector):
         for target, result in zip(self.targets, results):
             if isinstance(result, Exception):
                 logger.debug(f"Ubiquiti poll error for {target.get('ip')}: {result}")
-                # Device unreachable - create offline alert
                 alerts.append(self._create_offline_alert(target, str(result)))
             elif result:
                 alerts.extend(result)
@@ -158,89 +124,114 @@ class UbiquitiConnector(PollingConnector):
         username = target.get("username") or self.default_username
         password = target.get("password") or self.default_password
         
-        alerts = []
+        device_info = await self._get_device_info_ssh(ip, username, password)
         
-        # Create SSL context for older Ubiquiti devices with legacy TLS
-        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-        ssl_context.check_hostname = False
-        ssl_context.verify_mode = ssl.CERT_NONE
-        ssl_context.set_ciphers('DEFAULT:@SECLEVEL=0')  # Allow older ciphers
-        
-        connector = aiohttp.TCPConnector(ssl=ssl_context)
-        timeout = aiohttp.ClientTimeout(total=10)
-        
-        async with aiohttp.ClientSession(connector=connector, timeout=timeout) as session:
-            # Try UniFi device API endpoints
-            device_info = await self._get_device_info(session, ip, username, password)
-            
-            if device_info:
-                alerts.extend(self._check_device_status(ip, name, device_info))
-            else:
-                # Device didn't respond properly - might be offline
-                alerts.append(self._create_offline_alert(target, "No response from device API"))
-        
-        return alerts
+        if device_info:
+            return self._check_device_status(ip, name, device_info)
+        else:
+            return [self._create_offline_alert(target, "SSH connection failed")]
     
-    async def _get_device_info(self, session: aiohttp.ClientSession, ip: str, username: str, password: str) -> Optional[Dict]:
-        """Check if Ubiquiti device is reachable via HTTP/HTTPS."""
-        
-        # Try HTTPS first (most Ubiquiti devices use HTTPS)
+    async def _get_device_info_ssh(self, ip: str, username: str, password: str) -> Optional[Dict]:
+        """Connect via SSH and run mca-status to get device metrics."""
         try:
-            async with session.get(f"https://{ip}/", allow_redirects=False) as response:
-                # Any HTTP response means device is reachable
-                # AirOS devices return 302 redirect to login
-                if response.status in [200, 301, 302, 401, 403]:
-                    return {"reachable": True, "status_code": response.status, "ip": ip}
+            async with asyncssh.connect(
+                ip,
+                username=username,
+                password=password,
+                known_hosts=None,
+                server_host_key_algs=['ssh-rsa'],
+                connect_timeout=10
+            ) as conn:
+                result = await conn.run('mca-status', check=True)
+                return self._parse_mca_status(result.stdout)
+        except asyncssh.PermissionDenied:
+            logger.warning(f"SSH auth failed for {ip} - check credentials")
+            return None
+        except asyncssh.ConnectionLost:
+            logger.debug(f"SSH connection lost to {ip}")
+            return None
         except Exception as e:
-            logger.debug(f"HTTPS check failed for {ip}: {e}")
+            logger.debug(f"SSH failed for {ip}: {e}")
+            return None
+    
+    def _parse_mca_status(self, output: str) -> Dict:
+        """Parse mca-status output into a dictionary."""
+        data = {"reachable": True}
         
-        # Try HTTP as fallback
-        try:
-            async with session.get(f"http://{ip}/", allow_redirects=False) as response:
-                if response.status in [200, 301, 302, 401, 403]:
-                    return {"reachable": True, "status_code": response.status, "ip": ip}
-        except Exception as e:
-            logger.debug(f"HTTP check failed for {ip}: {e}")
-        
-        return None
+        for line in output.strip().split('\n'):
+            # First line is comma-separated: deviceName=X,deviceId=Y,...
+            if ',' in line and '=' in line:
+                for part in line.split(','):
+                    if '=' in part:
+                        key, value = part.split('=', 1)
+                        data[key] = value
+            elif '=' in line:
+                key, value = line.split('=', 1)
+                # Try to convert numeric values
+                try:
+                    if '.' in value:
+                        data[key] = float(value)
+                    else:
+                        data[key] = int(value)
+                except ValueError:
+                    data[key] = value
+        return data
     
     def _check_device_status(self, ip: str, name: str, device_info: Dict) -> List[NormalizedAlert]:
+        """Check device metrics from mca-status output and generate alerts."""
         alerts = []
         
-        # If we got a response, device is online
-        if device_info.get("reachable"):
-            # Device is reachable - no alert needed
-            return alerts
+        # Get device name from mca-status output
+        device_name = name or device_info.get("deviceName", ip)
+        model = device_info.get("platform", "")
         
-        # Check CPU if available
-        cpu = device_info.get("cpu") or device_info.get("system-stats", {}).get("cpu")
+        # Check CPU (mca-status: cpuUsage)
+        cpu = device_info.get("cpuUsage")
         if cpu is not None:
             try:
                 cpu_val = float(cpu)
                 if cpu_val > self.thresholds.get("cpu_warning", 80):
-                    alerts.append(self._create_alert(ip, name, "high_cpu", {"cpu_percent": cpu_val}))
+                    alerts.append(self._create_alert(ip, device_name, "high_cpu", {
+                        "cpu_percent": cpu_val,
+                        "hostname": device_info.get("deviceName"),
+                        "model": model,
+                    }))
             except (ValueError, TypeError):
                 pass
         
-        # Check memory if available
-        mem = device_info.get("mem") or device_info.get("system-stats", {}).get("mem")
-        if mem is not None:
+        # Check memory (mca-status: memTotal, memFree in kB)
+        total_ram = device_info.get("memTotal")
+        free_ram = device_info.get("memFree")
+        if total_ram and free_ram:
             try:
-                mem_val = float(mem)
-                if mem_val > self.thresholds.get("memory_warning", 80):
-                    alerts.append(self._create_alert(ip, name, "high_memory", {"memory_percent": mem_val}))
-            except (ValueError, TypeError):
+                mem_percent = ((total_ram - free_ram) / total_ram) * 100
+                if mem_percent > self.thresholds.get("memory_warning", 80):
+                    alerts.append(self._create_alert(ip, device_name, "high_memory", {
+                        "memory_percent": round(mem_percent, 1),
+                        "hostname": device_info.get("deviceName"),
+                        "model": model,
+                    }))
+            except (ValueError, TypeError, ZeroDivisionError):
                 pass
         
-        # Check wireless signal if available
-        signal = device_info.get("signal") or device_info.get("wireless", {}).get("signal")
+        # Check wireless signal (mca-status: signal in dBm)
+        signal = device_info.get("signal")
         if signal is not None:
             try:
                 signal_val = int(signal)
                 if signal_val < self.thresholds.get("signal_warning", -70):
-                    alerts.append(self._create_alert(ip, name, "signal_degraded", {"signal": signal_val}))
+                    alerts.append(self._create_alert(ip, device_name, "signal_degraded", {
+                        "signal": signal_val,
+                        "noise": device_info.get("noise"),
+                        "hostname": device_info.get("deviceName"),
+                        "essid": device_info.get("essid"),
+                    }))
             except (ValueError, TypeError):
                 pass
+        
+        # Log successful poll
+        logger.debug(f"Ubiquiti {ip} ({device_info.get('deviceName', 'unknown')}): "
+                    f"CPU={device_info.get('cpuUsage')}%, Signal={device_info.get('signal')}dBm")
         
         return alerts
     
