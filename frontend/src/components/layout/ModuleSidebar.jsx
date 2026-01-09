@@ -95,8 +95,6 @@ const moduleNavigation = {
         title: 'Configuration',
         items: [
           { id: 'settings', label: 'Settings', icon: Settings, path: '/system/settings' },
-          { id: 'normalization', label: 'Normalization Rules', icon: FileKey, path: '/system/normalization' },
-          { id: 'polling', label: 'Connector Polling', icon: Clock, path: '/system/polling' },
         ]
       },
       {

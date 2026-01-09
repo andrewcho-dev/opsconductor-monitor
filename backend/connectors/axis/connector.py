@@ -187,6 +187,8 @@ class AxisConnector(PollingConnector):
                 if isinstance(result, list):
                     alerts.extend(result)
         
+        # Filter out any None values that might have slipped through
+        alerts = [a for a in alerts if a is not None]
         logger.debug(f"Axis poll: {len(alerts)} alerts from {len(targets)} cameras")
         return alerts
     
@@ -196,7 +198,8 @@ class AxisConnector(PollingConnector):
             return await self._poll_camera(target)
         except Exception as e:
             logger.error(f"Error polling camera {target.get('ip')}: {e}")
-            return [self._create_alert(target, "camera_offline", {"error": str(e)})]
+            alert = self._create_alert(target, "camera_offline", {"error": str(e)})
+            return [alert] if alert else []
     
     async def _get_targets(self) -> List[Dict]:
         """Get camera targets from configured source."""
@@ -285,10 +288,14 @@ class AxisConnector(PollingConnector):
                 # Auth failed is a config issue, just log it, don't create alert
                 logger.warning(f"Camera {ip} auth failed (401/403) - check credentials")
             else:
-                alerts.append(self._create_alert(target, "camera_offline", {"error": str(e)}))
+                alert = self._create_alert(target, "camera_offline", {"error": str(e)})
+                if alert:
+                    alerts.append(alert)
         except Exception as e:
             logger.warning(f"Camera {ip} appears offline: {e}")
-            alerts.append(self._create_alert(target, "camera_offline", {"error": str(e)}))
+            alert = self._create_alert(target, "camera_offline", {"error": str(e)})
+            if alert:
+                alerts.append(alert)
         
         return alerts
     
@@ -362,7 +369,9 @@ class AxisConnector(PollingConnector):
             for pattern, alert_type, description in SYSTEM_LOG_PATTERNS:
                 if alert_type not in detected_types and re.search(pattern, line, re.IGNORECASE):
                     detected_types.add(alert_type)
-                    alerts.append(self._create_alert(target, alert_type, {"log_entry": line, "description": description}))
+                    alert = self._create_alert(target, alert_type, {"log_entry": line, "description": description})
+                    if alert:
+                        alerts.append(alert)
         return alerts
     
     async def _check_temperature(self, target: Dict) -> List[NormalizedAlert]:
@@ -379,9 +388,13 @@ class AxisConnector(PollingConnector):
                             try:
                                 temp = float(re.sub(r"[^\d.]", "", line.split("=")[1]))
                                 if temp > 70:
-                                    alerts.append(self._create_alert(target, "temperature_critical", {"temperature": temp}))
+                                    alert = self._create_alert(target, "temperature_critical", {"temperature": temp})
+                                    if alert:
+                                        alerts.append(alert)
                                 elif temp > 60:
-                                    alerts.append(self._create_alert(target, "temperature_warning", {"temperature": temp}))
+                                    alert = self._create_alert(target, "temperature_warning", {"temperature": temp})
+                                    if alert:
+                                        alerts.append(alert)
                             except (ValueError, IndexError):
                                 pass
         except Exception:
@@ -396,11 +409,15 @@ class AxisConnector(PollingConnector):
         
         # Check for disk errors
         if "error" in raw.lower() or "fail" in raw.lower():
-            alerts.append(self._create_alert(target, "storage_failure", storage))
+            alert = self._create_alert(target, "storage_failure", storage)
+            if alert:
+                alerts.append(alert)
         
         # Check for full disk
         if "full" in raw.lower() or "100%" in raw:
-            alerts.append(self._create_alert(target, "storage_full", storage))
+            alert = self._create_alert(target, "storage_full", storage)
+            if alert:
+                alerts.append(alert)
         
         return alerts
     

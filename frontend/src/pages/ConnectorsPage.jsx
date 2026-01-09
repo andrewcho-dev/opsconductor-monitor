@@ -17,6 +17,14 @@ import ConfigModal from '../components/connectors/ConfigModal';
 function ConnectorCard({ connector, onTest, onToggle, onConfigure, testing }) {
   const typeInfo = CONNECTOR_TYPES.find(t => t.type === connector.type) || {};
   
+  // SNMP trap connectors are push-based, not polling - don't show polling errors
+  const isPushBased = connector.type === 'snmp_trap';
+  
+  // For push-based connectors, show "listening" status instead of error
+  const effectiveStatus = isPushBased && connector.enabled ? 'connected' : 
+                          isPushBased && !connector.enabled ? 'disconnected' :
+                          connector.status;
+  
   const statusColors = {
     connected: 'text-green-500',
     disconnected: 'text-gray-400',
@@ -24,8 +32,11 @@ function ConnectorCard({ connector, onTest, onToggle, onConfigure, testing }) {
     unknown: 'text-yellow-500',
   };
 
-  const StatusIcon = connector.status === 'connected' ? Wifi : 
-                     connector.status === 'error' ? AlertCircle : WifiOff;
+  const StatusIcon = effectiveStatus === 'connected' ? Wifi : 
+                     effectiveStatus === 'error' ? AlertCircle : WifiOff;
+  
+  // Don't show error messages for push-based connectors (they don't poll)
+  const showError = connector.error_message && !isPushBased;
 
   return (
     <div className={`bg-white dark:bg-gray-800 rounded-lg border ${
@@ -41,13 +52,15 @@ function ConnectorCard({ connector, onTest, onToggle, onConfigure, testing }) {
             <p className="text-sm text-gray-500">{typeInfo.name || connector.type}</p>
           </div>
         </div>
-        <div className={`flex items-center gap-1 ${statusColors[connector.status]}`}>
+        <div className={`flex items-center gap-1 ${statusColors[effectiveStatus]}`}>
           <StatusIcon className="h-4 w-4" />
-          <span className="text-xs capitalize">{connector.status}</span>
+          <span className="text-xs capitalize">
+            {isPushBased && connector.enabled ? 'listening' : effectiveStatus}
+          </span>
         </div>
       </div>
 
-      {connector.error_message && (
+      {showError && (
         <div className="mb-3 p-2 bg-red-50 dark:bg-red-900/20 rounded text-sm text-red-700 dark:text-red-300">
           {connector.error_message}
         </div>

@@ -103,6 +103,9 @@ def poll_all_connectors():
             # Process alerts through AlertManager
             alert_manager = get_alert_manager()
             for alert in (alerts or []):
+                # Skip None alerts (disabled event types return None from normalizer)
+                if alert is None:
+                    continue
                 # Generate fingerprint for reconciliation
                 device_id = alert.device_ip or alert.device_name or ""
                 fp = generate_fingerprint(alert.source_system, alert.source_alert_id, device_id, alert.alert_type)
@@ -153,7 +156,8 @@ def poll_all_connectors():
             polled_count += 1
             
         except Exception as e:
-            logger.error(f"Error polling connector {row['name']}: {e}")
+            import traceback
+            logger.error(f"Error polling connector {row['name']}: {e}\n{traceback.format_exc()}")
             
             # Update error status
             with db.cursor() as cursor:
