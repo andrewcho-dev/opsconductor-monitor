@@ -173,37 +173,47 @@ class AlertManager:
         alert.created_at = now
         alert.updated_at = now
         
-        # Insert into database
-        db_execute("""
-            INSERT INTO alerts (
-                id, source_system, source_alert_id,
-                device_ip, device_name,
-                severity, category, alert_type,
-                title, message,
-                status, is_clear, source_status,
-                occurred_at, received_at,
-                fingerprint, occurrence_count,
-                raw_data, created_at, updated_at
-            ) VALUES (
-                %s, %s, %s,
-                %s, %s,
-                %s, %s, %s,
-                %s, %s,
-                %s, %s, %s,
-                %s, %s,
-                %s, %s,
-                %s, %s, %s
-            )
-        """, (
-            str(alert.id), alert.source_system, alert.source_alert_id,
-            alert.device_ip, alert.device_name,
-            alert.severity.value, alert.category.value, alert.alert_type,
-            alert.title, alert.message,
-            alert.status.value, alert.is_clear, alert.source_status,
-            alert.occurred_at, alert.received_at,
-            alert.fingerprint, alert.occurrence_count,
-            json.dumps(alert.raw_data), now, now
-        ))
+        # Insert into database with ON CONFLICT to handle race conditions
+        # If another worker already inserted, update the existing record instead
+        try:
+            db_execute("""
+                INSERT INTO alerts (
+                    id, source_system, source_alert_id,
+                    device_ip, device_name,
+                    severity, category, alert_type,
+                    title, message,
+                    status, is_clear, source_status,
+                    occurred_at, received_at,
+                    fingerprint, occurrence_count,
+                    raw_data, created_at, updated_at
+                ) VALUES (
+                    %s, %s, %s,
+                    %s, %s,
+                    %s, %s, %s,
+                    %s, %s,
+                    %s, %s, %s,
+                    %s, %s,
+                    %s, %s,
+                    %s, %s, %s
+                )
+            """, (
+                str(alert.id), alert.source_system, alert.source_alert_id,
+                alert.device_ip, alert.device_name,
+                alert.severity.value, alert.category.value, alert.alert_type,
+                alert.title, alert.message,
+                alert.status.value, alert.is_clear, alert.source_status,
+                alert.occurred_at, alert.received_at,
+                alert.fingerprint, alert.occurrence_count,
+                json.dumps(alert.raw_data), now, now
+            ))
+        except Exception as e:
+            # Handle unique constraint violation (race condition)
+            if "unique" in str(e).lower() or "duplicate" in str(e).lower():
+                logger.warning(f"Race condition detected for fingerprint {fingerprint[:16]}..., updating existing")
+                existing = await self._find_duplicate(fingerprint)
+                if existing:
+                    return await self._update_existing(existing, normalized)
+            raise
         
         # Add history entry
         await self._add_history(alert.id, "created", None, alert.status)

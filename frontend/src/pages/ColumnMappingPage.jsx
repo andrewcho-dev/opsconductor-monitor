@@ -201,6 +201,14 @@ export function NormalizationContent() {
   };
 
   const toggleEnabled = async (mapping) => {
+    // Optimistically update the UI immediately to prevent scroll jump
+    const newEnabled = !mapping.enabled;
+    setMappings(prev => prev.map(m => 
+      m.id === mapping.id && m.type === mapping.type 
+        ? { ...m, enabled: newEnabled } 
+        : m
+    ));
+    
     try {
       const endpoint = mapping.type === 'severity'
         ? `/api/v1/normalization/severity-mappings/${mapping.id}`
@@ -208,11 +216,16 @@ export function NormalizationContent() {
       
       await fetchApi(endpoint, {
         method: 'PUT',
-        body: JSON.stringify({ enabled: !mapping.enabled }),
+        body: JSON.stringify({ enabled: newEnabled }),
       });
-      
-      await loadMappings();
+      // No need to reload - we already updated the state optimistically
     } catch (err) {
+      // Revert on error
+      setMappings(prev => prev.map(m => 
+        m.id === mapping.id && m.type === mapping.type 
+          ? { ...m, enabled: !newEnabled } 
+          : m
+      ));
       alert(`Error: ${err.message}`);
     }
   };

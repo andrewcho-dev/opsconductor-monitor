@@ -82,11 +82,26 @@ class SikluNormalizer:
             self._cache_loaded = True  # Don't retry on every call
     
     def is_alert_enabled(self, alert_type: str) -> bool:
-        """Check if this alert type is enabled in mappings."""
+        """Check if this alert type is enabled in mappings.
+        
+        Returns False if:
+        - Alert type is not in any mapping (unknown events are ignored)
+        - Alert type is explicitly disabled in mappings
+        """
         self._load_mappings()
         
         severity_mapping = self._severity_cache.get(alert_type)
+        category_mapping = self._category_cache.get(alert_type)
+        
+        # If not in ANY mapping, treat as disabled (unknown event type)
+        if not severity_mapping and not category_mapping:
+            logger.debug(f"Alert type '{alert_type}' not in mappings - ignoring")
+            return False
+        
+        # Check if explicitly disabled
         if severity_mapping and not severity_mapping.get('enabled', True):
+            return False
+        if category_mapping and not category_mapping.get('enabled', True):
             return False
         
         return True

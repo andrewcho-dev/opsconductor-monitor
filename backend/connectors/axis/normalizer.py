@@ -67,14 +67,25 @@ class AxisNormalizer:
             self._cache_loaded = True  # Don't retry on every call
     
     def is_event_enabled(self, event_type: str) -> bool:
-        """Check if this event type is enabled in mappings."""
+        """Check if this event type is enabled in mappings.
+        
+        Returns False if:
+        - Event type is not in any mapping (unknown events are ignored)
+        - Event type is explicitly disabled in mappings
+        """
         self._load_mappings()
         
         severity_mapping = self._severity_cache.get(event_type)
-        if severity_mapping and not severity_mapping.get("enabled", True):
+        category_mapping = self._category_cache.get(event_type)
+        
+        # If not in ANY mapping, treat as disabled (unknown event type)
+        if not severity_mapping and not category_mapping:
+            logger.debug(f"Event type '{event_type}' not in mappings - ignoring")
             return False
         
-        category_mapping = self._category_cache.get(event_type)
+        # Check if explicitly disabled
+        if severity_mapping and not severity_mapping.get("enabled", True):
+            return False
         if category_mapping and not category_mapping.get("enabled", True):
             return False
         

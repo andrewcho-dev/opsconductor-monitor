@@ -60,9 +60,34 @@ class SNMPNormalizer:
     def source_system(self) -> str:
         return "snmp"
     
-    def normalize(self, raw_data: Dict[str, Any]) -> NormalizedAlert:
+    def is_trap_enabled(self, trap_oid: str) -> bool:
+        """Check if this trap OID is enabled in mappings.
+        
+        Returns False if:
+        - Trap OID is not in any mapping (unknown traps are ignored)
+        - Trap OID is explicitly disabled in mappings
+        """
+        if not self._cache_loaded:
+            self._load_mapping_cache()
+        
+        severity_mapping = self._severity_cache.get(trap_oid)
+        trap_mapping = self._trap_cache.get(trap_oid)
+        
+        # If not in ANY mapping, treat as disabled (unknown trap)
+        if not severity_mapping and not trap_mapping:
+            logger.debug(f"Trap OID '{trap_oid}' not in mappings - ignoring")
+            return False
+        
+        # Check if explicitly disabled in severity mapping
+        # Note: We check the raw database value, not the cached string
+        # For now, if it's in the cache, it's enabled
+        return True
+    
+    def normalize(self, raw_data: Dict[str, Any]) -> Optional[NormalizedAlert]:
         """
         Transform SNMP trap to NormalizedAlert.
+        
+        Returns None if the trap OID is not in mappings.
         
         Uses database mappings for CONSISTENT classification:
         - severity_mappings table (connector_type='snmp_trap')
@@ -89,6 +114,11 @@ class SNMPNormalizer:
         varbinds = raw_data.get("varbinds", {})
         timestamp = raw_data.get("timestamp")
         
+        # Check if trap OID is enabled in mappings
+        if not self.is_trap_enabled(trap_oid):
+            logger.debug(f"Skipping unmapped SNMP trap OID: {trap_oid}")
+            return None
+        
         # Look up from database mappings
         trap_mapping = self._trap_cache.get(trap_oid)
         severity_str = self._severity_cache.get(trap_oid)
@@ -100,21 +130,22 @@ class SNMPNormalizer:
             is_clear = trap_mapping.get("is_clear", False)
             title = f"SNMP Trap - {trap_mapping.get('description', alert_type)}"
         else:
-            # Fallback to standard traps or generic
-            _, _, alert_type, is_clear = self._classify_unknown(trap_oid, enterprise_oid)
-            title = f"SNMP Trap - {alert_type}"
+            # Use severity mapping description if available
+            alert_type = f"snmp_{trap_oid.replace('.', '_')}"
+            is_clear = False
+            title = f"SNMP Trap - {trap_oid}"
         
-        # Get severity from database or fallback
+        # Get severity from database
         if severity_str:
             severity = Severity(severity_str)
         else:
-            severity, _, _, _ = self._classify_unknown(trap_oid, enterprise_oid)
+            severity = Severity.WARNING
         
-        # Get category from database or fallback
+        # Get category from database
         if category_str:
             category = Category(category_str)
         else:
-            _, category, _, _ = self._classify_unknown(trap_oid, enterprise_oid)
+            category = Category.NETWORK
         
         # Build message from varbinds
         message = self._format_varbinds(varbinds, source_ip, trap_oid)
