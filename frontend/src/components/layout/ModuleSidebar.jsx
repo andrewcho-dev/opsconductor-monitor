@@ -60,7 +60,6 @@ const moduleNavigation = {
         title: 'Management',
         items: [
           { id: 'all-connectors', label: 'All Connectors', icon: Radio, path: '/connectors' },
-          { id: 'polling', label: 'Polling', icon: Clock, path: '/connectors/polling' },
           { id: 'normalization', label: 'Normalization', icon: FileKey, path: '/connectors/normalization' },
         ]
       }

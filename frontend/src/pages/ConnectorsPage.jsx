@@ -14,7 +14,7 @@ import { CONNECTOR_TYPES } from '../lib/constants';
 import { PageLayout } from '../components/layout/PageLayout';
 import ConfigModal from '../components/connectors/ConfigModal';
 
-function ConnectorCard({ connector, onTest, onToggle, onConfigure, testing }) {
+function ConnectorCard({ connector, onTest, onToggle, onConfigure, onPoll, testing, polling }) {
   const typeInfo = CONNECTOR_TYPES.find(t => t.type === connector.type) || {};
   
   // SNMP trap connectors are push-based, not polling - don't show polling errors
@@ -84,11 +84,12 @@ function ConnectorCard({ connector, onTest, onToggle, onConfigure, testing }) {
             {connector.alerts_received || 0}
           </span>
         </div>
-        {connector.last_poll_at && (
+        {!isPushBased && (
           <div className="col-span-2 flex items-center gap-1 text-gray-500">
             <Clock className="h-3 w-3" />
             <span className="text-xs">
-              Last poll: {new Date(connector.last_poll_at).toLocaleTimeString()}
+              Interval: {connector.config?.poll_interval || 60}s
+              {connector.last_poll_at && ` • Last: ${new Date(connector.last_poll_at).toLocaleTimeString()}`}
             </span>
           </div>
         )}
@@ -115,6 +116,20 @@ function ConnectorCard({ connector, onTest, onToggle, onConfigure, testing }) {
             </>
           )}
         </button>
+        {!isPushBased && (
+          <button
+            onClick={() => onPoll(connector.id)}
+            disabled={!connector.enabled || polling === connector.id}
+            className="flex items-center gap-1 px-3 py-2 rounded border border-green-300 dark:border-green-700 text-sm text-green-700 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-900/30 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {polling === connector.id ? (
+              <RefreshCw className="h-4 w-4 animate-spin" />
+            ) : (
+              <Play className="h-4 w-4" />
+            )}
+            Poll
+          </button>
+        )}
         <button
           onClick={() => onTest(connector.id)}
           disabled={testing === connector.id}
@@ -141,9 +156,10 @@ function ConnectorCard({ connector, onTest, onToggle, onConfigure, testing }) {
 // Content component without PageLayout wrapper (for use in ConnectorsLayout)
 export function ConnectorsContent() {
   const { connectors, loading, error, refresh } = useConnectors();
-  const { testConnection, enableConnector, disableConnector, updateConnector } = useConnectorActions();
+  const { testConnection, enableConnector, disableConnector, updateConnector, pollConnector } = useConnectorActions();
   
   const [testing, setTesting] = useState(null);
+  const [polling, setPolling] = useState(null);
   const [testResult, setTestResult] = useState(null);
   const [configuring, setConfiguring] = useState(null);
 
@@ -171,6 +187,23 @@ export function ConnectorsContent() {
       refresh();
     } catch (err) {
       console.error('Failed to toggle connector:', err);
+    }
+  };
+
+  const handlePoll = async (connectorId) => {
+    setPolling(connectorId);
+    try {
+      const result = await pollConnector(connectorId);
+      setTestResult({ 
+        id: connectorId, 
+        success: result.success, 
+        message: result.success ? `Poll completed: ${result.alerts || 0} alerts found` : (result.message || 'Poll failed')
+      });
+      refresh();
+    } catch (err) {
+      setTestResult({ id: connectorId, success: false, message: err.message });
+    } finally {
+      setPolling(null);
     }
   };
 
@@ -247,7 +280,9 @@ export function ConnectorsContent() {
                 onTest={handleTest}
                 onToggle={handleToggle}
                 onConfigure={setConfiguring}
+                onPoll={handlePoll}
                 testing={testing}
+                polling={polling}
               />
             ))}
           </div>

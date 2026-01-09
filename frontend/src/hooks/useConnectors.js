@@ -191,6 +191,25 @@ export function useConnectorActions() {
     }
   }, []);
 
+  const pollConnector = useCallback(async (connectorId) => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetchApi(`/api/v1/connectors/${connectorId}/poll`, {
+        method: 'POST',
+        timeout: 60000, // 60 seconds for polling
+      });
+
+      return response;
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   return {
     loading,
     error,
@@ -198,6 +217,7 @@ export function useConnectorActions() {
     enableConnector,
     disableConnector,
     updateConnector,
+    pollConnector,
   };
 }
 
