@@ -1,0 +1,225 @@
+{
+  "id": "ubiquiti",
+  "name": "Ubiquiti UniFi/UISP",
+  "version": "1.0.0",
+  "description": "Ubiquiti UniFi and UISP device monitoring via API. 21 alert types covering device status, interfaces, CPU, memory, and outages.",
+  "author": "OpsConductor",
+  "method": "api_poll",
+  "category": "wireless",
+  "api_poll": {
+    "base_url_template": "https://{host}:443",
+    "auth_type": "basic",
+    "endpoints": [
+      {
+        "path": "/api/s/default/stat/device",
+        "method": "GET",
+        "response_type": "json",
+        "check": "reachability",
+        "alert_on_failure": "device_offline"
+      }
+    ]
+  },
+  "default_credentials": {
+    "username": "",
+    "password": ""
+  },
+  "alert_mappings": [
+    {
+      "group": "Application Events",
+      "alerts": [
+        {
+          "alert_type": "firmware_update",
+          "enabled": true,
+          "severity": "info",
+          "category": "application",
+          "title": "Firmware Update",
+          "description": "Firmware update available for this device. Consider scheduling maintenance window for update."
+        }
+      ]
+    },
+    {
+      "group": "Compute Events",
+      "alerts": [
+        {
+          "alert_type": "high_cpu",
+          "enabled": false,
+          "severity": "warning",
+          "category": "compute",
+          "title": "High Cpu",
+          "description": "CPU utilization exceeds configured threshold. May indicate heavy traffic, attack, or process issue."
+        },
+        {
+          "alert_type": "high_cpu",
+          "enabled": true,
+          "severity": "warning",
+          "category": "compute",
+          "title": "High Cpu",
+          "description": "CPU utilization high"
+        },
+        {
+          "alert_type": "high_memory",
+          "enabled": false,
+          "severity": "warning",
+          "category": "compute",
+          "title": "High Memory",
+          "description": "Memory usage exceeds configured threshold. May require device restart or configuration review."
+        }
+      ]
+    },
+    {
+      "group": "Environmental Events",
+      "alerts": [
+        {
+          "alert_type": "temperature_critical",
+          "enabled": true,
+          "severity": "critical",
+          "category": "environment",
+          "title": "Temperature Critical",
+          "description": "Device temperature is critically high. Immediate attention required to prevent damage."
+        },
+        {
+          "alert_type": "temperature_high",
+          "enabled": true,
+          "severity": "warning",
+          "category": "environment",
+          "title": "Temperature High",
+          "description": "Device temperature is elevated. Check ventilation and ambient temperature."
+        }
+      ]
+    },
+    {
+      "group": "Network Events",
+      "alerts": [
+        {
+          "alert_type": "device_offline",
+          "enabled": true,
+          "severity": "critical",
+          "category": "network",
+          "title": "Device Offline",
+          "description": "AP offline"
+        },
+        {
+          "alert_type": "device_offline",
+          "enabled": true,
+          "severity": "critical",
+          "category": "network",
+          "title": "Device Offline",
+          "description": "Ubiquiti device is offline or unreachable. Check power, network connectivity, and device status in UISP."
+        },
+        {
+          "alert_type": "device_online",
+          "enabled": true,
+          "severity": "clear",
+          "category": "network",
+          "title": "Device Online",
+          "description": "AP online"
+        },
+        {
+          "alert_type": "device_online",
+          "enabled": true,
+          "severity": "clear",
+          "category": "network",
+          "title": "Device Online",
+          "description": "Device came back online - clears device_offline alert."
+        },
+        {
+          "alert_type": "interface_down",
+          "enabled": true,
+          "severity": "major",
+          "category": "network",
+          "title": "Interface Down",
+          "description": "Interface down"
+        },
+        {
+          "alert_type": "interface_down",
+          "enabled": true,
+          "severity": "major",
+          "category": "network",
+          "title": "Interface Down",
+          "description": "Network interface is down on the device. Check cable, port, or remote device."
+        },
+        {
+          "alert_type": "interface_up",
+          "enabled": true,
+          "severity": "clear",
+          "category": "network",
+          "title": "Interface Up",
+          "description": "Interface up"
+        },
+        {
+          "alert_type": "interface_up",
+          "enabled": true,
+          "severity": "clear",
+          "category": "network",
+          "title": "Interface Up",
+          "description": "Network interface came back up - clears interface_down alert."
+        },
+        {
+          "alert_type": "outage",
+          "enabled": true,
+          "severity": "critical",
+          "category": "network",
+          "title": "Outage",
+          "description": "Network outage detected for this device. Site may be down or experiencing connectivity issues."
+        },
+        {
+          "alert_type": "outage_ended",
+          "enabled": true,
+          "severity": "clear",
+          "category": "network",
+          "title": "Outage Ended",
+          "description": "Network outage has ended - clears outage alert."
+        },
+        {
+          "alert_type": "outage_ended",
+          "enabled": true,
+          "severity": "clear",
+          "category": "network",
+          "title": "Outage Ended",
+          "description": "Outage ended"
+        },
+        {
+          "alert_type": "outage_started",
+          "enabled": true,
+          "severity": "critical",
+          "category": "network",
+          "title": "Outage Started",
+          "description": "Outage started"
+        }
+      ]
+    },
+    {
+      "group": "Wireless Events",
+      "alerts": [
+        {
+          "alert_type": "device_offline",
+          "enabled": true,
+          "severity": "critical",
+          "category": "wireless",
+          "title": "Device Offline",
+          "description": "AP offline"
+        },
+        {
+          "alert_type": "device_offline",
+          "enabled": true,
+          "severity": "critical",
+          "category": "wireless",
+          "title": "Device Offline",
+          "description": "Ubiquiti device is offline or unreachable. Check power, network connectivity, and device status in UISP."
+        },
+        {
+          "alert_type": "signal_degraded",
+          "enabled": true,
+          "severity": "warning",
+          "category": "wireless",
+          "title": "Signal Degraded",
+          "description": "Wireless signal strength is below -70 dBm. Check antenna alignment, interference, or distance."
+        }
+      ]
+    }
+  ],
+  "clear_events": {
+    "method": "reconciliation",
+    "description": "Alerts auto-resolve when condition no longer detected"
+  }
+}

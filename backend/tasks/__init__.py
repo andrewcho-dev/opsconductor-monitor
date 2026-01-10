@@ -1,5 +1,7 @@
-"""Backend tasks package - Celery tasks."""
+"""
+Celery Tasks
 
-from .job_tasks import run_job, run_scheduled_job
-
-__all__ = ['run_job', 'run_scheduled_job']
+Background task processing for:
+- Scheduled polling of API/SNMP addons
+- Alert maintenance and cleanup
+"""

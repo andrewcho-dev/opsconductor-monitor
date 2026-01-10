@@ -1,0 +1,505 @@
+{
+  "id": "axis",
+  "name": "Axis Cameras",
+  "version": "1.0.0",
+  "description": "Comprehensive Axis camera monitoring via VAPIX API. 53 alert types covering availability, video, storage, security, PTZ, environmental, and hardware events.",
+  "author": "OpsConductor",
+  "method": "api_poll",
+  "category": "video",
+  "api_poll": {
+    "base_url_template": "http://{host}",
+    "auth_type": "digest",
+    "verify_ssl": false,
+    "endpoints": [
+      {
+        "path": "/axis-cgi/basicdeviceinfo.cgi",
+        "method": "GET",
+        "response_type": "text",
+        "check": "reachability",
+        "alert_on_failure": "camera_offline"
+      },
+      {
+        "path": "/axis-cgi/disks/list.cgi",
+        "method": "GET",
+        "response_type": "text",
+        "check": "storage"
+      },
+      {
+        "path": "/axis-cgi/param.cgi?action=list&group=Status.Temperature",
+        "method": "GET",
+        "response_type": "text",
+        "check": "temperature"
+      }
+    ]
+  },
+  "alert_mappings": [
+    {
+      "group": "Application Events",
+      "alerts": [
+        {
+          "alert_type": "camera_rebooted",
+          "enabled": false,
+          "severity": "info",
+          "category": "application",
+          "title": "Camera Rebooted",
+          "description": "Camera has restarted. May be power glitch, crash recovery, or scheduled reboot. Check if unexpected - could indicate instability."
+        },
+        {
+          "alert_type": "certificate_expired",
+          "enabled": false,
+          "severity": "major",
+          "category": "application",
+          "title": "Certificate Expired",
+          "description": "HTTPS certificate has expired. Secure connections will fail. Renew certificate immediately."
+        },
+        {
+          "alert_type": "certificate_expiring",
+          "enabled": false,
+          "severity": "warning",
+          "category": "application",
+          "title": "Certificate Expiring",
+          "description": "HTTPS certificate will expire soon. Plan certificate renewal to avoid browser warnings and connection failures."
+        },
+        {
+          "alert_type": "config_changed",
+          "enabled": false,
+          "severity": "info",
+          "category": "application",
+          "title": "Config Changed",
+          "description": "Camera settings were modified. Audit trail event. Verify change was authorized and documented."
+        },
+        {
+          "alert_type": "firmware_outdated",
+          "enabled": false,
+          "severity": "info",
+          "category": "application",
+          "title": "Firmware Outdated",
+          "description": "Newer firmware available. Not urgent but recommended to update for security patches and bug fixes during maintenance window."
+        },
+        {
+          "alert_type": "recording_error",
+          "enabled": false,
+          "severity": "major",
+          "category": "application",
+          "title": "Recording Error",
+          "description": "Error occurred during recording process. May be codec issue, storage write error, or stream problem. Check camera logs for details."
+        },
+        {
+          "alert_type": "recording_stopped",
+          "enabled": false,
+          "severity": "critical",
+          "category": "application",
+          "title": "Recording Stopped",
+          "description": "Axis camera recording stopped. Active recording stream has stopped unexpectedly. Check network, storage, and camera application status."
+        },
+        {
+          "alert_type": "system_error",
+          "enabled": true,
+          "severity": "major",
+          "category": "application",
+          "title": "System Error",
+          "description": "General system error in camera firmware. Check camera logs for details. May require reboot or firmware update."
+        }
+      ]
+    },
+    {
+      "group": "Environmental Events",
+      "alerts": [
+        {
+          "alert_type": "fan_failure",
+          "enabled": true,
+          "severity": "critical",
+          "category": "environment",
+          "title": "Fan Failure",
+          "description": "Internal cooling fan stopped working. Camera will overheat. Requires immediate service to prevent permanent damage."
+        },
+        {
+          "alert_type": "heater_failure",
+          "enabled": true,
+          "severity": "major",
+          "category": "environment",
+          "title": "Heater Failure",
+          "description": "Outdoor housing heater not functioning. Camera may freeze or fog in cold weather. Replace heater element or housing."
+        },
+        {
+          "alert_type": "high_temperature",
+          "enabled": true,
+          "severity": "warning",
+          "category": "environment",
+          "title": "High Temperature",
+          "description": "Camera temperature high"
+        },
+        {
+          "alert_type": "housing_open",
+          "enabled": true,
+          "severity": "major",
+          "category": "environment",
+          "title": "Housing Open",
+          "description": "Outdoor housing door/cover is open. Camera exposed to elements. May be maintenance in progress or security issue. Verify and close."
+        },
+        {
+          "alert_type": "temperature_critical",
+          "enabled": true,
+          "severity": "critical",
+          "category": "environment",
+          "title": "Temperature Critical",
+          "description": "Camera internal temperature exceeds safe operating limit (typically >70\u00b0C). May shut down to prevent damage. Check ventilation and ambient temperature."
+        },
+        {
+          "alert_type": "temperature_low",
+          "enabled": true,
+          "severity": "warning",
+          "category": "environment",
+          "title": "Temperature Low",
+          "description": "Camera temperature below minimum operating threshold. Heater may have failed in outdoor housing. Check heater element."
+        },
+        {
+          "alert_type": "temperature_warning",
+          "enabled": true,
+          "severity": "warning",
+          "category": "environment",
+          "title": "Temperature Warning",
+          "description": "Camera temperature elevated but still operational. Monitor closely. Improve ventilation or reduce direct sunlight exposure."
+        }
+      ]
+    },
+    {
+      "group": "Network Events",
+      "alerts": [
+        {
+          "alert_type": "dns_failure",
+          "enabled": true,
+          "severity": "warning",
+          "category": "network",
+          "title": "Dns Failure",
+          "description": "Cannot resolve DNS names. Affects NTP, cloud services, or hostname-based NVR connections. Check DNS server settings."
+        },
+        {
+          "alert_type": "ip_conflict",
+          "enabled": false,
+          "severity": "major",
+          "category": "network",
+          "title": "Ip Conflict",
+          "description": "Another device has same IP address. Camera connectivity will be intermittent. Resolve IP conflict immediately."
+        },
+        {
+          "alert_type": "network_config_error",
+          "enabled": false,
+          "severity": "major",
+          "category": "network",
+          "title": "Network Config Error",
+          "description": "Network settings invalid or conflicting. Camera may have wrong IP, subnet, or gateway. Reconfigure network settings."
+        },
+        {
+          "alert_type": "network_degraded",
+          "enabled": true,
+          "severity": "warning",
+          "category": "network",
+          "title": "Network Degraded",
+          "description": "Network performance degraded - packet loss or high latency detected. Video quality may suffer. Check network infrastructure."
+        }
+      ]
+    },
+    {
+      "group": "Power Events",
+      "alerts": [
+        {
+          "alert_type": "poe_warning",
+          "enabled": true,
+          "severity": "warning",
+          "category": "power",
+          "title": "Poe Warning",
+          "description": "PoE power nearing maximum threshold. Camera may experience intermittent issues. Consider upgrading PoE source or reducing camera power consumption."
+        },
+        {
+          "alert_type": "power_insufficient",
+          "enabled": true,
+          "severity": "major",
+          "category": "power",
+          "title": "Power Insufficient",
+          "description": "PoE power budget insufficient for camera operation. Check PoE switch capacity, cable length, or use higher-wattage PoE injector."
+        },
+        {
+          "alert_type": "power_supply_error",
+          "enabled": true,
+          "severity": "critical",
+          "category": "power",
+          "title": "Power Supply Error",
+          "description": "Internal power supply failure. Camera will shut down. For non-PoE cameras, check power adapter. May require hardware replacement."
+        }
+      ]
+    },
+    {
+      "group": "Security Events",
+      "alerts": [
+        {
+          "alert_type": "camera_moved",
+          "enabled": true,
+          "severity": "major",
+          "category": "security",
+          "title": "Camera Moved",
+          "description": "Camera field of view has shifted from calibrated position. May be wind, vibration, or intentional movement. Re-aim camera if needed."
+        },
+        {
+          "alert_type": "tampering",
+          "enabled": true,
+          "severity": "major",
+          "category": "security",
+          "title": "Tampering",
+          "description": "Camera tampering detected"
+        },
+        {
+          "alert_type": "tampering_detected",
+          "enabled": true,
+          "severity": "critical",
+          "category": "security",
+          "title": "Tampering Detected",
+          "description": "Camera detected physical tampering - lens covered, spray painted, or view obstructed. Immediate physical inspection required. Possible security incident."
+        },
+        {
+          "alert_type": "tampering_physical",
+          "enabled": true,
+          "severity": "critical",
+          "category": "security",
+          "title": "Tampering Physical",
+          "description": "Camera housing opened or mounting disturbed. Physical security breach detected. Inspect camera immediately for damage or unauthorized access."
+        },
+        {
+          "alert_type": "unauthorized_access",
+          "enabled": true,
+          "severity": "major",
+          "category": "security",
+          "title": "Unauthorized Access",
+          "description": "Failed login attempts or access from unauthorized IP. Possible intrusion attempt. Review access logs and verify security settings."
+        }
+      ]
+    },
+    {
+      "group": "Storage Events",
+      "alerts": [
+        {
+          "alert_type": "storage_failure",
+          "enabled": false,
+          "severity": "critical",
+          "category": "storage",
+          "title": "Storage Failure",
+          "description": "SD card or NAS storage has failed. Recording will stop. Check storage media health, replace if necessary. Data may be lost."
+        },
+        {
+          "alert_type": "storage_full",
+          "enabled": false,
+          "severity": "warning",
+          "category": "storage",
+          "title": "Storage Full",
+          "description": "Storage capacity full"
+        },
+        {
+          "alert_type": "storage_missing",
+          "enabled": false,
+          "severity": "major",
+          "category": "storage",
+          "title": "Storage Missing",
+          "description": "No storage device detected. SD card may be ejected, corrupted, or NAS mount failed. Recording is not possible until storage is restored."
+        },
+        {
+          "alert_type": "storage_readonly",
+          "enabled": false,
+          "severity": "major",
+          "category": "storage",
+          "title": "Storage Readonly",
+          "description": "Storage is mounted read-only, possibly due to filesystem errors or hardware failure. Recording cannot continue. Run filesystem check or replace media."
+        },
+        {
+          "alert_type": "storage_warning",
+          "enabled": false,
+          "severity": "warning",
+          "category": "storage",
+          "title": "Storage Warning",
+          "description": "Storage approaching capacity threshold (typically 80-90%). Plan to free up space or expand storage soon to avoid recording interruption."
+        }
+      ]
+    },
+    {
+      "group": "Other Events",
+      "alerts": [
+        {
+          "alert_type": "auth_failed",
+          "enabled": true,
+          "severity": "major",
+          "category": "unknown",
+          "title": "Auth Failed",
+          "description": "Axis camera authentication failed. Credentials rejected by camera. Verify username/password in credential vault matches camera configuration."
+        },
+        {
+          "alert_type": "device_online",
+          "enabled": true,
+          "severity": "clear",
+          "category": "unknown",
+          "title": "Device Online",
+          "description": "Camera online"
+        },
+        {
+          "alert_type": "disk_error",
+          "enabled": true,
+          "severity": "critical",
+          "category": "unknown",
+          "title": "Disk Error",
+          "description": "Storage disk error"
+        },
+        {
+          "alert_type": "video_restored",
+          "enabled": true,
+          "severity": "clear",
+          "category": "unknown",
+          "title": "Video Restored",
+          "description": "Camera video restored"
+        }
+      ]
+    },
+    {
+      "group": "Video & Camera Events",
+      "alerts": [
+        {
+          "alert_type": "audio_failure",
+          "enabled": true,
+          "severity": "warning",
+          "category": "video",
+          "title": "Audio Failure",
+          "description": "Built-in microphone or speaker not functioning. Audio recording/playback affected. Check audio settings or hardware."
+        },
+        {
+          "alert_type": "camera_auth_failed",
+          "enabled": false,
+          "severity": "major",
+          "category": "video",
+          "title": "Camera Auth Failed",
+          "description": "Login credentials rejected by camera. Verify username/password in connector config. Camera may have been reset to factory defaults or password changed."
+        },
+        {
+          "alert_type": "camera_offline",
+          "enabled": true,
+          "severity": "critical",
+          "category": "video",
+          "title": "Camera Offline",
+          "description": "Axis camera is offline. Camera is not responding to API requests. Check network connectivity, power, and camera health. Video recording affected."
+        },
+        {
+          "alert_type": "camera_unreachable",
+          "enabled": false,
+          "severity": "critical",
+          "category": "video",
+          "title": "Camera Unreachable",
+          "description": "Camera cannot be reached on the network. Verify IP address, check for network outages, firewall rules, or VLAN issues between monitoring system and camera."
+        },
+        {
+          "alert_type": "device_offline",
+          "enabled": true,
+          "severity": "critical",
+          "category": "video",
+          "title": "Device Offline",
+          "description": "Camera offline"
+        },
+        {
+          "alert_type": "focus_failure",
+          "enabled": true,
+          "severity": "warning",
+          "category": "video",
+          "title": "Focus Failure",
+          "description": "Auto-focus cannot achieve sharp image. Lens may be dirty, damaged, or subject too close/far. Clean lens or adjust focus manually."
+        },
+        {
+          "alert_type": "io_error",
+          "enabled": true,
+          "severity": "warning",
+          "category": "video",
+          "title": "Io Error",
+          "description": "Digital I/O port error - alarm input/output or relay not responding. Check wiring and I/O configuration."
+        },
+        {
+          "alert_type": "ir_failure",
+          "enabled": true,
+          "severity": "warning",
+          "category": "video",
+          "title": "Ir Failure",
+          "description": "Infrared LED illuminator not working. Night vision compromised. Check IR LED board or replace camera."
+        },
+        {
+          "alert_type": "lens_error",
+          "enabled": true,
+          "severity": "major",
+          "category": "video",
+          "title": "Lens Error",
+          "description": "Motorized lens error - zoom or focus mechanism failed. Image may be blurry or wrong focal length. Requires service."
+        },
+        {
+          "alert_type": "motion",
+          "enabled": true,
+          "severity": "info",
+          "category": "video",
+          "title": "Motion",
+          "description": "Motion detected"
+        },
+        {
+          "alert_type": "ptz_error",
+          "enabled": true,
+          "severity": "major",
+          "category": "video",
+          "title": "Ptz Error",
+          "description": "PTZ mechanism error - motor, gears, or controller issue. Camera may be stuck in position. Requires service or replacement."
+        },
+        {
+          "alert_type": "ptz_motor_failure",
+          "enabled": true,
+          "severity": "critical",
+          "category": "video",
+          "title": "Ptz Motor Failure",
+          "description": "PTZ motor has failed. Camera cannot pan, tilt, or zoom. Hardware replacement required. Consider temporary fixed camera coverage."
+        },
+        {
+          "alert_type": "ptz_power_insufficient",
+          "enabled": true,
+          "severity": "major",
+          "category": "video",
+          "title": "Ptz Power Insufficient",
+          "description": "Not enough power for PTZ operation. PTZ cameras require more power than fixed. Upgrade PoE to 60W or use dedicated power supply."
+        },
+        {
+          "alert_type": "ptz_preset_failure",
+          "enabled": true,
+          "severity": "warning",
+          "category": "video",
+          "title": "Ptz Preset Failure",
+          "description": "PTZ preset position could not be reached. Mechanical obstruction or calibration drift. Re-calibrate PTZ or check for physical obstructions."
+        },
+        {
+          "alert_type": "sensor_failure",
+          "enabled": true,
+          "severity": "critical",
+          "category": "video",
+          "title": "Sensor Failure",
+          "description": "Image sensor hardware failure. No video possible. Camera requires replacement. Critical component failure."
+        },
+        {
+          "alert_type": "stream_timeout",
+          "enabled": true,
+          "severity": "major",
+          "category": "video",
+          "title": "Stream Timeout",
+          "description": "Video stream connection timed out. Network congestion, bandwidth issues, or camera overloaded. Check network path and camera CPU usage."
+        },
+        {
+          "alert_type": "video_loss",
+          "enabled": true,
+          "severity": "critical",
+          "category": "video",
+          "title": "Video Loss",
+          "description": "Camera video loss"
+        }
+      ]
+    }
+  ],
+  "clear_events": {
+    "method": "reconciliation",
+    "description": "Alerts auto-resolve when condition no longer detected"
+  }
+}

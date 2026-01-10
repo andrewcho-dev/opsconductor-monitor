@@ -1,0 +1,93 @@
+{
+  "id": "mcp",
+  "name": "Ciena MCP",
+  "version": "1.0.0",
+  "description": "Ciena MCP (Manage, Control, Plan) network management alerts. 7 alert types for optical network equipment.",
+  "author": "OpsConductor",
+  "method": "api_poll",
+  "category": "network",
+  "api_poll": {
+    "base_url_template": "https://{host}",
+    "auth_type": "basic",
+    "endpoints": [
+      {
+        "path": "/nsi/api/v1/alarms",
+        "method": "GET",
+        "response_type": "json",
+        "check": "reachability",
+        "alert_on_failure": "device_offline"
+      }
+    ]
+  },
+  "default_credentials": {
+    "username": "",
+    "password": ""
+  },
+  "alert_mappings": [
+    {
+      "group": "Other Events",
+      "alerts": [
+        {
+          "alert_type": "CLEAR",
+          "enabled": true,
+          "severity": "clear",
+          "category": "unknown",
+          "title": "Clear",
+          "description": "Clear alarms"
+        },
+        {
+          "alert_type": "CLEARED",
+          "enabled": true,
+          "severity": "clear",
+          "category": "unknown",
+          "title": "Cleared",
+          "description": "Cleared alarms"
+        },
+        {
+          "alert_type": "CRITICAL",
+          "enabled": true,
+          "severity": "critical",
+          "category": "unknown",
+          "title": "Critical",
+          "description": "Critical alarms"
+        },
+        {
+          "alert_type": "INFO",
+          "enabled": true,
+          "severity": "info",
+          "category": "unknown",
+          "title": "Info",
+          "description": "Info alarms"
+        },
+        {
+          "alert_type": "MAJOR",
+          "enabled": true,
+          "severity": "major",
+          "category": "unknown",
+          "title": "Major",
+          "description": "Major alarms"
+        },
+        {
+          "alert_type": "MINOR",
+          "enabled": true,
+          "severity": "minor",
+          "category": "unknown",
+          "title": "Minor",
+          "description": "Minor alarms"
+        },
+        {
+          "alert_type": "WARNING",
+          "enabled": true,
+          "severity": "warning",
+          "category": "unknown",
+          "title": "Warning",
+          "description": "Warning alarms"
+        }
+      ]
+    }
+  ],
+  "clear_events": {
+    "method": "reconciliation",
+    "description": "Alerts auto-resolve when condition no longer detected"
+  }
+}

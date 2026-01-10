@@ -1,31 +1,12 @@
 """
-OpsConductor Core Module
+OpsConductor Core Engine
 
-Central business logic for alert aggregation platform.
+Minimal modules for alert processing:
+- db: Database access
+- addon_registry: Addon loading/lookup
+- parser: Parse engine
+- alert_engine: Alert processing
+- trap_receiver: SNMP trap handler
+- webhook_receiver: HTTP webhook handler
+- poller: SNMP/API/SSH polling
 """
-
-from .models import (
-    Severity,
-    Category,
-    AlertStatus,
-    Priority,
-    Impact,
-    Urgency,
-    NormalizedAlert,
-    Alert,
-    Dependency,
-    Connector,
-)
-
-__all__ = [
-    "Severity",
-    "Category", 
-    "AlertStatus",
-    "Priority",
-    "Impact",
-    "Urgency",
-    "NormalizedAlert",
-    "Alert",
-    "Dependency",
-    "Connector",
-]

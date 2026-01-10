@@ -2,13 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+/* Custom styles */
+.severity-critical { @apply bg-red-600 text-white; }
+.severity-major { @apply bg-orange-500 text-white; }
+.severity-minor { @apply bg-yellow-500 text-black; }
+.severity-warning { @apply bg-yellow-400 text-black; }
+.severity-info { @apply bg-blue-500 text-white; }
+.severity-clear { @apply bg-green-500 text-white; }
 
-body {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background-color: #f3f4f6;
-}
+.status-active { @apply bg-red-500; }
+.status-acknowledged { @apply bg-yellow-500; }
+.status-suppressed { @apply bg-gray-500; }
+.status-resolved { @apply bg-green-500; }

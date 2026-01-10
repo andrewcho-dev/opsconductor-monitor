@@ -1,726 +1,431 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import {
-  Save,
-  RotateCcw,
-  TestTube,
-  Download,
-  Upload,
-  ArrowLeft,
-  Settings as SettingsIcon,
-  Network,
-  Shield,
-  Monitor,
-  Key,
-  Bell,
-} from "lucide-react";
-import { cn } from "../lib/utils";
-import { fetchApi } from "../lib/utils";
+import { useState, useEffect } from 'react'
+import { Save, User, Key, Shield, Activity, RefreshCw, AlertTriangle, ExternalLink } from 'lucide-react'
 
-export function Settings() {
-  const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [testing, setTesting] = useState(false);
-  const [status, setStatus] = useState({ message: "", type: "" });
+export default function Settings() {
+  const [settings, setSettings] = useState([])
+  const [users, setUsers] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState('polling')
+  
+  // Polling config state
+  const [pollingConfig, setPollingConfig] = useState({
+    worker_count: 1,
+    worker_concurrency: 4,
+    rate_limit: 100,
+    poll_interval: 60,
+    default_target_interval: 300
+  })
+  const [serviceStatus, setServiceStatus] = useState({})
+  const [pollingDirty, setPollingDirty] = useState(false)
+  const [restarting, setRestarting] = useState(false)
+  const [saveMessage, setSaveMessage] = useState('')
 
-  const [settings, setSettings] = useState({
-    // Ping Settings
-    ping_command: "ping",
-    ping_count: "1",
-    ping_timeout: "0.3",
-    online_status: "online",
-    offline_status: "offline",
-
-    // SNMP Settings
-    snmp_version: "2c",
-    snmp_community: "public",
-    snmp_port: "161",
-    snmp_timeout: "1",
-    snmp_success_status: "YES",
-    snmp_fail_status: "NO",
-
-    // SSH Settings
-    ssh_port: "22",
-    ssh_timeout: "3",
-    ssh_username: "admin",
-    ssh_password: "admin",
-    ssh_success_status: "YES",
-    ssh_fail_status: "NO",
-
-    // RDP Settings
-    rdp_port: "3389",
-    rdp_timeout: "3",
-    rdp_success_status: "YES",
-    rdp_fail_status: "NO",
-
-    // General Settings
-    max_threads: "100",
-    completion_message: "Capability scan completed: {online}/{total} hosts online",
-
-    // Notification Settings (Apprise)
-    notifications_enabled: false,
-    notification_targets: "",
-    notify_discovery_on_success: false,
-    notify_discovery_on_error: true,
-    notify_interface_on_success: false,
-    notify_interface_on_error: true,
-    notify_optical_on_success: false,
-    notify_optical_on_error: true,
-  });
+  const token = localStorage.getItem('access_token')
+  const headers = { Authorization: `Bearer ${token}` }
 
   useEffect(() => {
-    loadSettings();
-  }, []);
+    fetchData()
+    fetchPollingConfig()
+    fetchServiceStatus()
+  }, [])
 
-  const loadSettings = async () => {
+  const fetchData = async () => {
     try {
-      setLoading(true);
-      const data = await fetchApi("/get_settings");
-      
-      setSettings({
-        ping_command: data.ping_command || "ping",
-        ping_count: data.ping_count || "1",
-        ping_timeout: data.ping_timeout || "0.3",
-        online_status: data.online_status || "online",
-        offline_status: data.offline_status || "offline",
-        
-        snmp_version: data.snmp_version || "2c",
-        snmp_community: data.snmp_community || "public",
-        snmp_port: data.snmp_port || "161",
-        snmp_timeout: data.snmp_timeout || "1",
-        snmp_success_status: data.snmp_success_status || "YES",
-        snmp_fail_status: data.snmp_fail_status || "NO",
-        
-        ssh_port: data.ssh_port || "22",
-        ssh_timeout: data.ssh_timeout || "3",
-        ssh_username: data.ssh_username || "admin",
-        ssh_password: data.ssh_password || "admin",
-        ssh_success_status: data.ssh_success_status || "YES",
-        ssh_fail_status: data.ssh_fail_status || "NO",
-        
-        rdp_port: data.rdp_port || "3389",
-        rdp_timeout: data.rdp_timeout || "3",
-        rdp_success_status: data.rdp_success_status || "YES",
-        rdp_fail_status: data.rdp_fail_status || "NO",
-        
-        max_threads: data.max_threads || "100",
-        completion_message: data.completion_message || "Capability scan completed: {online}/{total} hosts online",
-
-        notifications_enabled: data.notifications_enabled ?? false,
-        notification_targets: data.notification_targets || "",
-        notify_discovery_on_success: data.notify_discovery_on_success ?? false,
-        notify_discovery_on_error: data.notify_discovery_on_error ?? true,
-        notify_interface_on_success: data.notify_interface_on_success ?? false,
-        notify_interface_on_error: data.notify_interface_on_error ?? true,
-        notify_optical_on_success: data.notify_optical_on_success ?? false,
-        notify_optical_on_error: data.notify_optical_on_error ?? true,
-      });
-    } catch (err) {
-      showStatus("Error loading settings: " + err.message, "error");
-    } finally {
-      setLoading(false);
+      const settingsRes = await fetch('/api/v1/settings', { headers })
+      if (settingsRes.ok) {
+        const data = await settingsRes.json()
+        setSettings(data.settings || [])
+      }
+    } catch (e) {
+      console.error('Failed to fetch settings')
     }
-  };
-
-  const saveSettings = async () => {
-    try {
-      setSaving(true);
-      const result = await fetchApi("/save_settings", {
-        method: "POST",
-        body: JSON.stringify(settings),
-      });
-      showStatus("Settings saved successfully!", "success");
-    } catch (err) {
-      showStatus("Error saving settings: " + err.message, "error");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const resetToDefaults = () => {
-    if (confirm("Reset all settings to default values?")) {
-      setSettings({
-        ping_command: "ping",
-        ping_count: "1",
-        ping_timeout: "0.3",
-        online_status: "online",
-        offline_status: "offline",
-        
-        snmp_version: "2c",
-        snmp_community: "public",
-        snmp_port: "161",
-        snmp_timeout: "1",
-        snmp_success_status: "YES",
-        snmp_fail_status: "NO",
-        
-        ssh_port: "22",
-        ssh_timeout: "3",
-        ssh_username: "admin",
-        ssh_password: "admin",
-        ssh_success_status: "YES",
-        ssh_fail_status: "NO",
-        
-        rdp_port: "3389",
-        rdp_timeout: "3",
-        rdp_success_status: "YES",
-        rdp_fail_status: "NO",
-        
-        max_threads: "100",
-        completion_message: "Capability scan completed: {online}/{total} hosts online",
-
-        notifications_enabled: false,
-        notification_targets: "",
-        notify_discovery_on_success: false,
-        notify_discovery_on_error: true,
-        notify_interface_on_success: false,
-        notify_interface_on_error: true,
-        notify_optical_on_success: false,
-        notify_optical_on_error: true,
-      });
-      
-      showStatus("Settings reset to defaults. Click \"Save\" to apply.", "success");
-    }
-  };
-
-  const testSettings = async () => {
-    try {
-      setTesting(true);
-      showStatus("Testing settings...", "success");
-      
-      const result = await fetchApi("/test_settings", { method: "POST" });
-      showStatus("Settings test passed! All tools are accessible.", "success");
-    } catch (err) {
-      showStatus("Error testing settings: " + err.message, "error");
-    } finally {
-      setTesting(false);
-    }
-  };
-
-  const exportSettings = () => {
-    const blob = new Blob([JSON.stringify(settings, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "scan_settings.json";
-    a.click();
-    URL.revokeObjectURL(url);
-    
-    showStatus("Settings exported successfully!", "success");
-  };
-
-  const importSettings = () => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".json";
-    input.onchange = function(event) {
-      const file = event.target.files[0];
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        try {
-          const importedSettings = JSON.parse(e.target.result);
-          setSettings({
-            ping_command: importedSettings.ping_command || "ping",
-            ping_count: importedSettings.ping_count || "1",
-            ping_timeout: importedSettings.ping_timeout || "0.3",
-            online_status: importedSettings.online_status || "online",
-            offline_status: importedSettings.offline_status || "offline",
-            
-            snmp_version: importedSettings.snmp_version || "2c",
-            snmp_community: importedSettings.snmp_community || "public",
-            snmp_port: importedSettings.snmp_port || "161",
-            snmp_timeout: importedSettings.snmp_timeout || "1",
-            snmp_success_status: importedSettings.snmp_success_status || "YES",
-            snmp_fail_status: importedSettings.snmp_fail_status || "NO",
-            
-            ssh_port: importedSettings.ssh_port || "22",
-            ssh_timeout: importedSettings.ssh_timeout || "3",
-            ssh_username: importedSettings.ssh_username || "admin",
-            ssh_password: importedSettings.ssh_password || "admin",
-            ssh_success_status: importedSettings.ssh_success_status || "YES",
-            ssh_fail_status: importedSettings.ssh_fail_status || "NO",
-            
-            rdp_port: importedSettings.rdp_port || "3389",
-            rdp_timeout: importedSettings.rdp_timeout || "3",
-            rdp_success_status: importedSettings.rdp_success_status || "YES",
-            rdp_fail_status: importedSettings.rdp_fail_status || "NO",
-            
-            max_threads: importedSettings.max_threads || "100",
-            completion_message: importedSettings.completion_message || "Capability scan completed: {online}/{total} hosts online",
-
-            notifications_enabled: importedSettings.notifications_enabled ?? false,
-            notification_targets: importedSettings.notification_targets || "",
-            notify_discovery_on_success: importedSettings.notify_discovery_on_success ?? false,
-            notify_discovery_on_error: importedSettings.notify_discovery_on_error ?? true,
-            notify_interface_on_success: importedSettings.notify_interface_on_success ?? false,
-            notify_interface_on_error: importedSettings.notify_interface_on_error ?? true,
-            notify_optical_on_success: importedSettings.notify_optical_on_success ?? false,
-            notify_optical_on_error: importedSettings.notify_optical_on_error ?? true,
-          });
-          
-          showStatus("Settings imported successfully! Click \"Save\" to apply.", "success");
-        } catch (err) {
-          showStatus("Error importing settings: " + err.message, "error");
-        }
-      };
-      reader.readAsText(file);
-    };
-    input.click();
-  };
-
-  const showStatus = (message, type) => {
-    setStatus({ message, type });
-    setTimeout(() => setStatus({ message: "", type: "" }), 3000);
-  };
-
-  const updateSetting = (key, value) => {
-    setSettings(prev => ({ ...prev, [key]: value }));
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      </div>
-    );
+    setLoading(false)
   }
 
+  const fetchPollingConfig = async () => {
+    try {
+      const res = await fetch('/api/v1/polling/config', { headers })
+      if (res.ok) {
+        const data = await res.json()
+        setPollingConfig(data.config)
+      }
+    } catch (e) {
+      console.error('Failed to fetch polling config')
+    }
+  }
+
+  const fetchServiceStatus = async () => {
+    try {
+      const res = await fetch('/api/v1/services/status', { headers })
+      if (res.ok) {
+        const data = await res.json()
+        setServiceStatus(data)
+      }
+    } catch (e) {
+      console.error('Failed to fetch service status')
+    }
+  }
+
+  const handleSettingChange = async (key, value) => {
+    await fetch(`/api/v1/settings/${key}`, {
+      method: 'PUT',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value })
+    })
+    fetchData()
+  }
+
+  const handlePollingConfigChange = (field, value) => {
+    setPollingConfig(prev => ({ ...prev, [field]: parseInt(value) || 0 }))
+    setPollingDirty(true)
+    setSaveMessage('')
+  }
+
+  const savePollingConfig = async () => {
+    try {
+      const res = await fetch('/api/v1/polling/config', {
+        method: 'PUT',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify(pollingConfig)
+      })
+      if (res.ok) {
+        setPollingDirty(false)
+        setSaveMessage('Configuration saved. Restart services to apply changes.')
+      } else {
+        const err = await res.json()
+        setSaveMessage(`Error: ${err.detail}`)
+      }
+    } catch (e) {
+      setSaveMessage('Failed to save configuration')
+    }
+  }
+
+  const restartServices = async () => {
+    if (!confirm('This will restart all services. The UI will be briefly unavailable. Continue?')) {
+      return
+    }
+    setRestarting(true)
+    setSaveMessage('Restarting services...')
+    try {
+      await fetch('/api/v1/services/restart', {
+        method: 'POST',
+        headers
+      })
+      // Wait and then refresh
+      setTimeout(() => {
+        window.location.reload()
+      }, 5000)
+    } catch (e) {
+      setSaveMessage('Restart initiated. Refreshing...')
+      setTimeout(() => {
+        window.location.reload()
+      }, 5000)
+    }
+  }
+
+  const tabs = [
+    { id: 'polling', label: 'Polling', icon: Activity },
+    { id: 'system', label: 'System', icon: Shield },
+    { id: 'users', label: 'Users', icon: User },
+    { id: 'api', label: 'API Keys', icon: Key },
+  ]
+
   return (
-    <div className="p-4 bg-gray-100 min-h-screen">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6 bg-white p-4 rounded-lg shadow">
-        <div className="flex items-center gap-3">
-          <SettingsIcon className="w-6 h-6 text-gray-600" />
-          <h1 className="text-xl font-bold text-gray-800">Scan Settings</h1>
-        </div>
-        <button
-          onClick={() => navigate("/")}
-          className="flex items-center gap-2 px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Scan Results
-        </button>
+    <div className="p-6">
+      <h1 className="text-2xl font-bold mb-6">Settings</h1>
+
+      {/* Tabs */}
+      <div className="flex gap-2 mb-6 border-b border-gray-700">
+        {tabs.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex items-center gap-2 px-4 py-2 -mb-px border-b-2 transition-colors ${
+              activeTab === tab.id
+                ? 'border-blue-500 text-blue-500'
+                : 'border-transparent text-gray-400 hover:text-white'
+            }`}
+          >
+            <tab.icon className="w-4 h-4" />
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      {/* Settings Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-        {/* Ping Settings */}
-        <div className="bg-white p-4 rounded-lg shadow">
-          <div className="flex items-center gap-2 mb-4">
-            <Network className="w-5 h-5 text-blue-600" />
-            <h3 className="text-lg font-semibold text-gray-800">Ping</h3>
-          </div>
-          <div className="space-y-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Command</label>
-              <input
-                type="text"
-                value={settings.ping_command}
-                onChange={(e) => updateSetting("ping_command", e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Count</label>
-              <input
-                type="number"
-                value={settings.ping_count}
-                onChange={(e) => updateSetting("ping_count", e.target.value)}
-                min="1"
-                max="10"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Timeout (s)</label>
-              <input
-                type="number"
-                value={settings.ping_timeout}
-                onChange={(e) => updateSetting("ping_timeout", e.target.value)}
-                min="0.1"
-                max="10"
-                step="0.1"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Online Status</label>
-              <input
-                type="text"
-                value={settings.online_status}
-                onChange={(e) => updateSetting("online_status", e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Offline Status</label>
-              <input
-                type="text"
-                value={settings.offline_status}
-                onChange={(e) => updateSetting("offline_status", e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* SNMP Settings */}
-        <div className="bg-white p-4 rounded-lg shadow">
-          <div className="flex items-center gap-2 mb-4">
-            <Shield className="w-5 h-5 text-green-600" />
-            <h3 className="text-lg font-semibold text-gray-800">SNMP</h3>
-          </div>
-          <div className="space-y-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Version</label>
-              <select
-                value={settings.snmp_version}
-                onChange={(e) => updateSetting("snmp_version", e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+      {/* Polling Configuration */}
+      {activeTab === 'polling' && (
+        <div className="space-y-6">
+          {/* Service Status */}
+          <div className="bg-gray-800 rounded-lg border border-gray-700">
+            <div className="p-4 border-b border-gray-700 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <h2 className="font-semibold">Service Status</h2>
+                <a
+                  href={`http://${window.location.hostname}:5555`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  Flower Monitor
+                </a>
+              </div>
+              <button
+                onClick={fetchServiceStatus}
+                className="text-gray-400 hover:text-white"
               >
-                <option value="1">v1</option>
-                <option value="2c">v2c</option>
-                <option value="3">v3</option>
-              </select>
+                <RefreshCw className="w-4 h-4" />
+              </button>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Community</label>
-              <input
-                type="text"
-                value={settings.snmp_community}
-                onChange={(e) => updateSetting("snmp_community", e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Port</label>
-              <input
-                type="number"
-                value={settings.snmp_port}
-                onChange={(e) => updateSetting("snmp_port", e.target.value)}
-                min="1"
-                max="65535"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Timeout (s)</label>
-              <input
-                type="number"
-                value={settings.snmp_timeout}
-                onChange={(e) => updateSetting("snmp_timeout", e.target.value)}
-                min="0.1"
-                max="10"
-                step="0.1"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Success Status</label>
-              <input
-                type="text"
-                value={settings.snmp_success_status}
-                onChange={(e) => updateSetting("snmp_success_status", e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Fail Status</label>
-              <input
-                type="text"
-                value={settings.snmp_fail_status}
-                onChange={(e) => updateSetting("snmp_fail_status", e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+            <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+              {Object.entries(serviceStatus).map(([service, status]) => (
+                <div key={service} className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${status === 'running' ? 'bg-green-500' : 'bg-red-500'}`} />
+                  <span className="text-sm">
+                    {service.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
-        </div>
 
-        {/* SSH Settings */}
-        <div className="bg-white p-4 rounded-lg shadow">
-          <div className="flex items-center gap-2 mb-4">
-            <Key className="w-5 h-5 text-purple-600" />
-            <h3 className="text-lg font-semibold text-gray-800">SSH</h3>
-          </div>
-          <div className="space-y-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Port</label>
-              <input
-                type="number"
-                value={settings.ssh_port}
-                onChange={(e) => updateSetting("ssh_port", e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+          {/* Polling Configuration */}
+          <div className="bg-gray-800 rounded-lg border border-gray-700">
+            <div className="p-4 border-b border-gray-700">
+              <h2 className="font-semibold">Polling Configuration</h2>
+              <p className="text-sm text-gray-400 mt-1">
+                Configure how the system polls your devices. Changes require a service restart.
+              </p>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Timeout (s)</label>
-              <input
-                type="number"
-                value={settings.ssh_timeout}
-                onChange={(e) => updateSetting("ssh_timeout", e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
-              <input
-                type="text"
-                value={settings.ssh_username}
-                onChange={(e) => updateSetting("ssh_username", e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-              <input
-                type="password"
-                value={settings.ssh_password}
-                onChange={(e) => updateSetting("ssh_password", e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Success Status</label>
-              <input
-                type="text"
-                value={settings.ssh_success_status}
-                onChange={(e) => updateSetting("ssh_success_status", e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Fail Status</label>
-              <input
-                type="text"
-                value={settings.ssh_fail_status}
-                onChange={(e) => updateSetting("ssh_fail_status", e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-        </div>
+            <div className="p-4 space-y-6">
+              {/* Worker Settings */}
+              <div>
+                <h3 className="text-sm font-medium text-gray-300 mb-3">Worker Settings</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Number of Workers</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="16"
+                      value={pollingConfig.worker_count}
+                      onChange={e => handlePollingConfigChange('worker_count', e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Parallel worker processes (1-16)</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Concurrency per Worker</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="16"
+                      value={pollingConfig.worker_concurrency}
+                      onChange={e => handlePollingConfigChange('worker_concurrency', e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Parallel tasks per worker (1-16)</p>
+                  </div>
+                </div>
+                <div className="mt-3 p-3 bg-gray-700/50 rounded text-sm">
+                  <span className="text-gray-400">Total parallel polls: </span>
+                  <span className="text-white font-medium">
+                    {pollingConfig.worker_count} × {pollingConfig.worker_concurrency} = {pollingConfig.worker_count * pollingConfig.worker_concurrency}
+                  </span>
+                </div>
+              </div>
 
-        {/* RDP Settings */}
-        <div className="bg-white p-4 rounded-lg shadow">
-          <div className="flex items-center gap-2 mb-4">
-            <Monitor className="w-5 h-5 text-orange-600" />
-            <h3 className="text-lg font-semibold text-gray-800">RDP</h3>
-          </div>
-          <div className="space-y-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Port</label>
-              <input
-                type="number"
-                value={settings.rdp_port}
-                onChange={(e) => updateSetting("rdp_port", e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Timeout (s)</label>
-              <input
-                type="number"
-                value={settings.rdp_timeout}
-                onChange={(e) => updateSetting("rdp_timeout", e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Success Status</label>
-              <input
-                type="text"
-                value={settings.rdp_success_status}
-                onChange={(e) => updateSetting("rdp_success_status", e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Fail Status</label>
-              <input
-                type="text"
-                value={settings.rdp_fail_status}
-                onChange={(e) => updateSetting("rdp_fail_status", e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
+              {/* Rate Limiting */}
+              <div>
+                <h3 className="text-sm font-medium text-gray-300 mb-3">Rate Limiting</h3>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Max Polls per Second</label>
+                  <input
+                    type="number"
+                    min="10"
+                    max="1000"
+                    value={pollingConfig.rate_limit}
+                    onChange={e => handlePollingConfigChange('rate_limit', e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Prevents overwhelming your network. Recommended: 100 for most networks.
+                  </p>
+                </div>
+              </div>
 
-      {/* Notification Settings */}
-      <div className="bg-white p-4 rounded-lg shadow mb-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Bell className="w-5 h-5 text-yellow-600" />
-          <h3 className="text-lg font-semibold text-gray-800">Notifications</h3>
-        </div>
-        <div className="space-y-3">
-          <label className="flex items-center gap-2 text-sm text-gray-800">
-            <input
-              type="checkbox"
-              checked={!!settings.notifications_enabled}
-              onChange={(e) => updateSetting("notifications_enabled", e.target.checked)}
-            />
-            <span>Enable notifications for poller jobs</span>
-          </label>
+              {/* Timing */}
+              <div>
+                <h3 className="text-sm font-medium text-gray-300 mb-3">Timing</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Dispatch Interval (seconds)</label>
+                    <input
+                      type="number"
+                      min="10"
+                      max="3600"
+                      value={pollingConfig.poll_interval}
+                      onChange={e => handlePollingConfigChange('poll_interval', e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">How often to check for due targets</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Default Target Interval (seconds)</label>
+                    <input
+                      type="number"
+                      min="30"
+                      max="86400"
+                      value={pollingConfig.default_target_interval}
+                      onChange={e => handlePollingConfigChange('default_target_interval', e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Default polling interval for new targets</p>
+                  </div>
+                </div>
+              </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Apprise target URLs (one per line)
-            </label>
-            <textarea
-              className="w-full min-h-[80px] px-3 py-2 border border-gray-300 rounded-lg font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={settings.notification_targets}
-              onChange={(e) => updateSetting("notification_targets", e.target.value)}
-              placeholder={"mailtos://user:pass@smtp.example.com?from=you@example.com&to=dest@example.com\nslack://...\nmsteams://..."}
-            />
-          </div>
+              {/* Capacity Estimate */}
+              <div className="p-4 bg-blue-900/30 border border-blue-700 rounded">
+                <h3 className="text-sm font-medium text-blue-300 mb-2">Capacity Estimate</h3>
+                <p className="text-sm text-gray-300">
+                  With current settings, you can poll approximately{' '}
+                  <span className="text-white font-medium">
+                    {Math.floor((pollingConfig.worker_count * pollingConfig.worker_concurrency * pollingConfig.default_target_interval) / 0.5)}
+                  </span>{' '}
+                  devices at {pollingConfig.default_target_interval}s intervals (assuming 0.5s per poll).
+                </p>
+              </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-gray-800">
-            <div className="space-y-1">
-              <div className="font-semibold">Discovery job</div>
-              <label className="flex items-center gap-1">
-                <input
-                  type="checkbox"
-                  checked={!!settings.notify_discovery_on_success}
-                  onChange={(e) => updateSetting("notify_discovery_on_success", e.target.checked)}
-                />
-                <span>On success</span>
-              </label>
-              <label className="flex items-center gap-1">
-                <input
-                  type="checkbox"
-                  checked={!!settings.notify_discovery_on_error}
-                  onChange={(e) => updateSetting("notify_discovery_on_error", e.target.checked)}
-                />
-                <span>On error</span>
-              </label>
-            </div>
+              {/* Save Message */}
+              {saveMessage && (
+                <div className={`p-3 rounded flex items-center gap-2 ${
+                  saveMessage.includes('Error') ? 'bg-red-900/30 border border-red-700 text-red-300' :
+                  saveMessage.includes('Restart') ? 'bg-yellow-900/30 border border-yellow-700 text-yellow-300' :
+                  'bg-green-900/30 border border-green-700 text-green-300'
+                }`}>
+                  <AlertTriangle className="w-4 h-4" />
+                  {saveMessage}
+                </div>
+              )}
 
-            <div className="space-y-1">
-              <div className="font-semibold">Interface job</div>
-              <label className="flex items-center gap-1">
-                <input
-                  type="checkbox"
-                  checked={!!settings.notify_interface_on_success}
-                  onChange={(e) => updateSetting("notify_interface_on_success", e.target.checked)}
-                />
-                <span>On success</span>
-              </label>
-              <label className="flex items-center gap-1">
-                <input
-                  type="checkbox"
-                  checked={!!settings.notify_interface_on_error}
-                  onChange={(e) => updateSetting("notify_interface_on_error", e.target.checked)}
-                />
-                <span>On error</span>
-              </label>
-            </div>
-
-            <div className="space-y-1">
-              <div className="font-semibold">Optical job</div>
-              <label className="flex items-center gap-1">
-                <input
-                  type="checkbox"
-                  checked={!!settings.notify_optical_on_success}
-                  onChange={(e) => updateSetting("notify_optical_on_success", e.target.checked)}
-                />
-                <span>On success</span>
-              </label>
-              <label className="flex items-center gap-1">
-                <input
-                  type="checkbox"
-                  checked={!!settings.notify_optical_on_error}
-                  onChange={(e) => updateSetting("notify_optical_on_error", e.target.checked)}
-                />
-                <span>On error</span>
-              </label>
+              {/* Actions */}
+              <div className="flex gap-3 pt-4 border-t border-gray-700">
+                <button
+                  onClick={savePollingConfig}
+                  disabled={!pollingDirty}
+                  className={`flex items-center gap-2 px-4 py-2 rounded font-medium ${
+                    pollingDirty
+                      ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                      : 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                  }`}
+                >
+                  <Save className="w-4 h-4" />
+                  Save Configuration
+                </button>
+                <button
+                  onClick={restartServices}
+                  disabled={restarting}
+                  className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded font-medium"
+                >
+                  <RefreshCw className={`w-4 h-4 ${restarting ? 'animate-spin' : ''}`} />
+                  {restarting ? 'Restarting...' : 'Restart Services'}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* General Settings */}
-      <div className="bg-white p-4 rounded-lg shadow mb-6">
-        <div className="flex items-center gap-2 mb-4">
-          <SettingsIcon className="w-5 h-5 text-gray-600" />
-          <h3 className="text-lg font-semibold text-gray-800">General</h3>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Max Threads</label>
-            <input
-              type="number"
-              value={settings.max_threads}
-              onChange={(e) => updateSetting("max_threads", e.target.value)}
-              min="1"
-              max="1000"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Completion Message</label>
-            <input
-              type="text"
-              value={settings.completion_message}
-              onChange={(e) => updateSetting("completion_message", e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Action Buttons */}
-      <div className="bg-white p-4 rounded-lg shadow">
-        <div className="flex items-center justify-center gap-3">
-          <button
-            onClick={saveSettings}
-            disabled={saving}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            <Save className="w-4 h-4" />
-            {saving ? "Saving..." : "Save"}
-          </button>
-          <button
-            onClick={resetToDefaults}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-          >
-            <RotateCcw className="w-4 h-4" />
-            Reset
-          </button>
-          <button
-            onClick={testSettings}
-            disabled={testing}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            <TestTube className="w-4 h-4" />
-            {testing ? "Testing..." : "Test"}
-          </button>
-          <button
-            onClick={exportSettings}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-          >
-            <Download className="w-4 h-4" />
-            Export
-          </button>
-          <button
-            onClick={importSettings}
-            className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
-          >
-            <Upload className="w-4 h-4" />
-            Import
-          </button>
-        </div>
-      </div>
-
-      {/* Status Message */}
-      {status.message && (
-        <div className={cn(
-          "mt-4 p-4 rounded-lg text-sm font-medium",
-          status.type === "success" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-        )}>
-          {status.message}
         </div>
       )}
+
+      {/* System Settings */}
+      {activeTab === 'system' && (
+        <div className="bg-gray-800 rounded-lg border border-gray-700">
+          <div className="p-4 border-b border-gray-700">
+            <h2 className="font-semibold">System Settings</h2>
+          </div>
+          <div className="divide-y divide-gray-700">
+            {loading ? (
+              <div className="p-4 text-gray-400">Loading...</div>
+            ) : settings.length === 0 ? (
+              <div className="p-4 text-gray-400">No settings found</div>
+            ) : (
+              settings.map(setting => (
+                <div key={setting.key} className="p-4 flex items-center justify-between">
+                  <div>
+                    <div className="font-medium">{setting.key}</div>
+                    <div className="text-sm text-gray-400">
+                      Last updated: {setting.updated_at ? new Date(setting.updated_at).toLocaleString() : 'Never'}
+                    </div>
+                  </div>
+                  <input
+                    type="text"
+                    defaultValue={setting.value}
+                    onBlur={e => {
+                      if (e.target.value !== setting.value) {
+                        handleSettingChange(setting.key, e.target.value)
+                      }
+                    }}
+                    className="px-3 py-1.5 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Users */}
+      {activeTab === 'users' && (
+        <div className="bg-gray-800 rounded-lg border border-gray-700">
+          <div className="p-4 border-b border-gray-700">
+            <h2 className="font-semibold">User Management</h2>
+          </div>
+          <div className="p-4">
+            <p className="text-gray-400">User management coming soon.</p>
+            <p className="text-sm text-gray-500 mt-2">
+              Current roles: admin, operator, viewer, service
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* API Keys */}
+      {activeTab === 'api' && (
+        <div className="bg-gray-800 rounded-lg border border-gray-700">
+          <div className="p-4 border-b border-gray-700">
+            <h2 className="font-semibold">API Keys</h2>
+          </div>
+          <div className="p-4">
+            <p className="text-gray-400">API key management coming soon.</p>
+            <p className="text-sm text-gray-500 mt-2">
+              API keys can be used for service account authentication.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* System Info */}
+      <div className="mt-6 bg-gray-800 rounded-lg border border-gray-700 p-4">
+        <h2 className="font-semibold mb-4">System Information</h2>
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <span className="text-gray-400">Version:</span>
+            <span className="ml-2">2.0.0</span>
+          </div>
+          <div>
+            <span className="text-gray-400">API Endpoint:</span>
+            <span className="ml-2">/api/v1</span>
+          </div>
+          <div>
+            <span className="text-gray-400">WebSocket:</span>
+            <span className="ml-2">/ws</span>
+          </div>
+          <div>
+            <span className="text-gray-400">Webhooks:</span>
+            <span className="ml-2">/webhooks/*</span>
+          </div>
+        </div>
+      </div>
     </div>
-  );
+  )
 }

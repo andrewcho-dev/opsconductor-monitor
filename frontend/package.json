@@ -1,40 +1,28 @@
 {
-  "name": "frontend",
-  "private": true,
-  "version": "0.0.0",
+  "name": "opsconductor-frontend",
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host 0.0.0.0",
+    "dev": "vite",
     "build": "vite build",
-    "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
-    "chart.js": "^4.4.0",
-    "chartjs-adapter-date-fns": "^3.0.0",
     "clsx": "^2.0.0",
-    "lucide-react": "^0.460.0",
-    "qrcode.react": "^4.2.0",
-    "react": "^19.2.0",
-    "react-chartjs-2": "^5.2.0",
-    "react-dom": "^19.2.0",
-    "react-router-dom": "^6.20.1",
-    "reactflow": "^11.11.4",
-    "recharts": "^2.8.0",
-    "tailwind-merge": "^2.1.0"
+    "date-fns": "^2.30.0",
+    "lucide-react": "^0.294.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.20.0",
+    "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.1",
-    "@types/react": "^19.2.5",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^5.1.1",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.2.0",
     "autoprefixer": "^10.4.16",
-    "eslint": "^9.39.1",
-    "eslint-plugin-react-hooks": "^7.0.1",
-    "eslint-plugin-react-refresh": "^0.4.24",
-    "globals": "^16.5.0",
     "postcss": "^8.4.32",
     "tailwindcss": "^3.3.6",
-    "vite": "^7.2.4"
+    "vite": "^5.0.0"
   }
 }
