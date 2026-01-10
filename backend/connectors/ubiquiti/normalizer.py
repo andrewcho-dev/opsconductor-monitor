@@ -1,125 +1,30 @@
 """
-Ubiquiti UISP Alert Normalizer
+Ubiquiti Alert Normalizer
 
-Transforms Ubiquiti UISP data to standard NormalizedAlert format.
-Uses database mappings for severity and category - NO HARDCODED VALUES.
+Transforms Ubiquiti device data to standard NormalizedAlert format.
+Uses database mappings for severity and category via BaseNormalizer.
 """
 
 import logging
-import hashlib
 from datetime import datetime
 from typing import Dict, Any, Optional
 
+from backend.connectors.base import BaseNormalizer
 from backend.core.models import NormalizedAlert, Severity, Category
 from backend.utils.ip_utils import validate_device_ip
-from backend.utils.db import db_query
 
 logger = logging.getLogger(__name__)
 
 
-class UbiquitiNormalizer:
+class UbiquitiNormalizer(BaseNormalizer):
     """
-    Database-driven normalizer for Ubiquiti UISP alerts.
+    Database-driven normalizer for Ubiquiti device alerts.
     
-    All mappings come from severity_mappings and category_mappings tables.
+    Extends BaseNormalizer for standard mapping methods.
     """
     
-    def __init__(self):
-        self._severity_cache: Dict[str, Dict] = {}
-        self._category_cache: Dict[str, Dict] = {}
-        self._cache_loaded = False
-    
-    def _load_mappings(self):
-        """Load mappings from database."""
-        if self._cache_loaded:
-            return
-        
-        try:
-            # Load severity mappings
-            severity_rows = db_query(
-                "SELECT source_value, target_severity, enabled, description FROM severity_mappings WHERE connector_type = %s",
-                ("ubiquiti",)
-            )
-            for row in severity_rows:
-                self._severity_cache[row["source_value"]] = {
-                    "severity": row["target_severity"],
-                    "enabled": row["enabled"],
-                    "description": row.get("description", "")
-                }
-            
-            # Load category mappings
-            category_rows = db_query(
-                "SELECT source_value, target_category, enabled, description FROM category_mappings WHERE connector_type = %s",
-                ("ubiquiti",)
-            )
-            for row in category_rows:
-                self._category_cache[row["source_value"]] = {
-                    "category": row["target_category"],
-                    "enabled": row["enabled"],
-                    "description": row.get("description", "")
-                }
-            
-            self._cache_loaded = True
-            logger.info(f"Loaded {len(self._severity_cache)} severity and {len(self._category_cache)} category mappings for ubiquiti")
-            
-        except Exception as e:
-            logger.error(f"Failed to load ubiquiti mappings: {e}")
-            self._cache_loaded = True
-    
-    def is_event_enabled(self, event_type: str) -> bool:
-        """Check if this event type is enabled in mappings.
-        
-        Returns False if:
-        - Event type is not in any mapping (unknown events are ignored)
-        - Event type is explicitly disabled in mappings
-        """
-        self._load_mappings()
-        
-        severity_mapping = self._severity_cache.get(event_type)
-        category_mapping = self._category_cache.get(event_type)
-        
-        # If not in ANY mapping, treat as disabled (unknown event type)
-        if not severity_mapping and not category_mapping:
-            logger.debug(f"Event type '{event_type}' not in mappings - ignoring")
-            return False
-        
-        # Check if explicitly disabled
-        if severity_mapping and not severity_mapping.get("enabled", True):
-            return False
-        if category_mapping and not category_mapping.get("enabled", True):
-            return False
-        
-        return True
-    
-    def _get_severity(self, event_type: str) -> Severity:
-        """Get severity from database mapping."""
-        self._load_mappings()
-        
-        mapping = self._severity_cache.get(event_type)
-        if mapping:
-            try:
-                return Severity(mapping["severity"])
-            except ValueError:
-                pass
-        
-        return Severity.WARNING
-    
-    def _get_category(self, event_type: str) -> Category:
-        """Get category from database mapping."""
-        self._load_mappings()
-        
-        mapping = self._category_cache.get(event_type)
-        if mapping:
-            try:
-                return Category(mapping["category"])
-            except ValueError:
-                pass
-        
-        return Category.NETWORK
-    
-    @property
-    def source_system(self) -> str:
-        return "ubiquiti"
+    connector_type = "ubiquiti"
+    default_category = Category.WIRELESS
     
     def normalize(self, raw_data: Dict[str, Any]) -> Optional[NormalizedAlert]:
         """Transform Ubiquiti UISP data to NormalizedAlert.
@@ -158,8 +63,8 @@ class UbiquitiNormalizer:
         message = self._build_message(alert_type, metrics, device_name, validated_ip)
         occurred_at = self._parse_timestamp(timestamp)
         
-        # Is this a clear event?
-        is_clear = severity == Severity.CLEAR or alert_type in ("device_online", "interface_up", "outage_ended")
+        # Use standard clear event detection from BaseNormalizer
+        is_clear = self.is_clear_event(alert_type, raw_data)
         
         return NormalizedAlert(
             source_system=self.source_system,
@@ -175,19 +80,6 @@ class UbiquitiNormalizer:
             is_clear=is_clear,
             raw_data=raw_data,
         )
-    
-    def get_severity(self, raw_data: Dict[str, Any]) -> Severity:
-        alert_type = raw_data.get("alert_type", "")
-        return self.ALERT_TYPES.get(alert_type, {}).get("severity", Severity.WARNING)
-    
-    def get_category(self, raw_data: Dict[str, Any]) -> Category:
-        alert_type = raw_data.get("alert_type", "")
-        return self.ALERT_TYPES.get(alert_type, {}).get("category", Category.NETWORK)
-    
-    def get_fingerprint(self, raw_data: Dict[str, Any]) -> str:
-        device_ip = raw_data.get("device_ip", "")
-        alert_type = raw_data.get("alert_type", "")
-        return hashlib.sha256(f"ubiquiti:{device_ip}:{alert_type}".encode()).hexdigest()
     
     def _build_message(self, alert_type: str, metrics: Dict, device_name: str = "", device_ip: str = "") -> str:
         lines = []

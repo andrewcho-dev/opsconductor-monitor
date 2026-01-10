@@ -2,6 +2,7 @@
 OpsConductor Connector Base Classes
 
 Abstract base classes that all connectors must implement.
+Provides database-driven alert mapping with standard methods.
 """
 
 import logging
@@ -17,35 +18,176 @@ logger = logging.getLogger(__name__)
 
 class BaseNormalizer(ABC):
     """
-    Base class for alert normalizers.
+    Base class for alert normalizers with database-driven mappings.
     
     Each connector has a normalizer that transforms raw alert data
     from the source system into the standard NormalizedAlert format.
+    
+    Subclasses should set:
+        - connector_type: str (e.g., "prtg", "axis")
+        - default_category: Category (fallback when no mapping found)
+    
+    Standard methods provided:
+        - _load_mappings(): Load severity/category mappings from database
+        - is_event_enabled(): Check if event type is enabled
+        - _get_severity(): Get severity from database mapping
+        - _get_category(): Get category from database mapping
+        - is_clear_event(): Standard clear event detection
     """
     
-    @property
-    @abstractmethod
-    def source_system(self) -> str:
-        """Return the source system identifier (e.g., 'prtg', 'snmp')."""
-        pass
+    # Subclasses must set these
+    connector_type: str = None
+    default_category: Category = Category.UNKNOWN
     
-    @abstractmethod
-    def normalize(self, raw_data: Dict[str, Any]) -> NormalizedAlert:
+    # Clear event suffixes (standard across all connectors)
+    CLEAR_SUFFIXES = ('_restored', '_up', '_online', '_ok', '_normal', '_cleared', '_clear')
+    
+    def __init__(self):
+        """Initialize normalizer with empty caches."""
+        self._severity_cache: Dict[str, Dict] = {}
+        self._category_cache: Dict[str, Dict] = {}
+        self._cache_loaded = False
+    
+    @property
+    def source_system(self) -> str:
+        """Return the source system identifier."""
+        return self.connector_type
+    
+    def _load_mappings(self) -> None:
         """
-        Transform raw alert data to standard NormalizedAlert.
+        Load severity and category mappings from database.
+        
+        Caches mappings for performance. Call refresh_mappings() to reload.
+        """
+        if self._cache_loaded:
+            return
+        
+        try:
+            from backend.utils.db import db_query
+            
+            # Load severity mappings
+            severity_rows = db_query(
+                "SELECT source_value, target_severity, enabled, description "
+                "FROM severity_mappings WHERE connector_type = %s",
+                (self.connector_type,)
+            )
+            for row in severity_rows:
+                self._severity_cache[row["source_value"]] = {
+                    "severity": row["target_severity"],
+                    "enabled": row["enabled"],
+                    "description": row.get("description", "")
+                }
+            
+            # Load category mappings
+            category_rows = db_query(
+                "SELECT source_value, target_category, enabled, description "
+                "FROM category_mappings WHERE connector_type = %s",
+                (self.connector_type,)
+            )
+            for row in category_rows:
+                self._category_cache[row["source_value"]] = {
+                    "category": row["target_category"],
+                    "enabled": row["enabled"],
+                    "description": row.get("description", "")
+                }
+            
+            self._cache_loaded = True
+            logger.info(
+                f"Loaded {self.connector_type} mappings: "
+                f"{len(self._severity_cache)} severity, {len(self._category_cache)} category"
+            )
+            
+        except Exception as e:
+            logger.error(f"Failed to load {self.connector_type} mappings: {e}")
+            self._cache_loaded = True  # Don't retry on every call
+    
+    def refresh_mappings(self) -> None:
+        """Force reload of mappings from database."""
+        self._severity_cache.clear()
+        self._category_cache.clear()
+        self._cache_loaded = False
+        self._load_mappings()
+    
+    def is_event_enabled(self, event_type: str) -> bool:
+        """
+        Check if this event type is enabled in mappings.
+        
+        Returns False if:
+        - Event type is not in any mapping (unknown events are ignored)
+        - Event type is explicitly disabled in mappings
         
         Args:
-            raw_data: Raw alert data from source system
+            event_type: The event/alert type string
             
         Returns:
-            NormalizedAlert conforming to standard schema
+            True if event should be processed
         """
-        pass
+        self._load_mappings()
+        
+        severity_mapping = self._severity_cache.get(event_type)
+        category_mapping = self._category_cache.get(event_type)
+        
+        # If not in ANY mapping, treat as disabled (unknown event type)
+        if not severity_mapping and not category_mapping:
+            logger.debug(f"Event type '{event_type}' not in {self.connector_type} mappings - ignoring")
+            return False
+        
+        # Check if explicitly disabled
+        if severity_mapping and not severity_mapping.get("enabled", True):
+            return False
+        if category_mapping and not category_mapping.get("enabled", True):
+            return False
+        
+        return True
     
-    @abstractmethod
+    def _get_severity(self, event_type: str) -> Severity:
+        """
+        Get severity from database mapping.
+        
+        Args:
+            event_type: The event/alert type string
+            
+        Returns:
+            Mapped Severity enum value, or WARNING as fallback
+        """
+        self._load_mappings()
+        
+        mapping = self._severity_cache.get(event_type)
+        if mapping:
+            try:
+                return Severity(mapping["severity"])
+            except ValueError:
+                logger.warning(f"Invalid severity value in mapping: {mapping['severity']}")
+        
+        return Severity.WARNING
+    
+    def _get_category(self, event_type: str) -> Category:
+        """
+        Get category from database mapping.
+        
+        Args:
+            event_type: The event/alert type string
+            
+        Returns:
+            Mapped Category enum value, or default_category as fallback
+        """
+        self._load_mappings()
+        
+        mapping = self._category_cache.get(event_type)
+        if mapping:
+            try:
+                return Category(mapping["category"])
+            except ValueError:
+                logger.warning(f"Invalid category value in mapping: {mapping['category']}")
+        
+        return self.default_category
+    
     def get_severity(self, raw_data: Dict[str, Any]) -> Severity:
         """
         Determine severity from raw data.
+        
+        Default implementation extracts event_type/alert_type and looks up mapping.
+        Override for connector-specific logic.
         
         Args:
             raw_data: Raw alert data from source system
@@ -53,12 +195,15 @@ class BaseNormalizer(ABC):
         Returns:
             Mapped Severity enum value
         """
-        pass
+        event_type = raw_data.get("alert_type") or raw_data.get("event_type", "")
+        return self._get_severity(event_type)
     
-    @abstractmethod
     def get_category(self, raw_data: Dict[str, Any]) -> Category:
         """
         Determine category from raw data.
+        
+        Default implementation extracts event_type/alert_type and looks up mapping.
+        Override for connector-specific logic.
         
         Args:
             raw_data: Raw alert data from source system
@@ -66,15 +211,15 @@ class BaseNormalizer(ABC):
         Returns:
             Mapped Category enum value
         """
-        pass
+        event_type = raw_data.get("alert_type") or raw_data.get("event_type", "")
+        return self._get_category(event_type)
     
     def get_fingerprint(self, raw_data: Dict[str, Any]) -> str:
         """
         Generate deduplication fingerprint for alert.
         
         Default implementation creates hash from source system,
-        source alert ID, device, and alert type. Override for
-        custom deduplication logic.
+        device IP, and alert type. Override for custom logic.
         
         Args:
             raw_data: Raw alert data from source system
@@ -82,30 +227,49 @@ class BaseNormalizer(ABC):
         Returns:
             SHA256 hash string for deduplication
         """
-        # Extract key fields for fingerprint
-        source_id = str(raw_data.get("source_alert_id", ""))
         device = str(raw_data.get("device_ip") or raw_data.get("device_name") or "")
-        alert_type = str(raw_data.get("alert_type", ""))
+        alert_type = str(raw_data.get("alert_type") or raw_data.get("event_type", ""))
         
-        # Create fingerprint string
-        fingerprint_str = f"{self.source_system}:{source_id}:{device}:{alert_type}"
-        
-        # Return SHA256 hash
+        fingerprint_str = f"{self.connector_type}:{device}:{alert_type}"
         return hashlib.sha256(fingerprint_str.encode()).hexdigest()
     
-    def is_clear_event(self, raw_data: Dict[str, Any]) -> bool:
+    def is_clear_event(self, event_type: str, raw_data: Dict[str, Any] = None) -> bool:
         """
         Determine if this is a clear/recovery event.
         
-        Override in subclass for source-specific logic.
+        Standard logic:
+        1. Check if severity mapping returns 'clear'
+        2. Check if event_type ends with clear suffixes
+        
+        Args:
+            event_type: The event/alert type string
+            raw_data: Optional raw data for additional context
+            
+        Returns:
+            True if this is a clear/recovery event
+        """
+        # Check if database mapping says this is a clear event
+        severity = self._get_severity(event_type)
+        if severity == Severity.CLEAR:
+            return True
+        
+        # Check standard clear suffixes
+        return event_type.lower().endswith(self.CLEAR_SUFFIXES)
+    
+    @abstractmethod
+    def normalize(self, raw_data: Dict[str, Any]) -> Optional[NormalizedAlert]:
+        """
+        Transform raw alert data to standard NormalizedAlert.
+        
+        Returns None if event is disabled or should be filtered.
         
         Args:
             raw_data: Raw alert data from source system
             
         Returns:
-            True if this is a clear/recovery event
+            NormalizedAlert conforming to standard schema, or None
         """
-        return False
+        pass
 
 
 class BaseConnector(ABC):

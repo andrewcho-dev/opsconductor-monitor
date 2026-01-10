@@ -117,6 +117,7 @@ from backend.routers import (
     normalization_router,
 )
 from backend.routers.websocket import router as websocket_router
+from backend.routers.addons import router as addons_router
 
 # Include all routers
 app.include_router(system_router)
@@ -134,6 +135,7 @@ app.include_router(alerts_router, prefix="/api/v1/alerts", tags=["alerts"])
 app.include_router(dependencies_router, prefix="/api/v1/dependencies", tags=["dependencies"])
 app.include_router(connectors_router, prefix="/api/v1/connectors", tags=["connectors"])
 app.include_router(normalization_router, prefix="/api/v1/normalization", tags=["normalization"])
+app.include_router(addons_router)
 
 # WebSocket router for real-time updates
 app.include_router(websocket_router)

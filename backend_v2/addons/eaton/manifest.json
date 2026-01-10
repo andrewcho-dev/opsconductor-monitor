@@ -1,0 +1,182 @@
+{
+  "id": "eaton",
+  "name": "Eaton UPS",
+  "version": "1.0.0",
+  "description": "Eaton UPS monitoring via SNMP. 19 alert types covering battery, power, load, and environmental conditions.",
+  "author": "OpsConductor",
+  "method": "snmp_trap",
+  "category": "power",
+  "alert_mappings": [
+    {
+      "group": "Environmental Events",
+      "alerts": [
+        {
+          "alert_type": "high_temperature",
+          "enabled": true,
+          "severity": "warning",
+          "category": "environment",
+          "title": "High Temperature",
+          "description": "UPS temperature high"
+        }
+      ]
+    },
+    {
+      "group": "Power Events",
+      "alerts": [
+        {
+          "alert_type": "bypass_active",
+          "enabled": true,
+          "severity": "warning",
+          "category": "power",
+          "title": "Bypass Active",
+          "description": "UPS on bypass"
+        },
+        {
+          "alert_type": "device_offline",
+          "enabled": true,
+          "severity": "critical",
+          "category": "power",
+          "title": "Device Offline",
+          "description": "UPS offline"
+        },
+        {
+          "alert_type": "low_battery",
+          "enabled": true,
+          "severity": "critical",
+          "category": "power",
+          "title": "Low Battery",
+          "description": "Battery low"
+        },
+        {
+          "alert_type": "on_battery",
+          "enabled": true,
+          "severity": "critical",
+          "category": "power",
+          "title": "On Battery",
+          "description": "UPS on battery"
+        },
+        {
+          "alert_type": "overload",
+          "enabled": true,
+          "severity": "critical",
+          "category": "power",
+          "title": "Overload",
+          "description": "UPS overload"
+        }
+      ]
+    },
+    {
+      "group": "Other Events",
+      "alerts": [
+        {
+          "alert_type": "1101",
+          "enabled": true,
+          "severity": "warning",
+          "category": "unknown",
+          "title": "1101",
+          "description": "UPS on battery power. Utility power has failed. UPS is supplying load from battery. Check utility power source and prepare for potential shutdown if extended outage."
+        },
+        {
+          "alert_type": "1102",
+          "enabled": true,
+          "severity": "critical",
+          "category": "unknown",
+          "title": "1102",
+          "description": "UPS battery low. Battery capacity critically low during outage. Imminent shutdown. Initiate graceful shutdown of connected equipment immediately."
+        },
+        {
+          "alert_type": "1103",
+          "enabled": true,
+          "severity": "major",
+          "category": "unknown",
+          "title": "1103",
+          "description": "UPS overload. Load exceeds UPS capacity. Risk of shutdown or damage. Reduce load immediately by disconnecting non-critical equipment."
+        },
+        {
+          "alert_type": "1104",
+          "enabled": true,
+          "severity": "critical",
+          "category": "unknown",
+          "title": "1104",
+          "description": "UPS on bypass. UPS has switched to bypass mode. Load is unprotected from power anomalies. Investigate UPS fault condition."
+        },
+        {
+          "alert_type": "1105",
+          "enabled": true,
+          "severity": "major",
+          "category": "unknown",
+          "title": "1105",
+          "description": "UPS fault. Internal UPS fault detected. May affect protection capability. Contact Eaton support for diagnostics."
+        },
+        {
+          "alert_type": "1106",
+          "enabled": true,
+          "severity": "warning",
+          "category": "unknown",
+          "title": "1106",
+          "description": "UPS battery needs replacement. Battery end-of-life detected. Schedule battery replacement to maintain backup capability."
+        },
+        {
+          "alert_type": "1107",
+          "enabled": true,
+          "severity": "info",
+          "category": "unknown",
+          "title": "1107",
+          "description": "UPS self-test in progress. Automatic or manual self-test running. Normal operation."
+        },
+        {
+          "alert_type": "1108",
+          "enabled": true,
+          "severity": "warning",
+          "category": "unknown",
+          "title": "1108",
+          "description": "UPS temperature high. Operating temperature exceeds threshold. Check cooling and ventilation around UPS."
+        },
+        {
+          "alert_type": "1109",
+          "enabled": true,
+          "severity": "major",
+          "category": "unknown",
+          "title": "1109",
+          "description": "UPS output voltage out of range. Output voltage deviation detected. May affect connected equipment. Check UPS configuration and load."
+        },
+        {
+          "alert_type": "battery_fault",
+          "enabled": true,
+          "severity": "critical",
+          "category": "unknown",
+          "title": "Battery Fault",
+          "description": "Battery fault detected"
+        },
+        {
+          "alert_type": "device_online",
+          "enabled": true,
+          "severity": "clear",
+          "category": "unknown",
+          "title": "Device Online",
+          "description": "UPS online"
+        },
+        {
+          "alert_type": "normal",
+          "enabled": true,
+          "severity": "clear",
+          "category": "unknown",
+          "title": "Normal",
+          "description": "UPS status normal"
+        },
+        {
+          "alert_type": "utility_restored",
+          "enabled": true,
+          "severity": "clear",
+          "category": "unknown",
+          "title": "Utility Restored",
+          "description": "Utility power restored"
+        }
+      ]
+    }
+  ],
+  "clear_events": {
+    "method": "reconciliation",
+    "description": "Alerts auto-resolve when condition no longer detected"
+  }
+}

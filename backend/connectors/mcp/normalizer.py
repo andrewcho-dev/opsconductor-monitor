@@ -2,124 +2,29 @@
 MCP (Ciena) Alert Normalizer
 
 Transforms MCP alarm data to standard NormalizedAlert format.
-Uses database mappings for severity and category - NO HARDCODED VALUES.
+Uses database mappings for severity and category via BaseNormalizer.
 """
 
 import logging
-import hashlib
 from datetime import datetime
 from typing import Dict, Any, Optional
 
+from backend.connectors.base import BaseNormalizer
 from backend.core.models import NormalizedAlert, Severity, Category
 from backend.utils.ip_utils import validate_device_ip
-from backend.utils.db import db_query
 
 logger = logging.getLogger(__name__)
 
 
-class MCPNormalizer:
+class MCPNormalizer(BaseNormalizer):
     """
     Database-driven normalizer for Ciena MCP alarms.
     
-    All mappings come from severity_mappings and category_mappings tables.
+    Extends BaseNormalizer for standard mapping methods.
     """
     
-    def __init__(self):
-        self._severity_cache: Dict[str, Dict] = {}
-        self._category_cache: Dict[str, Dict] = {}
-        self._cache_loaded = False
-    
-    def _load_mappings(self):
-        """Load mappings from database."""
-        if self._cache_loaded:
-            return
-        
-        try:
-            # Load severity mappings
-            severity_rows = db_query(
-                "SELECT source_value, target_severity, enabled, description FROM severity_mappings WHERE connector_type = %s",
-                ("mcp",)
-            )
-            for row in severity_rows:
-                self._severity_cache[row["source_value"]] = {
-                    "severity": row["target_severity"],
-                    "enabled": row["enabled"],
-                    "description": row.get("description", "")
-                }
-            
-            # Load category mappings
-            category_rows = db_query(
-                "SELECT source_value, target_category, enabled, description FROM category_mappings WHERE connector_type = %s",
-                ("mcp",)
-            )
-            for row in category_rows:
-                self._category_cache[row["source_value"]] = {
-                    "category": row["target_category"],
-                    "enabled": row["enabled"],
-                    "description": row.get("description", "")
-                }
-            
-            self._cache_loaded = True
-            logger.info(f"Loaded {len(self._severity_cache)} severity and {len(self._category_cache)} category mappings for mcp")
-            
-        except Exception as e:
-            logger.error(f"Failed to load mcp mappings: {e}")
-            self._cache_loaded = True
-    
-    def is_event_enabled(self, alarm_type: str) -> bool:
-        """Check if this alarm type is enabled in mappings.
-        
-        Returns False if:
-        - Alarm type is not in any mapping (unknown events are ignored)
-        - Alarm type is explicitly disabled in mappings
-        """
-        self._load_mappings()
-        
-        severity_mapping = self._severity_cache.get(alarm_type)
-        category_mapping = self._category_cache.get(alarm_type)
-        
-        # If not in ANY mapping, treat as disabled (unknown event type)
-        if not severity_mapping and not category_mapping:
-            logger.debug(f"Alarm type '{alarm_type}' not in mappings - ignoring")
-            return False
-        
-        # Check if explicitly disabled
-        if severity_mapping and not severity_mapping.get("enabled", True):
-            return False
-        if category_mapping and not category_mapping.get("enabled", True):
-            return False
-        
-        return True
-    
-    def _get_severity(self, alarm_type: str) -> Severity:
-        """Get severity from database mapping."""
-        self._load_mappings()
-        
-        mapping = self._severity_cache.get(alarm_type)
-        if mapping:
-            try:
-                return Severity(mapping["severity"])
-            except ValueError:
-                pass
-        
-        return Severity.WARNING
-    
-    def _get_category(self, alarm_type: str) -> Category:
-        """Get category from database mapping."""
-        self._load_mappings()
-        
-        mapping = self._category_cache.get(alarm_type)
-        if mapping:
-            try:
-                return Category(mapping["category"])
-            except ValueError:
-                pass
-        
-        return Category.NETWORK
-    
-    @property
-    def source_system(self) -> str:
-        return "mcp"
+    connector_type = "mcp"
+    default_category = Category.NETWORK
     
     def normalize(self, raw_data: Dict[str, Any]) -> Optional[NormalizedAlert]:
         """
@@ -183,29 +88,6 @@ class MCPNormalizer:
             is_clear=is_clear,
             raw_data=raw_data,
         )
-    
-    def get_severity(self, raw_data: Dict[str, Any]) -> Severity:
-        """Determine severity from database mapping."""
-        alarm_type = raw_data.get("alarmType") or raw_data.get("probableCause", "unknown")
-        return self._get_severity(alarm_type.lower().replace(' ', '_'))
-    
-    def get_category(self, raw_data: Dict[str, Any]) -> Category:
-        """Determine category from database mapping."""
-        alarm_type = raw_data.get("alarmType") or raw_data.get("probableCause", "unknown")
-        return self._get_category(alarm_type.lower().replace(' ', '_'))
-    
-    def get_fingerprint(self, raw_data: Dict[str, Any]) -> str:
-        """Generate deduplication fingerprint."""
-        alarm_id = str(raw_data.get("id", "") or raw_data.get("alarmId", ""))
-        device = raw_data.get("sourceName") or raw_data.get("sourceIp", "")
-        
-        fingerprint_str = f"mcp:{alarm_id}:{device}"
-        return hashlib.sha256(fingerprint_str.encode()).hexdigest()
-    
-    def is_clear_event(self, raw_data: Dict[str, Any]) -> bool:
-        """Check if this is a clear event."""
-        severity_str = str(raw_data.get("severity", "") or raw_data.get("perceivedSeverity", "")).upper()
-        return severity_str in ("CLEARED", "CLEAR")
     
     def _build_message(self, description: str, alarm_type: str, device_name: str, device_ip: str) -> str:
         """Build message - ensure it's never empty."""

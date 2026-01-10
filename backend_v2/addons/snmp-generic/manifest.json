@@ -1,0 +1,66 @@
+{
+  "id": "snmp-generic",
+  "name": "Generic SNMP",
+  "version": "1.0.0",
+  "description": "Generic SNMP trap receiver for standard MIBs",
+  "author": "OpsConductor",
+  "method": "snmp_trap",
+  "category": "network",
+
+  "snmp_trap": {
+    "enterprise_oid": "*",
+    "trap_definitions": {
+      "1.3.6.1.6.3.1.1.5.3": {
+        "alert_type": "link_down",
+        "clear_oid": "1.3.6.1.6.3.1.1.5.4",
+        "description": "Interface link down (IF-MIB)"
+      },
+      "1.3.6.1.6.3.1.1.5.4": {
+        "alert_type": "link_down",
+        "description": "Interface link up (clear)"
+      },
+      "1.3.6.1.6.3.1.1.5.1": {
+        "alert_type": "cold_start",
+        "clear_oid": null,
+        "description": "Device cold start (reboot)"
+      },
+      "1.3.6.1.6.3.1.1.5.2": {
+        "alert_type": "warm_start",
+        "clear_oid": null,
+        "description": "Device warm start"
+      },
+      "1.3.6.1.6.3.1.1.5.5": {
+        "alert_type": "auth_failure",
+        "clear_oid": null,
+        "description": "SNMP authentication failure"
+      }
+    },
+    "varbind_mappings": {
+      "1.3.6.1.2.1.2.2.1.1": "if_index",
+      "1.3.6.1.2.1.2.2.1.2": "if_descr",
+      "1.3.6.1.2.1.31.1.1.1.1": "if_name"
+    }
+  },
+
+  "parser": {
+    "type": "snmp"
+  },
+
+  "severity_mappings": {
+    "link_down": "major",
+    "cold_start": "warning",
+    "warm_start": "info",
+    "auth_failure": "warning"
+  },
+
+  "category_mappings": {
+    "link_down": "network",
+    "cold_start": "system",
+    "warm_start": "system",
+    "auth_failure": "security"
+  },
+
+  "clear_events": {
+    "method": "oid_pair"
+  }
+}

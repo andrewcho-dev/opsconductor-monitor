@@ -24,16 +24,15 @@ export function NormalizationContent() {
   const [creating, setCreating] = useState(false);
   const connectors = [
     { value: 'prtg', label: 'PRTG' },
-    { value: 'mcp', label: 'MCP' },
+    { value: 'mcp', label: 'MCP (Ciena)' },
     { value: 'snmp_trap', label: 'SNMP Traps' },
-    { value: 'snmp_poll', label: 'SNMP Polling' },
-    { value: 'eaton', label: 'Eaton UPS (SNMP)' },
-    { value: 'eaton_rest', label: 'Eaton UPS (REST)' },
     { value: 'axis', label: 'Axis Cameras' },
     { value: 'milestone', label: 'Milestone VMS' },
     { value: 'cradlepoint', label: 'Cradlepoint' },
+    { value: 'siklu', label: 'Siklu Radios' },
     { value: 'ubiquiti', label: 'Ubiquiti' },
     { value: 'cisco_asa', label: 'Cisco ASA' },
+    { value: 'eaton', label: 'Eaton UPS' },
   ];
 
   // Load vendors for snmp_trap connector

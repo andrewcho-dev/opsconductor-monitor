@@ -1,0 +1,187 @@
+{
+  "id": "cisco_asa",
+  "name": "Cisco ASA Firewall",
+  "version": "1.0.0",
+  "description": "Cisco ASA firewall monitoring via SNMP/syslog. 19 alert types covering VPN, interfaces, failover, CPU, memory, and security threats.",
+  "author": "OpsConductor",
+  "method": "snmp_trap",
+  "category": "security",
+  "alert_mappings": [
+    {
+      "group": "Compute Events",
+      "alerts": [
+        {
+          "alert_type": "cpu_critical",
+          "enabled": true,
+          "severity": "critical",
+          "category": "compute",
+          "title": "Cpu Critical",
+          "description": "CPU usage critical"
+        },
+        {
+          "alert_type": "cpu_high",
+          "enabled": true,
+          "severity": "warning",
+          "category": "compute",
+          "title": "Cpu High",
+          "description": "CPU usage high"
+        },
+        {
+          "alert_type": "memory_critical",
+          "enabled": true,
+          "severity": "critical",
+          "category": "compute",
+          "title": "Memory Critical",
+          "description": "Memory usage critical"
+        },
+        {
+          "alert_type": "memory_high",
+          "enabled": false,
+          "severity": "warning",
+          "category": "compute",
+          "title": "Memory High",
+          "description": "Memory usage high"
+        }
+      ]
+    },
+    {
+      "group": "Network Events",
+      "alerts": [
+        {
+          "alert_type": "failover_active",
+          "enabled": true,
+          "severity": "warning",
+          "category": "network",
+          "title": "Failover Active",
+          "description": "Failover to standby"
+        },
+        {
+          "alert_type": "failover_failed",
+          "enabled": false,
+          "severity": "critical",
+          "category": "network",
+          "title": "Failover Failed",
+          "description": "Failover unit in failed state"
+        },
+        {
+          "alert_type": "failover_issue",
+          "enabled": false,
+          "severity": "warning",
+          "category": "network",
+          "title": "Failover Issue",
+          "description": "Failover state abnormal"
+        },
+        {
+          "alert_type": "ike_tunnel_down",
+          "enabled": true,
+          "severity": "critical",
+          "category": "network",
+          "title": "Ike Tunnel Down",
+          "description": "IKE SA not established"
+        },
+        {
+          "alert_type": "interface_down",
+          "enabled": true,
+          "severity": "critical",
+          "category": "network",
+          "title": "Interface Down",
+          "description": "Interface down"
+        },
+        {
+          "alert_type": "ipsec_tunnel_down",
+          "enabled": true,
+          "severity": "critical",
+          "category": "network",
+          "title": "Ipsec Tunnel Down",
+          "description": "Cisco ASA IPsec VPN tunnel is down. Site-to-site or remote access VPN connection lost. Check peer connectivity, certificates, and IKE configuration."
+        },
+        {
+          "alert_type": "vpn_peer_down",
+          "enabled": true,
+          "severity": "critical",
+          "category": "network",
+          "title": "Vpn Peer Down",
+          "description": "VPN peer is not responding"
+        }
+      ]
+    },
+    {
+      "group": "Security Events",
+      "alerts": [
+        {
+          "alert_type": "device_offline",
+          "enabled": false,
+          "severity": "critical",
+          "category": "security",
+          "title": "Device Offline",
+          "description": "Firewall offline"
+        },
+        {
+          "alert_type": "threat_detected",
+          "enabled": true,
+          "severity": "major",
+          "category": "security",
+          "title": "Threat Detected",
+          "description": "Security threat detected"
+        },
+        {
+          "alert_type": "vpn_tunnel_down",
+          "enabled": true,
+          "severity": "critical",
+          "category": "security",
+          "title": "Vpn Tunnel Down",
+          "description": "VPN tunnel down"
+        }
+      ]
+    },
+    {
+      "group": "Other Events",
+      "alerts": [
+        {
+          "alert_type": "device_online",
+          "enabled": true,
+          "severity": "clear",
+          "category": "unknown",
+          "title": "Device Online",
+          "description": "Firewall online"
+        },
+        {
+          "alert_type": "failover",
+          "enabled": true,
+          "severity": "major",
+          "category": "unknown",
+          "title": "Failover",
+          "description": "Cisco ASA failover event. Primary/secondary role change occurred. Check failed unit for hardware or connectivity issues."
+        },
+        {
+          "alert_type": "high_cpu",
+          "enabled": true,
+          "severity": "warning",
+          "category": "unknown",
+          "title": "High Cpu",
+          "description": "Cisco ASA CPU utilization high. Firewall processing load elevated. May indicate attack, misconfiguration, or capacity issue."
+        },
+        {
+          "alert_type": "interface_up",
+          "enabled": true,
+          "severity": "clear",
+          "category": "unknown",
+          "title": "Interface Up",
+          "description": "Interface up"
+        },
+        {
+          "alert_type": "vpn_tunnel_up",
+          "enabled": true,
+          "severity": "clear",
+          "category": "unknown",
+          "title": "Vpn Tunnel Up",
+          "description": "VPN tunnel established"
+        }
+      ]
+    }
+  ],
+  "clear_events": {
+    "method": "reconciliation",
+    "description": "Alerts auto-resolve when condition no longer detected"
+  }
+}

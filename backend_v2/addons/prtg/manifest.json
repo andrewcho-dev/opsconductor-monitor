@@ -1,0 +1,257 @@
+{
+  "id": "prtg",
+  "name": "PRTG Network Monitor",
+  "version": "1.0.0",
+  "description": "PRTG Network Monitor alerts via webhook. 29 alert types covering device status, sensors, bandwidth, and performance metrics.",
+  "author": "OpsConductor",
+  "method": "webhook",
+  "category": "nms",
+  "alert_mappings": [
+    {
+      "group": "Network Events",
+      "alerts": [
+        {
+          "alert_type": "ping",
+          "enabled": true,
+          "severity": "critical",
+          "category": "network",
+          "title": "Ping",
+          "description": "ICMP Ping sensor failure. Target device is not responding to ping requests. Device may be offline, network path blocked, or ICMP filtered."
+        },
+        {
+          "alert_type": "traffic",
+          "enabled": true,
+          "severity": "warning",
+          "category": "network",
+          "title": "Traffic",
+          "description": "Network traffic sensor alert. Interface bandwidth utilization or packet errors exceed threshold."
+        }
+      ]
+    },
+    {
+      "group": "Other Events",
+      "alerts": [
+        {
+          "alert_type": "1",
+          "enabled": true,
+          "severity": "warning",
+          "category": "unknown",
+          "title": "1",
+          "description": "PRTG status code 1 - Unknown state. Sensor has not yet collected data or is in an undefined state. Wait for next scan cycle."
+        },
+        {
+          "alert_type": "10",
+          "enabled": true,
+          "severity": "warning",
+          "category": "unknown",
+          "title": "10",
+          "description": "PRTG status code 10 - Unusual value detected. Reading is outside historical norms but not necessarily bad. Review for anomalies."
+        },
+        {
+          "alert_type": "11",
+          "enabled": true,
+          "severity": "warning",
+          "category": "unknown",
+          "title": "11",
+          "description": "PRTG status code 11 - Sensor type not licensed. PRTG license does not include this sensor type. Upgrade license or remove sensor."
+        },
+        {
+          "alert_type": "12",
+          "enabled": true,
+          "severity": "info",
+          "category": "unknown",
+          "title": "12",
+          "description": "PRTG status code 12 - Paused until specified date/time. Sensor will auto-resume at scheduled time."
+        },
+        {
+          "alert_type": "13",
+          "enabled": true,
+          "severity": "major",
+          "category": "unknown",
+          "title": "13",
+          "description": "PRTG status code 13 - Device or sensor is down. Target not responding or service failed. Check connectivity and service status."
+        },
+        {
+          "alert_type": "14",
+          "enabled": true,
+          "severity": "major",
+          "category": "unknown",
+          "title": "14",
+          "description": "PRTG status code 14 - Partial failure. Some channels failed while others succeeded. Review individual channel status."
+        },
+        {
+          "alert_type": "2",
+          "enabled": true,
+          "severity": "info",
+          "category": "unknown",
+          "title": "2",
+          "description": "PRTG status code 2 - Sensor is scanning/collecting data. Normal operation, data will be available shortly."
+        },
+        {
+          "alert_type": "3",
+          "enabled": true,
+          "severity": "clear",
+          "category": "unknown",
+          "title": "3",
+          "description": "PRTG status code 3 - Sensor is healthy and operating normally. All monitored values within acceptable thresholds."
+        },
+        {
+          "alert_type": "4",
+          "enabled": true,
+          "severity": "warning",
+          "category": "unknown",
+          "title": "4",
+          "description": "PRTG status code 4 - Warning threshold exceeded. One or more monitored values outside normal range but not critical. Investigate soon."
+        },
+        {
+          "alert_type": "5",
+          "enabled": true,
+          "severity": "critical",
+          "category": "unknown",
+          "title": "5",
+          "description": "PRTG status code 5 - Critical threshold exceeded or sensor in error state. Immediate attention required. Service may be impacted."
+        },
+        {
+          "alert_type": "6",
+          "enabled": true,
+          "severity": "major",
+          "category": "unknown",
+          "title": "6",
+          "description": "PRTG status code 6 - No Probe available. The probe monitoring this sensor is offline or disconnected. Check probe server."
+        },
+        {
+          "alert_type": "7",
+          "enabled": true,
+          "severity": "info",
+          "category": "unknown",
+          "title": "7",
+          "description": "PRTG status code 7 - Sensor is paused by user. Monitoring temporarily suspended. Resume when ready."
+        },
+        {
+          "alert_type": "8",
+          "enabled": true,
+          "severity": "info",
+          "category": "unknown",
+          "title": "8",
+          "description": "PRTG status code 8 - Sensor paused by dependency. Parent device or sensor is down, so this sensor is auto-paused."
+        },
+        {
+          "alert_type": "9",
+          "enabled": true,
+          "severity": "info",
+          "category": "unknown",
+          "title": "9",
+          "description": "PRTG status code 9 - Sensor paused by schedule. Outside of monitoring window defined in schedule."
+        },
+        {
+          "alert_type": "camera",
+          "enabled": true,
+          "severity": "major",
+          "category": "unknown",
+          "title": "Camera",
+          "description": "Camera status sensor alert. Monitored camera is reporting issues or is unreachable."
+        },
+        {
+          "alert_type": "disk_free",
+          "enabled": true,
+          "severity": "warning",
+          "category": "unknown",
+          "title": "Disk Free",
+          "description": "Disk space sensor alert. Available disk space on monitored volume is below threshold. Free up disk space or expand storage."
+        },
+        {
+          "alert_type": "down",
+          "enabled": true,
+          "severity": "critical",
+          "category": "unknown",
+          "title": "Down",
+          "description": "PRTG \"down\" status text - Target device or service is not responding. Network issue, service crash, or device offline."
+        },
+        {
+          "alert_type": "paused",
+          "enabled": true,
+          "severity": "info",
+          "category": "unknown",
+          "title": "Paused",
+          "description": "PRTG \"paused\" status text - Monitoring intentionally suspended. User action or schedule. No alerts generated while paused."
+        },
+        {
+          "alert_type": "probe_health",
+          "enabled": true,
+          "severity": "major",
+          "category": "unknown",
+          "title": "Probe Health",
+          "description": "PRTG probe health issue. Remote probe experiencing problems. Check probe connectivity and system resources."
+        },
+        {
+          "alert_type": "snmp_disk_free",
+          "enabled": true,
+          "severity": "warning",
+          "category": "unknown",
+          "title": "Snmp Disk Free",
+          "description": "SNMP disk space sensor alert. Disk space queried via SNMP is below configured threshold. Monitor disk usage trends."
+        },
+        {
+          "alert_type": "snmp_traffic",
+          "enabled": true,
+          "severity": "warning",
+          "category": "unknown",
+          "title": "Snmp Traffic",
+          "description": "SNMP traffic sensor alert. Network interface traffic or errors exceed threshold. Check for bandwidth saturation or interface errors."
+        },
+        {
+          "alert_type": "tunnel",
+          "enabled": true,
+          "severity": "critical",
+          "category": "unknown",
+          "title": "Tunnel",
+          "description": "VPN tunnel sensor failure. IPsec or VPN tunnel is down. Check tunnel endpoint connectivity and configuration."
+        },
+        {
+          "alert_type": "unknown",
+          "enabled": true,
+          "severity": "warning",
+          "category": "unknown",
+          "title": "Unknown",
+          "description": "PRTG \"unknown\" status text - Sensor state cannot be determined. May be initializing, probe issue, or configuration error."
+        },
+        {
+          "alert_type": "unusual",
+          "enabled": true,
+          "severity": "warning",
+          "category": "unknown",
+          "title": "Unusual",
+          "description": "PRTG \"unusual\" status text - Anomaly detected. Value significantly different from historical baseline. May indicate emerging issue."
+        },
+        {
+          "alert_type": "up",
+          "enabled": true,
+          "severity": "clear",
+          "category": "unknown",
+          "title": "Up",
+          "description": "PRTG \"up\" status text - Device/service is healthy and responding normally. All monitored values within acceptable range."
+        },
+        {
+          "alert_type": "uptime",
+          "enabled": true,
+          "severity": "info",
+          "category": "unknown",
+          "title": "Uptime",
+          "description": "System uptime sensor alert. Device uptime changed unexpectedly, indicating a reboot occurred."
+        },
+        {
+          "alert_type": "warning",
+          "enabled": true,
+          "severity": "warning",
+          "category": "unknown",
+          "title": "Warning",
+          "description": "PRTG \"warning\" status text - Monitored value exceeded warning threshold. Not critical yet but trending toward problem."
+        }
+      ]
+    }
+  ],
+  "clear_events": {
+    "method": "reconciliation",
+    "description": "Alerts auto-resolve when condition no longer detected"
+  }
+}

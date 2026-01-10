@@ -2,113 +2,43 @@
 Siklu Radio Alert Normalizer
 
 Database-driven normalizer for Siklu EtherHaul radio alerts.
-All mappings come from severity_mappings and category_mappings tables.
+Uses database mappings for severity and category via BaseNormalizer.
 """
 
 import logging
-import hashlib
 from datetime import datetime
 from typing import Dict, Any, Optional
 
+from backend.connectors.base import BaseNormalizer
 from backend.core.models import NormalizedAlert, Severity, Category
 from backend.utils.ip_utils import validate_device_ip
-from backend.utils.db import db_query
 
 logger = logging.getLogger(__name__)
 
 
-# Fallback alert type definitions (used when no database mapping exists)
-ALERT_TYPE_DEFAULTS = {
-    "link_down": {"title": "Radio Link Down", "is_clear": False},
-    "link_up": {"title": "Radio Link Up", "is_clear": True},
-    "rsl_low": {"title": "RSL Low", "is_clear": False},
-    "rsl_critical": {"title": "RSL Critical", "is_clear": False},
-    "modulation_drop": {"title": "Modulation Reduced", "is_clear": False},
-    "ethernet_down": {"title": "Ethernet Port Down", "is_clear": False},
-    "ethernet_up": {"title": "Ethernet Port Up", "is_clear": True},
-    "high_temperature": {"title": "High Temperature", "is_clear": False},
-    "device_offline": {"title": "Radio Offline", "is_clear": False},
-    "device_online": {"title": "Radio Online", "is_clear": True},
-}
-
-
-class SikluNormalizer:
+class SikluNormalizer(BaseNormalizer):
     """
     Database-driven normalizer for Siklu radio link alerts.
     
-    All mappings come from severity_mappings and category_mappings tables.
+    Extends BaseNormalizer for standard mapping methods.
     """
     
-    def __init__(self):
-        self._severity_cache = {}
-        self._category_cache = {}
-        self._cache_loaded = False
+    connector_type = "siklu"
+    default_category = Category.WIRELESS
     
-    def _load_mappings(self):
-        """Load mappings from database."""
-        if self._cache_loaded:
-            return
-        
-        try:
-            # Load severity mappings
-            severity_rows = db_query(
-                "SELECT source_value, target_severity, enabled, description FROM severity_mappings WHERE connector_type = %s",
-                ("siklu",)
-            )
-            for row in severity_rows:
-                self._severity_cache[row['source_value']] = {
-                    'severity': row['target_severity'],
-                    'enabled': row['enabled'],
-                    'description': row.get('description', '')
-                }
-            
-            # Load category mappings
-            category_rows = db_query(
-                "SELECT source_value, target_category, enabled, description FROM category_mappings WHERE connector_type = %s",
-                ("siklu",)
-            )
-            for row in category_rows:
-                self._category_cache[row['source_value']] = {
-                    'category': row['target_category'],
-                    'enabled': row['enabled'],
-                    'description': row.get('description', '')
-                }
-            
-            logger.info(f"Loaded siklu mappings: {len(self._severity_cache)} severity, {len(self._category_cache)} category")
-            self._cache_loaded = True
-            
-        except Exception as e:
-            logger.error(f"Failed to load siklu mappings: {e}")
-            self._cache_loaded = True  # Don't retry on every call
-    
-    def is_alert_enabled(self, alert_type: str) -> bool:
-        """Check if this alert type is enabled in mappings.
-        
-        Returns False if:
-        - Alert type is not in any mapping (unknown events are ignored)
-        - Alert type is explicitly disabled in mappings
-        """
-        self._load_mappings()
-        
-        severity_mapping = self._severity_cache.get(alert_type)
-        category_mapping = self._category_cache.get(alert_type)
-        
-        # If not in ANY mapping, treat as disabled (unknown event type)
-        if not severity_mapping and not category_mapping:
-            logger.debug(f"Alert type '{alert_type}' not in mappings - ignoring")
-            return False
-        
-        # Check if explicitly disabled
-        if severity_mapping and not severity_mapping.get('enabled', True):
-            return False
-        if category_mapping and not category_mapping.get('enabled', True):
-            return False
-        
-        return True
-    
-    @property
-    def source_system(self) -> str:
-        return "siklu"
+    # Fallback alert type definitions for titles (connector-specific)
+    ALERT_TYPE_DEFAULTS = {
+        "link_down": {"title": "Radio Link Down"},
+        "link_up": {"title": "Radio Link Up"},
+        "rsl_low": {"title": "RSL Low"},
+        "rsl_critical": {"title": "RSL Critical"},
+        "modulation_drop": {"title": "Modulation Reduced"},
+        "ethernet_down": {"title": "Ethernet Port Down"},
+        "ethernet_up": {"title": "Ethernet Port Up"},
+        "high_temperature": {"title": "High Temperature"},
+        "device_offline": {"title": "Radio Offline"},
+        "device_online": {"title": "Radio Online"},
+    }
     
     def normalize(self, raw_data: Dict[str, Any]) -> Optional[NormalizedAlert]:
         device_ip = raw_data.get("device_ip", "")
@@ -118,42 +48,23 @@ class SikluNormalizer:
         timestamp = raw_data.get("timestamp")
         
         # Check if this alert type is enabled in mappings
-        if not self.is_alert_enabled(alert_type):
+        if not self.is_event_enabled(alert_type):
             logger.debug(f"Skipping disabled Siklu alert type: {alert_type}")
             return None
         
-        # Load mappings
-        self._load_mappings()
+        # Get severity and category from database mappings (via BaseNormalizer)
+        severity = self._get_severity(alert_type)
+        category = self._get_category(alert_type)
         
-        # Get severity from database mapping, fallback to warning
-        severity_mapping = self._severity_cache.get(alert_type)
-        if severity_mapping:
-            severity = Severity(severity_mapping['severity'])
-        else:
-            severity = Severity.WARNING
-        
-        # Get category from database mapping, fallback to wireless
-        category_mapping = self._category_cache.get(alert_type)
-        if category_mapping:
-            category = Category(category_mapping['category'])
-        else:
-            category = Category.WIRELESS
-        
-        # Get title and is_clear from defaults
-        alert_defaults = ALERT_TYPE_DEFAULTS.get(alert_type, {
-            "title": f"Siklu Alert - {alert_type}",
-            "is_clear": False
-        })
-        
+        # Get title from defaults
+        alert_defaults = self.ALERT_TYPE_DEFAULTS.get(alert_type, {})
         base_title = alert_defaults.get("title", f"Siklu Alert - {alert_type}")
         title = f"{base_title} - {device_name}" if device_name else base_title
         message = self._build_message(alert_type, metrics, device_name, device_ip)
         occurred_at = self._parse_timestamp(timestamp)
-        is_clear = alert_defaults.get("is_clear", False)
         
-        # Clear events always have CLEAR severity
-        if is_clear:
-            severity = Severity.CLEAR
+        # Use standard clear event detection from BaseNormalizer
+        is_clear = self.is_clear_event(alert_type, raw_data)
         
         return NormalizedAlert(
             source_system=self.source_system,
@@ -169,27 +80,6 @@ class SikluNormalizer:
             is_clear=is_clear,
             raw_data=raw_data,
         )
-    
-    def get_severity(self, raw_data: Dict[str, Any]) -> Severity:
-        alert_type = raw_data.get("alert_type", "")
-        self._load_mappings()
-        severity_mapping = self._severity_cache.get(alert_type)
-        if severity_mapping:
-            return Severity(severity_mapping['severity'])
-        return Severity.WARNING
-    
-    def get_category(self, raw_data: Dict[str, Any]) -> Category:
-        alert_type = raw_data.get("alert_type", "")
-        self._load_mappings()
-        category_mapping = self._category_cache.get(alert_type)
-        if category_mapping:
-            return Category(category_mapping['category'])
-        return Category.WIRELESS
-    
-    def get_fingerprint(self, raw_data: Dict[str, Any]) -> str:
-        device_ip = raw_data.get("device_ip", "")
-        alert_type = raw_data.get("alert_type", "")
-        return hashlib.sha256(f"siklu:{device_ip}:{alert_type}".encode()).hexdigest()
     
     def _build_message(self, alert_type: str, metrics: Dict, device_name: str = "", device_ip: str = "") -> str:
         lines = []

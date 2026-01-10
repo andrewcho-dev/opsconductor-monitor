@@ -34,6 +34,7 @@ import {
 import NotificationsPage from "./pages/system/NotificationsPage.jsx";
 import UsersPage from "./pages/system/UsersPage.jsx";
 import RolesPage from "./pages/system/RolesPage.jsx";
+import AddonsPage from "./pages/system/AddonsPage.jsx";
 
 // Credentials Module
 import { CredentialVaultPage } from "./pages/credentials";
@@ -96,6 +97,7 @@ function App() {
         {/* CONNECTORS MODULE */}
         <Route path="/connectors" element={<ProtectedRoute><ConnectorsPage /></ProtectedRoute>} />
         <Route path="/connectors/normalization" element={<ProtectedRoute><NormalizationRulesPage /></ProtectedRoute>} />
+        <Route path="/connectors/addons" element={<ProtectedRoute><AddonsPage /></ProtectedRoute>} />
         
         <Route path="/dependencies" element={<ProtectedRoute><DependenciesPage /></ProtectedRoute>} />
 

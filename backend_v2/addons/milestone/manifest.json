@@ -1,0 +1,967 @@
+{
+  "id": "milestone",
+  "name": "Milestone XProtect",
+  "version": "1.0.0",
+  "description": "Milestone XProtect VMS alerts. 114 alert types covering cameras, recording, storage, servers, analytics, and system events.",
+  "author": "OpsConductor",
+  "method": "webhook",
+  "category": "video",
+  "alert_mappings": [
+    {
+      "group": "Application Events",
+      "alerts": [
+        {
+          "alert_type": "automaticactivationfailed",
+          "enabled": true,
+          "severity": "critical",
+          "category": "application",
+          "title": "Automaticactivationfailed",
+          "description": "Automatic failover activation failed. Manual intervention required to restore recording."
+        },
+        {
+          "alert_type": "database_error",
+          "enabled": true,
+          "severity": "critical",
+          "category": "application",
+          "title": "Database Error",
+          "description": "Database error"
+        },
+        {
+          "alert_type": "failoverauthorizationerror",
+          "enabled": true,
+          "severity": "critical",
+          "category": "application",
+          "title": "Failoverauthorizationerror",
+          "description": "Failover authorization failed. Backup server cannot take over. Check failover configuration and credentials."
+        },
+        {
+          "alert_type": "failoverencryptedcommunicationerror",
+          "enabled": true,
+          "severity": "critical",
+          "category": "application",
+          "title": "Failoverencryptedcommunicationerror",
+          "description": "Failover encrypted communication error. Secure failover channel is broken. Check certificates and network."
+        },
+        {
+          "alert_type": "failoverstarted",
+          "enabled": true,
+          "severity": "major",
+          "category": "application",
+          "title": "Failoverstarted",
+          "description": "Failover has been activated. Primary Recording Server failed and backup has taken over. Investigate primary server failure immediately."
+        },
+        {
+          "alert_type": "failoverstopped",
+          "enabled": true,
+          "severity": "info",
+          "category": "application",
+          "title": "Failoverstopped",
+          "description": "Failover has ended. Primary server has resumed control. Verify all cameras are recording on primary."
+        },
+        {
+          "alert_type": "managementserverfailovernodestarted",
+          "enabled": true,
+          "severity": "major",
+          "category": "application",
+          "title": "Managementserverfailovernodestarted",
+          "description": "Management Server failover node has started. Primary Management Server may have failed."
+        },
+        {
+          "alert_type": "serviceavailablecritical",
+          "enabled": true,
+          "severity": "critical",
+          "category": "application",
+          "title": "Serviceavailablecritical",
+          "description": "Critical service is unavailable. Core VMS functionality may be impacted."
+        },
+        {
+          "alert_type": "settingschangederror",
+          "enabled": false,
+          "severity": "major",
+          "category": "application",
+          "title": "Settingschangederror",
+          "description": "Error occurred while changing settings. Configuration change may not have been applied."
+        },
+        {
+          "alert_type": "systemconfigurationchanged",
+          "enabled": false,
+          "severity": "info",
+          "category": "application",
+          "title": "Systemconfigurationchanged",
+          "description": "System configuration was changed. Audit trail event."
+        }
+      ]
+    },
+    {
+      "group": "Compute Events",
+      "alerts": [
+        {
+          "alert_type": "cpuusagecritical",
+          "enabled": true,
+          "severity": "critical",
+          "category": "compute",
+          "title": "Cpuusagecritical",
+          "description": "Recording Server CPU usage is critically high. Server performance is degraded and may drop frames or fail to record. Consider load balancing or hardware upgrade."
+        },
+        {
+          "alert_type": "cpuusagewarning",
+          "enabled": false,
+          "severity": "warning",
+          "category": "compute",
+          "title": "Cpuusagewarning",
+          "description": "Recording Server CPU usage is elevated. Monitor for further increase. May need to redistribute cameras or upgrade hardware."
+        },
+        {
+          "alert_type": "memoryusagecritical",
+          "enabled": true,
+          "severity": "critical",
+          "category": "compute",
+          "title": "Memoryusagecritical",
+          "description": "Recording Server memory usage is critically high. Server may become unstable or crash. Restart services or add memory."
+        },
+        {
+          "alert_type": "memoryusagewarning",
+          "enabled": false,
+          "severity": "warning",
+          "category": "compute",
+          "title": "Memoryusagewarning",
+          "description": "Recording Server memory usage is elevated. Monitor for memory leaks or consider adding RAM."
+        },
+        {
+          "alert_type": "nvidiaDecodingcritical",
+          "enabled": true,
+          "severity": "critical",
+          "category": "compute",
+          "title": "Nvidiadecodingcritical",
+          "description": "Nvidia GPU decoding is critically overloaded. Hardware acceleration is failing. Check GPU health and driver."
+        },
+        {
+          "alert_type": "nvidiaDecodingwarning",
+          "enabled": false,
+          "severity": "warning",
+          "category": "compute",
+          "title": "Nvidiadecodingwarning",
+          "description": "Nvidia GPU decoding load is high. Monitor for degradation."
+        },
+        {
+          "alert_type": "nvidiamemorycritical",
+          "enabled": true,
+          "severity": "critical",
+          "category": "compute",
+          "title": "Nvidiamemorycritical",
+          "description": "Nvidia GPU memory is critically low. Video processing may fail."
+        },
+        {
+          "alert_type": "nvidiamemorywarning",
+          "enabled": false,
+          "severity": "warning",
+          "category": "compute",
+          "title": "Nvidiamemorywarning",
+          "description": "Nvidia GPU memory usage is elevated."
+        },
+        {
+          "alert_type": "nvidiarenderingcritical",
+          "enabled": true,
+          "severity": "critical",
+          "category": "compute",
+          "title": "Nvidiarenderingcritical",
+          "description": "Nvidia GPU rendering is critically overloaded."
+        },
+        {
+          "alert_type": "nvidiarenderingwarning",
+          "enabled": false,
+          "severity": "warning",
+          "category": "compute",
+          "title": "Nvidiarenderingwarning",
+          "description": "Nvidia GPU rendering load is high."
+        },
+        {
+          "alert_type": "server_down",
+          "enabled": true,
+          "severity": "critical",
+          "category": "compute",
+          "title": "Server Down",
+          "description": "Server offline"
+        }
+      ]
+    },
+    {
+      "group": "Network Events",
+      "alerts": [
+        {
+          "alert_type": "networklost",
+          "enabled": true,
+          "severity": "critical",
+          "category": "network",
+          "title": "Networklost",
+          "description": "Network connection lost to device. Camera is offline. Check network infrastructure."
+        }
+      ]
+    },
+    {
+      "group": "Power Events",
+      "alerts": [
+        {
+          "alert_type": "powersupplyfailure",
+          "enabled": true,
+          "severity": "critical",
+          "category": "power",
+          "title": "Powersupplyfailure",
+          "description": "Power supply failure detected. Device may lose power."
+        },
+        {
+          "alert_type": "ptzpowerfailure",
+          "enabled": true,
+          "severity": "major",
+          "category": "power",
+          "title": "Ptzpowerfailure",
+          "description": "PTZ power failure. PTZ mechanism cannot operate."
+        }
+      ]
+    },
+    {
+      "group": "Security Events",
+      "alerts": [
+        {
+          "alert_type": "intrusionend",
+          "enabled": false,
+          "severity": "info",
+          "category": "security",
+          "title": "Intrusionend",
+          "description": "Intrusion detection event ended."
+        },
+        {
+          "alert_type": "licenseplatedetection",
+          "enabled": false,
+          "severity": "info",
+          "category": "security",
+          "title": "Licenseplatedetection",
+          "description": "License plate detected by analytics."
+        },
+        {
+          "alert_type": "scheduledpasswordchangecompletedsuccessfully",
+          "enabled": false,
+          "severity": "info",
+          "category": "security",
+          "title": "Scheduledpasswordchangecompletedsuccessfully",
+          "description": "Scheduled password change completed successfully."
+        },
+        {
+          "alert_type": "scheduledpasswordchangecompletedwitherrors",
+          "enabled": false,
+          "severity": "warning",
+          "category": "security",
+          "title": "Scheduledpasswordchangecompletedwitherrors",
+          "description": "Scheduled password change completed with errors. Some devices may have old passwords."
+        },
+        {
+          "alert_type": "scheduledpasswordchangestarted",
+          "enabled": false,
+          "severity": "info",
+          "category": "security",
+          "title": "Scheduledpasswordchangestarted",
+          "description": "Scheduled password change operation started."
+        },
+        {
+          "alert_type": "smokeandfire",
+          "enabled": false,
+          "severity": "critical",
+          "category": "security",
+          "title": "Smokeandfire",
+          "description": "Smoke and fire detected by analytics. Immediate attention required."
+        },
+        {
+          "alert_type": "smokeandfireend",
+          "enabled": false,
+          "severity": "clear",
+          "category": "security",
+          "title": "Smokeandfireend",
+          "description": "Smoke and fire detection event ended."
+        },
+        {
+          "alert_type": "stoppedvehiclestart",
+          "enabled": false,
+          "severity": "warning",
+          "category": "security",
+          "title": "Stoppedvehiclestart",
+          "description": "Stopped vehicle detected by analytics."
+        },
+        {
+          "alert_type": "stoppedvehiclestop",
+          "enabled": false,
+          "severity": "clear",
+          "category": "security",
+          "title": "Stoppedvehiclestop",
+          "description": "Stopped vehicle detection ended."
+        }
+      ]
+    },
+    {
+      "group": "Storage Events",
+      "alerts": [
+        {
+          "alert_type": "archiveavailable",
+          "enabled": false,
+          "severity": "clear",
+          "category": "storage",
+          "title": "Archiveavailable",
+          "description": "Archive storage is now available. Archiving operations can resume."
+        },
+        {
+          "alert_type": "archivediskavailable",
+          "enabled": false,
+          "severity": "clear",
+          "category": "storage",
+          "title": "Archivediskavailable",
+          "description": "Archive disk space is available."
+        },
+        {
+          "alert_type": "archivediskunavailable",
+          "enabled": true,
+          "severity": "critical",
+          "category": "storage",
+          "title": "Archivediskunavailable",
+          "description": "Milestone archive disk unavailable. Storage location for archived recordings is inaccessible. Recordings cannot be archived. Check storage connectivity and health."
+        },
+        {
+          "alert_type": "archivenotfinished",
+          "enabled": true,
+          "severity": "warning",
+          "category": "storage",
+          "title": "Archivenotfinished",
+          "description": "Milestone archive job incomplete. Scheduled archiving did not complete successfully. Check storage space and archive job configuration."
+        },
+        {
+          "alert_type": "archiveunavailable",
+          "enabled": true,
+          "severity": "critical",
+          "category": "storage",
+          "title": "Archiveunavailable",
+          "description": "Archive storage is unavailable. Cannot archive recordings. Verify archive storage is online and accessible."
+        },
+        {
+          "alert_type": "archivingfailed",
+          "enabled": true,
+          "severity": "critical",
+          "category": "storage",
+          "title": "Archivingfailed",
+          "description": "Archive operation failed. Recordings could not be moved to archive storage. Check archive destination accessibility and permissions."
+        },
+        {
+          "alert_type": "backup_failed",
+          "enabled": true,
+          "severity": "major",
+          "category": "storage",
+          "title": "Backup Failed",
+          "description": "Backup failed"
+        },
+        {
+          "alert_type": "databasearchivingsessionended",
+          "enabled": false,
+          "severity": "info",
+          "category": "storage",
+          "title": "Databasearchivingsessionended",
+          "description": "Database archiving session completed successfully."
+        },
+        {
+          "alert_type": "databasearchivingsessionstarted",
+          "enabled": false,
+          "severity": "info",
+          "category": "storage",
+          "title": "Databasearchivingsessionstarted",
+          "description": "Database archiving session started. Old recordings are being moved to archive storage."
+        },
+        {
+          "alert_type": "databasedeletebeforesetretentionsize",
+          "enabled": true,
+          "severity": "warning",
+          "category": "storage",
+          "title": "Databasedeletebeforesetretentionsize",
+          "description": "Recordings deleted before reaching configured retention size. Storage pressure may be causing premature deletion."
+        },
+        {
+          "alert_type": "databasedeletebeforesetretentiontime",
+          "enabled": true,
+          "severity": "warning",
+          "category": "storage",
+          "title": "Databasedeletebeforesetretentiontime",
+          "description": "Recordings deleted before reaching configured retention time. Storage is filling faster than expected."
+        },
+        {
+          "alert_type": "databasediskavailable",
+          "enabled": false,
+          "severity": "clear",
+          "category": "storage",
+          "title": "Databasediskavailable",
+          "description": "Database disk space is now available. Recording can resume normally."
+        },
+        {
+          "alert_type": "databasediskfull",
+          "enabled": true,
+          "severity": "critical",
+          "category": "storage",
+          "title": "Databasediskfull",
+          "description": "Recording Server database disk is completely full. Recording has stopped for all cameras on this server. Immediately free disk space, expand storage, or adjust retention policies."
+        },
+        {
+          "alert_type": "databasediskfullautooarchive",
+          "enabled": true,
+          "severity": "critical",
+          "category": "storage",
+          "title": "Databasediskfullautooarchive",
+          "description": "Database disk full, auto-archive triggered. System is attempting to archive old recordings to free space. Monitor archive progress."
+        },
+        {
+          "alert_type": "databasediskfullautooarchiveevent",
+          "enabled": true,
+          "severity": "critical",
+          "category": "storage",
+          "title": "Databasediskfullautooarchiveevent",
+          "description": "Auto-archive initiated due to full disk. Old recordings are being moved to archive storage."
+        },
+        {
+          "alert_type": "databasediskfullevent",
+          "enabled": true,
+          "severity": "critical",
+          "category": "storage",
+          "title": "Databasediskfullevent",
+          "description": "Database disk full event triggered. No new recordings can be written. Critical action required to restore recording capability."
+        },
+        {
+          "alert_type": "databasediskunavailable",
+          "enabled": true,
+          "severity": "critical",
+          "category": "storage",
+          "title": "Databasediskunavailable",
+          "description": "Database disk is unavailable. Storage may have failed or been disconnected. Check disk health and connections immediately."
+        },
+        {
+          "alert_type": "databasefullautooarchive",
+          "enabled": true,
+          "severity": "major",
+          "category": "storage",
+          "title": "Databasefullautooarchive",
+          "description": "Database full, automatic archive in progress. System is managing storage automatically but capacity planning is needed."
+        },
+        {
+          "alert_type": "databaserepairevent",
+          "enabled": true,
+          "severity": "major",
+          "category": "storage",
+          "title": "Databaserepairevent",
+          "description": "Database repair operation triggered. Database corruption was detected and is being repaired. Monitor for completion."
+        },
+        {
+          "alert_type": "databaserepairsessionended",
+          "enabled": true,
+          "severity": "info",
+          "category": "storage",
+          "title": "Databaserepairsessionended",
+          "description": "Database repair session completed. Normal operations should resume."
+        },
+        {
+          "alert_type": "databaserepairsessionstarted",
+          "enabled": false,
+          "severity": "warning",
+          "category": "storage",
+          "title": "Databaserepairsessionstarted",
+          "description": "Database repair session has started. Some recording operations may be affected during repair."
+        },
+        {
+          "alert_type": "diskspacelow",
+          "enabled": true,
+          "severity": "warning",
+          "category": "storage",
+          "title": "Diskspacelow",
+          "description": "Disk space is running low. Monitor closely and plan for expansion."
+        },
+        {
+          "alert_type": "freespacecritical",
+          "enabled": true,
+          "severity": "critical",
+          "category": "storage",
+          "title": "Freespacecritical",
+          "description": "Free disk space is critically low. Recording will stop imminently. Immediately free space or expand storage."
+        },
+        {
+          "alert_type": "freespacenormal",
+          "enabled": false,
+          "severity": "clear",
+          "category": "storage",
+          "title": "Freespacenormal",
+          "description": "Free disk space has returned to normal levels."
+        },
+        {
+          "alert_type": "freespaceundefined",
+          "enabled": false,
+          "severity": "warning",
+          "category": "storage",
+          "title": "Freespaceundefined",
+          "description": "Free disk space status is undefined. Storage monitoring may not be functioning correctly."
+        },
+        {
+          "alert_type": "freespacewarning",
+          "enabled": false,
+          "severity": "warning",
+          "category": "storage",
+          "title": "Freespacewarning",
+          "description": "Free disk space is running low. Plan storage expansion or cleanup before recording stops."
+        },
+        {
+          "alert_type": "manualarchive",
+          "enabled": false,
+          "severity": "info",
+          "category": "storage",
+          "title": "Manualarchive",
+          "description": "Manual archive operation initiated by user."
+        },
+        {
+          "alert_type": "retentiontimecritical",
+          "enabled": true,
+          "severity": "major",
+          "category": "storage",
+          "title": "Retentiontimecritical",
+          "description": "Retention time is critically short. Recordings are being deleted much sooner than configured. Storage capacity issue."
+        },
+        {
+          "alert_type": "retentiontimewarning",
+          "enabled": false,
+          "severity": "warning",
+          "category": "storage",
+          "title": "Retentiontimewarning",
+          "description": "Retention time is shorter than expected. Monitor storage usage."
+        },
+        {
+          "alert_type": "sdcarderror",
+          "enabled": false,
+          "severity": "major",
+          "category": "storage",
+          "title": "Sdcarderror",
+          "description": "SD card error on camera. Edge storage may be failing. Check camera SD card health."
+        },
+        {
+          "alert_type": "sdcardrecording",
+          "enabled": false,
+          "severity": "info",
+          "category": "storage",
+          "title": "Sdcardrecording",
+          "description": "Camera is recording to SD card (edge storage active)."
+        },
+        {
+          "alert_type": "storagealert",
+          "enabled": false,
+          "severity": "warning",
+          "category": "storage",
+          "title": "Storagealert",
+          "description": "Storage alert from camera. Check edge storage status."
+        },
+        {
+          "alert_type": "storageavailable",
+          "enabled": false,
+          "severity": "clear",
+          "category": "storage",
+          "title": "Storageavailable",
+          "description": "Camera edge storage is available."
+        },
+        {
+          "alert_type": "storagedisruption",
+          "enabled": true,
+          "severity": "major",
+          "category": "storage",
+          "title": "Storagedisruption",
+          "description": "Storage disruption detected. Recording may be interrupted."
+        },
+        {
+          "alert_type": "storagefull",
+          "enabled": true,
+          "severity": "critical",
+          "category": "storage",
+          "title": "Storagefull",
+          "description": "Camera edge storage is full. Local recording has stopped."
+        },
+        {
+          "alert_type": "storagelocked",
+          "enabled": false,
+          "severity": "warning",
+          "category": "storage",
+          "title": "Storagelocked",
+          "description": "Storage is locked."
+        },
+        {
+          "alert_type": "storagereadonly",
+          "enabled": false,
+          "severity": "major",
+          "category": "storage",
+          "title": "Storagereadonly",
+          "description": "Storage is in read-only mode. Cannot write new recordings."
+        },
+        {
+          "alert_type": "storageremoved",
+          "enabled": true,
+          "severity": "major",
+          "category": "storage",
+          "title": "Storageremoved",
+          "description": "Storage media was removed from camera."
+        },
+        {
+          "alert_type": "storage_warning",
+          "enabled": true,
+          "severity": "warning",
+          "category": "storage",
+          "title": "Storage Warning",
+          "description": "Storage space low"
+        },
+        {
+          "alert_type": "usedspacecritical",
+          "enabled": true,
+          "severity": "critical",
+          "category": "storage",
+          "title": "Usedspacecritical",
+          "description": "Used disk space has reached critical threshold. Storage is nearly full."
+        },
+        {
+          "alert_type": "usedspacenormal",
+          "enabled": false,
+          "severity": "clear",
+          "category": "storage",
+          "title": "Usedspacenormal",
+          "description": "Used disk space has returned to normal levels."
+        },
+        {
+          "alert_type": "usedspaceundefined",
+          "enabled": false,
+          "severity": "warning",
+          "category": "storage",
+          "title": "Usedspaceundefined",
+          "description": "Used disk space status is undefined."
+        },
+        {
+          "alert_type": "usedspacewarning",
+          "enabled": false,
+          "severity": "warning",
+          "category": "storage",
+          "title": "Usedspacewarning",
+          "description": "Used disk space is approaching capacity. Plan for storage expansion."
+        }
+      ]
+    },
+    {
+      "group": "Other Events",
+      "alerts": [
+        {
+          "alert_type": "camera_online",
+          "enabled": true,
+          "severity": "clear",
+          "category": "unknown",
+          "title": "Camera Online",
+          "description": "Camera online"
+        },
+        {
+          "alert_type": "daborunawayfrom",
+          "enabled": true,
+          "severity": "warning",
+          "category": "unknown",
+          "title": "Daborunawayfrom",
+          "description": "Database maintenance overdue. Milestone database optimization has not run as scheduled. May affect performance."
+        },
+        {
+          "alert_type": "motion_stopped",
+          "enabled": true,
+          "severity": "clear",
+          "category": "unknown",
+          "title": "Motion Stopped",
+          "description": "Motion stopped"
+        },
+        {
+          "alert_type": "recording_started",
+          "enabled": true,
+          "severity": "clear",
+          "category": "unknown",
+          "title": "Recording Started",
+          "description": "Recording started"
+        },
+        {
+          "alert_type": "server_started",
+          "enabled": true,
+          "severity": "clear",
+          "category": "unknown",
+          "title": "Server Started",
+          "description": "Server started"
+        },
+        {
+          "alert_type": "storage_critical",
+          "enabled": true,
+          "severity": "critical",
+          "category": "unknown",
+          "title": "Storage Critical",
+          "description": "Storage space critical"
+        }
+      ]
+    },
+    {
+      "group": "Video & Camera Events",
+      "alerts": [
+        {
+          "alert_type": "camera_offline",
+          "enabled": true,
+          "severity": "critical",
+          "category": "video",
+          "title": "Camera Offline",
+          "description": "Camera offline"
+        },
+        {
+          "alert_type": "communicationerror",
+          "enabled": true,
+          "severity": "major",
+          "category": "video",
+          "title": "Communicationerror",
+          "description": "Milestone camera communication error. Recording server cannot communicate with camera. Check network connectivity, camera power, and credentials."
+        },
+        {
+          "alert_type": "communicationerrorhardware",
+          "enabled": true,
+          "severity": "major",
+          "category": "video",
+          "title": "Communicationerrorhardware",
+          "description": "Milestone hardware communication failure. Critical hardware component not responding. May affect recording capability. Check physical connections and hardware health."
+        },
+        {
+          "alert_type": "communicationstarted",
+          "enabled": false,
+          "severity": "clear",
+          "category": "video",
+          "title": "Communicationstarted",
+          "description": "Device communication has been restored. The device is now online and recording should resume. Previous offline alert should auto-resolve."
+        },
+        {
+          "alert_type": "communicationstartedhardware",
+          "enabled": false,
+          "severity": "clear",
+          "category": "video",
+          "title": "Communicationstartedhardware",
+          "description": "Hardware device communication restored. Camera/encoder is back online and operational."
+        },
+        {
+          "alert_type": "communicationstopped",
+          "enabled": true,
+          "severity": "critical",
+          "category": "video",
+          "title": "Communicationstopped",
+          "description": "Camera or device has stopped communicating with the Recording Server. The device is offline and not recording. Check network connectivity, power supply, and device health immediately."
+        },
+        {
+          "alert_type": "communicationstoppedhardware",
+          "enabled": true,
+          "severity": "critical",
+          "category": "video",
+          "title": "Communicationstoppedhardware",
+          "description": "Hardware device (camera, encoder) has lost communication with the Recording Server. No video is being recorded from this device. Verify network path, PoE power, and device status."
+        },
+        {
+          "alert_type": "fanfailure",
+          "enabled": true,
+          "severity": "major",
+          "category": "video",
+          "title": "Fanfailure",
+          "description": "Fan failure detected on device. Camera may overheat without cooling."
+        },
+        {
+          "alert_type": "feedoverflowstopped",
+          "enabled": false,
+          "severity": "info",
+          "category": "video",
+          "title": "Feedoverflowstopped",
+          "description": "Feed overflow condition has ended. Stream buffering has recovered."
+        },
+        {
+          "alert_type": "hardwarefailure",
+          "enabled": true,
+          "severity": "critical",
+          "category": "video",
+          "title": "Hardwarefailure",
+          "description": "Hardware failure detected on device. Camera component may have failed."
+        },
+        {
+          "alert_type": "livefpscritical",
+          "enabled": true,
+          "severity": "major",
+          "category": "video",
+          "title": "Livefpscritical",
+          "description": "Live video frame rate is critically low. Live viewing is severely degraded."
+        },
+        {
+          "alert_type": "livefpswarning",
+          "enabled": false,
+          "severity": "warning",
+          "category": "video",
+          "title": "Livefpswarning",
+          "description": "Live video frame rate is below expected."
+        },
+        {
+          "alert_type": "manualrecordingstarted",
+          "enabled": false,
+          "severity": "info",
+          "category": "video",
+          "title": "Manualrecordingstarted",
+          "description": "Manual recording initiated by operator."
+        },
+        {
+          "alert_type": "manualrecordingstopped",
+          "enabled": false,
+          "severity": "info",
+          "category": "video",
+          "title": "Manualrecordingstopped",
+          "description": "Manual recording stopped by operator."
+        },
+        {
+          "alert_type": "motion_started",
+          "enabled": true,
+          "severity": "info",
+          "category": "video",
+          "title": "Motion Started",
+          "description": "Motion detected"
+        },
+        {
+          "alert_type": "motionstarted",
+          "enabled": false,
+          "severity": "info",
+          "category": "video",
+          "title": "Motionstarted",
+          "description": "Motion detected on camera. Normal operation for motion-triggered recording."
+        },
+        {
+          "alert_type": "motionstopped",
+          "enabled": false,
+          "severity": "clear",
+          "category": "video",
+          "title": "Motionstopped",
+          "description": "Motion detection stopped. Camera motion detection ended. Normal event indicating end of motion activity."
+        },
+        {
+          "alert_type": "ptzerror",
+          "enabled": true,
+          "severity": "major",
+          "category": "video",
+          "title": "Ptzerror",
+          "description": "PTZ error detected. Camera may be stuck or unable to move."
+        },
+        {
+          "alert_type": "ptzmanualsessionstarted",
+          "enabled": false,
+          "severity": "info",
+          "category": "video",
+          "title": "Ptzmanualsessionstarted",
+          "description": "PTZ manual control session started."
+        },
+        {
+          "alert_type": "ptzmanualsessionstopped",
+          "enabled": false,
+          "severity": "info",
+          "category": "video",
+          "title": "Ptzmanualsessionstopped",
+          "description": "PTZ manual control session ended."
+        },
+        {
+          "alert_type": "recordingfpscritical",
+          "enabled": true,
+          "severity": "critical",
+          "category": "video",
+          "title": "Recordingfpscritical",
+          "description": "Recording frame rate is critically low. Video quality is severely degraded. Check camera, network, or server load."
+        },
+        {
+          "alert_type": "recordingfpsnormal",
+          "enabled": false,
+          "severity": "clear",
+          "category": "video",
+          "title": "Recordingfpsnormal",
+          "description": "Recording frame rate has returned to normal."
+        },
+        {
+          "alert_type": "recordingfpsundefined",
+          "enabled": false,
+          "severity": "warning",
+          "category": "video",
+          "title": "Recordingfpsundefined",
+          "description": "Recording frame rate status is undefined."
+        },
+        {
+          "alert_type": "recordingfpswarning",
+          "enabled": false,
+          "severity": "warning",
+          "category": "video",
+          "title": "Recordingfpswarning",
+          "description": "Recording frame rate is below expected. Video quality may be affected."
+        },
+        {
+          "alert_type": "recordingsavailable",
+          "enabled": false,
+          "severity": "info",
+          "category": "video",
+          "title": "Recordingsavailable",
+          "description": "Recordings are available for playback."
+        },
+        {
+          "alert_type": "recordingsevidencelocked",
+          "enabled": false,
+          "severity": "info",
+          "category": "video",
+          "title": "Recordingsevidencelocked",
+          "description": "Recordings have been evidence-locked to prevent deletion."
+        },
+        {
+          "alert_type": "recordingsevidenceunlocked",
+          "enabled": false,
+          "severity": "info",
+          "category": "video",
+          "title": "Recordingsevidenceunlocked",
+          "description": "Evidence lock removed from recordings."
+        },
+        {
+          "alert_type": "recordingstarted",
+          "enabled": false,
+          "severity": "info",
+          "category": "video",
+          "title": "Recordingstarted",
+          "description": "Recording started on camera. Camera has begun recording, typically triggered by motion or schedule."
+        },
+        {
+          "alert_type": "recording_stopped",
+          "enabled": true,
+          "severity": "critical",
+          "category": "video",
+          "title": "Recording Stopped",
+          "description": "Recording stopped"
+        },
+        {
+          "alert_type": "recordingstopped",
+          "enabled": false,
+          "severity": "warning",
+          "category": "video",
+          "title": "Recordingstopped",
+          "description": "Recording stopped unexpectedly. Camera recording halted outside normal schedule. Check camera and storage status."
+        },
+        {
+          "alert_type": "requeststartrecording",
+          "enabled": false,
+          "severity": "info",
+          "category": "video",
+          "title": "Requeststartrecording",
+          "description": "Recording start requested."
+        },
+        {
+          "alert_type": "requeststoprecording",
+          "enabled": false,
+          "severity": "info",
+          "category": "video",
+          "title": "Requeststoprecording",
+          "description": "Recording stop requested."
+        }
+      ]
+    }
+  ],
+  "clear_events": {
+    "method": "reconciliation",
+    "description": "Alerts auto-resolve when condition no longer detected"
+  }
+}

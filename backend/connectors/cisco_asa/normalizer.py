@@ -2,7 +2,7 @@
 Cisco ASA Normalizer
 
 Converts Cisco ASA events to normalized alerts.
-Uses database mappings for severity and category - NO HARDCODED VALUES.
+Uses database mappings for severity and category via BaseNormalizer.
 """
 
 import logging
@@ -12,7 +12,6 @@ from typing import Dict, Any, Optional
 from backend.connectors.base import BaseNormalizer
 from backend.core.models import NormalizedAlert, Severity, Category
 from backend.utils.ip_utils import validate_device_ip
-from backend.utils.db import db_query
 
 logger = logging.getLogger(__name__)
 
@@ -21,114 +20,11 @@ class CiscoASANormalizer(BaseNormalizer):
     """
     Database-driven normalizer for Cisco ASA events.
     
-    All mappings come from severity_mappings and category_mappings tables.
+    Extends BaseNormalizer for standard mapping methods.
     """
     
-    def __init__(self):
-        super().__init__()
-        self._severity_cache: Dict[str, Dict] = {}
-        self._category_cache: Dict[str, Dict] = {}
-        self._cache_loaded = False
-    
-    def _load_mappings(self):
-        """Load mappings from database."""
-        if self._cache_loaded:
-            return
-        
-        try:
-            # Load severity mappings
-            severity_rows = db_query(
-                "SELECT source_value, target_severity, enabled, description FROM severity_mappings WHERE connector_type = %s",
-                ("cisco_asa",)
-            )
-            for row in severity_rows:
-                self._severity_cache[row["source_value"]] = {
-                    "severity": row["target_severity"],
-                    "enabled": row["enabled"],
-                    "description": row.get("description", "")
-                }
-            
-            # Load category mappings
-            category_rows = db_query(
-                "SELECT source_value, target_category, enabled, description FROM category_mappings WHERE connector_type = %s",
-                ("cisco_asa",)
-            )
-            for row in category_rows:
-                self._category_cache[row["source_value"]] = {
-                    "category": row["target_category"],
-                    "enabled": row["enabled"],
-                    "description": row.get("description", "")
-                }
-            
-            self._cache_loaded = True
-            logger.info(f"Loaded {len(self._severity_cache)} severity and {len(self._category_cache)} category mappings for cisco_asa")
-            
-        except Exception as e:
-            logger.error(f"Failed to load cisco_asa mappings: {e}")
-            self._cache_loaded = True
-    
-    def is_event_enabled(self, event_type: str) -> bool:
-        """Check if this event type is enabled in mappings.
-        
-        Returns False if:
-        - Event type is not in any mapping (unknown events are ignored)
-        - Event type is explicitly disabled in mappings
-        """
-        self._load_mappings()
-        
-        severity_mapping = self._severity_cache.get(event_type)
-        category_mapping = self._category_cache.get(event_type)
-        
-        # If not in ANY mapping, treat as disabled (unknown event type)
-        if not severity_mapping and not category_mapping:
-            logger.debug(f"Event type '{event_type}' not in mappings - ignoring")
-            return False
-        
-        # Check if explicitly disabled
-        if severity_mapping and not severity_mapping.get("enabled", True):
-            return False
-        if category_mapping and not category_mapping.get("enabled", True):
-            return False
-        
-        return True
-    
-    def _get_severity(self, event_type: str) -> Severity:
-        """Get severity from database mapping."""
-        self._load_mappings()
-        
-        mapping = self._severity_cache.get(event_type)
-        if mapping:
-            try:
-                return Severity(mapping["severity"])
-            except ValueError:
-                pass
-        
-        return Severity.WARNING
-    
-    def _get_category(self, event_type: str) -> Category:
-        """Get category from database mapping."""
-        self._load_mappings()
-        
-        mapping = self._category_cache.get(event_type)
-        if mapping:
-            try:
-                return Category(mapping["category"])
-            except ValueError:
-                pass
-        
-        return Category.NETWORK
-    
-    @property
-    def source_system(self) -> str:
-        return "cisco_asa"
-    
-    def get_severity(self, raw_data: Dict[str, Any]) -> Severity:
-        event_type = raw_data.get("event_type", "")
-        return self._get_severity(event_type)
-    
-    def get_category(self, raw_data: Dict[str, Any]) -> Category:
-        event_type = raw_data.get("event_type", "")
-        return self._get_category(event_type)
+    connector_type = "cisco_asa"
+    default_category = Category.SECURITY
     
     def normalize(self, raw_event: Dict[str, Any]) -> Optional[NormalizedAlert]:
         """Convert raw ASA event to normalized alert.

@@ -1,0 +1,227 @@
+{
+  "id": "siklu",
+  "name": "Siklu EtherHaul",
+  "version": "1.0.0",
+  "description": "Siklu wireless backhaul monitoring via SNMP. 24 alert types covering RF link, signal levels, modulation, and hardware status.",
+  "author": "OpsConductor",
+  "method": "snmp_trap",
+  "category": "wireless",
+  "alert_mappings": [
+    {
+      "group": "Environmental Events",
+      "alerts": [
+        {
+          "alert_type": "high_temperature",
+          "enabled": true,
+          "severity": "warning",
+          "category": "environment",
+          "title": "High Temperature",
+          "description": "High temperature"
+        },
+        {
+          "alert_type": "high_temperature",
+          "enabled": true,
+          "severity": "warning",
+          "category": "environment",
+          "title": "High Temperature",
+          "description": "Radio temperature high"
+        }
+      ]
+    },
+    {
+      "group": "Network Events",
+      "alerts": [
+        {
+          "alert_type": "device_offline",
+          "enabled": true,
+          "severity": "critical",
+          "category": "network",
+          "title": "Device Offline",
+          "description": "Radio offline"
+        },
+        {
+          "alert_type": "device_offline",
+          "enabled": true,
+          "severity": "critical",
+          "category": "network",
+          "title": "Device Offline",
+          "description": "Radio offline/unreachable"
+        },
+        {
+          "alert_type": "device_offline",
+          "enabled": true,
+          "severity": "critical",
+          "category": "network",
+          "title": "Device Offline",
+          "description": "Siklu wireless radio offline. Point-to-point or point-to-multipoint radio not responding. Check power, alignment, and network connectivity."
+        },
+        {
+          "alert_type": "device_online",
+          "enabled": false,
+          "severity": "clear",
+          "category": "network",
+          "title": "Device Online",
+          "description": "Radio online (clear event)"
+        },
+        {
+          "alert_type": "device_online",
+          "enabled": true,
+          "severity": "clear",
+          "category": "network",
+          "title": "Device Online",
+          "description": "Radio online"
+        },
+        {
+          "alert_type": "ethernet_down",
+          "enabled": true,
+          "severity": "major",
+          "category": "network",
+          "title": "Ethernet Down",
+          "description": "Ethernet port down"
+        },
+        {
+          "alert_type": "ethernet_up",
+          "enabled": false,
+          "severity": "clear",
+          "category": "network",
+          "title": "Ethernet Up",
+          "description": "Ethernet port up (clear event)"
+        },
+        {
+          "alert_type": "ethernet_up",
+          "enabled": true,
+          "severity": "clear",
+          "category": "network",
+          "title": "Ethernet Up",
+          "description": "Ethernet port up"
+        }
+      ]
+    },
+    {
+      "group": "Other Events",
+      "alerts": [
+        {
+          "alert_type": "rf_link_down",
+          "enabled": true,
+          "severity": "critical",
+          "category": "unknown",
+          "title": "Rf Link Down",
+          "description": "Siklu RF link down. Wireless link between radios has failed. Check for interference, alignment issues, or hardware failure at either end."
+        },
+        {
+          "alert_type": "signal_low",
+          "enabled": true,
+          "severity": "warning",
+          "category": "unknown",
+          "title": "Signal Low",
+          "description": "Siklu signal strength low. RF signal below optimal threshold. Link may be unstable. Check antenna alignment and for obstructions."
+        },
+        {
+          "alert_type": "throughput_degraded",
+          "enabled": true,
+          "severity": "warning",
+          "category": "unknown",
+          "title": "Throughput Degraded",
+          "description": "Siklu throughput degraded. Achieved throughput below expected capacity. May indicate interference or modulation downshift."
+        }
+      ]
+    },
+    {
+      "group": "Wireless Events",
+      "alerts": [
+        {
+          "alert_type": "device_offline",
+          "enabled": true,
+          "severity": "critical",
+          "category": "wireless",
+          "title": "Device Offline",
+          "description": "Radio offline"
+        },
+        {
+          "alert_type": "device_offline",
+          "enabled": true,
+          "severity": "critical",
+          "category": "wireless",
+          "title": "Device Offline",
+          "description": "Radio offline/unreachable"
+        },
+        {
+          "alert_type": "device_offline",
+          "enabled": true,
+          "severity": "critical",
+          "category": "wireless",
+          "title": "Device Offline",
+          "description": "Siklu wireless radio offline. Point-to-point or point-to-multipoint radio not responding. Check power, alignment, and network connectivity."
+        },
+        {
+          "alert_type": "link_down",
+          "enabled": true,
+          "severity": "critical",
+          "category": "wireless",
+          "title": "Link Down",
+          "description": "Radio link down"
+        },
+        {
+          "alert_type": "link_up",
+          "enabled": false,
+          "severity": "clear",
+          "category": "wireless",
+          "title": "Link Up",
+          "description": "Radio link up (clear event)"
+        },
+        {
+          "alert_type": "link_up",
+          "enabled": true,
+          "severity": "clear",
+          "category": "wireless",
+          "title": "Link Up",
+          "description": "Radio link up"
+        },
+        {
+          "alert_type": "modulation_drop",
+          "enabled": true,
+          "severity": "warning",
+          "category": "wireless",
+          "title": "Modulation Drop",
+          "description": "Modulation reduced"
+        },
+        {
+          "alert_type": "rsl_critical",
+          "enabled": true,
+          "severity": "critical",
+          "category": "wireless",
+          "title": "Rsl Critical",
+          "description": "RSL critically low"
+        },
+        {
+          "alert_type": "rsl_critical",
+          "enabled": true,
+          "severity": "major",
+          "category": "wireless",
+          "title": "Rsl Critical",
+          "description": "RSL below critical threshold"
+        },
+        {
+          "alert_type": "rsl_low",
+          "enabled": true,
+          "severity": "warning",
+          "category": "wireless",
+          "title": "Rsl Low",
+          "description": "RSL below threshold"
+        },
+        {
+          "alert_type": "rsl_low",
+          "enabled": true,
+          "severity": "warning",
+          "category": "wireless",
+          "title": "Rsl Low",
+          "description": "RSL below warning threshold"
+        }
+      ]
+    }
+  ],
+  "clear_events": {
+    "method": "reconciliation",
+    "description": "Alerts auto-resolve when condition no longer detected"
+  }
+}
