@@ -19,8 +19,10 @@ from celery import shared_task
 from backend.core.db import query, query_one, execute
 from backend.core.addon_registry import get_registry, Addon
 from backend.core.poller import get_poller
-from backend.core.parser import get_parser
+from backend.core.parser import get_parser, ParsedAlert
 from backend.core.alert_engine import get_engine
+from backend.core.clients import get_clients
+from backend.core.types import Target, Credentials, PollResult
 
 logger = logging.getLogger(__name__)
 
@@ -130,17 +132,17 @@ def poll_single_target(self, target_id: int) -> Dict[str, Any]:
         if not target:
             return {'error': f'Target {target_id} not found'}
         
-        # Load addon
-        registry = get_registry()
-        addon = registry.get(target['addon_id'])
+        # Load addon fresh from database (not cache) to get latest manifest
+        from backend.core.addon_registry import get_addon_from_db
+        addon = get_addon_from_db(target['addon_id'])
         if not addon:
             return {'error': f"Addon {target['addon_id']} not found"}
         
-        # Get poller instance
-        poller = get_poller()
+        # Get clients instance
+        clients = get_clients()
         
         # Execute the poll
-        alert_count = _run_async(_poll_target_async(addon, target, poller))
+        alert_count = _run_async(_poll_target_async(addon, target, clients))
         
         # Update last poll time
         execute(
@@ -172,14 +174,140 @@ def poll_all_addons() -> Dict[str, Any]:
     return poll_dispatch()
 
 
-async def _poll_target_async(addon: Addon, target: Dict, poller) -> int:
-    """Internal async function to poll a single target using addon configuration."""
+def _resolve_credentials(target: Dict, addon: Addon) -> Credentials:
+    """Resolve credentials from target config or addon defaults."""
+    config = target.get('config', {}) or {}
+    default_creds = addon.manifest.get('default_credentials', {})
+    
+    return Credentials(
+        username=config.get('username') or default_creds.get('username'),
+        password=config.get('password') or default_creds.get('password'),
+        api_key=config.get('api_key') or default_creds.get('api_key'),
+        community=config.get('community') or default_creds.get('community', 'public'),
+        key_file=config.get('key_file') or default_creds.get('key_file'),
+    )
+
+
+def _build_target(target: Dict) -> Target:
+    """Build Target object from database row."""
+    return Target(
+        id=str(target['id']),
+        ip_address=target['ip_address'],
+        name=target.get('name', target['ip_address']),
+        addon_id=target['addon_id'],
+        port=target.get('config', {}).get('port') if target.get('config') else None,
+        config=target.get('config', {}) or {},
+        enabled=target.get('enabled', True),
+        last_poll_at=target.get('last_poll_at'),
+    )
+
+
+async def _poll_target_async(addon: Addon, target: Dict, clients) -> int:
+    """
+    Poll a single target using addon's poll module or fallback to declarative config.
+    
+    If the addon has a poll.py module, it will be used for full control over polling.
+    Otherwise, falls back to declarative manifest-based polling (legacy).
+    """
+    engine = get_engine()
+    alert_count = 0
+    
+    ip = target['ip_address']
+    
+    # Check if addon has a poll module
+    if 'poll' in addon.modules and hasattr(addon.modules['poll'], 'poll'):
+        # Use addon's poll module (new architecture)
+        logger.debug(f"Using addon poll module for {addon.id}")
+        
+        # Build target and credentials
+        target_obj = _build_target(target)
+        credentials = _resolve_credentials(target, addon)
+        addon_logger = logging.getLogger(f"addon.{addon.id}")
+        
+        # Call addon's poll function with timeout protection
+        try:
+            result = await asyncio.wait_for(
+                addon.modules['poll'].poll(
+                    target=target_obj,
+                    credentials=credentials,
+                    http=clients.http,
+                    snmp=clients.snmp,
+                    ssh=clients.ssh,
+                    logger=addon_logger
+                ),
+                timeout=60.0  # 60 second timeout for addon poll
+            )
+        except asyncio.TimeoutError:
+            logger.error(f"Addon poll timeout for {ip}")
+            result = PollResult(
+                success=False,
+                reachable=False,
+                alerts=[{'alert_type': 'poll_timeout', 'message': f'Poll timed out for {ip}'}],
+                error='Poll timeout'
+            )
+        except Exception as e:
+            logger.error(f"Addon poll error for {ip}: {e}")
+            result = PollResult(
+                success=False,
+                reachable=False,
+                alerts=[{'alert_type': 'poll_error', 'message': f'Poll failed: {str(e)}'}],
+                error=str(e)
+            )
+        
+        # Process poll result
+        alert_count = await _process_poll_result(result, addon, target)
+    
+    else:
+        # Fallback to declarative polling (legacy)
+        logger.debug(f"Using declarative polling for {addon.id} (no poll module)")
+        alert_count = await _poll_target_declarative(addon, target, clients)
+    
+    return alert_count
+
+
+async def _process_poll_result(result: PollResult, addon: Addon, target: Dict) -> int:
+    """Process PollResult from addon poll module."""
+    engine = get_engine()
+    alert_count = 0
+    ip = target['ip_address']
+    
+    # Auto-resolve cleared alert types
+    for alert_type in result.clear_types:
+        resolved = await engine.auto_resolve(addon.id, alert_type, ip)
+        if resolved:
+            logger.debug(f"Auto-resolved {alert_type} for {ip}")
+    
+    # Create alerts
+    for alert_data in result.alerts:
+        parsed = ParsedAlert(
+            addon_id=addon.id,
+            alert_type=alert_data.get('alert_type', 'unknown'),
+            device_ip=ip,
+            device_name=target.get('name', ip),
+            message=alert_data.get('message', ''),
+            raw_data=alert_data,
+            fields=alert_data.get('fields', {}),
+            is_clear=alert_data.get('is_clear', False)
+        )
+        alert = await engine.process(parsed, addon)
+        if alert:
+            alert_count += 1
+    
+    return alert_count
+
+
+async def _poll_target_declarative(addon: Addon, target: Dict, clients) -> int:
+    """
+    Legacy declarative polling using manifest configuration.
+    
+    Used when addon does not have a poll.py module.
+    """
     parser = get_parser()
     engine = get_engine()
     alert_count = 0
     
     ip = target['ip_address']
-    config = target.get('config', {})
+    config = target.get('config', {}) or {}
     
     if addon.method == 'api_poll':
         # API polling
@@ -193,18 +321,18 @@ async def _poll_target_async(addon: Addon, target: Dict, poller) -> int:
         # Use target-specific credentials, fall back to addon default credentials
         username = config.get('username') or default_creds.get('username')
         password = config.get('password') or default_creds.get('password')
+        auth_type = api_config.get('auth_type', 'digest')
         
         for endpoint in api_config.get('endpoints', []):
             url = f"{base_url}{endpoint['path']}"
             alert_on_failure = endpoint.get('alert_on_failure')
             
-            result = await poller.poll_api(
-                url=url,
+            result = await clients.http.request(
                 method=endpoint.get('method', 'GET'),
+                url=url,
                 headers=config.get('headers', {}),
-                api_key=config.get('api_key'),
                 auth=(username, password) if username else None,
-                auth_type=api_config.get('auth_type'),
+                auth_type=auth_type,
                 verify_ssl=api_config.get('verify_ssl', True)
             )
             
@@ -227,7 +355,6 @@ async def _poll_target_async(addon: Addon, target: Dict, poller) -> int:
             else:
                 # Create alert on failure if configured
                 if alert_on_failure:
-                    from backend.core.parser import ParsedAlert
                     parsed = ParsedAlert(
                         addon_id=addon.id,
                         alert_type=alert_on_failure,
@@ -250,8 +377,8 @@ async def _poll_target_async(addon: Addon, target: Dict, poller) -> int:
         for poll_group in snmp_config.get('poll_groups', []):
             oids = [o['oid'] for o in poll_group.get('oids', [])]
             
-            result = await poller.poll_snmp(
-                target=ip,
+            result = await clients.snmp.get(
+                host=ip,
                 oids=oids,
                 community=config.get('community', snmp_config.get('default_community', 'public')),
                 version=snmp_config.get('version', '2c'),
@@ -262,13 +389,13 @@ async def _poll_target_async(addon: Addon, target: Dict, poller) -> int:
                 # Check alert conditions
                 for condition in poll_group.get('alert_conditions', []):
                     field = condition['field']
-                    value = result.data.get('oids', {}).get(field)
+                    value = result.data.get(field)
                     
                     if _check_condition(value, condition):
                         parsed = parser.parse({
                             'device_ip': ip,
                             'alert_type': condition['alert_type'],
-                            'oids': result.data.get('oids', {}),
+                            'oids': result.data,
                         }, addon.manifest, addon.id)
                         
                         if parsed:
@@ -280,7 +407,7 @@ async def _poll_target_async(addon: Addon, target: Dict, poller) -> int:
         ssh_config = addon.manifest.get('ssh', {})
         
         for cmd_config in ssh_config.get('commands', []):
-            result = await poller.poll_ssh(
+            result = await clients.ssh.exec(
                 host=ip,
                 command=cmd_config['command'],
                 username=config.get('username'),
@@ -291,7 +418,7 @@ async def _poll_target_async(addon: Addon, target: Dict, poller) -> int:
             
             if result.success:
                 parsed = parser.parse(
-                    result.data.get('stdout', ''),
+                    result.stdout,
                     addon.manifest,
                     addon.id
                 )
@@ -338,13 +465,13 @@ def poll_addon(addon_id: str, target_id: int = None) -> Dict[str, Any]:
     
     Called on-demand or for immediate polling.
     """
-    registry = get_registry()
-    addon = registry.get(addon_id)
+    from backend.core.addon_registry import get_addon_from_db
+    addon = get_addon_from_db(addon_id)
     
     if not addon:
         return {'error': f'Addon {addon_id} not found'}
     
-    poller = get_poller()
+    clients = get_clients()
     
     # Get targets
     if target_id:
@@ -359,7 +486,7 @@ def poll_addon(addon_id: str, target_id: int = None) -> Dict[str, Any]:
     
     for target in targets:
         try:
-            count = _run_async(_poll_target_async(addon, target, poller))
+            count = _run_async(_poll_target_async(addon, target, clients))
             results['alerts'] += count
         except Exception as e:
             logger.error(f"Poll error: {e}")

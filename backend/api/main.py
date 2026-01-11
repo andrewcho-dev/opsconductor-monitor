@@ -54,6 +54,34 @@ async def redis_alert_subscriber():
         await asyncio.sleep(0.1)
 
 
+async def cleanup_disabled_alert_types():
+    """Resolve any active alerts for disabled alert types on startup."""
+    from backend.core.db import execute
+    
+    registry = get_registry()
+    total_resolved = 0
+    
+    for addon in registry.get_enabled():
+        # Get disabled alert types for this addon
+        disabled_types = []
+        for group in addon.manifest.get('alert_mappings', []):
+            for alert in group.get('alerts', []):
+                if not alert.get('enabled', True):
+                    disabled_types.append(alert['alert_type'])
+        
+        # Resolve any active alerts for disabled types
+        for alert_type in disabled_types:
+            result = execute(
+                """UPDATE alerts SET status = 'resolved', resolved_at = NOW()
+                   WHERE addon_id = %s AND alert_type = %s AND status IN ('active', 'acknowledged')""",
+                (addon.id, alert_type)
+            )
+            total_resolved += result
+    
+    if total_resolved > 0:
+        logger.info(f"Startup cleanup: resolved {total_resolved} alerts for disabled alert types")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application startup and shutdown."""
@@ -63,6 +91,9 @@ async def lifespan(app: FastAPI):
     # Load addons
     registry = get_registry()
     logger.info(f"Loaded {len(registry.get_enabled())} addons")
+    
+    # Cleanup alerts for disabled types
+    await cleanup_disabled_alert_types()
     
     # Setup Socket.IO broadcasts from alert engine (for in-process events)
     setup_alert_broadcasts()

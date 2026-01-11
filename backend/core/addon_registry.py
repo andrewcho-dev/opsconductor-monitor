@@ -2,12 +2,13 @@
 Addon Registry
 
 Load, register, and lookup addons. Single source of truth for addon management.
-Addons are declarative manifests (JSON) - no Python code.
+Addons contain Python modules (poll.py, parse.py) for vendor-specific logic.
 """
 
 import json
 import logging
-from typing import Dict, List, Optional
+import importlib.util
+from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -15,10 +16,48 @@ from .db import query, query_one, execute
 
 logger = logging.getLogger(__name__)
 
+# Path to addons directory
+ADDONS_DIR = Path(__file__).parent.parent / 'addons'
+
+
+def load_addon_modules(addon_id: str) -> Dict[str, Any]:
+    """
+    Load Python modules from addon directory.
+    
+    Args:
+        addon_id: Addon ID (directory name)
+        
+    Returns:
+        Dict of module_name -> module object
+    """
+    addon_path = ADDONS_DIR / addon_id
+    modules = {}
+    
+    if not addon_path.exists():
+        logger.debug(f"Addon directory not found: {addon_path}")
+        return modules
+    
+    for module_name in ['poll', 'parse', 'webhook', 'trap', 'discover']:
+        module_file = addon_path / f"{module_name}.py"
+        if module_file.exists():
+            try:
+                spec = importlib.util.spec_from_file_location(
+                    f"addons.{addon_id}.{module_name}",
+                    module_file
+                )
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+                modules[module_name] = module
+                logger.debug(f"Loaded module: addons.{addon_id}.{module_name}")
+            except Exception as e:
+                logger.error(f"Failed to load module {addon_id}/{module_name}.py: {e}")
+    
+    return modules
+
 
 @dataclass
 class Addon:
-    """Addon definition loaded from database."""
+    """Addon definition loaded from database with optional Python modules."""
     id: str
     name: str
     version: str
@@ -27,6 +66,7 @@ class Addon:
     description: str
     manifest: Dict
     enabled: bool = True
+    modules: Dict[str, Any] = field(default_factory=dict)  # Loaded Python modules
     
     @property
     def enterprise_oid(self) -> Optional[str]:
@@ -153,6 +193,9 @@ class AddonRegistry:
             if isinstance(manifest, str):
                 manifest = json.loads(manifest)
             
+            # Load Python modules for this addon
+            modules = load_addon_modules(row['id'])
+            
             addon = Addon(
                 id=row['id'],
                 name=row['name'],
@@ -161,10 +204,17 @@ class AddonRegistry:
                 category=row['category'] or 'unknown',
                 description=row['description'] or '',
                 manifest=manifest,
-                enabled=row['enabled']
+                enabled=row['enabled'],
+                modules=modules
             )
             
             self._addons[addon.id] = addon
+            
+            # Log module status
+            if modules:
+                logger.info(f"Addon {addon.id}: loaded modules {list(modules.keys())}")
+            else:
+                logger.debug(f"Addon {addon.id}: no modules found (using declarative config)")
             
             # Index by OID prefix for trap lookup
             if addon.enterprise_oid:
@@ -300,7 +350,7 @@ def disable_addon(addon_id: str) -> bool:
 
 
 def get_addon_from_db(addon_id: str) -> Optional[Addon]:
-    """Get addon directly from database (not cache)."""
+    """Get addon directly from database (not cache) with fresh manifest."""
     row = query_one("""
         SELECT id, name, version, method, category, description, manifest, enabled
         FROM addons WHERE id = %s
@@ -313,6 +363,9 @@ def get_addon_from_db(addon_id: str) -> Optional[Addon]:
     if isinstance(manifest, str):
         manifest = json.loads(manifest)
     
+    # Load Python modules for this addon
+    modules = load_addon_modules(addon_id)
+    
     return Addon(
         id=row['id'],
         name=row['name'],
@@ -321,7 +374,8 @@ def get_addon_from_db(addon_id: str) -> Optional[Addon]:
         category=row['category'] or 'unknown',
         description=row['description'] or '',
         manifest=manifest,
-        enabled=row['enabled']
+        enabled=row['enabled'],
+        modules=modules
     )
 
 

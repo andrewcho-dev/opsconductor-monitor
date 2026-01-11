@@ -12,27 +12,54 @@ from pydantic import BaseModel
 
 from backend.api.auth import get_current_user, require_role, Role, User
 from backend.core.alert_engine import get_engine, Alert, Severity, Status
+from backend.core.addon_registry import get_registry
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
+
+
+def _get_alert_description(addon_id: str, alert_type: str) -> Optional[str]:
+    """Get alert description from addon manifest."""
+    registry = get_registry()
+    addon = registry.get(addon_id)
+    if not addon:
+        return None
+    
+    for group in addon.manifest.get('alert_mappings', []):
+        for alert in group.get('alerts', []):
+            if alert.get('alert_type') == alert_type:
+                return alert.get('description')
+    return None
+
+
+def _enrich_alert_response(alert: Alert) -> dict:
+    """Enrich alert dict with description from manifest."""
+    data = alert.to_dict()
+    data['description'] = _get_alert_description(alert.addon_id, alert.alert_type)
+    return data
 
 
 class AlertResponse(BaseModel):
     """Alert response model."""
     id: str
     addon_id: Optional[str]
+    fingerprint: Optional[str]
     device_ip: str
     device_name: Optional[str]
     alert_type: str
     severity: str
     category: str
     title: str
+    description: Optional[str]  # From manifest alert_mappings
     message: Optional[str]
     status: str
     is_clear: bool
     occurred_at: str
     received_at: str
+    created_at: Optional[str]
+    acknowledged_at: Optional[str]
     resolved_at: Optional[str]
     occurrence_count: int
+    raw_data: Optional[dict]  # Contains threshold values, etc.
 
     class Config:
         from_attributes = True
@@ -87,7 +114,7 @@ async def list_alerts(
     total = stats.get('total_active', len(alerts))
     
     return AlertListResponse(
-        items=[AlertResponse(**a.to_dict()) for a in alerts],
+        items=[AlertResponse(**_enrich_alert_response(a)) for a in alerts],
         total=total,
         limit=limit,
         offset=offset
@@ -114,7 +141,7 @@ async def get_alert(
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
     
-    return AlertResponse(**alert.to_dict())
+    return AlertResponse(**_enrich_alert_response(alert))
 
 
 @router.post("/{alert_id}/acknowledge", response_model=AlertResponse)
@@ -133,7 +160,7 @@ async def acknowledge_alert(
         raise HTTPException(status_code=400, detail="Only active alerts can be acknowledged")
     
     alert = await engine.acknowledge_alert(alert_id)
-    return AlertResponse(**alert.to_dict())
+    return AlertResponse(**_enrich_alert_response(alert))
 
 
 @router.post("/{alert_id}/resolve", response_model=AlertResponse)
@@ -152,7 +179,7 @@ async def resolve_alert(
         raise HTTPException(status_code=400, detail="Alert already resolved")
     
     alert = await engine.resolve_alert(alert_id, resolution_source='manual')
-    return AlertResponse(**alert.to_dict())
+    return AlertResponse(**_enrich_alert_response(alert))
 
 
 @router.delete("/{alert_id}")

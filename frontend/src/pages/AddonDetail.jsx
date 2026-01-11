@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Plus, Trash2, Upload, Download, Server, Eye, EyeOff, Save, AlertTriangle, Info, AlertCircle, XCircle, CheckCircle } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Upload, Download, Server, Eye, EyeOff, Save, AlertTriangle, Info, AlertCircle, XCircle, CheckCircle, ArrowUpDown, Search, X } from 'lucide-react'
 import clsx from 'clsx'
 
 const SEVERITIES = [
@@ -204,6 +204,12 @@ export default function AddonDetail() {
   const [savingMappings, setSavingMappings] = useState(false)
   const mappingsChangedRef = useRef(false)
   const [selectedSources, setSelectedSources] = useState(new Set())
+  
+  // Sort and filter state for sources
+  const [sortField, setSortField] = useState('ip_address')
+  const [sortDirection, setSortDirection] = useState('asc')
+  const [ipFilter, setIpFilter] = useState('')
+  const [nameFilter, setNameFilter] = useState('')
   
   const [newSource, setNewSource] = useState({
     name: '',
@@ -536,6 +542,42 @@ export default function AddonDetail() {
     sum + (g.alerts?.filter(a => a.enabled)?.length || 0), 0)
 
   const needsCredentials = addon?.method && ['api_poll', 'snmp_poll', 'ssh'].includes(addon.method)
+
+  // Helper to parse IP for proper numeric sorting
+  const parseIP = (ip) => {
+    const parts = ip.split('.').map(Number)
+    return parts[0] * 16777216 + parts[1] * 65536 + parts[2] * 256 + parts[3]
+  }
+
+  // Filter and sort sources
+  const filteredSources = sources
+    .filter(s => {
+      if (ipFilter && !s.ip_address.includes(ipFilter)) return false
+      if (nameFilter && !s.name.toLowerCase().includes(nameFilter.toLowerCase())) return false
+      return true
+    })
+    .sort((a, b) => {
+      let cmp = 0
+      if (sortField === 'ip_address') {
+        cmp = parseIP(a.ip_address) - parseIP(b.ip_address)
+      } else if (sortField === 'name') {
+        cmp = a.name.localeCompare(b.name)
+      } else if (sortField === 'last_poll_at') {
+        const aTime = a.last_poll_at ? new Date(a.last_poll_at).getTime() : 0
+        const bTime = b.last_poll_at ? new Date(b.last_poll_at).getTime() : 0
+        cmp = aTime - bTime
+      }
+      return sortDirection === 'asc' ? cmp : -cmp
+    })
+
+  const toggleSort = (field) => {
+    if (sortField === field) {
+      setSortDirection(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+  }
   const needsSNMP = addon?.method === 'snmp_poll'
   const needsAPI = addon?.method === 'api_poll'
   const needsSSH = addon?.method === 'ssh'
@@ -598,17 +640,6 @@ export default function AddonDetail() {
           )}
         >
           Configuration
-        </button>
-        <button
-          onClick={() => setActiveTab('manifest')}
-          className={clsx(
-            'px-4 py-2 -mb-px border-b-2 transition-colors',
-            activeTab === 'manifest'
-              ? 'border-blue-500 text-blue-500'
-              : 'border-transparent text-gray-400 hover:text-white'
-          )}
-        >
-          Manifest
         </button>
       </div>
 
@@ -854,16 +885,51 @@ export default function AddonDetail() {
           </div>
 
           <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+            {/* Filter bar */}
+            <div className="bg-gray-900 px-4 py-2 border-b border-gray-700 flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Search className="w-4 h-4 text-gray-500" />
+                <input
+                  type="text"
+                  placeholder="Filter by IP..."
+                  value={ipFilter}
+                  onChange={e => setIpFilter(e.target.value)}
+                  className="px-2 py-1 bg-gray-800 border border-gray-600 rounded text-sm w-40"
+                />
+                {ipFilter && (
+                  <button onClick={() => setIpFilter('')} className="text-gray-400 hover:text-white">
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="Filter by name..."
+                  value={nameFilter}
+                  onChange={e => setNameFilter(e.target.value)}
+                  className="px-2 py-1 bg-gray-800 border border-gray-600 rounded text-sm w-40"
+                />
+                {nameFilter && (
+                  <button onClick={() => setNameFilter('')} className="text-gray-400 hover:text-white">
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+              <span className="text-sm text-gray-500 ml-auto">
+                {filteredSources.length} of {sources.length} sources
+              </span>
+            </div>
             <table className="w-full">
               <thead className="bg-gray-900">
                 <tr>
                   <th className="px-2 py-3 text-left">
                     <input
                       type="checkbox"
-                      checked={sources.length > 0 && selectedSources.size === sources.length}
+                      checked={filteredSources.length > 0 && selectedSources.size === filteredSources.length}
                       onChange={e => {
                         if (e.target.checked) {
-                          setSelectedSources(new Set(sources.map(s => s.id)))
+                          setSelectedSources(new Set(filteredSources.map(s => s.id)))
                         } else {
                           setSelectedSources(new Set())
                         }
@@ -871,25 +937,58 @@ export default function AddonDetail() {
                       className="rounded bg-gray-700 border-gray-600"
                     />
                   </th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Name</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">IP Address</th>
+                  <th 
+                    className="px-4 py-3 text-left text-sm font-medium text-gray-400 cursor-pointer hover:text-white"
+                    onClick={() => toggleSort('name')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Name
+                      {sortField === 'name' 
+                        ? <span className="text-blue-400 text-xs font-bold">{sortDirection === 'asc' ? '▲' : '▼'}</span>
+                        : <ArrowUpDown className="w-3 h-3 text-gray-600" />
+                      }
+                    </div>
+                  </th>
+                  <th 
+                    className="px-4 py-3 text-left text-sm font-medium text-gray-400 cursor-pointer hover:text-white"
+                    onClick={() => toggleSort('ip_address')}
+                  >
+                    <div className="flex items-center gap-1">
+                      IP Address
+                      {sortField === 'ip_address' 
+                        ? <span className="text-blue-400 text-xs font-bold">{sortDirection === 'asc' ? '▲' : '▼'}</span>
+                        : <ArrowUpDown className="w-3 h-3 text-gray-600" />
+                      }
+                    </div>
+                  </th>
                   {needsCredentials && (
                     <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Credentials</th>
                   )}
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Status</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Last Poll</th>
+                  <th 
+                    className="px-4 py-3 text-left text-sm font-medium text-gray-400 cursor-pointer hover:text-white"
+                    onClick={() => toggleSort('last_poll_at')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Last Poll
+                      {sortField === 'last_poll_at' 
+                        ? <span className="text-blue-400 text-xs font-bold">{sortDirection === 'asc' ? '▲' : '▼'}</span>
+                        : <ArrowUpDown className="w-3 h-3 text-gray-600" />
+                      }
+                    </div>
+                  </th>
                   <th className="px-4 py-3 text-right text-sm font-medium text-gray-400">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-700">
-                {sources.length === 0 ? (
+                {filteredSources.length === 0 ? (
                   <tr>
                     <td colSpan={needsCredentials ? 7 : 6} className="px-4 py-8 text-center text-gray-400">
-                      No sources configured. Add devices to monitor.
+                      {sources.length === 0 ? 'No sources configured. Add devices to monitor.' : 'No sources match the filter.'}
                     </td>
                   </tr>
                 ) : (
-                  sources.map(source => (
+                  filteredSources.map(source => (
                     <tr key={source.id} className={clsx(
                       !source.enabled && 'opacity-50',
                       selectedSources.has(source.id) && 'bg-blue-900/20'
@@ -971,14 +1070,6 @@ export default function AddonDetail() {
         />
       )}
 
-      {/* Manifest Tab */}
-      {activeTab === 'manifest' && (
-        <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
-          <pre className="text-sm font-mono text-gray-300 overflow-auto max-h-96">
-            {JSON.stringify(addon.manifest, null, 2)}
-          </pre>
-        </div>
-      )}
 
       {/* Add Source Modal */}
       {showAddModal && (

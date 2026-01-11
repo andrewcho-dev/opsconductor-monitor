@@ -56,10 +56,11 @@ class Alert:
     is_clear: bool
     occurred_at: datetime
     received_at: datetime
-    resolved_at: Optional[datetime]
-    occurrence_count: int
-    raw_data: Dict
-    created_at: datetime
+    resolved_at: Optional[datetime] = None
+    occurrence_count: int = 1
+    raw_data: Dict = field(default_factory=dict)
+    created_at: datetime = None
+    acknowledged_at: Optional[datetime] = None
     
     def to_dict(self) -> Dict:
         """Convert to dictionary for JSON serialization."""
@@ -78,6 +79,7 @@ class Alert:
             'is_clear': self.is_clear,
             'occurred_at': self.occurred_at.isoformat() if self.occurred_at else None,
             'received_at': self.received_at.isoformat() if self.received_at else None,
+            'acknowledged_at': self.acknowledged_at.isoformat() if self.acknowledged_at else None,
             'resolved_at': self.resolved_at.isoformat() if self.resolved_at else None,
             'occurrence_count': self.occurrence_count,
             'raw_data': self.raw_data,
@@ -151,10 +153,10 @@ class AlertEngine:
         """
         # Check if this alert type is enabled
         if not addon.is_alert_enabled(parsed.alert_type):
-            logger.debug(f"Alert type {parsed.alert_type} is disabled for addon {addon.id}")
+            logger.info(f"FILTERED: Alert type {parsed.alert_type} is disabled for addon {addon.id}")
             return None
         
-        now = datetime.utcnow()
+        now = datetime.now()
         
         # Apply severity mapping from addon
         severity = addon.severity_mappings.get(parsed.alert_type, 'warning')
@@ -295,7 +297,7 @@ class AlertEngine:
         resolution_source: str = 'manual'
     ) -> Alert:
         """Resolve an alert."""
-        now = datetime.utcnow()
+        now = datetime.now()
         
         execute("""
             UPDATE alerts SET
@@ -447,6 +449,7 @@ class AlertEngine:
             is_clear=row.get('is_clear', False),
             occurred_at=row['occurred_at'],
             received_at=row['received_at'],
+            acknowledged_at=row.get('acknowledged_at'),
             resolved_at=row.get('resolved_at'),
             occurrence_count=row.get('occurrence_count', 1),
             raw_data=row.get('raw_data', {}),

@@ -258,18 +258,50 @@ async def update_addon_manifest(
 ):
     """
     Update addon manifest (for editing mappings, etc).
+    Auto-resolves existing alerts for any alert types that were disabled.
     """
-    from backend.core.db import execute
+    from backend.core.db import execute, query
     
     addon = get_addon_from_db(addon_id)
     if not addon:
         raise HTTPException(status_code=404, detail="Addon not found")
     
     try:
+        # Find alert types that are being disabled
+        old_enabled = set()
+        new_enabled = set()
+        
+        # Get currently enabled alert types
+        for group in addon.manifest.get('alert_mappings', []):
+            for alert in group.get('alerts', []):
+                if alert.get('enabled', True):
+                    old_enabled.add(alert['alert_type'])
+        
+        # Get newly enabled alert types from request
+        for group in request.manifest.get('alert_mappings', []):
+            for alert in group.get('alerts', []):
+                if alert.get('enabled', True):
+                    new_enabled.add(alert['alert_type'])
+        
+        # Alert types being disabled = was enabled, now not enabled
+        disabled_types = old_enabled - new_enabled
+        
+        # Update manifest
         execute(
             "UPDATE addons SET manifest = %s, updated_at = NOW() WHERE id = %s",
             (json.dumps(request.manifest), addon_id)
         )
+        
+        # Auto-resolve alerts for disabled types
+        resolved_count = 0
+        for alert_type in disabled_types:
+            result = execute(
+                """UPDATE alerts 
+                   SET status = 'resolved', resolved_at = NOW() 
+                   WHERE addon_id = %s AND alert_type = %s AND status IN ('active', 'acknowledged')""",
+                (addon_id, alert_type)
+            )
+            resolved_count += result
         
         # If poll interval changed, update all targets for this addon
         new_poll_interval = request.manifest.get('default_poll_interval')
@@ -280,7 +312,13 @@ async def update_addon_manifest(
             )
         
         reload_registry()
-        return {"status": "updated", "addon_id": addon_id, "targets_updated": new_poll_interval is not None}
+        return {
+            "status": "updated", 
+            "addon_id": addon_id, 
+            "targets_updated": new_poll_interval is not None,
+            "alerts_resolved": resolved_count,
+            "disabled_types": list(disabled_types)
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
